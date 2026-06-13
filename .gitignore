@@ -1,0 +1,20 @@
+*.iml
+.gradle/
+.claude/
+/local.properties
+.idea/
+.DS_Store
+build/
+/captures/
+.externalNativeBuild/
+.cxx/
+tmp/
+*.apk
+*.keystore
+!debug.keystore
+/*.xml
+
+# Release signing (never commit these)
+keystore.properties
+*.jks
+*.keystore
