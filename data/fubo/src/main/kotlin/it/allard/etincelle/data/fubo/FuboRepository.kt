@@ -1,0 +1,153 @@
+// Copyright (c) 2026 Renaud Allard <renaud@allard.it>
+// SPDX-License-Identifier: BSD-2-Clause
+
+package it.allard.etincelle.data.fubo
+
+import it.allard.etincelle.core.domain.MolotovRepository
+import it.allard.etincelle.core.model.AppError
+import it.allard.etincelle.core.model.ContentPage
+import it.allard.etincelle.core.model.DrmSpec
+import it.allard.etincelle.core.model.PlaybackSource
+import it.allard.etincelle.core.model.UserSession
+import it.allard.etincelle.core.network.NetworkClient
+import it.allard.etincelle.core.network.ProgressStore
+import it.allard.etincelle.core.network.SessionManager
+import it.allard.etincelle.core.network.SessionStore
+import retrofit2.HttpException
+import java.io.IOException
+
+private const val GUIDE_WINDOW_MS = 4L * 60 * 60 * 1000
+private const val GUIDE_CHANNEL_LIMIT = 40
+
+/** Fubo implementation of auth + content + playback, with persisted sessions and token refresh. */
+class FuboRepository(
+    private val api: FuboApi,
+    private val session: SessionManager,
+    private val store: SessionStore,
+    private val progress: ProgressStore,
+) : MolotovRepository {
+    constructor(network: NetworkClient, store: SessionStore, progress: ProgressStore) : this(
+        network.retrofit.create(FuboApi::class.java),
+        network.session,
+        store,
+        progress,
+    )
+
+    /** Signs in, loads the user/profile id, and persists the session. */
+    override suspend fun login(email: String, password: String): UserSession {
+        val tokens = api.signin(SigninRequest(email, password))
+        val accessToken = tokens.accessToken ?: throw AppError.Unauthorized
+        session.session = UserSession(accessToken, tokens.refreshToken, userId = "", profileId = "")
+
+        val user = api.user().data ?: throw AppError.Unknown("Empty user response")
+        val userId = user.id ?: throw AppError.Unknown("Missing user id")
+        val profileId = user.profiles?.firstOrNull()?.id ?: throw AppError.Unknown("Missing profile")
+
+        return UserSession(accessToken, tokens.refreshToken, userId, profileId).also {
+            session.session = it
+            store.save(it)
+        }
+    }
+
+    /** Loads a persisted session into memory; returns true if one was present. */
+    override suspend fun restoreSession(): Boolean {
+        val saved = store.read() ?: return false
+        session.session = saved
+        return true
+    }
+
+    override suspend fun logout() {
+        session.session = null
+        store.clear()
+    }
+
+    override suspend fun loadHome(): ContentPage = withRefresh { api.homePage().toPage() }
+
+    override suspend fun loadPage(url: String): ContentPage = withRefresh { api.pageByUrl(url).toPage() }
+
+    override suspend fun loadGuide(): ContentPage = withRefresh {
+        val now = System.currentTimeMillis()
+        api.epg(
+            startTime = rfc3339Utc(now),
+            endTime = rfc3339Utc(now + GUIDE_WINDOW_MS),
+            limit = GUIDE_CHANNEL_LIMIT,
+        ).toGuidePage()
+    }
+
+    override suspend fun search(query: String): ContentPage = withRefresh { api.search(query).toPage() }
+
+    override suspend fun resolveLiveChannel(channelId: String): PlaybackSource =
+        withRefresh { api.playbackAsset(channelId = channelId, type = "live").toPlaybackSource() }
+
+    override suspend fun resolveVod(vodId: String): PlaybackSource = withRefresh {
+        api.playbackAsset(id = vodId, type = "vod").toPlaybackSource()
+            .copy(resumeKey = vodId, startPositionMs = progress.read(vodId))
+    }
+
+    override suspend fun savePlaybackPosition(key: String, positionMs: Long) {
+        if (positionMs > 0) progress.save(key, positionMs) else progress.clear(key)
+    }
+
+    private suspend fun refreshTokens() {
+        val current = session.session ?: throw AppError.Unauthorized
+        val refreshToken = current.refreshToken ?: throw AppError.Unauthorized
+        val tokens = api.refresh("Bearer $refreshToken")
+        val newAccess = tokens.accessToken ?: throw AppError.Unauthorized
+        val updated = current.copy(accessToken = newAccess, refreshToken = tokens.refreshToken ?: refreshToken)
+        session.session = updated
+        store.save(updated)
+    }
+
+    /** Runs an authenticated call, refreshing the token once on a 401, and mapping errors for the UI. */
+    private suspend fun <T> withRefresh(block: suspend () -> T): T = translateErrors {
+        try {
+            block()
+        } catch (e: HttpException) {
+            if (e.code() != 401) throw e
+            try {
+                refreshTokens()
+            } catch (refreshError: Exception) {
+                logout()
+                throw AppError.Unauthorized
+            }
+            block()
+        }
+    }
+
+    /** Turns raw transport failures into friendly domain errors; passes [AppError]s through. */
+    private suspend fun <T> translateErrors(block: suspend () -> T): T = try {
+        block()
+    } catch (e: AppError) {
+        throw e
+    } catch (e: HttpException) {
+        throw e.toAppError()
+    } catch (e: IOException) {
+        throw AppError.Network("Pas de connexion, vérifiez votre réseau")
+    }
+}
+
+private fun HttpException.toAppError(): AppError = when (code()) {
+    401, 403 -> AppError.Unauthorized
+    404 -> AppError.Unknown("Contenu introuvable")
+    in 500..599 -> AppError.Network("Service indisponible, réessayez")
+    else -> AppError.Unknown("Chargement impossible, réessayez")
+}
+
+internal fun PlaybackResponse.toPlaybackSource(): PlaybackSource {
+    val manifest = stream?.url ?: throw AppError.Unknown("Playback response has no stream url")
+    val licenseUrl = drmV2?.license?.url ?: drm?.licenseUrl
+    val drmSpec = if (stream.drmProtected == true && licenseUrl != null) {
+        val headers = drmV2?.license?.headers ?: drm?.licenseUrlHeaders ?: emptyMap()
+        DrmSpec.Widevine(licenseUrl, headers)
+    } else {
+        DrmSpec.None
+    }
+    return PlaybackSource(
+        manifestUrl = manifest,
+        drm = drmSpec,
+        isLive = stream.live ?: (type == "live"),
+        title = program?.title,
+        heartbeatUrl = heartbeat?.url,
+        concurrencyHeartbeatUrl = concurrency?.heartbeatUrl,
+    )
+}

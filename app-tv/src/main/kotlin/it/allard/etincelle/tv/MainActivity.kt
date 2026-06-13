@@ -1,0 +1,95 @@
+// Copyright (c) 2026 Renaud Allard <renaud@allard.it>
+// SPDX-License-Identifier: BSD-2-Clause
+
+package it.allard.etincelle.tv
+
+import android.os.Bundle
+import android.view.WindowManager
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.setContent
+import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
+import it.allard.etincelle.core.designsystem.theme.EtincelleTheme
+import it.allard.etincelle.core.model.PlaybackSource
+import it.allard.etincelle.core.player.MediaItemFactory
+import it.allard.etincelle.core.player.PlaybackProgress
+import it.allard.etincelle.core.ui.MainViewModel
+import it.allard.etincelle.core.ui.MainViewModelFactory
+
+class MainActivity : ComponentActivity() {
+
+    private val viewModel: MainViewModel by viewModels {
+        MainViewModelFactory((application as EtincelleTvApp).container.repository)
+    }
+    private var player: ExoPlayer? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        val exo = ExoPlayer.Builder(this).build()
+        player = exo
+        setContent {
+            EtincelleTheme {
+                val state by viewModel.state.collectAsStateWithLifecycle()
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    val playing = state.playing
+                    when {
+                        state.checking -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+
+                        playing != null -> {
+                            BackHandler { viewModel.stopPlaying() }
+                            TvPlayerSurface(playing, exo, viewModel::savePlaybackPosition)
+                        }
+
+                        state.loggedIn -> {
+                            BackHandler(enabled = state.canGoBack) { viewModel.back() }
+                            TvBrowseScreen(state, viewModel::selectTab, viewModel::onCardClick, viewModel::search, viewModel::logout)
+                        }
+
+                        else -> TvLoginScreen(state.busy, state.error, viewModel::login)
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        player?.release()
+        player = null
+        super.onDestroy()
+    }
+}
+
+@Composable
+private fun TvPlayerSurface(source: PlaybackSource, player: ExoPlayer, onSavePosition: (String?, Long) -> Unit) {
+    DisposableEffect(source) {
+        val item = MediaItemFactory.create(source)
+        if (source.startPositionMs > 0) player.setMediaItem(item, source.startPositionMs) else player.setMediaItem(item)
+        player.prepare()
+        player.playWhenReady = true
+        onDispose {
+            onSavePosition(source.resumeKey, PlaybackProgress.positionToSave(player.currentPosition, player.duration))
+            player.stop()
+            player.clearMediaItems()
+        }
+    }
+    AndroidView(
+        factory = { context -> PlayerView(context).apply { this.player = player } },
+        modifier = Modifier.fillMaxSize(),
+    )
+}
