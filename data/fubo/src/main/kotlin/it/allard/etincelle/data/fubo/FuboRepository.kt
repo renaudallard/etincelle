@@ -3,6 +3,7 @@
 
 package it.allard.etincelle.data.fubo
 
+import it.allard.etincelle.core.domain.DetailKind
 import it.allard.etincelle.core.domain.MolotovRepository
 import it.allard.etincelle.core.model.AppError
 import it.allard.etincelle.core.model.ContentPage
@@ -77,8 +78,22 @@ class FuboRepository(
 
     override suspend fun search(query: String): ContentPage = withRefresh { api.search(query).toPage() }
 
-    override suspend fun fetchProgramDetail(vodId: String): ProgramDetail = withRefresh {
-        api.programDetail(vodId).toProgramDetail(channelId = null, vodId = vodId)
+    override suspend fun fetchProgramDetail(id: String, kind: DetailKind): ProgramDetail = withRefresh {
+        when (kind) {
+            DetailKind.PROGRAM -> api.programDetail(id).toProgramDetail(channelId = null, vodId = id, isLive = false)
+            DetailKind.SERIES -> api.seriesDetail(id).toProgramDetail(channelId = null, vodId = id, isLive = false)
+            DetailKind.CHANNEL -> api.channelDetail(id).toProgramDetail(channelId = id, vodId = null, isLive = true)
+        }
+    }
+
+    override suspend fun recordEpisode(assetId: String) = withRefresh {
+        api.addRecording(
+            AddRecordingRequest(
+                params = AddRecordingParams(assetId = assetId),
+                metadatas = mapOf("asset.asset_id" to assetId),
+            ),
+        )
+        Unit
     }
 
     override suspend fun resolveLiveChannel(channelId: String): PlaybackSource = withRefresh {

@@ -182,7 +182,9 @@ private fun AppRoot(
                 detail = detail,
                 busy = state.busy,
                 error = state.error,
+                info = state.info,
                 onWatch = { vm.watchDetail() },
+                onRecord = { vm.recordDetail() },
                 onBack = { vm.closeDetail() },
             )
         }

@@ -25,7 +25,16 @@ data class MetadataDto(
     val description: TextDto?,
     val artwork: PictureDto?,
     val tags: List<TagDto>?,
+    val ctas: List<CtaDto>?,
 )
+
+// The record action hides inside the metadata CTAs: a menu-item whose id is "id-record-{LIVE_xxxxx}".
+data class CtaDto(@Json(name = "action_items") val actionItems: List<CtaActionItemDto>?)
+data class CtaActionItemDto(val actions: CtaActionsDto?)
+data class CtaActionsDto(@Json(name = "on_click") val onClick: List<CtaOnClickDto>?)
+data class CtaOnClickDto(val content: CtaContentDto?)
+data class CtaContentDto(@Json(name = "menu_items") val menuItems: List<MenuItemDto>?)
+data class MenuItemDto(val id: String?)
 
 data class TagDto(val label: String?)
 data class AboutFieldDto(val label: TextDto?, val value: TextDto?)
@@ -64,11 +73,13 @@ data class TextDto(val text: String?)
 
 private val CHANNEL_REGEX = Regex("""program-details/channel/(\d+)""")
 private val VOD_REGEX = Regex("""program-details/program/([\w-]+)""")
+private val SERIES_REGEX = Regex("""program-details/series/([\w-]+)""")
+private val RECORD_REGEX = Regex("""id-record-(LIVE_[0-9]+)""")
 
 fun PageResponse.toPage(): ContentPage = ContentPage(title?.text, toRails())
 
 /** Maps a `program-details/...` page (its `metadata` + the "À propos" `about` section) to a detail. */
-fun PageResponse.toProgramDetail(channelId: String?, vodId: String?): ProgramDetail {
+fun PageResponse.toProgramDetail(channelId: String?, vodId: String?, isLive: Boolean): ProgramDetail {
     val meta = content?.metadata
     val about = content?.sections.orEmpty().firstOrNull { it.componentType == "about" }?.components?.firstOrNull()
     val fields = about?.aboutFields.orEmpty().mapNotNull { f ->
@@ -85,6 +96,12 @@ fun PageResponse.toProgramDetail(channelId: String?, vodId: String?): ProgramDet
     } else {
         rawSynopsis
     }
+    // The live airing to record sits in a CTA menu-item id like "id-record-LIVE_3479644".
+    val recordAssetId = meta?.ctas.orEmpty()
+        .flatMap { it.actionItems.orEmpty() }
+        .flatMap { it.actions?.onClick.orEmpty() }
+        .flatMap { it.content?.menuItems.orEmpty() }
+        .firstNotNullOfOrNull { item -> item.id?.let { RECORD_REGEX.find(it)?.groupValues?.get(1) } }
     return ProgramDetail(
         title = meta?.title?.text,
         subtitle = meta?.subtitle?.text,
@@ -97,6 +114,8 @@ fun PageResponse.toProgramDetail(channelId: String?, vodId: String?): ProgramDet
         tags = meta?.tags.orEmpty().mapNotNull { it.label },
         channelId = channelId,
         vodId = vodId,
+        isLive = isLive,
+        recordAssetId = recordAssetId,
     )
 }
 
@@ -116,6 +135,7 @@ private fun ComponentDto.toCard(): ContentCard? {
     val actionUrl = actions?.onClick?.firstOrNull()?.endpoint?.url
     val channelId = actionUrl?.let { CHANNEL_REGEX.find(it)?.groupValues?.get(1) }
     val vodId = actionUrl?.let { VOD_REGEX.find(it)?.groupValues?.get(1) }
+    val seriesId = actionUrl?.let { SERIES_REGEX.find(it)?.groupValues?.get(1) }
 
     return ContentCard(
         id = id ?: label ?: img ?: "card",
@@ -124,6 +144,7 @@ private fun ComponentDto.toCard(): ContentCard? {
         isLocked = isLocked ?: state?.isLocked ?: false,
         channelId = channelId,
         vodId = vodId,
+        seriesId = seriesId,
         actionUrl = actionUrl,
     )
 }

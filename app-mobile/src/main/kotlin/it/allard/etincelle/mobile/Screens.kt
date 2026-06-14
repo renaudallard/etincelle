@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -142,7 +143,9 @@ fun ProgramDetailScreen(
     detail: ProgramDetail,
     busy: Boolean,
     error: String?,
+    info: String?,
     onWatch: () -> Unit,
+    onRecord: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -165,8 +168,16 @@ fun ProgramDetailScreen(
             if (detail.tags.isNotEmpty()) {
                 Text(detail.tags.joinToString("   "), style = MaterialTheme.typography.labelMedium, color = BrandYellow)
             }
-            Button(onClick = onWatch, enabled = !busy) { Text("Regarder") }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(onClick = onWatch, enabled = !busy) {
+                    Text(if (detail.isLive) "Regarder en direct" else "Regarder")
+                }
+                if (detail.recordAssetId != null) {
+                    Button(onClick = onRecord, enabled = !busy) { Text("Enregistrer") }
+                }
+            }
             if (busy) CircularProgressIndicator()
+            if (info != null) Text(info, color = BrandYellow)
             if (error != null) Text(error, color = MaterialTheme.colorScheme.error)
             detail.synopsis?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
             detail.credits?.let {

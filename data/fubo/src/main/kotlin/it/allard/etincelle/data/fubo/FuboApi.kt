@@ -37,12 +37,30 @@ interface FuboApi {
     @GET("papi/v1/search")
     suspend fun search(@Query("query") query: String): PageResponse
 
-    /** A show's detail page; the "À propos" tab carries both the metadata and the cast/credits. */
+    /** A program's detail page; the "À propos" tab carries both the metadata and the cast/credits. */
     @GET("papi/v1/program-details/program/{id}")
     suspend fun programDetail(
         @Path("id") id: String,
         @Query("tabID") tab: String = "id-tab-about",
     ): PageResponse
+
+    /** A series' detail page; same shape as a program detail. */
+    @GET("papi/v1/program-details/series/{id}")
+    suspend fun seriesDetail(
+        @Path("id") id: String,
+        @Query("tabID") tab: String = "id-tab-about",
+    ): PageResponse
+
+    /** A live channel's detail page; same shape as a program detail, carries the record CTA. */
+    @GET("papi/v1/program-details/channel/{id}")
+    suspend fun channelDetail(
+        @Path("id") id: String,
+        @Query("tabID") tab: String = "id-tab-about",
+    ): PageResponse
+
+    /** Records a live airing; the response body is unused. */
+    @POST("action/v1/add-recording")
+    suspend fun addRecording(@Body body: AddRecordingRequest): okhttp3.ResponseBody
 
     /** Live guide (EPG): channels with their programs over an RFC3339-UTC time window. */
     @GET("epg")

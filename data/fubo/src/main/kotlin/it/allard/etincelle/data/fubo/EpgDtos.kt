@@ -85,6 +85,7 @@ private fun EpgProgramWithAssetsDto.toCard(channelId: String, channelLogo: Strin
         isLocked = false,
         channelId = channelId,
         vodId = null,
+        seriesId = null,
         actionUrl = null,
     )
 }

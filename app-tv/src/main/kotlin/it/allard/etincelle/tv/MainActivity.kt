@@ -59,7 +59,10 @@ class MainActivity : ComponentActivity() {
 
                         detail != null -> {
                             BackHandler { viewModel.closeDetail() }
-                            TvProgramDetailScreen(detail, state.busy, state.error, viewModel::watchDetail)
+                            TvProgramDetailScreen(
+                                detail, state.busy, state.error, state.info,
+                                viewModel::watchDetail, viewModel::recordDetail,
+                            )
                         }
 
                         state.loggedIn -> {

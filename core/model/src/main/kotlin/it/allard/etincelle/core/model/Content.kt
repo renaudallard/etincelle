@@ -18,8 +18,9 @@ data class ContentRail(
 
 /**
  * A single card in a rail. Tap behaviour, in priority order:
- * - [channelId] non-null -> plays that live channel.
- * - [vodId] non-null     -> plays that VOD/replay.
+ * - [channelId] non-null -> opens that live channel's detail page.
+ * - [vodId] non-null     -> opens that VOD/program detail page.
+ * - [seriesId] non-null  -> opens that series detail page.
  * - else [actionUrl]     -> navigates to that page (sub-page or detail).
  */
 data class ContentCard(
@@ -29,6 +30,7 @@ data class ContentCard(
     val isLocked: Boolean,
     val channelId: String?,
     val vodId: String?,
+    val seriesId: String?,
     val actionUrl: String?,
 )
 
@@ -36,6 +38,10 @@ data class ContentCard(
  * A show's detail page (Molotov-4.x style): the program metadata plus how to watch it. Shown when a
  * show card is tapped, instead of playing immediately. The play target is carried in
  * [channelId]/[vodId] (whichever the tapped card had), so watching reuses the normal resolve path.
+ *
+ * [isLive] marks a live-channel detail: the watch button reads "Regarder en direct" and plays via
+ * [channelId] rather than [vodId]. [recordAssetId] is the live airing asset id to record, present
+ * only when the airing is recordable; null hides the "Enregistrer" button.
  */
 data class ProgramDetail(
     val title: String?,
@@ -49,4 +55,6 @@ data class ProgramDetail(
     val tags: List<String>,
     val channelId: String?,
     val vodId: String?,
+    val isLive: Boolean,
+    val recordAssetId: String?,
 )

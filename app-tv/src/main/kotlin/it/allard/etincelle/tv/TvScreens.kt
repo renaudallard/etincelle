@@ -203,7 +203,14 @@ private fun TvTab(label: String, selected: Boolean, onClick: () -> Unit, modifie
 
 /** A show's detail page on TV: poster beside the info (year, genre, cast), synopsis, and Regarder. */
 @Composable
-fun TvProgramDetailScreen(detail: ProgramDetail, busy: Boolean, error: String?, onWatch: () -> Unit) {
+fun TvProgramDetailScreen(
+    detail: ProgramDetail,
+    busy: Boolean,
+    error: String?,
+    info: String?,
+    onWatch: () -> Unit,
+    onRecord: () -> Unit,
+) {
     val watchFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { watchFocus.requestFocus() } }
     Row(Modifier.fillMaxSize().padding(OVERSCAN)) {
@@ -224,8 +231,16 @@ fun TvProgramDetailScreen(detail: ProgramDetail, busy: Boolean, error: String?, 
             if (detail.tags.isNotEmpty()) {
                 Text(detail.tags.joinToString("   "), style = MaterialTheme.typography.titleSmall, color = BrandYellow)
             }
-            Button(onClick = onWatch, enabled = !busy, modifier = Modifier.focusRequester(watchFocus)) { Text("Regarder") }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(onClick = onWatch, enabled = !busy, modifier = Modifier.focusRequester(watchFocus)) {
+                    Text(if (detail.isLive) "Regarder en direct" else "Regarder")
+                }
+                if (detail.recordAssetId != null) {
+                    Button(onClick = onRecord, enabled = !busy) { Text("Enregistrer") }
+                }
+            }
             if (busy) CircularProgressIndicator()
+            if (info != null) Text(info, color = BrandYellow)
             if (error != null) Text(error, color = MaterialTheme.colorScheme.error)
             detail.synopsis?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = Color.White) }
             detail.credits?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Color.White) }

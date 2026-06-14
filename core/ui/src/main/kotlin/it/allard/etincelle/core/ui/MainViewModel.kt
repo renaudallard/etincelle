@@ -6,6 +6,7 @@ package it.allard.etincelle.core.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import it.allard.etincelle.core.domain.DetailKind
 import it.allard.etincelle.core.domain.MolotovRepository
 import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentPage
@@ -35,6 +36,7 @@ data class UiState(
     val detail: ProgramDetail? = null,
     val playing: PlaybackSource? = null,
     val error: String? = null,
+    val info: String? = null,
 ) {
     val current: ContentPage? get() = backStack.lastOrNull()
     val canGoBack: Boolean get() = backStack.size > 1
@@ -108,9 +110,11 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
     fun onCardClick(card: ContentCard) {
         val channelId = card.channelId
         val vodId = card.vodId
+        val seriesId = card.seriesId
         when {
-            channelId != null -> playOrLocked(card) { repo.resolveLiveChannel(channelId) }
-            vodId != null -> showDetail(card, vodId)
+            channelId != null -> showDetail(card, channelId, DetailKind.CHANNEL)
+            vodId != null -> showDetail(card, vodId, DetailKind.PROGRAM)
+            seriesId != null -> showDetail(card, seriesId, DetailKind.SERIES)
             else -> {
                 val url = card.actionUrl ?: return
                 _state.update { it.copy(busy = true, error = null) }
@@ -119,34 +123,21 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         }
     }
 
-    private fun playOrLocked(card: ContentCard, resolve: suspend () -> PlaybackSource) {
+    /** Opens a card's detail page (info, cast, year) instead of playing it immediately. */
+    private fun showDetail(card: ContentCard, id: String, kind: DetailKind) {
         if (card.isLocked) {
             _state.update { it.copy(error = "${card.title ?: "Ce contenu"} est réservé à Molotov Extra") }
             return
         }
-        _state.update { it.copy(busy = true, error = null) }
+        _state.update { it.copy(busy = true, error = null, info = null) }
         viewModelScope.launch {
-            runCatching { resolve() }
-                .onSuccess { src -> _state.update { it.copy(busy = false, playing = src) } }
-                .onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Échec de lecture") } }
-        }
-    }
-
-    /** Opens a show's detail page (info, cast, year) instead of playing it immediately. */
-    private fun showDetail(card: ContentCard, vodId: String) {
-        if (card.isLocked) {
-            _state.update { it.copy(error = "${card.title ?: "Ce contenu"} est réservé à Molotov Extra") }
-            return
-        }
-        _state.update { it.copy(busy = true, error = null) }
-        viewModelScope.launch {
-            runCatching { repo.fetchProgramDetail(vodId) }
+            runCatching { repo.fetchProgramDetail(id, kind) }
                 .onSuccess { d -> _state.update { it.copy(busy = false, detail = d) } }
                 .onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Détail indisponible") } }
         }
     }
 
-    /** Plays the show currently shown on the detail page. */
+    /** Plays the show currently shown on the detail page; a live detail plays its channel directly. */
     fun watchDetail() {
         val d = _state.value.detail ?: return
         val vodId = d.vodId
@@ -155,6 +146,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         viewModelScope.launch {
             runCatching {
                 when {
+                    d.isLive && channelId != null -> repo.resolveLiveChannel(channelId)
                     vodId != null -> repo.resolveVod(vodId)
                     channelId != null -> repo.resolveLiveChannel(channelId)
                     else -> null
@@ -165,8 +157,19 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         }
     }
 
+    /** Records the live airing shown on the detail page. */
+    fun recordDetail() {
+        val assetId = _state.value.detail?.recordAssetId ?: return
+        _state.update { it.copy(busy = true, error = null, info = null) }
+        viewModelScope.launch {
+            runCatching { repo.recordEpisode(assetId) }
+                .onSuccess { _state.update { it.copy(busy = false, info = "Enregistrement programmé") } }
+                .onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Échec de l'enregistrement") } }
+        }
+    }
+
     /** Closes the detail page, back to browsing. */
-    fun closeDetail() = _state.update { it.copy(detail = null, error = null) }
+    fun closeDetail() = _state.update { it.copy(detail = null, error = null, info = null) }
 
     private fun loadPageInto(url: String, replace: Boolean, fallbackTitle: String?) {
         viewModelScope.launch {

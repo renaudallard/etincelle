@@ -8,6 +8,9 @@ import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.UserSession
 
+/** Which `program-details/{kind}/{id}` endpoint a detail page comes from. */
+enum class DetailKind { PROGRAM, SERIES, CHANNEL }
+
 /**
  * What the app needs from a Molotov backend, expressed in domain terms. The presentation layer
  * depends only on this interface, so the backend (Fubo today) stays swappable.
@@ -23,8 +26,14 @@ interface MolotovRepository {
     suspend fun loadGuide(): ContentPage
     suspend fun search(query: String): ContentPage
 
-    /** A show's detail page (info, cast, year, …) shown before playing, keyed by its VOD/program id. */
-    suspend fun fetchProgramDetail(vodId: String): ProgramDetail
+    /**
+     * A show's detail page (info, cast, year, …) shown before playing, keyed by an id and its [kind]
+     * (program, series, or channel). A channel detail is marked live so the watch button plays it directly.
+     */
+    suspend fun fetchProgramDetail(id: String, kind: DetailKind): ProgramDetail
+
+    /** Records the live airing identified by [assetId]. */
+    suspend fun recordEpisode(assetId: String)
 
     suspend fun resolveLiveChannel(channelId: String): PlaybackSource
     suspend fun resolveVod(vodId: String): PlaybackSource
