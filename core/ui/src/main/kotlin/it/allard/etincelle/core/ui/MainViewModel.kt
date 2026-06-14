@@ -154,6 +154,17 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         viewModelScope.launch { runCatching { repo.savePlaybackPosition(key, positionMs) } }
     }
 
+    /** Re-resolves a stream (fresh tokens/URL), used by Cast transfers when a token has expired. */
+    suspend fun reResolve(source: PlaybackSource): PlaybackSource? = runCatching {
+        val channelId = source.originChannelId
+        val vodId = source.originVodId
+        when {
+            channelId != null -> repo.resolveLiveChannel(channelId)
+            vodId != null -> repo.resolveVod(vodId)
+            else -> null
+        }
+    }.getOrNull()
+
     fun logout() {
         viewModelScope.launch {
             runCatching { repo.logout() }

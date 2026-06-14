@@ -84,6 +84,7 @@ dependencies {
 
     implementation(project(":core:model"))
     implementation(project(":core:player"))
+    implementation(project(":core:cast"))
     implementation(project(":core:ui"))
     implementation(project(":data:fubo"))
 }

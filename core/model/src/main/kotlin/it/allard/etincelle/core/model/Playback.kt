@@ -27,6 +27,10 @@ data class PlaybackSource(
     val resumeKey: String? = null,
     /** Where to start playback (ms); 0 starts at the beginning / live edge. */
     val startPositionMs: Long = 0L,
+    /** The originating ids, so a stream can be re-resolved (e.g. when a Cast transfer hits an
+     * expired token). Exactly one is set: [originChannelId] for live, [originVodId] for VOD. */
+    val originChannelId: String? = null,
+    val originVodId: String? = null,
     /** Server session keep-alive endpoints to ping while playing (may be null). */
     val heartbeatUrl: String? = null,
     val concurrencyHeartbeatUrl: String? = null,

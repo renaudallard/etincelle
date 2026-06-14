@@ -5,6 +5,7 @@ package it.allard.etincelle.core.player
 
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MimeTypes
 import it.allard.etincelle.core.model.DrmSpec
 import it.allard.etincelle.core.model.PlaybackSource
@@ -16,6 +17,10 @@ object MediaItemFactory {
         val builder = MediaItem.Builder()
             .setUri(source.manifestUrl)
             .setMimeType(MimeTypes.APPLICATION_MPD)
+            // Carry the source as the tag + a title so the Cast layer can rebuild the receiver
+            // payload (license token, live flag, title) straight from the MediaItem.
+            .setTag(source)
+            .setMediaMetadata(MediaMetadata.Builder().setTitle(source.title).build())
 
         when (val drm = source.drm) {
             is DrmSpec.Widevine -> builder.setDrmConfiguration(

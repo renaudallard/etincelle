@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Cast receiver Application ID. Default: the custom Molotov/Fubo receiver (handles DRMtoday
+         Widevine via x-dt-auth-token). An app module can override this to e.g. D4E9D842 (Fubo's
+         published receiver). -->
+    <string name="cast_receiver_app_id" translatable="false">9527437F</string>
+</resources>

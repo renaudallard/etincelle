@@ -76,12 +76,14 @@ class FuboRepository(
 
     override suspend fun search(query: String): ContentPage = withRefresh { api.search(query).toPage() }
 
-    override suspend fun resolveLiveChannel(channelId: String): PlaybackSource =
-        withRefresh { api.playbackAsset(channelId = channelId, type = "live").toPlaybackSource() }
+    override suspend fun resolveLiveChannel(channelId: String): PlaybackSource = withRefresh {
+        api.playbackAsset(channelId = channelId, type = "live").toPlaybackSource()
+            .copy(originChannelId = channelId)
+    }
 
     override suspend fun resolveVod(vodId: String): PlaybackSource = withRefresh {
         api.playbackAsset(id = vodId, type = "vod").toPlaybackSource()
-            .copy(resumeKey = vodId, startPositionMs = progress.read(vodId))
+            .copy(resumeKey = vodId, startPositionMs = progress.read(vodId), originVodId = vodId)
     }
 
     override suspend fun savePlaybackPosition(key: String, positionMs: Long) {
