@@ -48,40 +48,6 @@ Android TV (Compose for TV, navigation D-pad) :
   <img src="docs/screenshots/tv-browse.png" width="640" alt="Android TV, navigation avec onglets en haut et carrousels de chaînes">
 </p>
 
-## État
-
-Application téléphone fonctionnelle. Elle **se connecte au backend Fubo (Molotov), affiche la page
-d'accueil** (le catalogue `papi` piloté par le serveur : chaînes en direct avec badges de verrouillage
-pour les chaînes payantes, ainsi que « Que voulez-vous regarder ? », « En direct à la TV », etc.) dans
-le style sombre de Molotov 4.27, et **lit une chaîne gratuite sur l'appareil** avec le DRM Widevine
-(via DRMtoday) grâce à AndroidX Media3, vérifié de bout en bout sur un appareil Android 16. Elle est
-**navigable** : onglets de la barre inférieure (Accueil / Direct / Films / Séries) et une pile de
-navigation, de sorte que toute carte qui n'est pas une chaîne ouvre sa propre page `papi` (catégories,
-« Voir tout », fiche programme/série) rendue avec les mêmes carrousels. Elle lit aussi la **VOD et les
-replays** (films et épisodes de séries, via le chemin `type=vod`) et **reprend la lecture là où vous
-l'aviez laissée** (la position de lecture est mémorisée localement par titre), et dispose d'un onglet
-**Recherche** (`/papi/v1/search`) dont les résultats s'affichent en carrousels. Un onglet **Guide**
-affiche l'EPG en direct (`/epg`) : un carrousel par chaîne montrant le programme en cours et les
-suivants avec leurs horaires, et toucher un programme lance la chaîne en direct. Sur téléphone, elle
-peut **diffuser le flux en cours vers un Chromecast** ou un téléviseur compatible Cast (direct et VOD,
-Widevine via DRMtoday) : un bouton dans la barre du haut ouvre la liste des appareils, et choisir
-« Cet appareil » ou couper la session ramène la lecture sur le téléphone. Chaque transfert ré-résout
-le flux avec des jetons frais (le direct reprend au bord du direct, la VOD à sa position), et un écran
-« Lecture sur l'appareil » remplace la vidéo pendant la diffusion ; la diffusion nécessite Google Play
-Services, à défaut l'application reste pleinement utilisable en lecture locale. Une application
-**Android TV** (Compose for TV : lignes navigables au D-pad, surbrillance du focus, barre d'onglets
-défilante avec les mêmes onglets Accueil / Direct / Guide / Films / Séries / Recherche) partage la
-même couche données/lecteur. Le contrat complet du backend est décrit dans
-[`docs/fubo-api.md`](docs/fubo-api.md). La **session persiste** entre les lancements (DataStore, avec
-les jetons d'accès et de rafraîchissement **chiffrés au repos** via AES-GCM et une clé Android
-Keystore **adossée au matériel**), le jeton d'accès **se rafraîchit automatiquement** sur un 401, et
-les incidents réseau passagers (y compris les `5xx`/`404` intermittents du backend sur un GET) sont
-réessayés une fois, les échecs étant présentés par des messages en français clairs plutôt que par des
-codes HTTP bruts ; une commande de **déconnexion** sur les deux applications efface la session et
-revient à l'écran de connexion. Les enregistrements (DVR) sont reportés : l'endpoint est mappé
-(`/dvr/v2/list`, voir la doc d'API), mais le compte de test ne dispose d'aucun droit DVR, donc une
-interface d'enregistrements ne peut être construite et vérifiée qu'avec un compte qui en possède un.
-
 ## Installation
 
 Téléchargez l'APK signé pour votre appareil depuis la
