@@ -69,6 +69,14 @@ follows each component's `actions`.
 - Detail: `GET /papi/v1/program-details/channel/{channelId}` (template `program-details-single`,
   has `cast_url`, tabs, metadata{station_logo,title,...}), `GET /papi/v1/program-details/series/{id}`,
   `GET /papi/v1/broadcaster-details/{id}`.
+- **Show detail (validated 2026-06-14):** a show card's `on_click` is `GET /papi/v1/program-details/program/{id}`.
+  Fetch `?tabID=id-tab-about` to get, in one call, `content.metadata` (type `program-details-metadata`:
+  `title`, `subtitle` ["2h 12m • 2004" = duration • year, or "S8 E24 …"], `description` [synopsis],
+  `artwork`, `station_logo`, `tags` [DIRECT/REPLAY/VOD], `ctas`) **and** the "À propos" tab's `about`
+  component (`description` = "Réalisé par … avec …" director+cast; `about_fields` = Genre / Année de
+  sortie / Classification). Tabs are "À voir aussi" (carousels) + "À propos"; `cast_url` just re-fetches
+  the same page with `transient=true`. The description sometimes already ends with the credits — strip
+  that tail so the cast is not shown twice.
 - Components/cards carry `actions` (`on_click`/`on_expired`/`on_poll`) → `{endpoint:{method,url}, type, template, ...}`.
   Action types seen: `navigation`, `refresh_page`, `tracking`. Card types: `card-wide`, `card-poster`,
   `square`, `chip-navigation`, `tab`, `picture`, `progress_bar`, `tag`, `text`, `program-details-metadata`.
@@ -151,10 +159,20 @@ return `400 dynamic path not found`). They come from the knowledge-graph DVR ser
   on `api-eu.fubo.tv`, with the `Authorization: Bearer` header (and the standard `x-application-id:
   molotov` set). `sort`/`status` are **required** — omitting them returns `400 invalid DVR query`.
 
-The test account has the Molotov Extra add-on but **no DVR quota**, so every valid request returns
-`400 {"error":{"message":"dvr service failed: invalid DVR quota entitlement"}}`. The endpoint and its
-parameters are therefore confirmed, but the response body and a recordings UI can only be built and
-verified against an account that actually carries a DVR entitlement.
+The shared test account has the Molotov Extra add-on but **no DVR quota**, so every valid request
+returns `400 {"error":{"message":"dvr service failed: invalid DVR quota entitlement"}}`.
+
+**Validated under a DVR-entitled account (2026-06-14):** `GET /dvr/v2/list?sort=date&status=all` returns
+`200 { response:[ <recording> ], metadata:[ {type:"paginationState", data:{totalResults, currentOffset,
+nextOffset}} ] }`. That account currently has **0 recordings**, so a recording entry's own fields are
+still unseen (the `response` array is empty).
+
+**Scheduling a recording** comes from a live/upcoming programme's `program-details` CTAs (full account
+only; the entitlement-less account gets the `papi/v1/page/abonnements-options-enregistrement` upsell):
+- Episode: `POST /action/v1/add-recording` — body `{action_name:"add-recording", params:{asset_id:"LIVE_xxxxx",
+  is_upcoming:"<bool>"}, metadatas:{"asset.asset_id":"LIVE_xxxxx"}, callback_actions:[<refresh the detail>]}`.
+- Series: `POST /action/v1/record-new-episodes` (same shape). Labels "Enregistrer l'épisode"/"Enregistrer la série".
+- The record target is a **`LIVE_…` airing asset**, so recording applies to live/upcoming programmes, not VOD.
 
 ## Decrypted-capture pipeline (reusable)
 
