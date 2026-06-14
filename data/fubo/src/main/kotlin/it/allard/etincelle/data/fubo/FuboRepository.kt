@@ -124,7 +124,7 @@ class FuboRepository(
 
     override suspend fun resolveRecording(assetId: String): PlaybackSource = withRefresh {
         api.playbackAsset(id = assetId, type = "dvr").toPlaybackSource()
-            .copy(originVodId = assetId)
+            .copy(originRecordingAssetId = assetId)
     }
 
     override suspend fun resolveLiveChannel(channelId: String): PlaybackSource = withRefresh {

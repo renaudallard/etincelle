@@ -211,9 +211,11 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
     suspend fun reResolve(source: PlaybackSource): PlaybackSource? = runCatching {
         val channelId = source.originChannelId
         val vodId = source.originVodId
+        val recordingAssetId = source.originRecordingAssetId
         when {
             channelId != null -> repo.resolveLiveChannel(channelId)
             vodId != null -> repo.resolveVod(vodId)
+            recordingAssetId != null -> repo.resolveRecording(recordingAssetId)
             else -> null
         }
     }.getOrNull()

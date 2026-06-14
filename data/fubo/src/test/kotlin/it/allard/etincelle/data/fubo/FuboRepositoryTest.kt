@@ -100,6 +100,22 @@ class FuboRepositoryTest {
     }
 
     @Test
+    fun `resolveRecording requests the dvr asset and keeps its origin for re-resolving`() = runTest {
+        server.enqueue(
+            MockResponse().setBody(
+                """{"stream":{"url":"https://cdn/r.mpd","packagingProtocol":"dash","drmProtected":false,"live":false},"type":"dvr"}""",
+            ),
+        )
+
+        val source = repo.resolveRecording("LIVE_42")
+
+        val request = server.takeRequest()
+        assertEquals("dvr", request.requestUrl?.queryParameter("type"))
+        assertEquals("LIVE_42", request.requestUrl?.queryParameter("id"))
+        assertEquals("LIVE_42", source.originRecordingAssetId)
+    }
+
+    @Test
     fun `savePlaybackPosition stores a position and clears it at zero`() = runTest {
         repo.savePlaybackPosition("VOD_7", 30_000L)
         assertEquals(30_000L, progress.positions["VOD_7"])
