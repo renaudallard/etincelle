@@ -3,6 +3,7 @@
 
 package it.allard.etincelle.mobile
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.KeyboardActions
@@ -24,6 +25,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -37,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -147,6 +150,9 @@ private fun Rail(rail: ContentRail, onCardClick: (ContentCard) -> Unit) {
 @Composable
 private fun CardItem(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
     val isChannel = card.channelId != null
+    // A genre tile is a navigation card (no channel/VOD id) whose title names a category; it carries
+    // no artwork, so draw the brand icon instead of a blank box.
+    val categoryIcon = if (card.channelId == null && card.vodId == null) categoryIconRes(card.title) else null
     val cardWidth = if (isChannel) 96.dp else 150.dp
     Column(
         modifier = Modifier.width(cardWidth).clickable { onCardClick(card) },
@@ -156,13 +162,23 @@ private fun CardItem(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
             modifier = (if (isChannel) Modifier.size(96.dp) else Modifier.width(150.dp).height(86.dp))
                 .clip(RoundedCornerShape(if (isChannel) 16.dp else 10.dp))
                 .background(BackgroundLevel1),
+            contentAlignment = Alignment.Center,
         ) {
-            AsyncImage(
-                model = card.imageUrl,
-                contentDescription = card.title,
-                modifier = Modifier.fillMaxSize().padding(if (isChannel) 12.dp else 0.dp),
-                contentScale = if (isChannel) ContentScale.Fit else ContentScale.Crop,
-            )
+            if (categoryIcon != null) {
+                Icon(
+                    painterResource(categoryIcon),
+                    contentDescription = card.title,
+                    tint = BrandYellow,
+                    modifier = Modifier.size(40.dp),
+                )
+            } else {
+                AsyncImage(
+                    model = card.imageUrl,
+                    contentDescription = card.title,
+                    modifier = Modifier.fillMaxSize().padding(if (isChannel) 12.dp else 0.dp),
+                    contentScale = if (isChannel) ContentScale.Fit else ContentScale.Crop,
+                )
+            }
             if (card.isLocked) {
                 Box(
                     modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)
@@ -184,4 +200,18 @@ private fun CardItem(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
             )
         }
     }
+}
+
+/** Brand icon for a genre tile, matched by its title; null for any non-category card. */
+@DrawableRes
+private fun categoryIconRes(title: String?): Int? = when (title?.trim()?.lowercase()) {
+    "films", "cinéma", "cinema" -> R.drawable.ic_films
+    "séries", "series" -> R.drawable.ic_series
+    "divertissement" -> R.drawable.ic_divertissement
+    "sport", "sports" -> R.drawable.ic_sport
+    "informations", "information", "info", "actualités", "actualites", "actu" -> R.drawable.ic_informations
+    "documentaires", "documentaire", "découverte", "decouverte", "docs" -> R.drawable.ic_documentaires
+    "enfants", "enfant", "jeunesse" -> R.drawable.ic_enfants
+    "culture" -> R.drawable.ic_culture
+    else -> null
 }
