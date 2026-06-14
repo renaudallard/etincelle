@@ -10,11 +10,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -28,6 +30,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -135,6 +138,15 @@ class MainActivity : ComponentActivity() {
 
 private val EMPTY_CAST_FLOW: StateFlow<CastUiState> = MutableStateFlow(CastUiState()).asStateFlow()
 
+/** Brand-pack vector icon for the tabs it covers; the rest keep their emoji glyph. */
+@DrawableRes
+private fun tabIconRes(tab: Tab): Int? = when (tab) {
+    Tab.LIVE -> R.drawable.ic_direct
+    Tab.GUIDE -> R.drawable.ic_grille
+    Tab.SEARCH -> R.drawable.ic_recherche
+    else -> null
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AppRoot(
@@ -184,7 +196,14 @@ private fun AppRoot(
                             NavigationBarItem(
                                 selected = state.tab == tab && !state.canGoBack,
                                 onClick = { vm.selectTab(tab) },
-                                icon = { Text(tab.icon) },
+                                icon = {
+                                    val iconRes = tabIconRes(tab)
+                                    if (iconRes != null) {
+                                        Icon(painterResource(iconRes), contentDescription = tab.label)
+                                    } else {
+                                        Text(tab.icon)
+                                    }
+                                },
                                 label = { Text(tab.label) },
                             )
                         }
