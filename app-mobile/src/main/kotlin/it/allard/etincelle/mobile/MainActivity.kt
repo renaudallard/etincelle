@@ -143,6 +143,8 @@ private val EMPTY_CAST_FLOW: StateFlow<CastUiState> = MutableStateFlow(CastUiSta
 private fun tabIconRes(tab: Tab): Int? = when (tab) {
     Tab.LIVE -> R.drawable.ic_direct
     Tab.GUIDE -> R.drawable.ic_grille
+    Tab.MOVIES -> R.drawable.ic_films
+    Tab.SERIES -> R.drawable.ic_series
     Tab.SEARCH -> R.drawable.ic_recherche
     else -> null
 }
