@@ -6,6 +6,7 @@ package it.allard.etincelle.core.domain
 import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramDetail
+import it.allard.etincelle.core.model.Recording
 import it.allard.etincelle.core.model.UserSession
 
 /** Which `program-details/{kind}/{id}` endpoint a detail page comes from. */
@@ -35,8 +36,14 @@ interface MolotovRepository {
     /** Records the live airing identified by [assetId]. */
     suspend fun recordEpisode(assetId: String)
 
+    /** The user's DVR recordings (recorded and scheduled), each with a playable dvr asset. */
+    suspend fun loadRecordings(): List<Recording>
+
     suspend fun resolveLiveChannel(channelId: String): PlaybackSource
     suspend fun resolveVod(vodId: String): PlaybackSource
+
+    /** Resolves a DVR recording [assetId] to a playable stream. */
+    suspend fun resolveRecording(assetId: String): PlaybackSource
 
     /** Remembers (or, when [positionMs] is 0, forgets) the resume position for a VOD/replay. */
     suspend fun savePlaybackPosition(key: String, positionMs: Long)

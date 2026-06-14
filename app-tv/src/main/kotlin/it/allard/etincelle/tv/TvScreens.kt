@@ -30,6 +30,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -61,6 +62,7 @@ import it.allard.etincelle.core.designsystem.theme.BrandYellow
 import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.ProgramDetail
+import it.allard.etincelle.core.model.Recording
 import it.allard.etincelle.core.ui.Tab
 import it.allard.etincelle.core.ui.UiState
 
@@ -210,6 +212,7 @@ fun TvProgramDetailScreen(
     info: String?,
     onWatch: () -> Unit,
     onRecord: () -> Unit,
+    onWatchRecording: (String) -> Unit,
 ) {
     val watchFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { watchFocus.requestFocus() } }
@@ -248,7 +251,32 @@ fun TvProgramDetailScreen(
                 detail.year?.let { "Année de sortie : $it" },
                 detail.classification?.let { "Classification : $it" },
             ).forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Color.White) }
+            if (detail.recordings.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Text("Vos enregistrements", style = MaterialTheme.typography.titleMedium, color = Color.White)
+                detail.recordings.forEach { recording ->
+                    TvRecordingRow(recording, enabled = !busy, onWatch = { onWatchRecording(recording.assetId) })
+                }
+            }
         }
+    }
+}
+
+/** One DVR recording on the TV detail: its subtitle/channel plus a "Regarder l'enregistrement" action. */
+@Composable
+private fun TvRecordingRow(recording: Recording, enabled: Boolean, onWatch: () -> Unit) {
+    val label = listOfNotNull(recording.subtitle, recording.channelName).joinToString(" • ")
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            label.ifBlank { recording.title ?: "Enregistrement" },
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(Modifier.width(8.dp))
+        TextButton(onClick = onWatch, enabled = enabled) { Text("Regarder l'enregistrement") }
     }
 }
 

@@ -18,6 +18,7 @@ data class ContentRail(
 
 /**
  * A single card in a rail. Tap behaviour, in priority order:
+ * - [recordingAssetId] non-null -> plays that DVR recording directly (no detail page).
  * - [channelId] non-null -> opens that live channel's detail page.
  * - [vodId] non-null     -> opens that VOD/program detail page.
  * - [seriesId] non-null  -> opens that series detail page.
@@ -32,6 +33,21 @@ data class ContentCard(
     val vodId: String?,
     val seriesId: String?,
     val actionUrl: String?,
+    val recordingAssetId: String? = null,
+)
+
+/**
+ * A DVR recording: a recorded (or scheduled) airing the user can play back. [assetId] is the dvr asset
+ * passed to playback. [programId]/[seriesId] let a detail page keep only the recordings of its show.
+ */
+data class Recording(
+    val assetId: String,
+    val title: String?,
+    val subtitle: String?,
+    val imageUrl: String?,
+    val channelName: String?,
+    val programId: String?,
+    val seriesId: String?,
 )
 
 /**
@@ -57,4 +73,8 @@ data class ProgramDetail(
     val vodId: String?,
     val isLive: Boolean,
     val recordAssetId: String?,
+    /** This program's id ("{digits}_{digits}"), used to match its DVR recordings; null on series/channel. */
+    val programId: String? = null,
+    /** DVR recordings of this very show, shown as a "Vos enregistrements" section. */
+    val recordings: List<Recording> = emptyList(),
 )

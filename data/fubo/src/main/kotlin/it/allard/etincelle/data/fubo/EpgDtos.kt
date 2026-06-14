@@ -38,9 +38,20 @@ data class EpgProgramDto(
     val title: String?,
     val heading: String?,
     val horizontalImage: String?,
+    val subheading: String? = null,
+    val verticalImage: String? = null,
+    val programId: String? = null,
+    val metadata: EpgProgramMetadataDto? = null,
 )
 
-data class EpgAssetDto(val accessRights: EpgAccessRightsDto?)
+data class EpgProgramMetadataDto(val seriesId: String?)
+
+data class EpgAssetDto(
+    val accessRights: EpgAccessRightsDto?,
+    val assetId: String? = null,
+    val type: String? = null,
+    val channel: EpgChannelDto? = null,
+)
 
 data class EpgAccessRightsDto(val startTime: String?, val endTime: String?)
 
@@ -87,5 +98,6 @@ private fun EpgProgramWithAssetsDto.toCard(channelId: String, channelLogo: Strin
         vodId = null,
         seriesId = null,
         actionUrl = null,
+        recordingAssetId = null,
     )
 }

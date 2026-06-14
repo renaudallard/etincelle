@@ -56,6 +56,7 @@ import it.allard.etincelle.core.designsystem.theme.BrandYellow
 import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.ProgramDetail
+import it.allard.etincelle.core.model.Recording
 
 @Composable
 fun LoginScreen(busy: Boolean, error: String?, onLogin: (String, String) -> Unit) {
@@ -146,6 +147,7 @@ fun ProgramDetailScreen(
     info: String?,
     onWatch: () -> Unit,
     onRecord: () -> Unit,
+    onWatchRecording: (String) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -189,7 +191,35 @@ fun ProgramDetailScreen(
             ).forEach {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            if (detail.recordings.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Text("Vos enregistrements", style = MaterialTheme.typography.titleMedium)
+                detail.recordings.forEach { recording ->
+                    RecordingRow(recording, enabled = !busy, onWatch = { onWatchRecording(recording.assetId) })
+                }
+            }
         }
+    }
+}
+
+/** One DVR recording on a detail page: its subtitle/channel plus a "Regarder l'enregistrement" action. */
+@Composable
+private fun RecordingRow(recording: Recording, enabled: Boolean, onWatch: () -> Unit) {
+    val label = listOfNotNull(recording.subtitle, recording.channelName).joinToString(" • ")
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label.ifBlank { recording.title ?: "Enregistrement" },
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(Modifier.width(8.dp))
+        TextButton(onClick = onWatch, enabled = enabled) { Text("Regarder l'enregistrement") }
     }
 }
 

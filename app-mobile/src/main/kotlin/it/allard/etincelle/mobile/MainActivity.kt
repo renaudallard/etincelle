@@ -185,6 +185,7 @@ private fun AppRoot(
                 info = state.info,
                 onWatch = { vm.watchDetail() },
                 onRecord = { vm.recordDetail() },
+                onWatchRecording = { vm.watchRecording(it) },
                 onBack = { vm.closeDetail() },
             )
         }

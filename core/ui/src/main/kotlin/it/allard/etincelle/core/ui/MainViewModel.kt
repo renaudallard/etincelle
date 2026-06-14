@@ -108,10 +108,12 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
     }
 
     fun onCardClick(card: ContentCard) {
+        val recordingAssetId = card.recordingAssetId
         val channelId = card.channelId
         val vodId = card.vodId
         val seriesId = card.seriesId
         when {
+            recordingAssetId != null -> watchRecording(recordingAssetId)
             channelId != null -> showDetail(card, channelId, DetailKind.CHANNEL)
             vodId != null -> showDetail(card, vodId, DetailKind.PROGRAM)
             seriesId != null -> showDetail(card, seriesId, DetailKind.SERIES)
@@ -120,6 +122,16 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
                 _state.update { it.copy(busy = true, error = null) }
                 loadPageInto(url, replace = false, fallbackTitle = card.title)
             }
+        }
+    }
+
+    /** Plays a DVR recording by its dvr asset id (from a recording card or a detail's recordings list). */
+    fun watchRecording(assetId: String) {
+        _state.update { it.copy(busy = true, error = null, info = null) }
+        viewModelScope.launch {
+            runCatching { repo.resolveRecording(assetId) }
+                .onSuccess { src -> _state.update { it.copy(busy = false, playing = src) } }
+                .onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Échec de lecture") } }
         }
     }
 

@@ -7,9 +7,11 @@ import it.allard.etincelle.core.domain.DetailKind
 import it.allard.etincelle.core.domain.MolotovRepository
 import it.allard.etincelle.core.model.AppError
 import it.allard.etincelle.core.model.ContentPage
+import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.DrmSpec
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramDetail
+import it.allard.etincelle.core.model.Recording
 import it.allard.etincelle.core.model.UserSession
 import it.allard.etincelle.core.network.NetworkClient
 import it.allard.etincelle.core.network.ProgressStore
@@ -63,7 +65,16 @@ class FuboRepository(
         store.clear()
     }
 
-    override suspend fun loadHome(): ContentPage = withRefresh { api.homePage().toPage() }
+    override suspend fun loadHome(): ContentPage = withRefresh {
+        val page = api.homePage().toPage()
+        val recordings = loadRecordings()
+        if (recordings.isEmpty()) {
+            page
+        } else {
+            val rail = ContentRail("recordings", "Mes enregistrements", recordings.map { it.toCard() })
+            page.copy(rails = listOf(rail) + page.rails)
+        }
+    }
 
     override suspend fun loadPage(url: String): ContentPage = withRefresh { api.pageByUrl(url).toPage() }
 
@@ -79,11 +90,19 @@ class FuboRepository(
     override suspend fun search(query: String): ContentPage = withRefresh { api.search(query).toPage() }
 
     override suspend fun fetchProgramDetail(id: String, kind: DetailKind): ProgramDetail = withRefresh {
-        when (kind) {
+        val detail = when (kind) {
             DetailKind.PROGRAM -> api.programDetail(id).toProgramDetail(channelId = null, vodId = id, isLive = false)
             DetailKind.SERIES -> api.seriesDetail(id).toProgramDetail(channelId = null, vodId = id, isLive = false)
             DetailKind.CHANNEL -> api.channelDetail(id).toProgramDetail(channelId = id, vodId = null, isLive = true)
         }
+        val detailProgramId = detail.programId
+        val matches = when (kind) {
+            DetailKind.PROGRAM ->
+                if (detailProgramId == null) emptyList() else loadRecordings().filter { it.programId == detailProgramId }
+            DetailKind.SERIES -> loadRecordings().filter { it.seriesId == id }
+            DetailKind.CHANNEL -> emptyList()
+        }
+        detail.copy(recordings = matches)
     }
 
     override suspend fun recordEpisode(assetId: String) = withRefresh {
@@ -94,6 +113,18 @@ class FuboRepository(
             ),
         )
         Unit
+    }
+
+    override suspend fun loadRecordings(): List<Recording> = withRefresh {
+        // status=all returns an empty body, so fetch both statuses and merge, deduped by asset id.
+        val recorded = api.dvrList(status = "recorded").toRecordings()
+        val scheduled = api.dvrList(status = "scheduled").toRecordings()
+        (recorded + scheduled).distinctBy { it.assetId }
+    }
+
+    override suspend fun resolveRecording(assetId: String): PlaybackSource = withRefresh {
+        api.playbackAsset(id = assetId, type = "dvr").toPlaybackSource()
+            .copy(originVodId = assetId)
     }
 
     override suspend fun resolveLiveChannel(channelId: String): PlaybackSource = withRefresh {

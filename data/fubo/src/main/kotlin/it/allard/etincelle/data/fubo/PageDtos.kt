@@ -15,11 +15,12 @@ data class PageResponse(val title: TextDto?, val content: PageContentDto?)
 
 data class PageContentDto(
     val template: String?,
-    val metadata: MetadataDto?,
+    val metadata: MetadataDto? = null,
     val sections: List<SectionDto>?,
 )
 
 data class MetadataDto(
+    val id: String?,
     val title: TextDto?,
     val subtitle: TextDto?,
     val description: TextDto?,
@@ -57,8 +58,8 @@ data class ComponentDto(
     @Json(name = "is_locked") val isLocked: Boolean?,
     val state: StateDto?,
     val actions: ActionsDto?,
-    val description: TextDto?,
-    @Json(name = "about_fields") val aboutFields: List<AboutFieldDto>?,
+    val description: TextDto? = null,
+    @Json(name = "about_fields") val aboutFields: List<AboutFieldDto>? = null,
 )
 
 data class BodyDto(val picture: PictureDto?)
@@ -75,6 +76,9 @@ private val CHANNEL_REGEX = Regex("""program-details/channel/(\d+)""")
 private val VOD_REGEX = Regex("""program-details/program/([\w-]+)""")
 private val SERIES_REGEX = Regex("""program-details/series/([\w-]+)""")
 private val RECORD_REGEX = Regex("""id-record-(LIVE_[0-9]+)""")
+// metadata.id looks like "id-metadata-program-details-2768066_48"; the trailing "{digits}_{digits}"
+// is the program id used to match this show's DVR recordings.
+private val PROGRAM_ID_REGEX = Regex("""(\d+_\d+)$""")
 
 fun PageResponse.toPage(): ContentPage = ContentPage(title?.text, toRails())
 
@@ -102,6 +106,7 @@ fun PageResponse.toProgramDetail(channelId: String?, vodId: String?, isLive: Boo
         .flatMap { it.actions?.onClick.orEmpty() }
         .flatMap { it.content?.menuItems.orEmpty() }
         .firstNotNullOfOrNull { item -> item.id?.let { RECORD_REGEX.find(it)?.groupValues?.get(1) } }
+    val programId = meta?.id?.let { PROGRAM_ID_REGEX.find(it)?.groupValues?.get(1) }
     return ProgramDetail(
         title = meta?.title?.text,
         subtitle = meta?.subtitle?.text,
@@ -116,6 +121,7 @@ fun PageResponse.toProgramDetail(channelId: String?, vodId: String?, isLive: Boo
         vodId = vodId,
         isLive = isLive,
         recordAssetId = recordAssetId,
+        programId = programId,
     )
 }
 
@@ -146,5 +152,6 @@ private fun ComponentDto.toCard(): ContentCard? {
         vodId = vodId,
         seriesId = seriesId,
         actionUrl = actionUrl,
+        recordingAssetId = null,
     )
 }

@@ -62,6 +62,16 @@ interface FuboApi {
     @POST("action/v1/add-recording")
     suspend fun addRecording(@Body body: AddRecordingRequest): okhttp3.ResponseBody
 
+    /**
+     * DVR recordings. [status] must be "recorded" or "scheduled": status=all returns an empty body,
+     * so the two statuses are fetched separately and merged.
+     */
+    @GET("dvr/v2/list")
+    suspend fun dvrList(
+        @Query("sort") sort: String = "date",
+        @Query("status") status: String,
+    ): DvrListResponse
+
     /** Live guide (EPG): channels with their programs over an RFC3339-UTC time window. */
     @GET("epg")
     suspend fun epg(

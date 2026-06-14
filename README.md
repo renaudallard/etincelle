@@ -15,6 +15,12 @@ backend **Fubo** qu'utilise l'application Molotov actuelle (5.51), avec l'appare
 interface Molotov **4.27**. Elle fonctionne sur **téléphone/tablette** et **Android TV**, et lit les
 contenus directement sur l'appareil avec le **DRM Widevine** via AndroidX Media3.
 
+Elle donne accès au **direct**, au **guide des programmes** (EPG), à la **recherche**, au
+**rattrapage** et à la **VOD**. Cliquer sur un programme ouvre d'abord sa **fiche détaillée**
+(synopsis, casting, année, classification) plutôt que de le lire aussitôt, et la fiche regroupe ses
+autres diffusions disponibles. Vous pouvez aussi **programmer un enregistrement** et retrouver vos
+**enregistrements** (DVR) dans une rangée dédiée sur l'accueil.
+
 > ### ⚠️ Avertissement
 >
 > Projet non officiel, sans aucune affiliation avec Molotov ni Fubo. **etincelle** n'est qu'un
