@@ -162,10 +162,15 @@ return `400 dynamic path not found`). They come from the knowledge-graph DVR ser
 The shared test account has the Molotov Extra add-on but **no DVR quota**, so every valid request
 returns `400 {"error":{"message":"dvr service failed: invalid DVR quota entitlement"}}`.
 
-**Validated under a DVR-entitled account (2026-06-14):** `GET /dvr/v2/list?sort=date&status=all` returns
-`200 { response:[ <recording> ], metadata:[ {type:"paginationState", data:{totalResults, currentOffset,
-nextOffset}} ] }`. That account currently has **0 recordings**, so a recording entry's own fields are
-still unseen (the `response` array is empty).
+**Validated with recordings (2026-06-14):** `GET /dvr/v2/list?sort=date&status={recorded|scheduled|recording}`
+returns `200 { response:[ <recording> ], metadata:[ {type:"paginationState", data:{totalResults,
+currentOffset, nextOffset}} ] }`. WARNING: `status=all` returns an **empty** `response` (a backend quirk);
+query the specific statuses (`recorded`, `scheduled`, `recording`) and merge. Each recording is a
+**`programWithAssets`** — the SAME shape as the EPG: `data.program{programId ("contentId_variant"), heading
+(show name), subheading (S/E), shortDescription, horizontalImage/verticalImage, rating, type:"episode",
+metadata{episodeNumber, seasonNumber, seriesId}}` + `data.assets[]{assetId:"LIVE_xxxxx", type:"dvr",
+channel{id,name,logoOnDarkUrl}, playbackDurationSec, accessRights{startTime,endTime}}`. So a recordings list
+reuses the EPG DTOs; the playable is the `type:"dvr"` asset (its exact vapi playback type is still TBD).
 
 **Scheduling a recording** comes from a live/upcoming programme's `program-details` CTAs (full account
 only; the entitlement-less account gets the `papi/v1/page/abonnements-options-enregistrement` upsell):
