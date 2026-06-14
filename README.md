@@ -1,10 +1,14 @@
-# etincelle
+<div align="center">
+
+<img src="docs/etincelle-hero.png" alt="Étincelle, Molotov dans un lecteur alternatif" width="720">
 
 [![License: BSD-2-Clause](https://img.shields.io/badge/License-BSD%202--Clause-blue.svg)](LICENSE)
 ![Platform: Android 16](https://img.shields.io/badge/platform-Android%2016%20(API%2036)-3DDC84?logo=android&logoColor=white)
 ![minSdk 23](https://img.shields.io/badge/minSdk-23-orange)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.4-7F52FF?logo=kotlin&logoColor=white)
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-%2B%20TV-4285F4?logo=jetpackcompose&logoColor=white)
+
+</div>
 
 Application Android native (ciblant **Android 16 / API 36**) pour regarder **Molotov** via le
 backend **Fubo** qu'utilise l'application Molotov actuelle (5.51), avec l'apparence de l'ancienne
@@ -32,7 +36,7 @@ contenus directement sur l'appareil avec le **DRM Widevine** via AndroidX Media3
 
 Téléphone (Jetpack Compose, Material 3) :
 
-<p>
+<p align="center">
   <img src="docs/screenshots/phone-home.png" width="240" alt="Téléphone, accueil avec chaînes en direct et carrousels">
   <img src="docs/screenshots/phone-guide.png" width="240" alt="Téléphone, guide des programmes (EPG)">
   <img src="docs/screenshots/phone-search.png" width="240" alt="Téléphone, résultats de recherche">
@@ -40,7 +44,9 @@ Téléphone (Jetpack Compose, Material 3) :
 
 Android TV (Compose for TV, navigation D-pad) :
 
-<img src="docs/screenshots/tv-browse.png" width="640" alt="Android TV, navigation avec onglets en haut et carrousels de chaînes">
+<p align="center">
+  <img src="docs/screenshots/tv-browse.png" width="640" alt="Android TV, navigation avec onglets en haut et carrousels de chaînes">
+</p>
 
 ## État
 
