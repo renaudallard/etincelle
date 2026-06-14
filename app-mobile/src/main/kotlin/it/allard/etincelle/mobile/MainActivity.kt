@@ -162,6 +162,7 @@ private fun AppRoot(
     onCastDisconnect: () -> Unit,
 ) {
     val playing = state.playing
+    val detail = state.detail
     when {
         state.checking -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
@@ -172,6 +173,17 @@ private fun AppRoot(
             PlayerSurface(
                 playing, currentPlayer, castState,
                 onPlay, onStop, onCastConnect, onCastDisconnect,
+            )
+        }
+
+        detail != null -> {
+            BackHandler { vm.closeDetail() }
+            ProgramDetailScreen(
+                detail = detail,
+                busy = state.busy,
+                error = state.error,
+                onWatch = { vm.watchDetail() },
+                onBack = { vm.closeDetail() },
             )
         }
 

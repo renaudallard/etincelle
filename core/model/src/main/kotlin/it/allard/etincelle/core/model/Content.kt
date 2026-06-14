@@ -31,3 +31,22 @@ data class ContentCard(
     val vodId: String?,
     val actionUrl: String?,
 )
+
+/**
+ * A show's detail page (Molotov-4.x style): the program metadata plus how to watch it. Shown when a
+ * show card is tapped, instead of playing immediately. The play target is carried in
+ * [channelId]/[vodId] (whichever the tapped card had), so watching reuses the normal resolve path.
+ */
+data class ProgramDetail(
+    val title: String?,
+    val subtitle: String?,
+    val synopsis: String?,
+    val posterUrl: String?,
+    val genre: String?,
+    val year: String?,
+    val classification: String?,
+    val credits: String?,
+    val tags: List<String>,
+    val channelId: String?,
+    val vodId: String?,
+)

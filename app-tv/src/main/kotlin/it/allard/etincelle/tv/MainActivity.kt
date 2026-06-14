@@ -46,6 +46,7 @@ class MainActivity : ComponentActivity() {
                 val state by viewModel.state.collectAsStateWithLifecycle()
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val playing = state.playing
+                    val detail = state.detail
                     when {
                         state.checking -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             CircularProgressIndicator()
@@ -54,6 +55,11 @@ class MainActivity : ComponentActivity() {
                         playing != null -> {
                             BackHandler { viewModel.stopPlaying() }
                             TvPlayerSurface(playing, exo, viewModel::savePlaybackPosition)
+                        }
+
+                        detail != null -> {
+                            BackHandler { viewModel.closeDetail() }
+                            TvProgramDetailScreen(detail, state.busy, state.error, viewModel::watchDetail)
                         }
 
                         state.loggedIn -> {

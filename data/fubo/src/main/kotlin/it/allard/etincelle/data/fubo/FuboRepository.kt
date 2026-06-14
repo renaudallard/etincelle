@@ -8,6 +8,7 @@ import it.allard.etincelle.core.model.AppError
 import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.DrmSpec
 import it.allard.etincelle.core.model.PlaybackSource
+import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.UserSession
 import it.allard.etincelle.core.network.NetworkClient
 import it.allard.etincelle.core.network.ProgressStore
@@ -75,6 +76,10 @@ class FuboRepository(
     }
 
     override suspend fun search(query: String): ContentPage = withRefresh { api.search(query).toPage() }
+
+    override suspend fun fetchProgramDetail(vodId: String): ProgramDetail = withRefresh {
+        api.programDetail(vodId).toProgramDetail(channelId = null, vodId = vodId)
+    }
 
     override suspend fun resolveLiveChannel(channelId: String): PlaybackSource = withRefresh {
         api.playbackAsset(channelId = channelId, type = "live").toPlaybackSource()

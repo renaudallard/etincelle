@@ -10,6 +10,7 @@ import it.allard.etincelle.core.domain.MolotovRepository
 import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.PlaybackSource
+import it.allard.etincelle.core.model.ProgramDetail
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,6 +32,7 @@ data class UiState(
     val busy: Boolean = false,
     val tab: Tab = Tab.HOME,
     val backStack: List<ContentPage> = emptyList(),
+    val detail: ProgramDetail? = null,
     val playing: PlaybackSource? = null,
     val error: String? = null,
 ) {
@@ -108,7 +110,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         val vodId = card.vodId
         when {
             channelId != null -> playOrLocked(card) { repo.resolveLiveChannel(channelId) }
-            vodId != null -> playOrLocked(card) { repo.resolveVod(vodId) }
+            vodId != null -> showDetail(card, vodId)
             else -> {
                 val url = card.actionUrl ?: return
                 _state.update { it.copy(busy = true, error = null) }
@@ -129,6 +131,42 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
                 .onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Échec de lecture") } }
         }
     }
+
+    /** Opens a show's detail page (info, cast, year) instead of playing it immediately. */
+    private fun showDetail(card: ContentCard, vodId: String) {
+        if (card.isLocked) {
+            _state.update { it.copy(error = "${card.title ?: "Ce contenu"} est réservé à Molotov Extra") }
+            return
+        }
+        _state.update { it.copy(busy = true, error = null) }
+        viewModelScope.launch {
+            runCatching { repo.fetchProgramDetail(vodId) }
+                .onSuccess { d -> _state.update { it.copy(busy = false, detail = d) } }
+                .onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Détail indisponible") } }
+        }
+    }
+
+    /** Plays the show currently shown on the detail page. */
+    fun watchDetail() {
+        val d = _state.value.detail ?: return
+        val vodId = d.vodId
+        val channelId = d.channelId
+        _state.update { it.copy(busy = true, error = null) }
+        viewModelScope.launch {
+            runCatching {
+                when {
+                    vodId != null -> repo.resolveVod(vodId)
+                    channelId != null -> repo.resolveLiveChannel(channelId)
+                    else -> null
+                }
+            }.onSuccess { src ->
+                _state.update { if (src != null) it.copy(busy = false, playing = src) else it.copy(busy = false) }
+            }.onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Échec de lecture") } }
+        }
+    }
+
+    /** Closes the detail page, back to browsing. */
+    fun closeDetail() = _state.update { it.copy(detail = null, error = null) }
 
     private fun loadPageInto(url: String, replace: Boolean, fallbackTitle: String?) {
         viewModelScope.launch {

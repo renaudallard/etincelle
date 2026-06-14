@@ -8,6 +8,7 @@ import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.PUT
+import retrofit2.http.Path
 import retrofit2.http.Query
 import retrofit2.http.Url
 
@@ -35,6 +36,13 @@ interface FuboApi {
     /** Search; results come back as a normal page of rails. */
     @GET("papi/v1/search")
     suspend fun search(@Query("query") query: String): PageResponse
+
+    /** A show's detail page; the "À propos" tab carries both the metadata and the cast/credits. */
+    @GET("papi/v1/program-details/program/{id}")
+    suspend fun programDetail(
+        @Path("id") id: String,
+        @Query("tabID") tab: String = "id-tab-about",
+    ): PageResponse
 
     /** Live guide (EPG): channels with their programs over an RFC3339-UTC time window. */
     @GET("epg")

@@ -22,7 +22,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -58,6 +60,7 @@ import it.allard.etincelle.core.designsystem.theme.BrandBlack
 import it.allard.etincelle.core.designsystem.theme.BrandYellow
 import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentRail
+import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.ui.Tab
 import it.allard.etincelle.core.ui.UiState
 
@@ -195,6 +198,42 @@ private fun TvTab(label: String, selected: Boolean, onClick: () -> Unit, modifie
             .padding(horizontal = 18.dp, vertical = 8.dp),
     ) {
         Text(label, color = if (focused) BrandBlack else Color.White, style = MaterialTheme.typography.titleMedium)
+    }
+}
+
+/** A show's detail page on TV: poster beside the info (year, genre, cast), synopsis, and Regarder. */
+@Composable
+fun TvProgramDetailScreen(detail: ProgramDetail, busy: Boolean, error: String?, onWatch: () -> Unit) {
+    val watchFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { watchFocus.requestFocus() } }
+    Row(Modifier.fillMaxSize().padding(OVERSCAN)) {
+        AsyncImage(
+            model = detail.posterUrl,
+            contentDescription = detail.title,
+            modifier = Modifier.width(300.dp).height(440.dp).clip(RoundedCornerShape(12.dp)).background(BackgroundLevel1),
+            contentScale = ContentScale.Crop,
+        )
+        Spacer(Modifier.width(32.dp))
+        Column(
+            Modifier.weight(1f).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(detail.title ?: "", style = MaterialTheme.typography.displaySmall)
+            val sub = listOfNotNull(detail.subtitle, detail.genre).joinToString(" • ")
+            if (sub.isNotBlank()) Text(sub, style = MaterialTheme.typography.titleMedium, color = Color.White)
+            if (detail.tags.isNotEmpty()) {
+                Text(detail.tags.joinToString("   "), style = MaterialTheme.typography.titleSmall, color = BrandYellow)
+            }
+            Button(onClick = onWatch, enabled = !busy, modifier = Modifier.focusRequester(watchFocus)) { Text("Regarder") }
+            if (busy) CircularProgressIndicator()
+            if (error != null) Text(error, color = MaterialTheme.colorScheme.error)
+            detail.synopsis?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = Color.White) }
+            detail.credits?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Color.White) }
+            listOfNotNull(
+                detail.year?.let { "Année de sortie : $it" },
+                detail.classification?.let { "Classification : $it" },
+            ).forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Color.White) }
+        }
     }
 }
 

@@ -6,6 +6,8 @@ package it.allard.etincelle.mobile
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
@@ -30,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,6 +54,7 @@ import it.allard.etincelle.core.designsystem.theme.BrandBlack
 import it.allard.etincelle.core.designsystem.theme.BrandYellow
 import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentRail
+import it.allard.etincelle.core.model.ProgramDetail
 
 @Composable
 fun LoginScreen(busy: Boolean, error: String?, onLogin: (String, String) -> Unit) {
@@ -129,6 +133,52 @@ fun SearchScreen(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
         )
         PageContent(rails, busy, error, onCardClick, Modifier.weight(1f))
+    }
+}
+
+/** A show's detail page: poster, info (year, genre, cast), synopsis, and a Regarder button. */
+@Composable
+fun ProgramDetailScreen(
+    detail: ProgramDetail,
+    busy: Boolean,
+    error: String?,
+    onWatch: () -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        Box(Modifier.fillMaxWidth().height(220.dp).background(BackgroundLevel1)) {
+            AsyncImage(
+                model = detail.posterUrl,
+                contentDescription = detail.title,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+            TextButton(onClick = onBack) { Text("← Retour") }
+        }
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(detail.title ?: "", style = MaterialTheme.typography.headlineSmall)
+            val sub = listOfNotNull(detail.subtitle, detail.genre).joinToString(" • ")
+            if (sub.isNotBlank()) {
+                Text(sub, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (detail.tags.isNotEmpty()) {
+                Text(detail.tags.joinToString("   "), style = MaterialTheme.typography.labelMedium, color = BrandYellow)
+            }
+            Button(onClick = onWatch, enabled = !busy) { Text("Regarder") }
+            if (busy) CircularProgressIndicator()
+            if (error != null) Text(error, color = MaterialTheme.colorScheme.error)
+            detail.synopsis?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+            detail.credits?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            listOfNotNull(
+                detail.year?.let { "Année de sortie : $it" },
+                detail.classification?.let { "Classification : $it" },
+            ).forEach {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
     }
 }
 

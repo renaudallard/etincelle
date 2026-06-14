@@ -5,6 +5,7 @@ package it.allard.etincelle.core.domain
 
 import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.PlaybackSource
+import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.UserSession
 
 /**
@@ -21,6 +22,9 @@ interface MolotovRepository {
     /** The live guide (EPG): channels, each with its current and upcoming programs. */
     suspend fun loadGuide(): ContentPage
     suspend fun search(query: String): ContentPage
+
+    /** A show's detail page (info, cast, year, …) shown before playing, keyed by its VOD/program id. */
+    suspend fun fetchProgramDetail(vodId: String): ProgramDetail
 
     suspend fun resolveLiveChannel(channelId: String): PlaybackSource
     suspend fun resolveVod(vodId: String): PlaybackSource
