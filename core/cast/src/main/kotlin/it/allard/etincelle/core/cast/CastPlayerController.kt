@@ -47,6 +47,7 @@ class CastPlayerController(
     private val localPlayer: ExoPlayer,
     private val reResolve: (suspend (PlaybackSource) -> PlaybackSource?)? = null,
     private val onError: ((String) -> Unit)? = null,
+    private val onReturnToPhone: ((PlaybackSource) -> Unit)? = null,
 ) : CastController(context, castContext) {
 
     private val castPlayer = CastPlayer(castContext, FuboCastMediaItemConverter())
@@ -78,8 +79,12 @@ class CastPlayerController(
         loadOn(_currentPlayer.value, item, startPositionMs)
     }
 
-    /** Stop the current player; returns (position, duration) for resume persistence. */
-    fun stopPlayback(): Pair<Long, Long> {
+    /**
+     * Stop local playback and return (position, duration) for resume persistence. Returns null while
+     * casting: leaving the player screen must keep the stream running on the Chromecast.
+     */
+    fun stopPlayback(): Pair<Long, Long>? {
+        if (_currentPlayer.value === castPlayer) return null
         reResolveJob?.cancel()
         val player = _currentPlayer.value
         val pos = player.currentPosition
@@ -123,6 +128,8 @@ class CastPlayerController(
         // Re-resolve when coming back to the phone: the cast may have run for a while and the
         // original (live) URL is stale, so a fresh resolve gives the current edge.
         swapTo(localPlayer, endingPosition, endingPlayWhenReady)
+        // Playback is back on the phone; bring the player screen back if it had been left while casting.
+        (currentItem?.localConfiguration?.tag as? PlaybackSource)?.let { onReturnToPhone?.invoke(it) }
     }
 
     private fun swapTo(target: Player, fromPosition: Long, fromPlayWhenReady: Boolean) {

@@ -77,6 +77,7 @@ class MainActivity : ComponentActivity() {
                 this, it, exo,
                 reResolve = viewModel::reResolve,
                 onError = { msg -> Toast.makeText(this, msg, Toast.LENGTH_SHORT).show() },
+                onReturnToPhone = { source -> viewModel.showPlaying(source) },
             )
         }
         castController = controller
@@ -94,14 +95,18 @@ class MainActivity : ComponentActivity() {
             }
         }
         val onStop: (PlaybackSource) -> Unit = { source ->
-            val (pos, dur) = controller?.stopPlayback() ?: run {
-                val p = exo.currentPosition
-                val d = exo.duration
+            if (controller != null) {
+                // null while casting: the stream keeps playing on the TV, so nothing to stop or save.
+                controller.stopPlayback()?.let { (pos, dur) ->
+                    viewModel.savePlaybackPosition(source.resumeKey, PlaybackProgress.positionToSave(pos, dur))
+                }
+            } else {
+                val pos = exo.currentPosition
+                val dur = exo.duration
                 exo.stop()
                 exo.clearMediaItems()
-                p to d
+                viewModel.savePlaybackPosition(source.resumeKey, PlaybackProgress.positionToSave(pos, dur))
             }
-            viewModel.savePlaybackPosition(source.resumeKey, PlaybackProgress.positionToSave(pos, dur))
         }
         val playerFlow: StateFlow<Player> = controller?.currentPlayer ?: MutableStateFlow<Player>(exo).asStateFlow()
 

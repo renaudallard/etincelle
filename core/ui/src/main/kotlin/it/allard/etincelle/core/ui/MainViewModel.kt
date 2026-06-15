@@ -273,6 +273,9 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
 
     fun stopPlaying() = _state.update { it.copy(playing = null) }
 
+    /** Re-shows the player for [source] when a cast session hands playback back to the phone. */
+    fun showPlaying(source: PlaybackSource) = _state.update { if (it.playing == null) it.copy(playing = source) else it }
+
     /** Persists a VOD/replay resume position; a null [key] (live) is ignored. */
     fun savePlaybackPosition(key: String?, positionMs: Long) {
         if (key == null) return
