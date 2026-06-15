@@ -113,7 +113,11 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         val vodId = card.vodId
         val seriesId = card.seriesId
         when {
-            recordingAssetId != null -> watchRecording(recordingAssetId)
+            recordingAssetId != null -> when {
+                seriesId != null -> showRecordingDetail(card, seriesId, DetailKind.SERIES, recordingAssetId)
+                vodId != null -> showRecordingDetail(card, vodId, DetailKind.PROGRAM, recordingAssetId)
+                else -> watchRecording(recordingAssetId)
+            }
             channelId != null -> showDetail(card, channelId, DetailKind.CHANNEL)
             vodId != null -> showDetail(card, vodId, DetailKind.PROGRAM)
             seriesId != null -> showDetail(card, seriesId, DetailKind.SERIES)
@@ -146,6 +150,19 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
             runCatching { repo.fetchProgramDetail(id, kind) }
                 .onSuccess { d -> _state.update { it.copy(busy = false, detail = d) } }
                 .onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Détail indisponible") } }
+        }
+    }
+
+    /**
+     * Opens the detail page of a recording's show, so it can be browsed (info, cast) before playing.
+     * If that show has no detail page we can fetch, falls back to playing the recording directly.
+     */
+    private fun showRecordingDetail(card: ContentCard, id: String, kind: DetailKind, assetId: String) {
+        _state.update { it.copy(busy = true, error = null, info = null) }
+        viewModelScope.launch {
+            runCatching { repo.fetchProgramDetail(id, kind) }
+                .onSuccess { d -> _state.update { it.copy(busy = false, detail = d) } }
+                .onFailure { watchRecording(assetId) }
         }
     }
 

@@ -37,15 +37,20 @@ private fun EpgProgramWithAssetsDto.toRecording(): Recording? {
     )
 }
 
-/** A home-rail card that, when tapped, plays this recording (via [ContentCard.recordingAssetId]). */
+/**
+ * A home-rail card for a recording. Tapping it opens the show's detail page, where this recording
+ * appears as a playable occurrence: by [Recording.seriesId] for an episode, otherwise by
+ * [Recording.programId] as a programme detail. [ContentCard.recordingAssetId] is kept so playback
+ * still works as a fallback when no detail page can be opened.
+ */
 fun Recording.toCard(): ContentCard = ContentCard(
     id = "rec-$assetId",
     title = title,
     imageUrl = imageUrl,
     isLocked = false,
     channelId = null,
-    vodId = null,
-    seriesId = null,
+    vodId = programId?.takeIf { seriesId == null },
+    seriesId = seriesId,
     actionUrl = null,
     recordingAssetId = assetId,
 )
