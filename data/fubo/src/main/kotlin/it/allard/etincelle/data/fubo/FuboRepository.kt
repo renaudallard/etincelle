@@ -69,13 +69,15 @@ class FuboRepository(
 
     override suspend fun loadHome(): ContentPage = withRefresh {
         val page = api.homePage().toPage()
+        val apps = appsRail()
         val recordings = loadRecordings()
-        if (recordings.isEmpty()) {
-            page
-        } else {
-            val rail = ContentRail("recordings", "Mes enregistrements", recordings.map { it.toCard() })
-            page.copy(rails = listOf(rail) + page.rails)
+        val extra = buildList {
+            if (recordings.isNotEmpty()) {
+                add(ContentRail("recordings", "Mes enregistrements", recordings.map { it.toCard() }))
+            }
+            if (apps != null) add(apps)
         }
+        if (extra.isEmpty()) page else page.copy(rails = extra + page.rails)
     }
 
     override suspend fun loadPage(url: String): ContentPage = withRefresh {
@@ -91,15 +93,26 @@ class FuboRepository(
     private suspend fun recordingsPage(): ContentPage =
         ContentPage("Vos enregistrements", listOf(ContentRail("recordings", null, loadRecordings().map { it.toCard() })))
 
+    // The channels page, fetched once and cached; it carries both the channel directory and the
+    // broadcaster "Apps" section surfaced on the home page.
+    private var channelsPageCache: PageResponse? = null
+    private suspend fun channelsPage(): PageResponse? {
+        channelsPageCache?.let { return it }
+        return runCatching { api.channelsPage() }.getOrNull()?.also { channelsPageCache = it }
+    }
+
     // Cached channel id -> name directory, loaded lazily the first time a page carries live cards.
     private var channelDirectory: Map<String, String>? = null
 
     private suspend fun channelNames(): Map<String, String> {
         channelDirectory?.let { return it }
-        val map = runCatching { api.channelsPage().toChannelDirectory() }.getOrDefault(emptyMap())
+        val map = channelsPage()?.toChannelDirectory().orEmpty()
         if (map.isNotEmpty()) channelDirectory = map
         return map
     }
+
+    /** The broadcaster "Apps" rail (france.tv, TF1+, ...) shown on the home page. */
+    private suspend fun appsRail(): ContentRail? = channelsPage()?.toAppsRail()
 
     /** Labels each live card (one with a channel id but no subtitle) with its channel name. */
     private suspend fun labelChannels(page: ContentPage): ContentPage {

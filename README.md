@@ -20,9 +20,10 @@ Elle donne accès au **direct**, au **guide des programmes** (EPG), à la **rech
 (synopsis, casting, année, classification) plutôt que de le lire aussitôt, et la fiche regroupe ses
 autres diffusions disponibles. Pour une série en rattrapage, la fiche liste les **épisodes
 disponibles** avec leur vignette. Vous pouvez aussi **programmer un enregistrement** et retrouver vos
-**enregistrements** (DVR) dans une rangée dédiée sur l'accueil. Cliquer sur l'en-tête d'une rangée
-(par ex. *En direct à la TV*) ouvre la **catégorie complète en grille**, avec le nom de la chaîne sous
-chaque programme.
+**enregistrements** (DVR) dans une rangée dédiée sur l'accueil. L'accueil réunit aussi les
+**applications des diffuseurs** (france.tv, MyTF1, M6+…) : ouvrez l'une d'elles pour parcourir son
+catalogue (un abonnement peut être requis). Cliquer sur l'en-tête d'une rangée (par ex. *En direct à
+la TV*) ouvre la **catégorie complète en grille**, avec le nom de la chaîne sous chaque programme.
 
 L'application accepte aussi des **liens profonds** vers une fiche, pour l'intégration par des
 applications tierces (par ex. [multistream](https://github.com/renaudallard/multistream)) :

@@ -224,3 +224,15 @@ fun PageResponse.toChannelDirectory(): Map<String, String> {
     }
     return out
 }
+
+/**
+ * The channels page's "Apps" section (broadcaster apps: france.tv, TF1+, M6+, ...) as a rail for the
+ * home page. An entitled app links to its `broadcaster-details/{id}` catalogue (a normal page); a
+ * locked one only carries a tracking action and is marked `isLocked`.
+ */
+fun PageResponse.toAppsRail(): ContentRail? {
+    val section = content?.sections.orEmpty()
+        .firstOrNull { it.title?.text == "Apps" || it.title?.text == "Applications" } ?: return null
+    val cards = section.components.orEmpty().mapNotNull { it.toCard(square = true) }
+    return if (cards.isEmpty()) null else ContentRail("apps", "Applications", cards)
+}

@@ -159,6 +159,12 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
             vodId != null -> showDetail(card, vodId, DetailKind.PROGRAM)
             seriesId != null -> showDetail(card, seriesId, DetailKind.SERIES)
             else -> {
+                // A locked app (TF1+, M6+, ...) only carries a tracking/upsell action, so do not try
+                // to open it; tell the user a subscription is needed instead.
+                if (card.isLocked) {
+                    _state.update { it.copy(error = "Abonnement requis pour ${card.title ?: "ce contenu"}") }
+                    return
+                }
                 val url = card.actionUrl ?: return
                 _state.update { it.copy(busy = true, error = null) }
                 loadPageInto(url, replace = false, fallbackTitle = card.title)
