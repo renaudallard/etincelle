@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -228,7 +229,8 @@ private fun GridCard(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
 @Composable
 fun SettingsScreen(onBack: () -> Unit, onLogout: () -> Unit, modifier: Modifier = Modifier) {
     var confirm by remember { mutableStateOf(false) }
-    Column(modifier.fillMaxSize()) {
+    // statusBarsPadding keeps the Retour button below the status bar so it stays tappable.
+    Column(modifier.fillMaxSize().statusBarsPadding()) {
         Row(
             Modifier.fillMaxWidth().padding(start = 4.dp, end = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
