@@ -34,7 +34,9 @@ fun CastButton(state: CastUiState, onConnect: (String) -> Unit, onDisconnect: ()
     if (!state.available) return
     var open by remember { mutableStateOf(false) }
     TextButton(onClick = { open = true }) {
-        Icon(painterResource(DesignR.drawable.ic_cast), contentDescription = "Caster", modifier = Modifier.size(30.dp))
+        // A filled glyph signals an active Cast connection; the outline one means "not casting".
+        val icon = if (state.isCasting) DesignR.drawable.ic_cast_connected else DesignR.drawable.ic_cast
+        Icon(painterResource(icon), contentDescription = "Caster", modifier = Modifier.size(30.dp))
         val device = state.connectedDeviceName
         if (device != null) {
             Spacer(Modifier.width(6.dp))
