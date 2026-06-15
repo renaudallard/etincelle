@@ -89,6 +89,11 @@ follows each component's `actions`.
   the episode in `footer.subtitle`, and carry a numeric `channel_id` (no channel name). Map the name
   via `/papi/v1/page/channels`: each card's title is the channel name, with a `channel-details/{id}`
   action giving the id.
+- **Broadcaster apps:** `/papi/v1/page/channels` also carries an "Apps" (a.k.a. "Applications") section
+  of `square` broadcaster cards (france.tv, MyTF1, M6+, ...). An entitled app's `on_click` navigation
+  targets `/papi/v1/broadcaster-details/{id}` (a normal browsable `catalog` page of program/series/channel
+  cards); a locked app carries only a `tracking` action and is flagged via `is_locked`/`state.is_locked`.
+  etincelle reads this via `PageResponse.toAppsRail()` to build the home "Applications" rail.
 - **Recordings "see all":** the "Vos enregistrements" rail's see-all is `/papi/v1/my-stuff/main?selectedTab=recordings`,
   which has no standard `content.sections` — use the `dvr/v2/list` data instead.
 - **Poster cards** (`card-poster`, e.g. "Ce soir") carry no title field; their display name is in the
