@@ -21,7 +21,8 @@ import it.allard.etincelle.core.network.SessionStore
 import retrofit2.HttpException
 import java.io.IOException
 
-private const val GUIDE_WINDOW_MS = 4L * 60 * 60 * 1000
+// A full day of guide so a channel's "tout voir" grid covers at least 24h.
+private const val GUIDE_WINDOW_MS = 24L * 60 * 60 * 1000
 private const val GUIDE_CHANNEL_LIMIT = 40
 
 /** Fubo implementation of auth + content + playback, with persisted sessions and token refresh. */
