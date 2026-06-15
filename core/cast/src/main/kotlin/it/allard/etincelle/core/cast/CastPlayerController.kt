@@ -63,6 +63,11 @@ class CastPlayerController(
     private var hasRetried = false
     private var reResolveJob: Job? = null
 
+    // A transfer keeps the old player running until the new one starts; these track that pending stop.
+    private var deferStopSource: Player? = null
+    private var deferStopTarget: Player? = null
+    private var deferStopListener: Player.Listener? = null
+
     private val errorListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) = onPlaybackError()
     }
@@ -86,6 +91,7 @@ class CastPlayerController(
     fun stopPlayback(): Pair<Long, Long>? {
         if (_currentPlayer.value === castPlayer) return null
         reResolveJob?.cancel()
+        clearDeferredStop()
         val player = _currentPlayer.value
         val pos = player.currentPosition
         val dur = player.duration
@@ -96,6 +102,7 @@ class CastPlayerController(
     }
 
     fun release() {
+        clearDeferredStop()
         localPlayer.removeListener(errorListener)
         castPlayer.removeListener(errorListener)
         scope.cancel()
@@ -136,10 +143,12 @@ class CastPlayerController(
         val from = _currentPlayer.value
         if (from === target) return
         reResolveJob?.cancel()
-        runCatching { from.stop() }
+        // Keep `from` playing until `target` starts, so the hand-off does not blank out the picture;
+        // deferStop cuts the old screen once the new one is actually playing.
+        clearDeferredStop()
         _currentPlayer.value = target
         hasRetried = false
-        val item = currentItem ?: return
+        val item = currentItem ?: run { runCatching { from.stop() }; return }
         val source = item.localConfiguration?.tag as? PlaybackSource
         val position = if (source?.isLive == true) 0 else fromPosition
         val resolver = reResolve
@@ -157,6 +166,34 @@ class CastPlayerController(
             loadOn(target, item, position)
             target.playWhenReady = fromPlayWhenReady
         }
+        deferStop(from, target)
+    }
+
+    // Stop `from` only once `target` is actually playing (or immediately if it already is).
+    private fun deferStop(from: Player, target: Player) {
+        if (from === target) return
+        if (target.isPlaying) {
+            runCatching { from.stop() }
+            return
+        }
+        val listener = object : Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (isPlaying) clearDeferredStop()
+            }
+        }
+        deferStopSource = from
+        deferStopTarget = target
+        deferStopListener = listener
+        target.addListener(listener)
+    }
+
+    // Cut the pending source now (the target started, or a new swap superseded this one).
+    private fun clearDeferredStop() {
+        deferStopListener?.let { deferStopTarget?.removeListener(it) }
+        deferStopSource?.let { runCatching { it.stop() } }
+        deferStopSource = null
+        deferStopTarget = null
+        deferStopListener = null
     }
 
     private fun loadOn(player: Player, item: MediaItem, positionMs: Long) {
