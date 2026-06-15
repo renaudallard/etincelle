@@ -37,9 +37,11 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -59,6 +61,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import coil.compose.AsyncImage
+import it.allard.etincelle.core.cast.CastReceiver
 import it.allard.etincelle.core.designsystem.categoryIconRes
 import it.allard.etincelle.core.designsystem.theme.BackgroundLevel1
 import it.allard.etincelle.core.designsystem.theme.BrandBlack
@@ -226,10 +229,13 @@ private fun GridCard(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
     }
 }
 
-/** Settings page. For now its only entry is Déconnexion (with confirmation). */
+/** Settings page: app-icon and Cast-receiver toggles, plus Déconnexion (with confirmation). */
 @Composable
 fun SettingsScreen(onBack: () -> Unit, onLogout: () -> Unit, modifier: Modifier = Modifier) {
     var confirm by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    var mono by remember { mutableStateOf(AppIcon.isMono(context)) }
+    var officialReceiver by remember { mutableStateOf(CastReceiver.isOfficial(context)) }
     // statusBarsPadding keeps the Retour button below the status bar so it stays tappable.
     Column(modifier.fillMaxSize().statusBarsPadding()) {
         Row(
@@ -240,25 +246,20 @@ fun SettingsScreen(onBack: () -> Unit, onLogout: () -> Unit, modifier: Modifier 
             Spacer(Modifier.width(8.dp))
             Text("Paramètres", style = MaterialTheme.typography.titleLarge)
         }
-        val context = LocalContext.current
-        var mono by remember { mutableStateOf(AppIcon.isMono(context)) }
-        Text(
-            "Icône de l'application",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+        SettingToggle(
+            title = "Icône monochrome",
+            subtitle = "Logo blanc sur fond transparent",
+            checked = mono,
+            onCheckedChange = { mono = it; AppIcon.setMono(context, it) },
         )
-        Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            Text(
-                "Couleur",
-                color = if (!mono) BrandYellow else MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.clickable { AppIcon.setMono(context, false); mono = false }.padding(vertical = 8.dp),
-            )
-            Text(
-                "Monochrome",
-                color = if (mono) BrandYellow else MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.clickable { AppIcon.setMono(context, true); mono = true }.padding(vertical = 8.dp),
-            )
-        }
+        HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+        SettingToggle(
+            title = "Récepteur Fubo officiel",
+            subtitle = "Expérimental. Redémarrez l'application après le changement.",
+            checked = officialReceiver,
+            onCheckedChange = { officialReceiver = it; CastReceiver.setOfficial(context, it) },
+        )
+        HorizontalDivider(Modifier.padding(horizontal = 16.dp))
         Text(
             "Déconnexion",
             style = MaterialTheme.typography.bodyLarge,
@@ -274,6 +275,22 @@ fun SettingsScreen(onBack: () -> Unit, onLogout: () -> Unit, modifier: Modifier 
             confirmButton = { TextButton(onClick = { confirm = false; onLogout() }) { Text("Se déconnecter") } },
             dismissButton = { TextButton(onClick = { confirm = false }) { Text("Annuler") } },
         )
+    }
+}
+
+/** A settings row: a title + subtitle on the left and a Material switch on the right. */
+@Composable
+private fun SettingToggle(title: String, subtitle: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable { onCheckedChange(!checked) }.padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.width(12.dp))
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
