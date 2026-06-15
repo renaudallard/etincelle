@@ -229,9 +229,15 @@ private fun GridCard(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
     }
 }
 
-/** Settings page: app-icon and Cast-receiver toggles, plus Déconnexion (with confirmation). */
+/** Settings page: app-icon, hide-locked and Cast-receiver toggles, plus Déconnexion (with confirmation). */
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onLogout: () -> Unit, modifier: Modifier = Modifier) {
+fun SettingsScreen(
+    onBack: () -> Unit,
+    onLogout: () -> Unit,
+    hideLocked: Boolean = false,
+    onHideLocked: (Boolean) -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
     var confirm by remember { mutableStateOf(false) }
     val context = LocalContext.current
     var mono by remember { mutableStateOf(AppIcon.isMono(context)) }
@@ -246,6 +252,13 @@ fun SettingsScreen(onBack: () -> Unit, onLogout: () -> Unit, modifier: Modifier 
             Spacer(Modifier.width(8.dp))
             Text("Paramètres", style = MaterialTheme.typography.titleLarge)
         }
+        SettingToggle(
+            title = "Masquer les contenus verrouillés",
+            subtitle = "Cache les programmes non inclus dans votre abonnement",
+            checked = hideLocked,
+            onCheckedChange = { LocalPrefs.setHideLocked(context, it); onHideLocked(it) },
+        )
+        HorizontalDivider(Modifier.padding(horizontal = 16.dp))
         SettingToggle(
             title = "Icône monochrome",
             subtitle = "Logo blanc sur fond transparent",

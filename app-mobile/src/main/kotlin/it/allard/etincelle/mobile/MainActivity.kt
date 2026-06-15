@@ -83,6 +83,7 @@ class MainActivity : ComponentActivity() {
         castController = controller
         handleDeepLink(intent)
         viewModel.checkForUpdate(BuildConfig.VERSION_NAME)
+        viewModel.setHideLocked(LocalPrefs.hideLocked(this))
 
         val onPlay: (PlaybackSource) -> Unit = { source ->
             val item = MediaItemFactory.create(source)
@@ -243,7 +244,12 @@ private fun AppRoot(
 
         state.settings -> {
             BackHandler { vm.closeSettings() }
-            SettingsScreen(onBack = { vm.closeSettings() }, onLogout = { vm.logout() })
+            SettingsScreen(
+                onBack = { vm.closeSettings() },
+                onLogout = { vm.logout() },
+                hideLocked = state.hideLocked,
+                onHideLocked = vm::setHideLocked,
+            )
         }
 
         state.loggedIn -> {
@@ -293,7 +299,7 @@ private fun AppRoot(
                 val modifier = Modifier.padding(padding)
                 if (state.tab == Tab.SEARCH) {
                     SearchScreen(
-                        rails = state.current?.rails.orEmpty(),
+                        rails = state.visibleRails,
                         busy = state.busy,
                         error = state.error,
                         onSubmit = vm::search,
@@ -303,7 +309,7 @@ private fun AppRoot(
                     )
                 } else if (state.current?.isGrid == true) {
                     GridContent(
-                        rails = state.current?.rails.orEmpty(),
+                        rails = state.visibleRails,
                         busy = state.busy,
                         error = state.error,
                         onCardClick = vm::onCardClick,
@@ -311,7 +317,7 @@ private fun AppRoot(
                     )
                 } else {
                     PageContent(
-                        rails = state.current?.rails.orEmpty(),
+                        rails = state.visibleRails,
                         busy = state.busy,
                         error = state.error,
                         onCardClick = vm::onCardClick,

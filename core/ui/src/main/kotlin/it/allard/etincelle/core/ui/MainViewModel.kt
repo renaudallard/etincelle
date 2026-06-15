@@ -42,9 +42,21 @@ data class UiState(
     val update: UpdateInfo? = null,
     val error: String? = null,
     val info: String? = null,
+    val hideLocked: Boolean = false,
 ) {
     val current: ContentPage? get() = backStack.lastOrNull()
     val canGoBack: Boolean get() = backStack.size > 1
+
+    /** The current page's rails with locked (unentitled) cards removed when the user hid them. */
+    val visibleRails: List<ContentRail>
+        get() {
+            val rails = current?.rails ?: return emptyList()
+            if (!hideLocked) return rails
+            return rails.mapNotNull { rail ->
+                val cards = rail.cards.filterNot { it.isLocked }
+                if (cards.isEmpty()) null else rail.copy(cards = cards)
+            }
+        }
 }
 
 /** Shared presentation logic for both the phone and TV apps. */
@@ -299,6 +311,9 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
     fun openSettings() = _state.update { it.copy(settings = true) }
 
     fun closeSettings() = _state.update { it.copy(settings = false) }
+
+    /** Hides or shows locked (unentitled) cards across the content lists; see [UiState.visibleRails]. */
+    fun setHideLocked(hide: Boolean) = _state.update { it.copy(hideLocked = hide) }
 
     private var updateChecked = false
 
