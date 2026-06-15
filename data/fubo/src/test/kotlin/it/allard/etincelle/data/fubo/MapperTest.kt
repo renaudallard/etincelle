@@ -28,6 +28,15 @@ class MapperTest {
     }
 
     @Test
+    fun `a dvr recording is not live even when its manifest reports live`() {
+        val response = PlaybackResponse(
+            stream = StreamDto("https://cdn/dvr.mpd", "dash", drmProtected = false, live = true),
+            drmV2 = null, drm = null, heartbeat = null, concurrency = null, type = "dvr", program = null,
+        )
+        assertFalse(response.toPlaybackSource().isLive)
+    }
+
+    @Test
     fun `unprotected stream maps to no drm`() {
         val response = PlaybackResponse(
             stream = StreamDto("https://cdn/m.mpd", "dash", drmProtected = false, live = false),
