@@ -33,7 +33,7 @@ fun CastButton(state: CastUiState, onConnect: (String) -> Unit, onDisconnect: ()
     if (!state.available) return
     var open by remember { mutableStateOf(false) }
     TextButton(onClick = { open = true }) {
-        Icon(painterResource(R.drawable.ic_cast), contentDescription = "Caster", modifier = Modifier.size(20.dp))
+        Icon(painterResource(R.drawable.ic_cast), contentDescription = "Caster", modifier = Modifier.size(40.dp))
         val device = state.connectedDeviceName
         if (device != null) {
             Spacer(Modifier.width(6.dp))
