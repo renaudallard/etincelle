@@ -20,6 +20,15 @@ data class ContentRail(
     val seeAllUrl: String? = null,
 )
 
+/** Groups episode cards by season (parsed from their "Sx Ey ..." title), ordered by season number. */
+fun List<ContentCard>.groupBySeason(): List<Pair<String, List<ContentCard>>> {
+    val regex = Regex("""^S(\d+)""")
+    return groupBy { card -> card.title?.let { regex.find(it)?.groupValues?.get(1)?.toIntOrNull() } }
+        .toList()
+        .sortedBy { it.first ?: Int.MAX_VALUE }
+        .map { (n, eps) -> (if (n != null) "Saison $n" else "Épisodes") to eps }
+}
+
 /** A content rail (one whose cards lead somewhere) can be opened as a full grid from its header. */
 fun ContentRail.expandable(): Boolean = seeAllUrl != null || cards.any {
     it.vodId != null || it.seriesId != null || it.channelId != null ||

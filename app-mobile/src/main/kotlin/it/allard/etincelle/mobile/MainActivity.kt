@@ -4,6 +4,7 @@
 package it.allard.etincelle.mobile
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.WindowManager
 import android.widget.Toast
@@ -15,6 +16,7 @@ import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -42,6 +44,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import it.allard.etincelle.core.cast.CastPlayerController
 import it.allard.etincelle.core.cast.CastUiState
+import it.allard.etincelle.core.designsystem.R as DesignR
 import it.allard.etincelle.core.designsystem.theme.EtincelleTheme
 import it.allard.etincelle.core.domain.DetailKind
 import it.allard.etincelle.core.model.PlaybackSource
@@ -78,6 +81,7 @@ class MainActivity : ComponentActivity() {
         }
         castController = controller
         handleDeepLink(intent)
+        viewModel.checkForUpdate(BuildConfig.VERSION_NAME)
 
         val onPlay: (PlaybackSource) -> Unit = { source ->
             val item = MediaItemFactory.create(source)
@@ -116,6 +120,22 @@ class MainActivity : ComponentActivity() {
                         onStop = onStop,
                         onCastConnect = { controller?.connectTo(it) },
                         onCastDisconnect = { controller?.disconnect() },
+                    )
+                }
+                state.update?.let { up ->
+                    AlertDialog(
+                        onDismissRequest = { viewModel.dismissUpdate() },
+                        title = { Text("Mise à jour disponible") },
+                        text = { Text("La version ${up.version} est disponible. Voulez-vous la télécharger ?") },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(up.apkUrl))) }
+                                viewModel.dismissUpdate()
+                            }) { Text("Télécharger") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { viewModel.dismissUpdate() }) { Text("Plus tard") }
+                        },
                     )
                 }
             }
@@ -165,12 +185,12 @@ private val EMPTY_CAST_FLOW: StateFlow<CastUiState> = MutableStateFlow(CastUiSta
 /** Brand-pack vector icon for the tabs it covers; the rest keep their emoji glyph. */
 @DrawableRes
 private fun tabIconRes(tab: Tab): Int? = when (tab) {
-    Tab.HOME -> R.drawable.ic_accueil
-    Tab.LIVE -> R.drawable.ic_direct
-    Tab.GUIDE -> R.drawable.ic_grille
-    Tab.MOVIES -> R.drawable.ic_films
-    Tab.SERIES -> R.drawable.ic_series
-    Tab.SEARCH -> R.drawable.ic_recherche
+    Tab.HOME -> DesignR.drawable.ic_accueil
+    Tab.LIVE -> DesignR.drawable.ic_direct
+    Tab.GUIDE -> DesignR.drawable.ic_grille
+    Tab.MOVIES -> DesignR.drawable.ic_films
+    Tab.SERIES -> DesignR.drawable.ic_series
+    Tab.SEARCH -> DesignR.drawable.ic_recherche
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -216,6 +236,11 @@ private fun AppRoot(
             )
         }
 
+        state.settings -> {
+            BackHandler { vm.closeSettings() }
+            SettingsScreen(onBack = { vm.closeSettings() }, onLogout = { vm.logout() })
+        }
+
         state.loggedIn -> {
             BackHandler(enabled = state.canGoBack) { vm.back() }
             Scaffold(
@@ -229,7 +254,7 @@ private fun AppRoot(
                         },
                         actions = {
                             CastButton(castState, onCastConnect, onCastDisconnect)
-                            TextButton(onClick = { vm.logout() }) { Text("Déconnexion") }
+                            TextButton(onClick = { vm.openSettings() }) { Text("Paramètres") }
                         },
                     )
                 },

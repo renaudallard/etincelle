@@ -19,6 +19,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -27,6 +31,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -51,10 +56,13 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import it.allard.etincelle.core.designsystem.categoryIconRes
 import it.allard.etincelle.core.designsystem.theme.BackgroundLevel1
 import it.allard.etincelle.core.designsystem.theme.BackgroundLevel2
 import it.allard.etincelle.core.designsystem.theme.BrandBlack
@@ -62,10 +70,12 @@ import it.allard.etincelle.core.designsystem.theme.BrandYellow
 import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.expandable
+import it.allard.etincelle.core.model.groupBySeason
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.Recording
 import it.allard.etincelle.core.ui.Tab
 import it.allard.etincelle.core.ui.UiState
+import it.allard.etincelle.core.ui.UpdateInfo
 
 private val OVERSCAN = 48.dp
 
@@ -102,7 +112,7 @@ fun TvBrowseScreen(
     onSelectTab: (Tab) -> Unit,
     onCardClick: (ContentCard) -> Unit,
     onSearch: (String) -> Unit,
-    onLogout: () -> Unit,
+    onSettings: () -> Unit,
     onSeeAll: (ContentRail) -> Unit,
 ) {
     val firstTab = remember { FocusRequester() }
@@ -132,7 +142,7 @@ fun TvBrowseScreen(
                 )
             }
             item {
-                TvTab(label = "Déconnexion", selected = false, onClick = onLogout)
+                TvTab(label = "Paramètres", selected = false, onClick = onSettings)
             }
         }
         Spacer(Modifier.height(16.dp))
@@ -142,12 +152,17 @@ fun TvBrowseScreen(
             Text(state.current?.title ?: state.tab.label, style = MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(12.dp))
             Box(Modifier.fillMaxSize()) {
-                LazyColumn(
-                    modifier = Modifier.focusGroup().focusRequester(railsFocus),
-                    contentPadding = PaddingValues(bottom = 48.dp),
-                    verticalArrangement = Arrangement.spacedBy(20.dp),
-                ) {
-                    items(state.current?.rails.orEmpty(), key = { it.id }) { rail -> TvRail(rail, onCardClick, onSeeAll) }
+                val page = state.current
+                if (page?.isGrid == true) {
+                    TvGridContent(page.rails, onCardClick, railsFocus)
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.focusGroup().focusRequester(railsFocus),
+                        contentPadding = PaddingValues(bottom = 48.dp),
+                        verticalArrangement = Arrangement.spacedBy(20.dp),
+                    ) {
+                        items(page?.rails.orEmpty(), key = { it.id }) { rail -> TvRail(rail, onCardClick, onSeeAll) }
+                    }
                 }
                 if (state.busy) CircularProgressIndicator(Modifier.align(Alignment.Center))
                 state.error?.let {
@@ -210,6 +225,51 @@ private fun TvTab(label: String, selected: Boolean, onClick: () -> Unit, modifie
     }
 }
 
+/** Settings page on TV. For now its only entry is Déconnexion, with an inline confirmation. */
+@Composable
+fun TvSettingsScreen(onBack: () -> Unit, onLogout: () -> Unit) {
+    var confirm by remember { mutableStateOf(false) }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(confirm) { runCatching { focus.requestFocus() } }
+    Column(Modifier.fillMaxSize().padding(OVERSCAN), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text("Paramètres", style = MaterialTheme.typography.displaySmall)
+        if (!confirm) {
+            Button(onClick = { confirm = true }, modifier = Modifier.focusRequester(focus)) { Text("Déconnexion") }
+        } else {
+            Text("Voulez-vous vraiment vous déconnecter ?", color = Color.White, style = MaterialTheme.typography.titleMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(onClick = { confirm = false }, modifier = Modifier.focusRequester(focus)) { Text("Annuler") }
+                Button(onClick = onLogout) { Text("Se déconnecter") }
+            }
+        }
+    }
+}
+
+/** Startup prompt offering the newer GitHub release: focusable card over the current screen. */
+@Composable
+fun TvUpdateDialog(info: UpdateInfo, onDownload: () -> Unit, onDismiss: () -> Unit) {
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    // A real Dialog traps D-pad focus and routes Back to onDismissRequest, unlike a plain overlay.
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            Modifier.clip(RoundedCornerShape(12.dp)).background(BackgroundLevel1).padding(32.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text("Mise à jour disponible", style = MaterialTheme.typography.headlineSmall)
+            Text(
+                "La version ${info.version} est disponible. Voulez-vous la télécharger ?",
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(onClick = onDownload, modifier = Modifier.focusRequester(focus)) { Text("Télécharger") }
+                Button(onClick = onDismiss) { Text("Plus tard") }
+            }
+        }
+    }
+}
+
 /** A show's detail page on TV: poster beside the info (year, genre, cast), synopsis, and Regarder. */
 @Composable
 fun TvProgramDetailScreen(
@@ -220,6 +280,7 @@ fun TvProgramDetailScreen(
     onWatch: () -> Unit,
     onRecord: () -> Unit,
     onWatchRecording: (String) -> Unit,
+    onEpisode: (ContentCard) -> Unit,
 ) {
     val watchFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { watchFocus.requestFocus() } }
@@ -260,6 +321,9 @@ fun TvProgramDetailScreen(
                 detail.year?.let { "Année de sortie : $it" },
                 detail.classification?.let { "Classification : $it" },
             ).forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Color.White) }
+            if (detail.episodes.isNotEmpty()) {
+                TvEpisodesSection(detail.episodes, busy, onEpisode)
+            }
             if (detail.recordings.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 Text("Vos enregistrements", style = MaterialTheme.typography.titleMedium, color = Color.White)
@@ -268,6 +332,50 @@ fun TvProgramDetailScreen(
                 }
             }
         }
+    }
+}
+
+/** The "Épisodes disponibles" section on TV: a season selector (when several) over the episode list. */
+@Composable
+private fun TvEpisodesSection(episodes: List<ContentCard>, busy: Boolean, onEpisode: (ContentCard) -> Unit) {
+    val seasons = remember(episodes) { episodes.groupBySeason() }
+    var selected by remember(episodes) { mutableStateOf(0) }
+    val idx = selected.coerceIn(0, seasons.size - 1)
+    Spacer(Modifier.height(8.dp))
+    Text("Épisodes disponibles", style = MaterialTheme.typography.titleMedium, color = Color.White)
+    if (seasons.size > 1) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            seasons.forEachIndexed { i, (label, _) ->
+                TextButton(onClick = { selected = i }) {
+                    Text(label, color = if (i == idx) BrandYellow else Color.White)
+                }
+            }
+        }
+    }
+    seasons[idx].second.forEach { ep -> TvEpisodeRow(ep, enabled = !busy, onClick = { onEpisode(ep) }) }
+}
+
+/** One catch-up episode on the TV detail: a thumbnail and label, focusable and clickable. */
+@Composable
+private fun TvEpisodeRow(card: ContentCard, enabled: Boolean, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    Row(
+        Modifier.fillMaxWidth()
+            .onFocusChanged { focused = it.isFocused }
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (focused) BackgroundLevel2 else Color.Transparent)
+            .clickable(enabled = enabled) { onClick() }
+            .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AsyncImage(
+            model = card.imageUrl,
+            contentDescription = card.title,
+            modifier = Modifier.width(120.dp).height(68.dp).clip(RoundedCornerShape(6.dp)).background(BackgroundLevel1),
+            contentScale = ContentScale.Crop,
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(card.title ?: "Épisode", color = Color.White, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -314,9 +422,34 @@ private fun TvRail(rail: ContentRail, onCardClick: (ContentCard) -> Unit, onSeeA
     }
 }
 
+/** A "see all" / Direct page on TV as a D-pad grid (5 per row), keeping section headers. */
+@Composable
+private fun TvGridContent(rails: List<ContentRail>, onCardClick: (ContentCard) -> Unit, focus: FocusRequester) {
+    val multiSection = rails.size > 1
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(5),
+        modifier = Modifier.fillMaxSize().focusGroup().focusRequester(focus),
+        contentPadding = PaddingValues(bottom = 48.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        rails.forEach { rail ->
+            val header = rail.title?.takeIf { multiSection && it.isNotBlank() }
+            if (header != null) {
+                item(span = { GridItemSpan(maxLineSpan) }, key = "h-${rail.id}") {
+                    Text(header, style = MaterialTheme.typography.titleMedium, color = Color.White)
+                }
+            }
+            items(rail.cards, key = { "${rail.id}-${it.id}" }) { card -> TvCard(card, onCardClick) }
+        }
+    }
+}
+
 @Composable
 private fun TvCard(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
     val isChannel = card.square
+    // A genre/category tile carries no artwork; draw the brand icon instead of a blank box.
+    val categoryIcon = if (card.channelId == null && card.vodId == null) categoryIconRes(card.title) else null
     var focused by remember { mutableStateOf(false) }
     val w = if (isChannel) 112.dp else 208.dp
     val h = if (isChannel) 112.dp else 117.dp
@@ -328,13 +461,18 @@ private fun TvCard(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
                 .background(BackgroundLevel1)
                 .border(if (focused) 3.dp else 0.dp, if (focused) Color.White else Color.Transparent, RoundedCornerShape(10.dp))
                 .clickable { onCardClick(card) },
+            contentAlignment = Alignment.Center,
         ) {
-            AsyncImage(
-                model = card.imageUrl,
-                contentDescription = card.title,
-                modifier = Modifier.fillMaxSize().padding(if (isChannel) 14.dp else 0.dp),
-                contentScale = if (isChannel) ContentScale.Fit else ContentScale.Crop,
-            )
+            if (categoryIcon != null) {
+                Icon(painterResource(categoryIcon), contentDescription = card.title, tint = BrandYellow, modifier = Modifier.size(48.dp))
+            } else {
+                AsyncImage(
+                    model = card.imageUrl,
+                    contentDescription = card.title,
+                    modifier = Modifier.fillMaxSize().padding(if (isChannel) 14.dp else 0.dp),
+                    contentScale = if (isChannel) ContentScale.Fit else ContentScale.Crop,
+                )
+            }
             if (card.isLocked) {
                 Box(Modifier.align(Alignment.TopEnd).padding(4.dp).clip(RoundedCornerShape(4.dp)).background(BrandYellow).padding(horizontal = 4.dp)) {
                     Text("€", color = BrandBlack, style = MaterialTheme.typography.labelSmall)
@@ -343,6 +481,9 @@ private fun TvCard(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
         }
         card.title?.let {
             Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelMedium, modifier = Modifier.width(w).padding(top = 4.dp))
+        }
+        card.subtitle?.let {
+            Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis, color = BrandYellow, style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(w))
         }
     }
 }

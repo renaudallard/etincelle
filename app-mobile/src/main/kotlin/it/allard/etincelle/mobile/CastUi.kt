@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import it.allard.etincelle.core.cast.CastUiState
+import it.allard.etincelle.core.designsystem.R as DesignR
 
 /** Cast control for the top bar: shows a picker of discovered Chromecasts, or the connected one. */
 @Composable
@@ -33,7 +34,7 @@ fun CastButton(state: CastUiState, onConnect: (String) -> Unit, onDisconnect: ()
     if (!state.available) return
     var open by remember { mutableStateOf(false) }
     TextButton(onClick = { open = true }) {
-        Icon(painterResource(R.drawable.ic_cast), contentDescription = "Caster", modifier = Modifier.size(40.dp))
+        Icon(painterResource(DesignR.drawable.ic_cast), contentDescription = "Caster", modifier = Modifier.size(40.dp))
         val device = state.connectedDeviceName
         if (device != null) {
             Spacer(Modifier.width(6.dp))

@@ -3,7 +3,6 @@
 
 package it.allard.etincelle.mobile
 
-import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
@@ -28,10 +27,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -54,12 +57,14 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import coil.compose.AsyncImage
+import it.allard.etincelle.core.designsystem.categoryIconRes
 import it.allard.etincelle.core.designsystem.theme.BackgroundLevel1
 import it.allard.etincelle.core.designsystem.theme.BrandBlack
 import it.allard.etincelle.core.designsystem.theme.BrandYellow
 import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.expandable
+import it.allard.etincelle.core.model.groupBySeason
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.Recording
 
@@ -129,7 +134,9 @@ fun GridContent(
     onCardClick: (ContentCard) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val cards = rails.flatMap { it.cards }
+    // A multi-section page (e.g. the channels page, with an "Apps" group) keeps its section headers;
+    // a single-section see-all just shows its cards (its title is already in the top bar).
+    val multiSection = rails.size > 1
     Box(modifier.fillMaxSize()) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),
@@ -138,7 +145,15 @@ fun GridContent(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            items(cards, key = { it.id }) { card -> GridCard(card, onCardClick) }
+            rails.forEach { rail ->
+                val header = rail.title?.takeIf { multiSection && it.isNotBlank() }
+                if (header != null) {
+                    item(span = { GridItemSpan(maxLineSpan) }, key = "h-${rail.id}") {
+                        Text(header, style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+                items(rail.cards, key = { "${rail.id}-${it.id}" }) { card -> GridCard(card, onCardClick) }
+            }
         }
         if (busy) CircularProgressIndicator(Modifier.align(Alignment.Center))
         if (error != null) {
@@ -206,6 +221,37 @@ private fun GridCard(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+    }
+}
+
+/** Settings page. For now its only entry is Déconnexion (with confirmation). */
+@Composable
+fun SettingsScreen(onBack: () -> Unit, onLogout: () -> Unit, modifier: Modifier = Modifier) {
+    var confirm by remember { mutableStateOf(false) }
+    Column(modifier.fillMaxSize()) {
+        Row(
+            Modifier.fillMaxWidth().padding(start = 4.dp, end = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(onClick = onBack) { Text("← Retour") }
+            Spacer(Modifier.width(8.dp))
+            Text("Paramètres", style = MaterialTheme.typography.titleLarge)
+        }
+        Text(
+            "Déconnexion",
+            style = MaterialTheme.typography.bodyLarge,
+            color = BrandYellow,
+            modifier = Modifier.fillMaxWidth().clickable { confirm = true }.padding(horizontal = 16.dp, vertical = 18.dp),
+        )
+    }
+    if (confirm) {
+        AlertDialog(
+            onDismissRequest = { confirm = false },
+            title = { Text("Déconnexion") },
+            text = { Text("Voulez-vous vraiment vous déconnecter ?") },
+            confirmButton = { TextButton(onClick = { confirm = false; onLogout() }) { Text("Se déconnecter") } },
+            dismissButton = { TextButton(onClick = { confirm = false }) { Text("Annuler") } },
+        )
     }
 }
 
@@ -299,11 +345,7 @@ fun ProgramDetailScreen(
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (detail.episodes.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                Text("Épisodes disponibles", style = MaterialTheme.typography.titleMedium)
-                detail.episodes.forEach { episode ->
-                    EpisodeRow(episode, enabled = !busy, onClick = { onEpisode(episode) })
-                }
+                EpisodesSection(detail.episodes, busy, onEpisode)
             }
             if (detail.recordings.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
@@ -314,6 +356,31 @@ fun ProgramDetailScreen(
             }
         }
     }
+}
+
+/** The "Épisodes disponibles" section: a season dropdown (when there are several) over the episode list. */
+@Composable
+private fun EpisodesSection(episodes: List<ContentCard>, busy: Boolean, onEpisode: (ContentCard) -> Unit) {
+    val seasons = remember(episodes) { episodes.groupBySeason() }
+    var selected by remember(episodes) { mutableStateOf(0) }
+    var expanded by remember { mutableStateOf(false) }
+    val idx = selected.coerceIn(0, seasons.size - 1)
+    Spacer(Modifier.height(8.dp))
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("Épisodes disponibles", style = MaterialTheme.typography.titleMedium)
+        if (seasons.size > 1) {
+            Spacer(Modifier.width(12.dp))
+            Box {
+                TextButton(onClick = { expanded = true }) { Text("${seasons[idx].first} ▾", color = BrandYellow) }
+                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    seasons.forEachIndexed { i, (label, _) ->
+                        DropdownMenuItem(text = { Text(label) }, onClick = { selected = i; expanded = false })
+                    }
+                }
+            }
+        }
+    }
+    seasons[idx].second.forEach { ep -> EpisodeRow(ep, enabled = !busy, onClick = { onEpisode(ep) }) }
 }
 
 /** One catch-up episode row on a detail page: a thumbnail and label, tappable to open the episode. */
@@ -446,18 +513,4 @@ private fun CardItem(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
     }
 }
 
-/** Brand icon for a genre tile, matched by its title; null for any non-category card. */
-@DrawableRes
-private fun categoryIconRes(title: String?): Int? = when (title?.trim()?.lowercase()) {
-    "films", "cinéma", "cinema" -> R.drawable.ic_films
-    "séries", "series" -> R.drawable.ic_series
-    "divertissement" -> R.drawable.ic_divertissement
-    "sport", "sports" -> R.drawable.ic_sport
-    "informations", "information", "info", "actualités", "actualites", "actu" -> R.drawable.ic_informations
-    "documentaires", "documentaire", "découverte", "decouverte", "docs" -> R.drawable.ic_documentaires
-    "enfants", "enfant", "jeunesse" -> R.drawable.ic_enfants
-    "culture" -> R.drawable.ic_culture
-    "toutes les chaînes", "toutes les chaines", "chaînes", "chaines" -> R.drawable.ic_chaines
-    "favoris", "favori", "mes favoris" -> R.drawable.ic_favoris
-    else -> null
-}
+// categoryIconRes now lives in core:designsystem so the TV app shares the same genre icons.

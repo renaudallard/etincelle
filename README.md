@@ -28,6 +28,13 @@ L'application accepte aussi des **liens profonds** vers une fiche, pour l'intég
 applications tierces (par ex. [multistream](https://github.com/renaudallard/multistream)) :
 `etincelle://series/{id}`, `etincelle://program/{id}` ou `etincelle://channel/{id}` (identifiants Fubo).
 
+Elle ajoute un **sélecteur de saison** sur les séries qui en comptent plusieurs, et des **icônes de
+genre** dans les grilles de catégories. Un menu **Paramètres**, accessible depuis la barre
+du haut, regroupe les réglages, dont la **déconnexion** (avec confirmation). Sur téléphone, vous pouvez
+**diffuser** le flux en cours vers un **Chromecast** et transférer la lecture d'un appareil à l'autre.
+À chaque démarrage, etincelle **vérifie les mises à jour** sur GitHub et propose de télécharger la
+dernière version lorsqu'une plus récente est disponible.
+
 > ### ⚠️ Avertissement
 >
 > Projet non officiel, sans aucune affiliation avec Molotov ni Fubo. **etincelle** n'est qu'un
@@ -98,12 +105,13 @@ etincelle/
 ├── app-mobile/             application téléphone/tablette (Compose, Material3, Media3)
 ├── app-tv/                 application Android TV (Compose for TV, navigation + lecture au D-pad)
 ├── core/
-│   ├── designsystem/       jetons du thème sombre Molotov-4.27 + composants Compose partagés
+│   ├── designsystem/       jetons du thème sombre Molotov-4.27 + composants + icônes de genre
 │   ├── model/              types métier en Kotlin pur (PlaybackSource, DrmSpec, UserSession)
 │   ├── domain/             l'interface MolotovRepository (abstraction du backend)
 │   ├── network/            OkHttp/Retrofit/Moshi + intercepteurs Fubo + session + TokenStore
 │   ├── player/             mapping Media3 : DrmSpec vers MediaItem Widevine
-│   └── ui/                 MainViewModel/UiState partagés (logique de présentation des deux apps)
+│   ├── cast/               diffusion Chromecast Widevine (téléphone uniquement)
+│   └── ui/                 MainViewModel/UiState partagés + vérif. de mise à jour GitHub
 ├── data/
 │   └── fubo/               FuboRepository (implémente MolotovRepository) + DTO/mappers + DI
 └── gradle/libs.versions.toml   catalogue de versions

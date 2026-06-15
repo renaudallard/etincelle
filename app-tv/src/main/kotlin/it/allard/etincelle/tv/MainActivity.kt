@@ -3,6 +3,8 @@
 
 package it.allard.etincelle.tv
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -23,6 +25,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import it.allard.etincelle.core.designsystem.theme.EtincelleTheme
+import it.allard.etincelle.core.domain.DetailKind
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.player.MediaItemFactory
 import it.allard.etincelle.core.player.PlaybackProgress
@@ -41,12 +44,15 @@ class MainActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val exo = ExoPlayer.Builder(this).build()
         player = exo
+        handleDeepLink(intent)
+        viewModel.checkForUpdate(BuildConfig.VERSION_NAME)
         setContent {
             EtincelleTheme {
                 val state by viewModel.state.collectAsStateWithLifecycle()
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val playing = state.playing
                     val detail = state.detail
+                    Box(Modifier.fillMaxSize()) {
                     when {
                         state.checking -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             CircularProgressIndicator()
@@ -62,22 +68,59 @@ class MainActivity : ComponentActivity() {
                             TvProgramDetailScreen(
                                 detail, state.busy, state.error, state.info,
                                 viewModel::watchDetail, viewModel::recordDetail, viewModel::watchRecording,
+                                viewModel::onCardClick,
                             )
+                        }
+
+                        state.settings -> {
+                            BackHandler { viewModel.closeSettings() }
+                            TvSettingsScreen(onBack = viewModel::closeSettings, onLogout = viewModel::logout)
                         }
 
                         state.loggedIn -> {
                             BackHandler(enabled = state.canGoBack) { viewModel.back() }
                             TvBrowseScreen(
                                 state, viewModel::selectTab, viewModel::onCardClick, viewModel::search,
-                                viewModel::logout, viewModel::onRailSeeAll,
+                                viewModel::openSettings, viewModel::onRailSeeAll,
                             )
                         }
 
                         else -> TvLoginScreen(state.busy, state.error, viewModel::login)
                     }
+                    state.update?.let { up ->
+                        TvUpdateDialog(
+                            info = up,
+                            onDownload = {
+                                runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(up.apkUrl))) }
+                                viewModel.dismissUpdate()
+                            },
+                            onDismiss = viewModel::dismissUpdate,
+                        )
+                    }
+                    }
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleDeepLink(intent)
+    }
+
+    /** Opens a show from an etincelle://series|program|channel/{id} deep link. */
+    private fun handleDeepLink(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme != "etincelle") return
+        val kind = when (data.host) {
+            "series" -> DetailKind.SERIES
+            "program" -> DetailKind.PROGRAM
+            "channel" -> DetailKind.CHANNEL
+            else -> return
+        }
+        val id = data.pathSegments.firstOrNull() ?: return
+        viewModel.onDeepLink(id, kind)
     }
 
     override fun onDestroy() {

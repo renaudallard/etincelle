@@ -36,6 +36,8 @@ data class UiState(
     val backStack: List<ContentPage> = emptyList(),
     val detail: ProgramDetail? = null,
     val playing: PlaybackSource? = null,
+    val settings: Boolean = false,
+    val update: UpdateInfo? = null,
     val error: String? = null,
     val info: String? = null,
 ) {
@@ -272,6 +274,23 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
             else -> null
         }
     }.getOrNull()
+
+    fun openSettings() = _state.update { it.copy(settings = true) }
+
+    fun closeSettings() = _state.update { it.copy(settings = false) }
+
+    private var updateChecked = false
+
+    /** Checks GitHub for a newer release once per process; the app proposes the download if found. */
+    fun checkForUpdate(currentVersion: String) {
+        if (updateChecked) return
+        updateChecked = true
+        viewModelScope.launch {
+            UpdateChecker(currentVersion).latestUpdate()?.let { info -> _state.update { it.copy(update = info) } }
+        }
+    }
+
+    fun dismissUpdate() = _state.update { it.copy(update = null) }
 
     fun logout() {
         viewModelScope.launch {

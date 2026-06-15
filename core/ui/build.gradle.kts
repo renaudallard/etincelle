@@ -26,4 +26,6 @@ dependencies {
     api(project(":core:domain"))
     api(libs.androidx.lifecycle.viewmodel)
     implementation(libs.kotlinx.coroutines.android)
+
+    testImplementation(libs.junit)
 }
