@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,6 +27,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -91,6 +95,7 @@ fun PageContent(
     busy: Boolean,
     error: String?,
     onCardClick: (ContentCard) -> Unit,
+    onSeeAll: (ContentRail) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier.fillMaxSize()) {
@@ -99,7 +104,40 @@ fun PageContent(
             contentPadding = PaddingValues(vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            items(rails, key = { it.id }) { rail -> Rail(rail, onCardClick) }
+            items(rails, key = { it.id }) { rail -> Rail(rail, onCardClick, onSeeAll) }
+        }
+        if (busy) CircularProgressIndicator(Modifier.align(Alignment.Center))
+        if (error != null) {
+            Surface(
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp),
+                color = MaterialTheme.colorScheme.errorContainer,
+                shape = RoundedCornerShape(8.dp),
+            ) {
+                Text(error, modifier = Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onErrorContainer)
+            }
+        }
+    }
+}
+
+/** A "see all" page: every card in a full-screen scrollable grid, 3 per row. */
+@Composable
+fun GridContent(
+    rails: List<ContentRail>,
+    busy: Boolean,
+    error: String?,
+    onCardClick: (ContentCard) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val cards = rails.flatMap { it.cards }
+    Box(modifier.fillMaxSize()) {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(3),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            items(cards, key = { it.id }) { card -> GridCard(card, onCardClick) }
         }
         if (busy) CircularProgressIndicator(Modifier.align(Alignment.Center))
         if (error != null) {
@@ -115,12 +153,69 @@ fun PageContent(
 }
 
 @Composable
+private fun GridCard(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
+    val categoryIcon = if (card.channelId == null && card.vodId == null) categoryIconRes(card.title) else null
+    Column(
+        modifier = Modifier.fillMaxWidth().clickable { onCardClick(card) },
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape(10.dp)).background(BackgroundLevel1),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (categoryIcon != null) {
+                Icon(painterResource(categoryIcon), contentDescription = card.title, tint = BrandYellow, modifier = Modifier.size(28.dp))
+            } else {
+                AsyncImage(
+                    model = card.imageUrl,
+                    contentDescription = card.title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                )
+            }
+            if (card.isLocked) {
+                Box(
+                    modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)
+                        .clip(RoundedCornerShape(4.dp)).background(BrandYellow).padding(horizontal = 4.dp),
+                ) {
+                    Text("€", style = MaterialTheme.typography.labelSmall, color = BrandBlack)
+                }
+            }
+        }
+        card.title?.let {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                it,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        card.subtitle?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.labelSmall,
+                color = BrandYellow,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+@Composable
 fun SearchScreen(
     rails: List<ContentRail>,
     busy: Boolean,
     error: String?,
     onSubmit: (String) -> Unit,
     onCardClick: (ContentCard) -> Unit,
+    onSeeAll: (ContentRail) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var query by remember { mutableStateOf("") }
@@ -134,7 +229,7 @@ fun SearchScreen(
             keyboardActions = KeyboardActions(onSearch = { onSubmit(query) }),
             modifier = Modifier.fillMaxWidth().padding(16.dp),
         )
-        PageContent(rails, busy, error, onCardClick, Modifier.weight(1f))
+        PageContent(rails, busy, error, onCardClick, onSeeAll, Modifier.weight(1f))
     }
 }
 
@@ -229,10 +324,22 @@ private fun RecordingRow(recording: Recording, enabled: Boolean, onWatch: () -> 
 }
 
 @Composable
-private fun Rail(rail: ContentRail, onCardClick: (ContentCard) -> Unit) {
+private fun Rail(rail: ContentRail, onCardClick: (ContentCard) -> Unit, onSeeAll: (ContentRail) -> Unit) {
     Column(Modifier.fillMaxWidth()) {
-        rail.title?.takeIf { it.isNotBlank() }?.let {
-            Text(it, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 16.dp, bottom = 8.dp))
+        rail.title?.takeIf { it.isNotBlank() }?.let { title ->
+            if (rail.seeAllUrl != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { onSeeAll(rail) }
+                        .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(title, style = MaterialTheme.typography.titleMedium)
+                    Text("Tout voir ›", style = MaterialTheme.typography.labelLarge, color = BrandYellow)
+                }
+            } else {
+                Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 16.dp, bottom = 8.dp))
+            }
         }
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
@@ -245,7 +352,8 @@ private fun Rail(rail: ContentRail, onCardClick: (ContentCard) -> Unit) {
 
 @Composable
 private fun CardItem(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
-    val isChannel = card.channelId != null
+    // Only channel-logo cards draw as small squares; program/guide cards stay landscape.
+    val isChannel = card.square
     // A genre tile is a navigation card (no channel/VOD id) whose title names a category; it carries
     // no artwork, so draw the brand icon instead of a blank box.
     val categoryIcon = if (card.channelId == null && card.vodId == null) categoryIconRes(card.title) else null
@@ -309,5 +417,7 @@ private fun categoryIconRes(title: String?): Int? = when (title?.trim()?.lowerca
     "documentaires", "documentaire", "découverte", "decouverte", "docs" -> R.drawable.ic_documentaires
     "enfants", "enfant", "jeunesse" -> R.drawable.ic_enfants
     "culture" -> R.drawable.ic_culture
+    "toutes les chaînes", "toutes les chaines", "chaînes", "chaines" -> R.drawable.ic_chaines
+    "favoris", "favori", "mes favoris" -> R.drawable.ic_favoris
     else -> null
 }

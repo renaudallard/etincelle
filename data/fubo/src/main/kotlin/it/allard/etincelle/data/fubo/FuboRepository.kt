@@ -76,7 +76,46 @@ class FuboRepository(
         }
     }
 
-    override suspend fun loadPage(url: String): ContentPage = withRefresh { api.pageByUrl(url).toPage() }
+    override suspend fun loadPage(url: String): ContentPage = withRefresh {
+        // The "Vos enregistrements" rail's see-all points at the my-stuff page (selectedTab=recordings),
+        // which carries no standard sections; serve the DVR list as a page instead.
+        if (url.contains("selectedTab=recordings")) {
+            recordingsPage()
+        } else {
+            labelChannels(api.pageByUrl(url).toPage())
+        }
+    }
+
+    private suspend fun recordingsPage(): ContentPage =
+        ContentPage("Vos enregistrements", listOf(ContentRail("recordings", null, loadRecordings().map { it.toCard() })))
+
+    // Cached channel id -> name directory, loaded lazily the first time a page carries live cards.
+    private var channelDirectory: Map<String, String>? = null
+
+    private suspend fun channelNames(): Map<String, String> {
+        channelDirectory?.let { return it }
+        val map = runCatching { api.channelsPage().toChannelDirectory() }.getOrDefault(emptyMap())
+        if (map.isNotEmpty()) channelDirectory = map
+        return map
+    }
+
+    /** Labels each live card (one with a channel id but no subtitle) with its channel name. */
+    private suspend fun labelChannels(page: ContentPage): ContentPage {
+        val needed = page.rails.any { rail -> rail.cards.any { it.liveChannelId != null && it.subtitle == null } }
+        if (!needed) return page
+        val names = channelNames()
+        if (names.isEmpty()) return page
+        return page.copy(
+            rails = page.rails.map { rail ->
+                rail.copy(
+                    cards = rail.cards.map { card ->
+                        val name = card.liveChannelId?.let { names[it] }
+                        if (name != null && card.subtitle == null) card.copy(subtitle = name) else card
+                    },
+                )
+            },
+        )
+    }
 
     override suspend fun loadGuide(): ContentPage = withRefresh {
         val now = System.currentTimeMillis()

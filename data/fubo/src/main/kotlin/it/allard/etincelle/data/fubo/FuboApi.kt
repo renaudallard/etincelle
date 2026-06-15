@@ -33,6 +33,10 @@ interface FuboApi {
     @GET
     suspend fun pageByUrl(@Url url: String): PageResponse
 
+    /** The full channel directory (used to label live cards with their channel name). */
+    @GET("papi/v1/page/channels")
+    suspend fun channelsPage(): PageResponse
+
     /** Search; results come back as a normal page of rails. */
     @GET("papi/v1/search")
     suspend fun search(@Query("query") query: String): PageResponse

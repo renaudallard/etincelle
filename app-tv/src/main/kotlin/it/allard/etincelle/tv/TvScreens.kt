@@ -102,6 +102,7 @@ fun TvBrowseScreen(
     onCardClick: (ContentCard) -> Unit,
     onSearch: (String) -> Unit,
     onLogout: () -> Unit,
+    onSeeAll: (ContentRail) -> Unit,
 ) {
     val firstTab = remember { FocusRequester() }
     val railsFocus = remember { FocusRequester() }
@@ -135,7 +136,7 @@ fun TvBrowseScreen(
         }
         Spacer(Modifier.height(16.dp))
         if (state.tab == Tab.SEARCH) {
-            TvSearchContent(state, onSearch, onCardClick)
+            TvSearchContent(state, onSearch, onCardClick, onSeeAll)
         } else {
             Text(state.current?.title ?: state.tab.label, style = MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(12.dp))
@@ -145,7 +146,7 @@ fun TvBrowseScreen(
                     contentPadding = PaddingValues(bottom = 48.dp),
                     verticalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
-                    items(state.current?.rails.orEmpty(), key = { it.id }) { rail -> TvRail(rail, onCardClick) }
+                    items(state.current?.rails.orEmpty(), key = { it.id }) { rail -> TvRail(rail, onCardClick, onSeeAll) }
                 }
                 if (state.busy) CircularProgressIndicator(Modifier.align(Alignment.Center))
                 state.error?.let {
@@ -157,7 +158,12 @@ fun TvBrowseScreen(
 }
 
 @Composable
-private fun TvSearchContent(state: UiState, onSubmit: (String) -> Unit, onCardClick: (ContentCard) -> Unit) {
+private fun TvSearchContent(
+    state: UiState,
+    onSubmit: (String) -> Unit,
+    onCardClick: (ContentCard) -> Unit,
+    onSeeAll: (ContentRail) -> Unit,
+) {
     var query by remember { mutableStateOf("") }
     val field = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { field.requestFocus() } }
@@ -178,7 +184,7 @@ private fun TvSearchContent(state: UiState, onSubmit: (String) -> Unit, onCardCl
                 contentPadding = PaddingValues(bottom = 48.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
-                items(state.current?.rails.orEmpty(), key = { it.id }) { rail -> TvRail(rail, onCardClick) }
+                items(state.current?.rails.orEmpty(), key = { it.id }) { rail -> TvRail(rail, onCardClick, onSeeAll) }
             }
             if (state.busy) CircularProgressIndicator(Modifier.align(Alignment.Center))
             state.error?.let {
@@ -283,10 +289,23 @@ private fun TvRecordingRow(recording: Recording, enabled: Boolean, onWatch: () -
 }
 
 @Composable
-private fun TvRail(rail: ContentRail, onCardClick: (ContentCard) -> Unit) {
+private fun TvRail(rail: ContentRail, onCardClick: (ContentCard) -> Unit, onSeeAll: (ContentRail) -> Unit) {
     Column {
-        rail.title?.takeIf { it.isNotBlank() }?.let {
-            Text(it, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(bottom = 6.dp))
+        rail.title?.takeIf { it.isNotBlank() }?.let { title ->
+            if (rail.seeAllUrl != null) {
+                var focused by remember { mutableStateOf(false) }
+                Text(
+                    "$title   ›  Tout voir",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (focused) BrandYellow else Color.White,
+                    modifier = Modifier
+                        .onFocusChanged { focused = it.isFocused }
+                        .clickable { onSeeAll(rail) }
+                        .padding(bottom = 6.dp),
+                )
+            } else {
+                Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(bottom = 6.dp))
+            }
         }
         LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             items(rail.cards, key = { it.id }) { card -> TvCard(card, onCardClick) }
@@ -296,7 +315,7 @@ private fun TvRail(rail: ContentRail, onCardClick: (ContentCard) -> Unit) {
 
 @Composable
 private fun TvCard(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
-    val isChannel = card.channelId != null
+    val isChannel = card.square
     var focused by remember { mutableStateOf(false) }
     val w = if (isChannel) 112.dp else 208.dp
     val h = if (isChannel) 112.dp else 117.dp

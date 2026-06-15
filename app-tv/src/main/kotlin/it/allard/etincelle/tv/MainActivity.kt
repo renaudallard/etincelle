@@ -67,7 +67,10 @@ class MainActivity : ComponentActivity() {
 
                         state.loggedIn -> {
                             BackHandler(enabled = state.canGoBack) { viewModel.back() }
-                            TvBrowseScreen(state, viewModel::selectTab, viewModel::onCardClick, viewModel::search, viewModel::logout)
+                            TvBrowseScreen(
+                                state, viewModel::selectTab, viewModel::onCardClick, viewModel::search,
+                                viewModel::logout, viewModel::onRailSeeAll,
+                            )
                         }
 
                         else -> TvLoginScreen(state.busy, state.error, viewModel::login)

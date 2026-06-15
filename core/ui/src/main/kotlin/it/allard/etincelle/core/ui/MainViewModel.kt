@@ -10,6 +10,7 @@ import it.allard.etincelle.core.domain.DetailKind
 import it.allard.etincelle.core.domain.MolotovRepository
 import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentPage
+import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramDetail
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -94,7 +95,9 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         }
         if (tab == _state.value.tab && _state.value.backStack.size == 1) return
         _state.update { it.copy(busy = true, error = null, tab = tab) }
-        loadPageInto(tab.path, replace = true, fallbackTitle = tab.label)
+        // The Direct tab loads the same /live-tv page as the "En direct à la TV" rail header, so
+        // render it as the same full-screen grid for a coherent experience.
+        loadPageInto(tab.path, replace = true, fallbackTitle = tab.label, grid = tab == Tab.LIVE)
     }
 
     fun search(query: String) {
@@ -127,6 +130,13 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
                 loadPageInto(url, replace = false, fallbackTitle = card.title)
             }
         }
+    }
+
+    /** Opens a rail's "see all" page (the carousel header's navigation target) as a grid. */
+    fun onRailSeeAll(rail: ContentRail) {
+        val url = rail.seeAllUrl ?: return
+        _state.update { it.copy(busy = true, error = null) }
+        loadPageInto(url, replace = false, fallbackTitle = rail.title, grid = true)
     }
 
     /** Plays a DVR recording by its dvr asset id (from a recording card or a detail's recordings list). */
@@ -200,11 +210,11 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
     /** Closes the detail page, back to browsing. */
     fun closeDetail() = _state.update { it.copy(detail = null, error = null, info = null) }
 
-    private fun loadPageInto(url: String, replace: Boolean, fallbackTitle: String?) {
+    private fun loadPageInto(url: String, replace: Boolean, fallbackTitle: String?, grid: Boolean = false) {
         viewModelScope.launch {
             runCatching { repo.loadPage(url) }
                 .onSuccess { page ->
-                    val titled = page.copy(title = page.title ?: fallbackTitle)
+                    val titled = page.copy(title = page.title ?: fallbackTitle, isGrid = grid)
                     _state.update {
                         val stack = if (replace) listOf(titled) else it.backStack + titled
                         it.copy(busy = false, backStack = stack)

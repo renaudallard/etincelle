@@ -44,7 +44,11 @@ data class SectionDto(
     val title: TextDto?,
     @Json(name = "component_type") val componentType: String?,
     val components: List<ComponentDto>?,
+    @Json(name = "aux_button") val auxButton: AuxButtonDto? = null,
 )
+
+// A carousel's "see more" button; its navigation action points to the rail's full "see all" page.
+data class AuxButtonDto(val actions: ActionsDto?)
 
 data class ComponentDto(
     val id: String?,
@@ -60,12 +64,17 @@ data class ComponentDto(
     val actions: ActionsDto?,
     val description: TextDto? = null,
     @Json(name = "about_fields") val aboutFields: List<AboutFieldDto>? = null,
+    val footer: FooterDto? = null,
+    @Json(name = "channel_id") val channelIdNum: Long? = null,
 )
+
+// Live ("En direct à la TV") cards carry their show title in a footer rather than in title/heading.
+data class FooterDto(val title: TextDto?, val subtitle: TextDto?)
 
 data class BodyDto(val picture: PictureDto?)
 data class StateDto(@Json(name = "is_locked") val isLocked: Boolean?)
 data class ActionsDto(@Json(name = "on_click") val onClick: List<ActionItemDto>?)
-data class ActionItemDto(val endpoint: EndpointDto?)
+data class ActionItemDto(val endpoint: EndpointDto?, val type: String? = null)
 data class EndpointDto(val url: String?, val method: String?)
 data class PictureDto(val url: String?)
 data class TextDto(val text: String?)
@@ -73,6 +82,7 @@ data class TextDto(val text: String?)
 // --- mapping to domain ---
 
 private val CHANNEL_REGEX = Regex("""program-details/channel/(\d+)""")
+private val CHANNEL_DETAILS_REGEX = Regex("""channel-details/(\d+)""")
 private val VOD_REGEX = Regex("""program-details/program/([\w-]+)""")
 private val SERIES_REGEX = Regex("""program-details/series/([\w-]+)""")
 private val RECORD_REGEX = Regex("""id-record-(LIVE_[0-9]+)""")
@@ -130,14 +140,20 @@ fun PageResponse.toProgramDetail(channelId: String?, vodId: String?, isLive: Boo
 fun PageResponse.toRails(): List<ContentRail> {
     val sections = content?.sections ?: return emptyList()
     return sections.mapIndexedNotNull { index, section ->
-        val cards = section.components.orEmpty().mapNotNull { it.toCard() }
-        if (cards.isEmpty()) null else ContentRail("rail-$index", section.title?.text, cards)
+        val square = section.componentType == "square"
+        val cards = section.components.orEmpty().mapNotNull { it.toCard(square) }
+        if (cards.isEmpty()) null else ContentRail("rail-$index", section.title?.text, cards, section.seeAllUrl())
     }
 }
 
-private fun ComponentDto.toCard(): ContentCard? {
+// The "see all" target lives in the carousel's aux button as a navigation action.
+private fun SectionDto.seeAllUrl(): String? = auxButton?.actions?.onClick.orEmpty()
+    .firstOrNull { it.type == "navigation" }?.endpoint?.url
+
+private fun ComponentDto.toCard(square: Boolean = false): ContentCard? {
     val img = picture?.url ?: body?.picture?.url ?: image?.url ?: imageCompact?.url
-    val label = title?.text ?: heading?.text
+    // Live cards put the show title in their footer rather than in title/heading.
+    val label = title?.text ?: heading?.text ?: footer?.title?.text
     if (img == null && label == null) return null
 
     val actionUrl = actions?.onClick?.firstOrNull()?.endpoint?.url
@@ -155,5 +171,25 @@ private fun ComponentDto.toCard(): ContentCard? {
         seriesId = seriesId,
         actionUrl = actionUrl,
         recordingAssetId = null,
+        liveChannelId = channelIdNum?.toString(),
+        square = square,
     )
+}
+
+/**
+ * Builds a channel id -> name directory from a `/page/channels` response: each channel card's title
+ * is the name, and a `channel-details/{id}` action carries its id.
+ */
+fun PageResponse.toChannelDirectory(): Map<String, String> {
+    val out = LinkedHashMap<String, String>()
+    content?.sections.orEmpty().forEach { section ->
+        section.components.orEmpty().forEach { card ->
+            val name = card.title?.text ?: card.heading?.text ?: card.footer?.title?.text ?: return@forEach
+            val id = card.actions?.onClick.orEmpty()
+                .firstNotNullOfOrNull { item -> item.endpoint?.url?.let { CHANNEL_DETAILS_REGEX.find(it)?.groupValues?.get(1) } }
+                ?: return@forEach
+            out.putIfAbsent(id, name)
+        }
+    }
+    return out
 }

@@ -7,6 +7,8 @@ package it.allard.etincelle.core.model
 data class ContentPage(
     val title: String?,
     val rails: List<ContentRail>,
+    /** A "see all" page: render its cards as a full-screen scrollable grid, not rails of carousels. */
+    val isGrid: Boolean = false,
 )
 
 /** A horizontal carousel ("rail") on a page. */
@@ -14,6 +16,8 @@ data class ContentRail(
     val id: String,
     val title: String?,
     val cards: List<ContentCard>,
+    /** A "see all" page to open from the rail header (the carousel's aux button), if any. */
+    val seeAllUrl: String? = null,
 )
 
 /**
@@ -34,6 +38,12 @@ data class ContentCard(
     val seriesId: String?,
     val actionUrl: String?,
     val recordingAssetId: String? = null,
+    /** A live card's raw channel id ("channel_id"), used to look up its channel name. */
+    val liveChannelId: String? = null,
+    /** A secondary label under the title, e.g. the channel name on a live card. */
+    val subtitle: String? = null,
+    /** A channel-logo card (drawn as a small square); program/guide cards are landscape. */
+    val square: Boolean = false,
 )
 
 /**

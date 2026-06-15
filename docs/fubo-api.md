@@ -82,6 +82,15 @@ follows each component's `actions`.
 - Components/cards carry `actions` (`on_click`/`on_expired`/`on_poll`) → `{endpoint:{method,url}, type, template, ...}`.
   Action types seen: `navigation`, `refresh_page`, `tracking`. Card types: `card-wide`, `card-poster`,
   `square`, `chip-navigation`, `tab`, `picture`, `progress_bar`, `tag`, `text`, `program-details-metadata`.
+- **Rail "see all":** a carousel with `context.has_see_more=true` carries an `aux_button` whose
+  `actions.on_click[]` of `type:"navigation"` is the full page URL (e.g. "En direct à la TV" →
+  `/papi/v1/page/live-tv`, "Chaînes en direct" → `/papi/v1/page/channels`).
+- **Live cards** (`/page/live-tv`) put the show title in `footer.title` (not `title`/`heading`),
+  the episode in `footer.subtitle`, and carry a numeric `channel_id` (no channel name). Map the name
+  via `/papi/v1/page/channels`: each card's title is the channel name, with a `channel-details/{id}`
+  action giving the id.
+- **Recordings "see all":** the "Vos enregistrements" rail's see-all is `/papi/v1/my-stuff/main?selectedTab=recordings`,
+  which has no standard `content.sections` — use the `dvr/v2/list` data instead.
 - Live channel IDs (FRA): France 2 = **600019**, France 4 = 600018, France 5 = 600042, Arte = 600034,
   BFMTV = 600035, CNEWS = 600002, LCP = 600008, CSTAR = 600038. (France 3 ≈ another 6000xx.)
 

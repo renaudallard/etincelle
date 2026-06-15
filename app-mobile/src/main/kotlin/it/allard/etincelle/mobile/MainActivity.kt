@@ -18,6 +18,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -141,12 +142,12 @@ private val EMPTY_CAST_FLOW: StateFlow<CastUiState> = MutableStateFlow(CastUiSta
 /** Brand-pack vector icon for the tabs it covers; the rest keep their emoji glyph. */
 @DrawableRes
 private fun tabIconRes(tab: Tab): Int? = when (tab) {
+    Tab.HOME -> R.drawable.ic_accueil
     Tab.LIVE -> R.drawable.ic_direct
     Tab.GUIDE -> R.drawable.ic_grille
     Tab.MOVIES -> R.drawable.ic_films
     Tab.SERIES -> R.drawable.ic_series
     Tab.SEARCH -> R.drawable.ic_recherche
-    else -> null
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -221,7 +222,14 @@ private fun AppRoot(
                                         Text(tab.icon)
                                     }
                                 },
-                                label = { Text(tab.label) },
+                                label = {
+                                    Text(
+                                        tab.label,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                    )
+                                },
                             )
                         }
                     }
@@ -235,6 +243,15 @@ private fun AppRoot(
                         error = state.error,
                         onSubmit = vm::search,
                         onCardClick = vm::onCardClick,
+                        onSeeAll = vm::onRailSeeAll,
+                        modifier = modifier,
+                    )
+                } else if (state.current?.isGrid == true) {
+                    GridContent(
+                        rails = state.current?.rails.orEmpty(),
+                        busy = state.busy,
+                        error = state.error,
+                        onCardClick = vm::onCardClick,
                         modifier = modifier,
                     )
                 } else {
@@ -243,6 +260,7 @@ private fun AppRoot(
                         busy = state.busy,
                         error = state.error,
                         onCardClick = vm::onCardClick,
+                        onSeeAll = vm::onRailSeeAll,
                         modifier = modifier,
                     )
                 }
