@@ -470,12 +470,19 @@ fun ProgramDetailScreen(
             if (detail.tags.isNotEmpty()) {
                 Text(detail.tags.joinToString("   "), style = MaterialTheme.typography.labelMedium, color = BrandYellow)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Button(onClick = onWatch, enabled = !busy) {
-                    Text(if (detail.isLive) "Regarder en direct" else "Regarder")
-                }
-                if (detail.recordAssetId != null) {
-                    Button(onClick = onRecord, enabled = !busy) { Text("Enregistrer") }
+            // A multi-episode series has no directly playable asset (its id is not a VOD), so it has
+            // no "Regarder"; the user picks an episode. A recorded series keeps it (plays the recording).
+            val showWatch = !(detail.isSeries && !isRecording)
+            if (showWatch || detail.recordAssetId != null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (showWatch) {
+                        Button(onClick = onWatch, enabled = !busy) {
+                            Text(if (detail.isLive) "Regarder en direct" else "Regarder")
+                        }
+                    }
+                    if (detail.recordAssetId != null) {
+                        Button(onClick = onRecord, enabled = !busy) { Text("Enregistrer") }
+                    }
                 }
             }
             if (busy) CircularProgressIndicator()

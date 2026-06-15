@@ -305,12 +305,19 @@ fun TvProgramDetailScreen(
             if (detail.tags.isNotEmpty()) {
                 Text(detail.tags.joinToString("   "), style = MaterialTheme.typography.titleSmall, color = BrandYellow)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = onWatch, enabled = !busy, modifier = Modifier.focusRequester(watchFocus)) {
-                    Text(if (detail.isLive) "Regarder en direct" else "Regarder")
-                }
-                if (detail.recordAssetId != null) {
-                    Button(onClick = onRecord, enabled = !busy) { Text("Enregistrer") }
+            // A multi-episode series has no directly playable asset (its id is not a VOD), so it has
+            // no "Regarder"; the user picks an episode. A recorded series keeps it (plays the recording).
+            val showWatch = !(detail.isSeries && !isRecording)
+            if (showWatch || detail.recordAssetId != null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (showWatch) {
+                        Button(onClick = onWatch, enabled = !busy, modifier = Modifier.focusRequester(watchFocus)) {
+                            Text(if (detail.isLive) "Regarder en direct" else "Regarder")
+                        }
+                    }
+                    if (detail.recordAssetId != null) {
+                        Button(onClick = onRecord, enabled = !busy) { Text("Enregistrer") }
+                    }
                 }
             }
             if (busy) CircularProgressIndicator()
@@ -325,7 +332,8 @@ fun TvProgramDetailScreen(
             // For a recording, hide the catch-up episodes (their VOD can 5xx for recorded content);
             // the user's recordings below are what plays.
             if (detail.episodes.isNotEmpty() && !isRecording) {
-                TvEpisodesSection(detail.episodes, busy, onEpisode)
+                // With no "Regarder" to focus on a series, hand initial focus to the first episode.
+                TvEpisodesSection(detail.episodes, busy, onEpisode, firstFocus = if (showWatch) null else watchFocus)
             }
             if (detail.recordings.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
@@ -340,7 +348,12 @@ fun TvProgramDetailScreen(
 
 /** The "Épisodes disponibles" section on TV: a season selector (when several) over the episode list. */
 @Composable
-private fun TvEpisodesSection(episodes: List<ContentCard>, busy: Boolean, onEpisode: (ContentCard) -> Unit) {
+private fun TvEpisodesSection(
+    episodes: List<ContentCard>,
+    busy: Boolean,
+    onEpisode: (ContentCard) -> Unit,
+    firstFocus: FocusRequester? = null,
+) {
     val seasons = remember(episodes) { episodes.groupBySeason() }
     var selected by remember(episodes) { mutableStateOf(0) }
     val idx = selected.coerceIn(0, seasons.size - 1)
@@ -355,15 +368,19 @@ private fun TvEpisodesSection(episodes: List<ContentCard>, busy: Boolean, onEpis
             }
         }
     }
-    seasons[idx].second.forEach { ep -> TvEpisodeRow(ep, enabled = !busy, onClick = { onEpisode(ep) }) }
+    seasons[idx].second.forEachIndexed { i, ep ->
+        TvEpisodeRow(ep, enabled = !busy, onClick = { onEpisode(ep) }, focus = firstFocus.takeIf { i == 0 })
+    }
 }
 
 /** One catch-up episode on the TV detail: a thumbnail and label, focusable and clickable. */
 @Composable
-private fun TvEpisodeRow(card: ContentCard, enabled: Boolean, onClick: () -> Unit) {
+private fun TvEpisodeRow(card: ContentCard, enabled: Boolean, onClick: () -> Unit, focus: FocusRequester? = null) {
     var focused by remember { mutableStateOf(false) }
+    if (focus != null) LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     Row(
         Modifier.fillMaxWidth()
+            .then(if (focus != null) Modifier.focusRequester(focus) else Modifier)
             .onFocusChanged { focused = it.isFocused }
             .clip(RoundedCornerShape(8.dp))
             .background(if (focused) BackgroundLevel2 else Color.Transparent)

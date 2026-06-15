@@ -106,4 +106,6 @@ data class ProgramDetail(
     val recordings: List<Recording> = emptyList(),
     /** Catch-up episodes from the series' "Regarder maintenant" tab; empty when there is no catch-up. */
     val episodes: List<ContentCard> = emptyList(),
+    /** A series page (vodId is the series id, not a playable asset), so it has no direct "Regarder". */
+    val isSeries: Boolean = false,
 )

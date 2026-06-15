@@ -182,6 +182,7 @@ class FuboRepository(
             recordings = matches,
             episodes = episodes,
             posterUrl = detail.posterUrl ?: matches.firstOrNull()?.imageUrl,
+            isSeries = kind == DetailKind.SERIES,
         )
     }
 
