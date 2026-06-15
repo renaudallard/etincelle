@@ -43,6 +43,8 @@ data class UiState(
     val error: String? = null,
     val info: String? = null,
     val hideLocked: Boolean = false,
+    // A lightweight reload is running (pull to refresh / resume), as opposed to a full-screen [busy] load.
+    val refreshing: Boolean = false,
 ) {
     val current: ContentPage? get() = backStack.lastOrNull()
     val canGoBack: Boolean get() = backStack.size > 1
@@ -121,24 +123,15 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
             return
         }
         if (tab == Tab.GUIDE) {
-            if (tab == _state.value.tab && _state.value.backStack.isNotEmpty()) return
-            _state.update { it.copy(busy = true, error = null, tab = tab, backStack = emptyList()) }
-            viewModelScope.launch {
-                runCatching { repo.loadGuide() }
-                    .onSuccess { page -> _state.update { it.copy(busy = false, backStack = listOf(page)) } }
-                    .onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Guide indisponible") } }
-            }
+            // The guide is time-sensitive, so re-selecting it refreshes (silently when already loaded)
+            // rather than keeping a stale snapshot.
+            reloadGuide(silent = tab == _state.value.tab && _state.value.backStack.isNotEmpty())
             return
         }
         if (tab == Tab.HOME) {
             // Accueil must go through loadHome (which prepends the recordings rail), not the raw page.
             if (tab == _state.value.tab && _state.value.backStack.size == 1) return
-            _state.update { it.copy(busy = true, error = null, tab = tab, backStack = emptyList()) }
-            viewModelScope.launch {
-                runCatching { repo.loadHome() }
-                    .onSuccess { page -> _state.update { it.copy(busy = false, backStack = listOf(page)) } }
-                    .onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Accueil indisponible") } }
-            }
+            reloadHome(silent = false)
             return
         }
         if (tab == _state.value.tab && _state.value.backStack.size == 1) return
@@ -148,13 +141,85 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         loadPageInto(tab.path, replace = true, fallbackTitle = tab.label, grid = tab == Tab.LIVE)
     }
 
-    fun search(query: String) {
+    private fun reloadGuide(silent: Boolean) {
+        _state.update {
+            if (silent) it.copy(tab = Tab.GUIDE, error = null, refreshing = true)
+            else it.copy(tab = Tab.GUIDE, error = null, busy = true, backStack = emptyList())
+        }
+        viewModelScope.launch {
+            runCatching { repo.loadGuide() }
+                .onSuccess { page -> _state.update { it.copy(busy = false, refreshing = false, backStack = listOf(page)) } }
+                .onFailure { e -> _state.update { it.copy(busy = false, refreshing = false, error = e.message ?: "Guide indisponible") } }
+        }
+    }
+
+    private fun reloadHome(silent: Boolean) {
+        _state.update {
+            if (silent) it.copy(tab = Tab.HOME, error = null, refreshing = true)
+            else it.copy(tab = Tab.HOME, error = null, busy = true, backStack = emptyList())
+        }
+        viewModelScope.launch {
+            runCatching { repo.loadHome() }
+                .onSuccess { page -> _state.update { it.copy(busy = false, refreshing = false, backStack = listOf(page)) } }
+                .onFailure { e -> _state.update { it.copy(busy = false, refreshing = false, error = e.message ?: "Accueil indisponible") } }
+        }
+    }
+
+    /** Refreshes time-sensitive content when the app returns to the foreground (the guide goes stale). */
+    fun refreshOnResume() {
+        val s = _state.value
+        if (!s.loggedIn || s.playing != null || s.detail != null || s.settings || s.busy || s.refreshing) return
+        if (s.tab == Tab.GUIDE && s.backStack.isNotEmpty()) reloadGuide(silent = true)
+    }
+
+    /** Reloads the page currently shown (pull to refresh, or overscroll past an end). */
+    fun refreshCurrent() {
+        val s = _state.value
+        if (s.playing != null || s.detail != null || s.settings || s.busy || s.refreshing) return
+        val top = s.backStack.lastOrNull()
+        val reloadUrl = top?.reloadUrl
+        when {
+            // A drilled-in papi page reloads itself, whatever tab it lives under.
+            reloadUrl != null -> reloadPageTop(reloadUrl, top?.isGrid ?: false)
+            // A drilled-in page with no backing url (a synthetic see-all) has nothing to reload.
+            s.backStack.size > 1 -> {}
+            s.tab == Tab.GUIDE -> reloadGuide(silent = true)
+            s.tab == Tab.SEARCH -> lastQuery?.let { search(it, silent = true) }
+            s.tab == Tab.HOME -> reloadHome(silent = true)
+            else -> {}
+        }
+    }
+
+    /** Re-fetches the top page's papi url, replacing only that entry so the back stack is kept. */
+    private fun reloadPageTop(url: String, grid: Boolean) {
+        _state.update { it.copy(refreshing = true, error = null) }
+        viewModelScope.launch {
+            runCatching { repo.loadPage(url) }
+                .onSuccess { page ->
+                    _state.update {
+                        val current = it.backStack.lastOrNull()
+                        // If the user navigated away during the fetch, drop the stale result.
+                        if (current == null || current.reloadUrl != url) it.copy(refreshing = false)
+                        else {
+                            val titled = page.copy(title = current.title, isGrid = grid, reloadUrl = url)
+                            it.copy(refreshing = false, backStack = it.backStack.dropLast(1) + titled)
+                        }
+                    }
+                }
+                .onFailure { e -> _state.update { it.copy(refreshing = false, error = e.message ?: "Échec de chargement") } }
+        }
+    }
+
+    private var lastQuery: String? = null
+
+    fun search(query: String, silent: Boolean = false) {
         if (query.isBlank()) return
-        _state.update { it.copy(busy = true, error = null) }
+        lastQuery = query.trim()
+        _state.update { if (silent) it.copy(refreshing = true, error = null) else it.copy(busy = true, error = null) }
         viewModelScope.launch {
             runCatching { repo.search(query.trim()) }
-                .onSuccess { page -> _state.update { it.copy(busy = false, backStack = listOf(page.copy(title = "Résultats"))) } }
-                .onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Échec de recherche") } }
+                .onSuccess { page -> _state.update { it.copy(busy = false, refreshing = false, backStack = listOf(page.copy(title = "Résultats"))) } }
+                .onFailure { e -> _state.update { it.copy(busy = false, refreshing = false, error = e.message ?: "Échec de recherche") } }
         }
     }
 
@@ -275,7 +340,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         viewModelScope.launch {
             runCatching { repo.loadPage(url) }
                 .onSuccess { page ->
-                    val titled = page.copy(title = page.title ?: fallbackTitle, isGrid = grid)
+                    val titled = page.copy(title = page.title ?: fallbackTitle, isGrid = grid, reloadUrl = url)
                     _state.update {
                         val stack = if (replace) listOf(titled) else it.backStack + titled
                         it.copy(busy = false, backStack = stack)

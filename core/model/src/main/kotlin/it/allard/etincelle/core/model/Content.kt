@@ -9,6 +9,8 @@ data class ContentPage(
     val rails: List<ContentRail>,
     /** A "see all" page: render its cards as a full-screen scrollable grid, not rails of carousels. */
     val isGrid: Boolean = false,
+    /** The papi url this page was fetched from, so it can be reloaded (pull to refresh); null for roots. */
+    val reloadUrl: String? = null,
 )
 
 /** A horizontal carousel ("rail") on a page. */

@@ -37,6 +37,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -116,6 +118,8 @@ class MainActivity : ComponentActivity() {
                 val state by viewModel.state.collectAsStateWithLifecycle()
                 val castState by (controller?.state ?: EMPTY_CAST_FLOW).collectAsStateWithLifecycle()
                 val currentPlayer by playerFlow.collectAsStateWithLifecycle()
+                // Returning to the foreground refreshes time-sensitive pages (the guide goes stale).
+                LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshOnResume() }
                 Surface(modifier = Modifier.fillMaxSize()) {
                     AppRoot(
                         state = state,
@@ -306,6 +310,8 @@ private fun AppRoot(
                         onSubmit = vm::search,
                         onCardClick = vm::onCardClick,
                         onSeeAll = vm::onRailSeeAll,
+                        refreshing = state.refreshing,
+                        onRefresh = vm::refreshCurrent,
                         modifier = modifier,
                     )
                 } else if (state.current?.isGrid == true) {
@@ -314,6 +320,8 @@ private fun AppRoot(
                         busy = state.busy,
                         error = state.error,
                         onCardClick = vm::onCardClick,
+                        refreshing = state.refreshing,
+                        onRefresh = vm::refreshCurrent,
                         modifier = modifier,
                     )
                 } else {
@@ -323,6 +331,8 @@ private fun AppRoot(
                         error = state.error,
                         onCardClick = vm::onCardClick,
                         onSeeAll = vm::onRailSeeAll,
+                        refreshing = state.refreshing,
+                        onRefresh = vm::refreshCurrent,
                         modifier = modifier,
                     )
                 }

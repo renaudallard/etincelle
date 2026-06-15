@@ -12,6 +12,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -27,13 +28,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -48,12 +52,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -100,6 +111,58 @@ fun LoginScreen(busy: Boolean, error: String?, onLogin: (String, String) -> Unit
     }
 }
 
+/**
+ * A Box that triggers [onRefresh] when the user drags past either end of a scrollable child (pull
+ * down at the top or push up past the bottom), and shows a thin progress bar while [refreshing].
+ *
+ * The drag is measured in onPreScroll at a boundary, before the child and its stretch-overscroll
+ * effect consume it (measuring afterwards in onPostScroll reads ~0 and never fires).
+ */
+@Composable
+fun RefreshableBox(
+    refreshing: Boolean,
+    onRefresh: () -> Unit,
+    atTop: () -> Boolean,
+    atBottom: () -> Boolean,
+    modifier: Modifier = Modifier,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val threshold = with(LocalDensity.current) { 96.dp.toPx() }
+    val refreshingNow by rememberUpdatedState(refreshing)
+    val topNow by rememberUpdatedState(atTop)
+    val bottomNow by rememberUpdatedState(atBottom)
+    val refresh by rememberUpdatedState(onRefresh)
+    val connection = remember {
+        object : NestedScrollConnection {
+            var overscroll = 0f
+
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (!refreshingNow && source == NestedScrollSource.UserInput) {
+                    val dy = available.y
+                    when {
+                        dy > 0f && topNow() -> overscroll += dy
+                        dy < 0f && bottomNow() -> overscroll += dy
+                        else -> overscroll = 0f
+                    }
+                }
+                return Offset.Zero
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                if (!refreshingNow && kotlin.math.abs(overscroll) > threshold) refresh()
+                overscroll = 0f
+                return Velocity.Zero
+            }
+        }
+    }
+    Box(modifier.nestedScroll(connection)) {
+        content()
+        if (refreshing) {
+            LinearProgressIndicator(Modifier.align(Alignment.TopCenter).fillMaxWidth(), color = BrandYellow)
+        }
+    }
+}
+
 @Composable
 fun PageContent(
     rails: List<ContentRail>,
@@ -107,10 +170,20 @@ fun PageContent(
     error: String?,
     onCardClick: (ContentCard) -> Unit,
     onSeeAll: (ContentRail) -> Unit,
+    refreshing: Boolean = false,
+    onRefresh: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier.fillMaxSize()) {
+    val listState = rememberLazyListState()
+    RefreshableBox(
+        refreshing,
+        onRefresh,
+        atTop = { !listState.canScrollBackward },
+        atBottom = { !listState.canScrollForward },
+        modifier = modifier.fillMaxSize(),
+    ) {
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
@@ -137,13 +210,23 @@ fun GridContent(
     busy: Boolean,
     error: String?,
     onCardClick: (ContentCard) -> Unit,
+    refreshing: Boolean = false,
+    onRefresh: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     // A multi-section page (e.g. the channels page, with an "Apps" group) keeps its section headers;
     // a single-section see-all just shows its cards (its title is already in the top bar).
     val multiSection = rails.size > 1
-    Box(modifier.fillMaxSize()) {
+    val gridState = rememberLazyGridState()
+    RefreshableBox(
+        refreshing,
+        onRefresh,
+        atTop = { !gridState.canScrollBackward },
+        atBottom = { !gridState.canScrollForward },
+        modifier = modifier.fillMaxSize(),
+    ) {
         LazyVerticalGrid(
+            state = gridState,
             columns = GridCells.Fixed(3),
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
@@ -315,6 +398,8 @@ fun SearchScreen(
     onSubmit: (String) -> Unit,
     onCardClick: (ContentCard) -> Unit,
     onSeeAll: (ContentRail) -> Unit,
+    refreshing: Boolean = false,
+    onRefresh: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var query by remember { mutableStateOf("") }
@@ -328,7 +413,16 @@ fun SearchScreen(
             keyboardActions = KeyboardActions(onSearch = { onSubmit(query) }),
             modifier = Modifier.fillMaxWidth().padding(16.dp),
         )
-        PageContent(rails, busy, error, onCardClick, onSeeAll, Modifier.weight(1f))
+        PageContent(
+            rails = rails,
+            busy = busy,
+            error = error,
+            onCardClick = onCardClick,
+            onSeeAll = onSeeAll,
+            refreshing = refreshing,
+            onRefresh = onRefresh,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 

@@ -27,6 +27,9 @@ disponibles** avec leur vignette ; pour une série **enregistrée**, elle propos
 **applications des diffuseurs** (france.tv, MyTF1, M6+…) : ouvrez l'une d'elles pour parcourir son
 catalogue (un abonnement peut être requis). Cliquer sur l'en-tête d'une rangée (par ex. *En direct à
 la TV*) ouvre la **catégorie complète en grille**, avec le nom de la chaîne sous chaque programme.
+Le **guide** se rafraîchit à chaque ouverture et au retour de l'application (son contenu se périme
+avec l'heure) ; sur téléphone, n'importe quelle page se **rafraîchit** en tirant au-delà du haut ou
+du bas de la liste.
 
 L'application accepte aussi des **liens profonds** vers une fiche, pour l'intégration par des
 applications tierces (par ex. [multistream](https://github.com/renaudallard/multistream)) :
