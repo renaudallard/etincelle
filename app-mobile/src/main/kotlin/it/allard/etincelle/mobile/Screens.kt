@@ -319,6 +319,10 @@ fun SettingsScreen(
     onLogout: () -> Unit,
     hideLocked: Boolean = false,
     onHideLocked: (Boolean) -> Unit = {},
+    appVersion: String = "",
+    checkingUpdate: Boolean = false,
+    updateStatus: String? = null,
+    onCheckUpdate: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var confirm by remember { mutableStateOf(false) }
@@ -355,6 +359,23 @@ fun SettingsScreen(
             checked = officialReceiver,
             onCheckedChange = { officialReceiver = it; CastReceiver.setOfficial(context, it) },
         )
+        HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+        Row(
+            Modifier.fillMaxWidth().clickable(enabled = !checkingUpdate) { onCheckUpdate() }
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Vérifier les mises à jour", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    updateStatus ?: "Version actuelle : $appVersion",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            if (checkingUpdate) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+        }
         HorizontalDivider(Modifier.padding(horizontal = 16.dp))
         Text(
             "Déconnexion",

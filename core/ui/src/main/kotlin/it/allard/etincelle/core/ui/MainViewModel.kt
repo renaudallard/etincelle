@@ -40,6 +40,9 @@ data class UiState(
     val playing: PlaybackSource? = null,
     val settings: Boolean = false,
     val update: UpdateInfo? = null,
+    // An explicit "check for updates" is running, and its result message when up-to-date or failed.
+    val checkingUpdate: Boolean = false,
+    val updateStatus: String? = null,
     val error: String? = null,
     val info: String? = null,
     val hideLocked: Boolean = false,
@@ -373,7 +376,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         }
     }.getOrNull()
 
-    fun openSettings() = _state.update { it.copy(settings = true) }
+    fun openSettings() = _state.update { it.copy(settings = true, updateStatus = null) }
 
     fun closeSettings() = _state.update { it.copy(settings = false) }
 
@@ -392,6 +395,19 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
     }
 
     fun dismissUpdate() = _state.update { it.copy(update = null) }
+
+    /** Explicit "check for updates" from settings; reports newer / up-to-date / failed to the user. */
+    fun checkForUpdateNow(currentVersion: String) {
+        if (_state.value.checkingUpdate) return
+        _state.update { it.copy(checkingUpdate = true, updateStatus = null) }
+        viewModelScope.launch {
+            when (val result = UpdateChecker(currentVersion).check()) {
+                is UpdateCheck.Available -> _state.update { it.copy(checkingUpdate = false, update = result.info) }
+                UpdateCheck.UpToDate -> _state.update { it.copy(checkingUpdate = false, updateStatus = "Vous avez la dernière version") }
+                UpdateCheck.Failed -> _state.update { it.copy(checkingUpdate = false, updateStatus = "Vérification impossible, réessayez") }
+            }
+        }
+    }
 
     fun logout() {
         viewModelScope.launch {

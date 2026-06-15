@@ -254,6 +254,10 @@ private fun AppRoot(
                 onLogout = { vm.logout() },
                 hideLocked = state.hideLocked,
                 onHideLocked = vm::setHideLocked,
+                appVersion = BuildConfig.VERSION_NAME,
+                checkingUpdate = state.checkingUpdate,
+                updateStatus = state.updateStatus,
+                onCheckUpdate = { vm.checkForUpdateNow(BuildConfig.VERSION_NAME) },
             )
         }
 

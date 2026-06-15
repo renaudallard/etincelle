@@ -39,8 +39,9 @@ Elle ajoute un **sélecteur de saison** sur les séries qui en comptent plusieur
 genre** dans les grilles de catégories. Sur téléphone, un menu **Paramètres**, accessible depuis la
 barre du haut, regroupe les réglages : le **masquage des contenus verrouillés** (cache les programmes
 non inclus dans votre abonnement), le choix d'une **icône monochrome** (logo blanc), l'activation
-expérimentale du **récepteur Cast Fubo officiel** (redémarrage requis) et la **déconnexion** (avec
-confirmation). Sur
+expérimentale du **récepteur Cast Fubo officiel** (redémarrage requis), un bouton **Vérifier les
+mises à jour** (compare la version installée à la dernière publiée sur GitHub) et la **déconnexion**
+(avec confirmation). Sur
 téléphone, vous pouvez **diffuser** le flux en cours vers un **Chromecast** et transférer la lecture
 d'un appareil à l'autre.
 À chaque démarrage, etincelle **vérifie les mises à jour** sur GitHub et propose de télécharger la

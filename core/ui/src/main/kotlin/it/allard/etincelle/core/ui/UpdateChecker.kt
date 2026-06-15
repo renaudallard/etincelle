@@ -12,6 +12,13 @@ import java.net.URL
 /** A newer release found on GitHub, with the direct link to its APK asset. */
 data class UpdateInfo(val version: String, val apkUrl: String)
 
+/** Outcome of an explicit "check for updates", so the UI can tell up-to-date apart from a failure. */
+sealed interface UpdateCheck {
+    data class Available(val info: UpdateInfo) : UpdateCheck
+    object UpToDate : UpdateCheck
+    object Failed : UpdateCheck
+}
+
 /**
  * Checks the project's GitHub releases for a version newer than the running app. Any failure
  * (offline, rate limit, malformed payload) resolves to null so a launch check can never disrupt
@@ -21,7 +28,11 @@ class UpdateChecker(
     private val currentVersion: String,
     private val releaseUrl: String = "https://api.github.com/repos/renaudallard/etincelle/releases/latest",
 ) {
-    suspend fun latestUpdate(): UpdateInfo? = withContext(Dispatchers.IO) {
+    /** Startup path: just the newer release, or null on up-to-date or any failure (never disruptive). */
+    suspend fun latestUpdate(): UpdateInfo? = (check() as? UpdateCheck.Available)?.info
+
+    /** Explicit-check path: distinguishes a newer release, up-to-date, and a failed lookup. */
+    suspend fun check(): UpdateCheck = withContext(Dispatchers.IO) {
         runCatching {
             val conn = (URL(releaseUrl).openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
@@ -31,12 +42,13 @@ class UpdateChecker(
                 readTimeout = 8000
             }
             try {
-                if (conn.responseCode != 200) return@runCatching null
-                parseUpdate(conn.inputStream.bufferedReader().use { it.readText() }, currentVersion)
+                if (conn.responseCode != 200) return@runCatching UpdateCheck.Failed
+                val info = parseUpdate(conn.inputStream.bufferedReader().use { it.readText() }, currentVersion)
+                if (info != null) UpdateCheck.Available(info) else UpdateCheck.UpToDate
             } finally {
                 conn.disconnect()
             }
-        }.getOrNull()
+        }.getOrDefault(UpdateCheck.Failed)
     }
 }
 
