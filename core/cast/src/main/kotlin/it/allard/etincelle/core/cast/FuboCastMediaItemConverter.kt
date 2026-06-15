@@ -3,6 +3,7 @@
 
 package it.allard.etincelle.core.cast
 
+import android.content.Context
 import androidx.media3.cast.MediaItemConverter
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -13,33 +14,62 @@ import com.google.android.gms.cast.MediaMetadata
 import com.google.android.gms.cast.MediaQueueItem
 import it.allard.etincelle.core.model.DrmSpec
 import it.allard.etincelle.core.model.PlaybackSource
+import it.allard.etincelle.core.model.UserSession
 import org.json.JSONObject
 
 private const val DRM_HEADER_TOKEN = "x-dt-auth-token"
+private const val HLS = "application/x-mpegurl"
+private const val VAPI_URL = "https://api-eu.fubo.tv/"
 
 /**
- * Converts a Media3 [MediaItem] to a Cast [MediaQueueItem], packing the DRMtoday Widevine license
- * URL + `x-dt-auth-token` into `customData` (`stream_url`, `content_type`, `license_url`,
- * `drm_token`) for the custom receiver, which injects the header on the license request. The title
- * travels via [MediaMetadata] and liveness via the Cast stream type. The default converter drops
- * DRM, so this is required to cast protected content.
+ * Converts a Media3 [MediaItem] to a Cast [MediaQueueItem]. Two receivers are supported (see
+ * [CastReceiver]):
+ *
+ * - Custom `9527437F` (default): packs the DASH stream + DRMtoday Widevine license URL +
+ *   `x-dt-auth-token` into `customData` (`stream_url`, `content_type`, `license_url`, `drm_token`);
+ *   the receiver injects the header on the license request.
+ * - Official `D4E9D842` (experimental): the receiver fetches HLS itself, so we hand off a
+ *   session-handoff `customData` (tokens + Fubo ids + endpoints), reverse-engineered from Molotov 5.51.
  */
 @UnstableApi
-class FuboCastMediaItemConverter : MediaItemConverter {
+class FuboCastMediaItemConverter(
+    private val context: Context,
+    private val session: () -> UserSession? = { null },
+) : MediaItemConverter {
 
     override fun toMediaQueueItem(mediaItem: MediaItem): MediaQueueItem {
         val source = mediaItem.localConfiguration?.tag as? PlaybackSource
+        val title = source?.title ?: mediaItem.mediaMetadata.title?.toString()
+        val isLive = source?.isLive ?: false
+
+        val metadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_GENERIC).apply {
+            if (!title.isNullOrEmpty()) putString(MediaMetadata.KEY_TITLE, title)
+        }
+
+        val official = CastReceiver.isOfficial(context)
+        val customData = if (official) officialCustomData(source, isLive) else customReceiverData(mediaItem, source)
+        // The official receiver resolves the stream from customData, so it gets no contentId.
+        val contentId = if (official) "" else customData.optString("stream_url")
+        val contentType = if (official) HLS else MimeTypes.APPLICATION_MPD
+
+        val mediaInfo = MediaInfo.Builder(contentId)
+            .setStreamType(if (isLive) MediaInfo.STREAM_TYPE_LIVE else MediaInfo.STREAM_TYPE_BUFFERED)
+            .setContentType(contentType)
+            .setMetadata(metadata)
+            .setCustomData(customData)
+            .build()
+
+        return MediaQueueItem.Builder(mediaInfo).setCustomData(customData).build()
+    }
+
+    private fun customReceiverData(mediaItem: MediaItem, source: PlaybackSource?): JSONObject {
         val drmConfig = mediaItem.localConfiguration?.drmConfiguration
         val widevine = source?.drm as? DrmSpec.Widevine
-
         val streamUrl = source?.manifestUrl ?: mediaItem.localConfiguration?.uri?.toString().orEmpty()
         val licenseUrl = widevine?.licenseUrl ?: drmConfig?.licenseUri?.toString()
         val token = widevine?.licenseHeaders?.get(DRM_HEADER_TOKEN)
             ?: drmConfig?.licenseRequestHeaders?.get(DRM_HEADER_TOKEN)
-        val title = source?.title ?: mediaItem.mediaMetadata.title?.toString()
-        val isLive = source?.isLive ?: false
-
-        val customData = JSONObject().apply {
+        return JSONObject().apply {
             put("stream_url", streamUrl)
             put("content_type", MimeTypes.APPLICATION_MPD)
             if (!licenseUrl.isNullOrEmpty() && !token.isNullOrEmpty()) {
@@ -47,19 +77,43 @@ class FuboCastMediaItemConverter : MediaItemConverter {
                 put("drm_token", token)
             }
         }
+    }
 
-        val metadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_GENERIC).apply {
-            if (!title.isNullOrEmpty()) putString(MediaMetadata.KEY_TITLE, title)
+    // The official receiver's session-handoff customData (reverse-engineered from Molotov 5.51).
+    private fun officialCustomData(source: PlaybackSource?, isLive: Boolean): JSONObject {
+        val s = session()
+        val recording = source?.originRecordingAssetId != null
+        return JSONObject().apply {
+            put("user_info", JSONObject().apply {
+                s?.profileId?.takeIf { it.isNotEmpty() }?.let { put("profile_id", it) }
+                s?.userId?.takeIf { it.isNotEmpty() }?.let { put("user_id", it) }
+            })
+            put("access_data", JSONObject().apply {
+                s?.accessToken?.let { put("access_token", it) }
+                s?.refreshToken?.let { put("refresh_token", it) }
+            })
+            put("headers", JSONObject().apply {
+                put("device_id", CastReceiver.stableId(context, "cast_device_id"))
+                put("sender_app_session_id", CastReceiver.stableId(context, "cast_session_id"))
+            })
+            put("stream_data", JSONObject().apply {
+                if (isLive) {
+                    source?.originChannelId?.let { put("station_id", it) }
+                } else {
+                    (source?.originVodId ?: source?.originRecordingAssetId)?.let { put("airing_id", it) }
+                    source?.manifestUrl?.let { put("content_url", it) }
+                }
+                put("vapi_url", VAPI_URL)
+                put("pdp_url", VAPI_URL)
+                put("stream_entered_time", System.currentTimeMillis())
+            })
+            put("env", "production")
+            put("playback_type", if (isLive) "LIVE" else if (recording) "DVR" else "VOD")
+            put("casting_source", "etincelle")
+            put("contract_version", "2.3")
+            put("sender_player_version", "1.129.4")
+            put("language", "fr")
         }
-
-        val mediaInfo = MediaInfo.Builder(streamUrl)
-            .setStreamType(if (isLive) MediaInfo.STREAM_TYPE_LIVE else MediaInfo.STREAM_TYPE_BUFFERED)
-            .setContentType(MimeTypes.APPLICATION_MPD)
-            .setMetadata(metadata)
-            .setCustomData(customData)
-            .build()
-
-        return MediaQueueItem.Builder(mediaInfo).setCustomData(customData).build()
     }
 
     override fun toMediaItem(mediaQueueItem: MediaQueueItem): MediaItem {

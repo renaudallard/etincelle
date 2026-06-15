@@ -13,6 +13,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.CastSession
 import it.allard.etincelle.core.model.PlaybackSource
+import it.allard.etincelle.core.model.UserSession
 import it.allard.etincelle.core.player.MediaItemFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -47,9 +48,10 @@ class CastPlayerController(
     private val localPlayer: ExoPlayer,
     private val reResolve: (suspend (PlaybackSource) -> PlaybackSource?)? = null,
     private val onError: ((String) -> Unit)? = null,
+    sessionProvider: () -> UserSession? = { null },
 ) : CastController(context, castContext) {
 
-    private val castPlayer = CastPlayer(castContext, FuboCastMediaItemConverter())
+    private val castPlayer = CastPlayer(castContext, FuboCastMediaItemConverter(context, sessionProvider))
     private val scope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
 
     private val _currentPlayer = MutableStateFlow<Player>(localPlayer)

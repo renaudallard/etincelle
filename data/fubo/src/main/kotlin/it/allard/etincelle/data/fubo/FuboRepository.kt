@@ -67,6 +67,8 @@ class FuboRepository(
         store.clear()
     }
 
+    override fun currentSession(): UserSession? = session.session
+
     override suspend fun loadHome(): ContentPage = withRefresh {
         val page = api.homePage().toPage()
         val apps = appsRail()

@@ -15,7 +15,8 @@ import com.google.android.gms.cast.framework.SessionProvider
 class CastOptionsProvider : OptionsProvider {
     override fun getCastOptions(context: Context): CastOptions =
         CastOptions.Builder()
-            .setReceiverApplicationId(context.getString(R.string.cast_receiver_app_id))
+            // Read once at Cast init; switching the receiver in Settings takes effect on app restart.
+            .setReceiverApplicationId(CastReceiver.appId(context))
             .build()
 
     override fun getAdditionalSessionProviders(context: Context): List<SessionProvider>? = null

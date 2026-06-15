@@ -77,6 +77,7 @@ class MainActivity : ComponentActivity() {
                 this, it, exo,
                 reResolve = viewModel::reResolve,
                 onError = { msg -> Toast.makeText(this, msg, Toast.LENGTH_SHORT).show() },
+                sessionProvider = { (application as EtincelleApp).container.repository.currentSession() },
             )
         }
         castController = controller

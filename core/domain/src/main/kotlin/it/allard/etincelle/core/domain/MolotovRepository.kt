@@ -21,6 +21,9 @@ interface MolotovRepository {
     suspend fun restoreSession(): Boolean
     suspend fun logout()
 
+    /** The current in-memory session (tokens + ids), used to build the official Cast session handoff. */
+    fun currentSession(): UserSession?
+
     suspend fun loadHome(): ContentPage
     suspend fun loadPage(url: String): ContentPage
     /** The live guide (EPG): channels, each with its current and upcoming programs. */
