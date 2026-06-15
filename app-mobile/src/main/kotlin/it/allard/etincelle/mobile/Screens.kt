@@ -51,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -238,6 +239,25 @@ fun SettingsScreen(onBack: () -> Unit, onLogout: () -> Unit, modifier: Modifier 
             TextButton(onClick = onBack) { Text("← Retour") }
             Spacer(Modifier.width(8.dp))
             Text("Paramètres", style = MaterialTheme.typography.titleLarge)
+        }
+        val context = LocalContext.current
+        var mono by remember { mutableStateOf(AppIcon.isMono(context)) }
+        Text(
+            "Icône de l'application",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+        )
+        Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+            Text(
+                "Couleur",
+                color = if (!mono) BrandYellow else MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.clickable { AppIcon.setMono(context, false); mono = false }.padding(vertical = 8.dp),
+            )
+            Text(
+                "Monochrome",
+                color = if (mono) BrandYellow else MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.clickable { AppIcon.setMono(context, true); mono = true }.padding(vertical = 8.dp),
+            )
         }
         Text(
             "Déconnexion",
