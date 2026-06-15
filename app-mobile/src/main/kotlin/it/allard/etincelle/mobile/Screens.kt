@@ -334,7 +334,7 @@ fun ProgramDetailScreen(
     castButton: @Composable () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+    Column(modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState())) {
         Row(
             Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
