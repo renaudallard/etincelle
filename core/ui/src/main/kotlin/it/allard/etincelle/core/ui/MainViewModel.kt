@@ -35,6 +35,8 @@ data class UiState(
     val tab: Tab = Tab.HOME,
     val backStack: List<ContentPage> = emptyList(),
     val detail: ProgramDetail? = null,
+    // When the detail was opened from a DVR recording, the recording to play on "Regarder".
+    val detailRecordingAssetId: String? = null,
     val playing: PlaybackSource? = null,
     val settings: Boolean = false,
     val update: UpdateInfo? = null,
@@ -203,7 +205,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         _state.update { it.copy(busy = true, error = null, info = null) }
         viewModelScope.launch {
             runCatching { repo.fetchProgramDetail(id, kind) }
-                .onSuccess { d -> _state.update { it.copy(busy = false, detail = d) } }
+                .onSuccess { d -> _state.update { it.copy(busy = false, detail = d, detailRecordingAssetId = null) } }
                 .onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Détail indisponible") } }
         }
     }
@@ -216,7 +218,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         _state.update { it.copy(busy = true, error = null, info = null) }
         viewModelScope.launch {
             runCatching { repo.fetchProgramDetail(id, kind) }
-                .onSuccess { d -> _state.update { it.copy(busy = false, detail = d) } }
+                .onSuccess { d -> _state.update { it.copy(busy = false, detail = d, detailRecordingAssetId = assetId) } }
                 .onFailure { watchRecording(assetId) }
         }
     }
@@ -224,6 +226,8 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
     /** Plays the show currently shown on the detail page; a live detail plays its channel directly. */
     fun watchDetail() {
         val d = _state.value.detail ?: return
+        // A detail opened from a recording plays that recording, not the (often unavailable) VOD.
+        _state.value.detailRecordingAssetId?.let { watchRecording(it); return }
         val vodId = d.vodId
         val channelId = d.channelId
         _state.update { it.copy(busy = true, error = null) }
@@ -253,7 +257,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
     }
 
     /** Closes the detail page, back to browsing. */
-    fun closeDetail() = _state.update { it.copy(detail = null, error = null, info = null) }
+    fun closeDetail() = _state.update { it.copy(detail = null, detailRecordingAssetId = null, error = null, info = null) }
 
     private fun loadPageInto(url: String, replace: Boolean, fallbackTitle: String?, grid: Boolean = false) {
         viewModelScope.launch {
