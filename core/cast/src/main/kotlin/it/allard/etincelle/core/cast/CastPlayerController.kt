@@ -180,6 +180,12 @@ class CastPlayerController(
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 if (isPlaying) clearDeferredStop()
             }
+
+            // STATE_READY covers targets that buffer the first frame without ever flipping isPlaying,
+            // so the hand-off still cuts the old stream instead of leaving it decoding behind it.
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_READY) clearDeferredStop()
+            }
         }
         deferStopSource = from
         deferStopTarget = target
@@ -212,6 +218,9 @@ class CastPlayerController(
         val source = currentItem?.localConfiguration?.tag as? PlaybackSource
         val resolver = reResolve
         if (source == null || resolver == null || hasRetried) {
+            // Giving up on the target: cut any source still kept alive for the hand-off so it does
+            // not keep decoding once there is nothing taking over.
+            clearDeferredStop()
             onError?.invoke(PLAYBACK_ERROR_MESSAGE)
             return
         }
