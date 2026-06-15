@@ -111,7 +111,9 @@ fun PageResponse.toProgramDetail(channelId: String?, vodId: String?, isLive: Boo
         title = meta?.title?.text,
         subtitle = meta?.subtitle?.text,
         synopsis = synopsis,
-        posterUrl = meta?.artwork?.url,
+        // Titles without a real poster come back with a generic "/arts/up/default-…" placeholder;
+        // treat that as no poster so a better image can be used instead.
+        posterUrl = meta?.artwork?.url?.takeUnless { it.contains("/arts/up/default-") },
         genre = fields["Genre"],
         year = fields["Année de sortie"],
         classification = fields["Classification"],

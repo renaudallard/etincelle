@@ -102,7 +102,8 @@ class FuboRepository(
             DetailKind.SERIES -> loadRecordings().filter { it.seriesId == id }
             DetailKind.CHANNEL -> emptyList()
         }
-        detail.copy(recordings = matches)
+        // When the show has no real poster, fall back to a recording's own image (a real thumbnail).
+        detail.copy(recordings = matches, posterUrl = detail.posterUrl ?: matches.firstOrNull()?.imageUrl)
     }
 
     override suspend fun recordEpisode(assetId: String) = withRefresh {

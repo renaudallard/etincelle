@@ -76,7 +76,9 @@ follows each component's `actions`.
   component (`description` = "Réalisé par … avec …" director+cast; `about_fields` = Genre / Année de
   sortie / Classification). Tabs are "À voir aussi" (carousels) + "À propos"; `cast_url` just re-fetches
   the same page with `transient=true`. The description sometimes already ends with the credits — strip
-  that tail so the cast is not shown twice.
+  that tail so the cast is not shown twice. `metadata.artwork.url` is a generic
+  `molotov-imgx.fubo.tv/arts/up/default-backdrop` placeholder (a 200 but content-less image) when the
+  title has no real poster — treat any `/arts/up/default-` URL as no artwork.
 - Components/cards carry `actions` (`on_click`/`on_expired`/`on_poll`) → `{endpoint:{method,url}, type, template, ...}`.
   Action types seen: `navigation`, `refresh_page`, `tracking`. Card types: `card-wide`, `card-poster`,
   `square`, `chip-navigation`, `tab`, `picture`, `progress_bar`, `tag`, `text`, `program-details-metadata`.

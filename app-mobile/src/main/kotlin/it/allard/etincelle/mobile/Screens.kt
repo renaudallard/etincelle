@@ -152,13 +152,18 @@ fun ProgramDetailScreen(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        Box(Modifier.fillMaxWidth().height(220.dp).background(BackgroundLevel1)) {
-            AsyncImage(
-                model = detail.posterUrl,
-                contentDescription = detail.title,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-            )
+        if (detail.posterUrl != null) {
+            Box(Modifier.fillMaxWidth().height(220.dp).background(BackgroundLevel1)) {
+                AsyncImage(
+                    model = detail.posterUrl,
+                    contentDescription = detail.title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                )
+                TextButton(onClick = onBack) { Text("← Retour") }
+            }
+        } else {
+            // No poster (placeholder dropped): a slim back bar instead of an empty 220dp block.
             TextButton(onClick = onBack) { Text("← Retour") }
         }
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {

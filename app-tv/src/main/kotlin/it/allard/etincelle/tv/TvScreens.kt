@@ -217,13 +217,15 @@ fun TvProgramDetailScreen(
     val watchFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { watchFocus.requestFocus() } }
     Row(Modifier.fillMaxSize().padding(OVERSCAN)) {
-        AsyncImage(
-            model = detail.posterUrl,
-            contentDescription = detail.title,
-            modifier = Modifier.width(300.dp).height(440.dp).clip(RoundedCornerShape(12.dp)).background(BackgroundLevel1),
-            contentScale = ContentScale.Crop,
-        )
-        Spacer(Modifier.width(32.dp))
+        if (detail.posterUrl != null) {
+            AsyncImage(
+                model = detail.posterUrl,
+                contentDescription = detail.title,
+                modifier = Modifier.width(300.dp).height(440.dp).clip(RoundedCornerShape(12.dp)).background(BackgroundLevel1),
+                contentScale = ContentScale.Crop,
+            )
+            Spacer(Modifier.width(32.dp))
+        }
         Column(
             Modifier.weight(1f).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
