@@ -26,6 +26,15 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Deep links to a show: etincelle://series|program|channel/{id} (e.g. from multistream). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="etincelle" android:host="series" />
+                <data android:scheme="etincelle" android:host="program" />
+                <data android:scheme="etincelle" android:host="channel" />
+            </intent-filter>
         </activity>
     </application>
 </manifest>

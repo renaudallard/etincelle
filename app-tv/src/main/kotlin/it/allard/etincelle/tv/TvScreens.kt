@@ -61,6 +61,7 @@ import it.allard.etincelle.core.designsystem.theme.BrandBlack
 import it.allard.etincelle.core.designsystem.theme.BrandYellow
 import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentRail
+import it.allard.etincelle.core.model.expandable
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.Recording
 import it.allard.etincelle.core.ui.Tab
@@ -292,7 +293,7 @@ private fun TvRecordingRow(recording: Recording, enabled: Boolean, onWatch: () -
 private fun TvRail(rail: ContentRail, onCardClick: (ContentCard) -> Unit, onSeeAll: (ContentRail) -> Unit) {
     Column {
         rail.title?.takeIf { it.isNotBlank() }?.let { title ->
-            if (rail.seeAllUrl != null) {
+            if (rail.expandable()) {
                 var focused by remember { mutableStateOf(false) }
                 Text(
                     "$title   ›  Tout voir",

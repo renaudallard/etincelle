@@ -56,6 +56,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
                 runCatching { repo.loadHome() }
                     .onSuccess { page ->
                         _state.update { it.copy(checking = false, loggedIn = true, tab = Tab.HOME, backStack = listOf(page)) }
+                        consumeDeepLink()
                     }
                     .onFailure { _state.update { it.copy(checking = false, loggedIn = false) } }
             } else {
@@ -72,9 +73,29 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
                 repo.loadHome()
             }.onSuccess { page ->
                 _state.update { it.copy(busy = false, loggedIn = true, tab = Tab.HOME, backStack = listOf(page)) }
+                consumeDeepLink()
             }.onFailure { e ->
                 _state.update { it.copy(busy = false, error = e.message ?: "Échec de connexion") }
             }
+        }
+    }
+
+    private var pendingDeepLink: Pair<String, DetailKind>? = null
+
+    /** Opens a show from an external deep link (etincelle://series|program|channel/{id}); defers until login. */
+    fun onDeepLink(id: String, kind: DetailKind) {
+        pendingDeepLink = id to kind
+        if (_state.value.loggedIn) consumeDeepLink()
+    }
+
+    private fun consumeDeepLink() {
+        val (id, kind) = pendingDeepLink ?: return
+        pendingDeepLink = null
+        _state.update { it.copy(busy = true, error = null, detail = null) }
+        viewModelScope.launch {
+            runCatching { repo.fetchProgramDetail(id, kind) }
+                .onSuccess { d -> _state.update { it.copy(busy = false, detail = d) } }
+                .onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Contenu introuvable") } }
         }
     }
 
@@ -132,11 +153,16 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         }
     }
 
-    /** Opens a rail's "see all" page (the carousel header's navigation target) as a grid. */
+    /** Opens a rail as a full grid: its backend "see all" page, or its own cards if there is none. */
     fun onRailSeeAll(rail: ContentRail) {
-        val url = rail.seeAllUrl ?: return
-        _state.update { it.copy(busy = true, error = null) }
-        loadPageInto(url, replace = false, fallbackTitle = rail.title, grid = true)
+        val url = rail.seeAllUrl
+        if (url != null) {
+            _state.update { it.copy(busy = true, error = null) }
+            loadPageInto(url, replace = false, fallbackTitle = rail.title, grid = true)
+        } else {
+            val page = ContentPage(rail.title, listOf(rail), isGrid = true)
+            _state.update { it.copy(busy = false, error = null, backStack = it.backStack + page) }
+        }
     }
 
     /** Plays a DVR recording by its dvr asset id (from a recording card or a detail's recordings list). */

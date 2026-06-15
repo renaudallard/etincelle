@@ -6,6 +6,7 @@ package it.allard.etincelle.data.fubo
 import it.allard.etincelle.core.domain.DetailKind
 import it.allard.etincelle.core.domain.MolotovRepository
 import it.allard.etincelle.core.model.AppError
+import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.DrmSpec
@@ -126,12 +127,31 @@ class FuboRepository(
         ).toGuidePage()
     }
 
-    override suspend fun search(query: String): ContentPage = withRefresh { api.search(query).toPage() }
+    override suspend fun search(query: String): ContentPage = withRefresh { api.search(query).toPage().groupByTitle() }
+
+    /** Search returns the same show several times (one per channel); keep one card per title. */
+    private fun ContentPage.groupByTitle(): ContentPage = copy(
+        rails = rails.map { rail ->
+            val seen = HashSet<String>()
+            rail.copy(cards = rail.cards.filter { card -> card.title?.trim()?.lowercase()?.let(seen::add) ?: true })
+        },
+    )
 
     override suspend fun fetchProgramDetail(id: String, kind: DetailKind): ProgramDetail = withRefresh {
+        var episodes = emptyList<ContentCard>()
         val detail = when (kind) {
-            DetailKind.PROGRAM -> api.programDetail(id).toProgramDetail(channelId = null, vodId = id, isLive = false)
-            DetailKind.SERIES -> api.seriesDetail(id).toProgramDetail(channelId = null, vodId = id, isLive = false)
+            DetailKind.PROGRAM -> {
+                val resp = api.programDetail(id)
+                // A programme episode links to its series; pull that series' catch-up episodes, if any.
+                resp.seriesLink()?.let { episodes = api.seriesDetail(it, "id-tab-watch-now").toEpisodes() }
+                resp.toProgramDetail(channelId = null, vodId = id, isLive = false)
+            }
+            DetailKind.SERIES -> {
+                val resp = api.seriesDetail(id)
+                // Series with catch-up expose their episodes on a separate "Regarder maintenant" tab.
+                if (resp.hasWatchNowTab()) episodes = api.seriesDetail(id, "id-tab-watch-now").toEpisodes()
+                resp.toProgramDetail(channelId = null, vodId = id, isLive = false)
+            }
             DetailKind.CHANNEL -> api.channelDetail(id).toProgramDetail(channelId = id, vodId = null, isLive = true)
         }
         val detailProgramId = detail.programId
@@ -142,7 +162,11 @@ class FuboRepository(
             DetailKind.CHANNEL -> emptyList()
         }
         // When the show has no real poster, fall back to a recording's own image (a real thumbnail).
-        detail.copy(recordings = matches, posterUrl = detail.posterUrl ?: matches.firstOrNull()?.imageUrl)
+        detail.copy(
+            recordings = matches,
+            episodes = episodes,
+            posterUrl = detail.posterUrl ?: matches.firstOrNull()?.imageUrl,
+        )
     }
 
     override suspend fun recordEpisode(assetId: String) = withRefresh {

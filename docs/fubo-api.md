@@ -91,6 +91,14 @@ follows each component's `actions`.
   action giving the id.
 - **Recordings "see all":** the "Vos enregistrements" rail's see-all is `/papi/v1/my-stuff/main?selectedTab=recordings`,
   which has no standard `content.sections` — use the `dvr/v2/list` data instead.
+- **Poster cards** (`card-poster`, e.g. "Ce soir") carry no title field; their display name is in the
+  action URL's `trkOriginElement` query param. `channel_id` is a number on live cards but a **string**
+  on poster cards — accept both.
+- **Series episodes (catch-up):** a series detail offers a `tab-watch-now` tab only when it has
+  catch-up. Fetch `program-details/series/{id}?tabID=id-tab-watch-now`; the `list-item-wide` section
+  is the episode list (each card: `title`, a `picture` thumbnail, and a `program-details/program/VOD_x`
+  action). A **programme** episode has no episodes itself but links to its series via a `metadata.ctas`
+  navigation to `program-details/series/{id}` ("Détails du programme") — follow that for the list.
 - Live channel IDs (FRA): France 2 = **600019**, France 4 = 600018, France 5 = 600042, Arte = 600034,
   BFMTV = 600035, CNEWS = 600002, LCP = 600008, CSTAR = 600038. (France 3 ≈ another 6000xx.)
 

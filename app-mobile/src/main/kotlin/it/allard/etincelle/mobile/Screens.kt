@@ -59,6 +59,7 @@ import it.allard.etincelle.core.designsystem.theme.BrandBlack
 import it.allard.etincelle.core.designsystem.theme.BrandYellow
 import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentRail
+import it.allard.etincelle.core.model.expandable
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.Recording
 
@@ -244,9 +245,19 @@ fun ProgramDetailScreen(
     onRecord: () -> Unit,
     onWatchRecording: (String) -> Unit,
     onBack: () -> Unit,
+    onEpisode: (ContentCard) -> Unit = {},
+    castButton: @Composable () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        Row(
+            Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(onClick = onBack) { Text("← Retour") }
+            castButton()
+        }
         if (detail.posterUrl != null) {
             Box(Modifier.fillMaxWidth().height(220.dp).background(BackgroundLevel1)) {
                 AsyncImage(
@@ -255,11 +266,7 @@ fun ProgramDetailScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,
                 )
-                TextButton(onClick = onBack) { Text("← Retour") }
             }
-        } else {
-            // No poster (placeholder dropped): a slim back bar instead of an empty 220dp block.
-            TextButton(onClick = onBack) { Text("← Retour") }
         }
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(detail.title ?: "", style = MaterialTheme.typography.headlineSmall)
@@ -291,6 +298,13 @@ fun ProgramDetailScreen(
             ).forEach {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            if (detail.episodes.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Text("Épisodes disponibles", style = MaterialTheme.typography.titleMedium)
+                detail.episodes.forEach { episode ->
+                    EpisodeRow(episode, enabled = !busy, onClick = { onEpisode(episode) })
+                }
+            }
             if (detail.recordings.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 Text("Vos enregistrements", style = MaterialTheme.typography.titleMedium)
@@ -299,6 +313,32 @@ fun ProgramDetailScreen(
                 }
             }
         }
+    }
+}
+
+/** One catch-up episode row on a detail page: a thumbnail and label, tappable to open the episode. */
+@Composable
+private fun EpisodeRow(card: ContentCard, enabled: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(enabled = enabled) { onClick() }.padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AsyncImage(
+            model = card.imageUrl,
+            contentDescription = card.title,
+            modifier = Modifier.width(120.dp).height(68.dp).clip(RoundedCornerShape(8.dp)).background(BackgroundLevel1),
+            contentScale = ContentScale.Crop,
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(
+            card.title ?: "Épisode",
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text("›", style = MaterialTheme.typography.titleLarge, color = BrandYellow)
     }
 }
 
@@ -327,7 +367,7 @@ private fun RecordingRow(recording: Recording, enabled: Boolean, onWatch: () -> 
 private fun Rail(rail: ContentRail, onCardClick: (ContentCard) -> Unit, onSeeAll: (ContentRail) -> Unit) {
     Column(Modifier.fillMaxWidth()) {
         rail.title?.takeIf { it.isNotBlank() }?.let { title ->
-            if (rail.seeAllUrl != null) {
+            if (rail.expandable()) {
                 Row(
                     modifier = Modifier.fillMaxWidth().clickable { onSeeAll(rail) }
                         .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),

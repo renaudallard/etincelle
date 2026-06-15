@@ -33,7 +33,7 @@ data class MetadataDto(
 data class CtaDto(@Json(name = "action_items") val actionItems: List<CtaActionItemDto>?)
 data class CtaActionItemDto(val actions: CtaActionsDto?)
 data class CtaActionsDto(@Json(name = "on_click") val onClick: List<CtaOnClickDto>?)
-data class CtaOnClickDto(val content: CtaContentDto?)
+data class CtaOnClickDto(val content: CtaContentDto?, val endpoint: EndpointDto? = null)
 data class CtaContentDto(@Json(name = "menu_items") val menuItems: List<MenuItemDto>?)
 data class MenuItemDto(val id: String?)
 
@@ -65,7 +65,8 @@ data class ComponentDto(
     val description: TextDto? = null,
     @Json(name = "about_fields") val aboutFields: List<AboutFieldDto>? = null,
     val footer: FooterDto? = null,
-    @Json(name = "channel_id") val channelIdNum: Long? = null,
+    @Json(name = "channel_id") val channelIdRaw: Any? = null,
+    val slug: String? = null,
 )
 
 // Live ("En direct à la TV") cards carry their show title in a footer rather than in title/heading.
@@ -137,6 +138,24 @@ fun PageResponse.toProgramDetail(channelId: String?, vodId: String?, isLive: Boo
     )
 }
 
+/** True if the series detail offers a "Regarder maintenant" (catch-up) tab carrying its episodes. */
+fun PageResponse.hasWatchNowTab(): Boolean = content?.sections.orEmpty()
+    .filter { it.componentType == "tab" }
+    .flatMap { it.components.orEmpty() }
+    .any { it.slug == "tab-watch-now" }
+
+/** The episodes listed on a series' "Regarder maintenant" tab (a list-item-wide section). */
+fun PageResponse.toEpisodes(): List<ContentCard> = content?.sections.orEmpty()
+    .filter { it.componentType == "list-item-wide" }
+    .flatMap { it.components.orEmpty() }
+    .mapNotNull { it.toCard() }
+
+/** A programme detail's "Détails du programme" CTA links to its series; returns that series id. */
+fun PageResponse.seriesLink(): String? = content?.metadata?.ctas.orEmpty()
+    .flatMap { it.actionItems.orEmpty() }
+    .flatMap { it.actions?.onClick.orEmpty() }
+    .firstNotNullOfOrNull { item -> item.endpoint?.url?.let { SERIES_REGEX.find(it)?.groupValues?.get(1) } }
+
 fun PageResponse.toRails(): List<ContentRail> {
     val sections = content?.sections ?: return emptyList()
     return sections.mapIndexedNotNull { index, section ->
@@ -150,13 +169,20 @@ fun PageResponse.toRails(): List<ContentRail> {
 private fun SectionDto.seeAllUrl(): String? = auxButton?.actions?.onClick.orEmpty()
     .firstOrNull { it.type == "navigation" }?.endpoint?.url
 
+// Poster cards carry no title field; their display name rides in the action's trkOriginElement param.
+private fun trkTitle(url: String): String? =
+    Regex("""[?&]trkOriginElement=([^&]+)""").find(url)?.groupValues?.get(1)
+        ?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrNull() }
+        ?.takeIf { it.isNotBlank() }
+
 private fun ComponentDto.toCard(square: Boolean = false): ContentCard? {
     val img = picture?.url ?: body?.picture?.url ?: image?.url ?: imageCompact?.url
-    // Live cards put the show title in their footer rather than in title/heading.
-    val label = title?.text ?: heading?.text ?: footer?.title?.text
+    val actionUrl = actions?.onClick?.firstOrNull()?.endpoint?.url
+    // Live cards put the show title in their footer; poster cards carry no title field at all, only
+    // the display name in the action's trkOriginElement tracking parameter.
+    val label = title?.text ?: heading?.text ?: footer?.title?.text ?: actionUrl?.let { trkTitle(it) }
     if (img == null && label == null) return null
 
-    val actionUrl = actions?.onClick?.firstOrNull()?.endpoint?.url
     val channelId = actionUrl?.let { CHANNEL_REGEX.find(it)?.groupValues?.get(1) }
     val vodId = actionUrl?.let { VOD_REGEX.find(it)?.groupValues?.get(1) }
     val seriesId = actionUrl?.let { SERIES_REGEX.find(it)?.groupValues?.get(1) }
@@ -171,7 +197,8 @@ private fun ComponentDto.toCard(square: Boolean = false): ContentCard? {
         seriesId = seriesId,
         actionUrl = actionUrl,
         recordingAssetId = null,
-        liveChannelId = channelIdNum?.toString(),
+        // channel_id is a number on live cards but a string on poster cards; accept both.
+        liveChannelId = (channelIdRaw as? String) ?: (channelIdRaw as? Number)?.toLong()?.toString(),
         square = square,
     )
 }

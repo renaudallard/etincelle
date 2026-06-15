@@ -3,6 +3,7 @@
 
 package it.allard.etincelle.mobile
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.WindowManager
 import android.widget.Toast
@@ -42,6 +43,7 @@ import androidx.media3.ui.PlayerView
 import it.allard.etincelle.core.cast.CastPlayerController
 import it.allard.etincelle.core.cast.CastUiState
 import it.allard.etincelle.core.designsystem.theme.EtincelleTheme
+import it.allard.etincelle.core.domain.DetailKind
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.player.MediaItemFactory
 import it.allard.etincelle.core.player.PlaybackProgress
@@ -75,6 +77,7 @@ class MainActivity : ComponentActivity() {
             )
         }
         castController = controller
+        handleDeepLink(intent)
 
         val onPlay: (PlaybackSource) -> Unit = { source ->
             val item = MediaItemFactory.create(source)
@@ -117,6 +120,26 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleDeepLink(intent)
+    }
+
+    /** Opens a show from an etincelle://series|program|channel/{id} deep link. */
+    private fun handleDeepLink(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme != "etincelle") return
+        val kind = when (data.host) {
+            "series" -> DetailKind.SERIES
+            "program" -> DetailKind.PROGRAM
+            "channel" -> DetailKind.CHANNEL
+            else -> return
+        }
+        val id = data.pathSegments.firstOrNull() ?: return
+        viewModel.onDeepLink(id, kind)
     }
 
     override fun onStart() {
@@ -188,6 +211,8 @@ private fun AppRoot(
                 onRecord = { vm.recordDetail() },
                 onWatchRecording = { vm.watchRecording(it) },
                 onBack = { vm.closeDetail() },
+                onEpisode = { vm.onCardClick(it) },
+                castButton = { CastButton(castState, onCastConnect, onCastDisconnect) },
             )
         }
 

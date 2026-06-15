@@ -20,6 +20,12 @@ data class ContentRail(
     val seeAllUrl: String? = null,
 )
 
+/** A content rail (one whose cards lead somewhere) can be opened as a full grid from its header. */
+fun ContentRail.expandable(): Boolean = seeAllUrl != null || cards.any {
+    it.vodId != null || it.seriesId != null || it.channelId != null ||
+        it.liveChannelId != null || it.recordingAssetId != null
+}
+
 /**
  * A single card in a rail. Tap behaviour, in priority order:
  * - [recordingAssetId] non-null -> plays that DVR recording directly (no detail page).
@@ -87,4 +93,6 @@ data class ProgramDetail(
     val programId: String? = null,
     /** DVR recordings of this very show, shown as a "Vos enregistrements" section. */
     val recordings: List<Recording> = emptyList(),
+    /** Catch-up episodes from the series' "Regarder maintenant" tab; empty when there is no catch-up. */
+    val episodes: List<ContentCard> = emptyList(),
 )
