@@ -159,6 +159,8 @@ fun PageResponse.seriesLink(): String? = content?.metadata?.ctas.orEmpty()
 fun PageResponse.toRails(): List<ContentRail> {
     val sections = content?.sections ?: return emptyList()
     return sections.mapIndexedNotNull { index, section ->
+        // Banners are single promo images, not browsable content; skip them (avoids a title-less 1-card row).
+        if (section.componentType == "banner") return@mapIndexedNotNull null
         val square = section.componentType == "square"
         val cards = section.components.orEmpty().mapNotNull { it.toCard(square) }
         if (cards.isEmpty()) null else ContentRail("rail-$index", section.title?.text, cards, section.seeAllUrl())
@@ -177,7 +179,9 @@ private fun trkTitle(url: String): String? =
 
 private fun ComponentDto.toCard(square: Boolean = false): ContentCard? {
     val img = picture?.url ?: body?.picture?.url ?: image?.url ?: imageCompact?.url
-    val actionUrl = actions?.onClick?.firstOrNull()?.endpoint?.url
+    // Cards often list a tracking action before the navigation one; prefer the navigation target.
+    val actionUrl = (actions?.onClick.orEmpty().firstOrNull { it.type == "navigation" }
+        ?: actions?.onClick?.firstOrNull())?.endpoint?.url
     // Live cards put the show title in their footer; poster cards carry no title field at all, only
     // the display name in the action's trkOriginElement tracking parameter.
     val label = title?.text ?: heading?.text ?: footer?.title?.text ?: actionUrl?.let { trkTitle(it) }
