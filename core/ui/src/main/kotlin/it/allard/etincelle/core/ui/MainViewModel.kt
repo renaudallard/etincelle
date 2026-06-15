@@ -116,6 +116,17 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
             }
             return
         }
+        if (tab == Tab.HOME) {
+            // Accueil must go through loadHome (which prepends the recordings rail), not the raw page.
+            if (tab == _state.value.tab && _state.value.backStack.size == 1) return
+            _state.update { it.copy(busy = true, error = null, tab = tab, backStack = emptyList()) }
+            viewModelScope.launch {
+                runCatching { repo.loadHome() }
+                    .onSuccess { page -> _state.update { it.copy(busy = false, backStack = listOf(page)) } }
+                    .onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Accueil indisponible") } }
+            }
+            return
+        }
         if (tab == _state.value.tab && _state.value.backStack.size == 1) return
         _state.update { it.copy(busy = true, error = null, tab = tab) }
         // The Direct tab loads the same /live-tv page as the "En direct à la TV" rail header, so
