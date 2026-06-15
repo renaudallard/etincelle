@@ -95,10 +95,10 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
     private fun consumeDeepLink() {
         val (id, kind) = pendingDeepLink ?: return
         pendingDeepLink = null
-        _state.update { it.copy(busy = true, error = null, detail = null) }
+        _state.update { it.copy(busy = true, error = null, detail = null, detailRecordingAssetId = null) }
         viewModelScope.launch {
             runCatching { repo.fetchProgramDetail(id, kind) }
-                .onSuccess { d -> _state.update { it.copy(busy = false, detail = d) } }
+                .onSuccess { d -> _state.update { it.copy(busy = false, detail = d, detailRecordingAssetId = null) } }
                 .onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Contenu introuvable") } }
         }
     }
