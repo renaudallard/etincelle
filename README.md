@@ -7,6 +7,8 @@
 ![minSdk 23](https://img.shields.io/badge/minSdk-23-orange)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.4-7F52FF?logo=kotlin&logoColor=white)
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-%2B%20TV-4285F4?logo=jetpackcompose&logoColor=white)
+[![Downloads](https://img.shields.io/github/downloads/renaudallard/etincelle/total?label=downloads&color=success)](https://github.com/renaudallard/etincelle/releases)
+[![PayPal](https://img.shields.io/badge/PayPal-Donate-blue.svg?logo=paypal&logoColor=white)](https://www.paypal.me/RenaudAllard)
 
 </div>
 
