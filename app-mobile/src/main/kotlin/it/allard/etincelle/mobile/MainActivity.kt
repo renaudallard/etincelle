@@ -238,6 +238,7 @@ private fun AppRoot(
                 onWatchRecording = { vm.watchRecording(it) },
                 onBack = { vm.closeDetail() },
                 onEpisode = { vm.onCardClick(it) },
+                isRecording = state.detailRecordingAssetId != null,
                 castButton = { CastButton(castState, onCastConnect, onCastDisconnect) },
             )
         }

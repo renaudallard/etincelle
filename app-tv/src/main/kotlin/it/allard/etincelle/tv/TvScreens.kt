@@ -281,6 +281,7 @@ fun TvProgramDetailScreen(
     onRecord: () -> Unit,
     onWatchRecording: (String) -> Unit,
     onEpisode: (ContentCard) -> Unit,
+    isRecording: Boolean = false,
 ) {
     val watchFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { watchFocus.requestFocus() } }
@@ -321,7 +322,9 @@ fun TvProgramDetailScreen(
                 detail.year?.let { "Année de sortie : $it" },
                 detail.classification?.let { "Classification : $it" },
             ).forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Color.White) }
-            if (detail.episodes.isNotEmpty()) {
+            // For a recording, hide the catch-up episodes (their VOD can 5xx for recorded content);
+            // the user's recordings below are what plays.
+            if (detail.episodes.isNotEmpty() && !isRecording) {
                 TvEpisodesSection(detail.episodes, busy, onEpisode)
             }
             if (detail.recordings.isNotEmpty()) {

@@ -21,7 +21,8 @@ Elle donne accès au **direct**, au **guide des programmes** (EPG), à la **rech
 **rattrapage** et à la **VOD**. Cliquer sur un programme ouvre d'abord sa **fiche détaillée**
 (synopsis, casting, année, classification) plutôt que de le lire aussitôt, et la fiche regroupe ses
 autres diffusions disponibles. Pour une série en rattrapage, la fiche liste les **épisodes
-disponibles** avec leur vignette. Vous pouvez aussi **programmer un enregistrement** et retrouver vos
+disponibles** avec leur vignette ; pour une série **enregistrée**, elle propose directement vos
+épisodes enregistrés, lus depuis le DVR. Vous pouvez aussi **programmer un enregistrement** et retrouver vos
 **enregistrements** (DVR) dans une rangée dédiée sur l'accueil. L'accueil réunit aussi les
 **applications des diffuseurs** (france.tv, MyTF1, M6+…) : ouvrez l'une d'elles pour parcourir son
 catalogue (un abonnement peut être requis). Cliquer sur l'en-tête d'une rangée (par ex. *En direct à

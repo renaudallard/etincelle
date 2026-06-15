@@ -344,6 +344,7 @@ fun ProgramDetailScreen(
     onWatchRecording: (String) -> Unit,
     onBack: () -> Unit,
     onEpisode: (ContentCard) -> Unit = {},
+    isRecording: Boolean = false,
     castButton: @Composable () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -396,7 +397,9 @@ fun ProgramDetailScreen(
             ).forEach {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            if (detail.episodes.isNotEmpty()) {
+            // For a recording, hide the catch-up episodes (their VOD can 5xx for recorded content);
+            // the user's recordings below are what plays.
+            if (detail.episodes.isNotEmpty() && !isRecording) {
                 EpisodesSection(detail.episodes, busy, onEpisode)
             }
             if (detail.recordings.isNotEmpty()) {

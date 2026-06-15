@@ -69,6 +69,7 @@ class MainActivity : ComponentActivity() {
                                 detail, state.busy, state.error, state.info,
                                 viewModel::watchDetail, viewModel::recordDetail, viewModel::watchRecording,
                                 viewModel::onCardClick,
+                                isRecording = state.detailRecordingAssetId != null,
                             )
                         }
 
