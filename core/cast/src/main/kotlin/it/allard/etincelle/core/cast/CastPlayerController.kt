@@ -47,7 +47,6 @@ class CastPlayerController(
     private val localPlayer: ExoPlayer,
     private val reResolve: (suspend (PlaybackSource) -> PlaybackSource?)? = null,
     private val onError: ((String) -> Unit)? = null,
-    private val onReturnToPhone: ((PlaybackSource) -> Unit)? = null,
 ) : CastController(context, castContext) {
 
     private val castPlayer = CastPlayer(castContext, FuboCastMediaItemConverter())
@@ -62,6 +61,10 @@ class CastPlayerController(
     private var endingCaptured = false
     private var hasRetried = false
     private var reResolveJob: Job? = null
+
+    // True once the player screen was left while a Cast session was running, so a later session end
+    // stops quietly instead of popping the player back over whatever the user is now browsing.
+    private var leftPlayerWhileCasting = false
 
     // A transfer keeps the old player running until the new one starts; these track that pending stop.
     private var deferStopSource: Player? = null
@@ -81,6 +84,7 @@ class CastPlayerController(
     fun play(item: MediaItem, startPositionMs: Long) {
         reResolveJob?.cancel()
         hasRetried = false
+        leftPlayerWhileCasting = false
         loadOn(_currentPlayer.value, item, startPositionMs)
     }
 
@@ -89,7 +93,11 @@ class CastPlayerController(
      * casting: leaving the player screen must keep the stream running on the Chromecast.
      */
     fun stopPlayback(): Pair<Long, Long>? {
-        if (_currentPlayer.value === castPlayer) return null
+        if (_currentPlayer.value === castPlayer) {
+            // Leaving the player while casting keeps the TV stream running; remember it was left.
+            leftPlayerWhileCasting = true
+            return null
+        }
         reResolveJob?.cancel()
         clearDeferredStop()
         val player = _currentPlayer.value
@@ -132,11 +140,20 @@ class CastPlayerController(
             endingPlayWhenReady = castPlayer.playWhenReady
         }
         endingCaptured = false
+        if (leftPlayerWhileCasting) {
+            // The user had left the player to keep casting; the session ended, so stop quietly rather
+            // than resuming on the phone or popping the player over what they are now browsing.
+            leftPlayerWhileCasting = false
+            clearDeferredStop()
+            runCatching { castPlayer.stop() }
+            runCatching { localPlayer.stop() }
+            currentItem = null
+            _currentPlayer.value = localPlayer
+            return
+        }
         // Re-resolve when coming back to the phone: the cast may have run for a while and the
         // original (live) URL is stale, so a fresh resolve gives the current edge.
         swapTo(localPlayer, endingPosition, endingPlayWhenReady)
-        // Playback is back on the phone; bring the player screen back if it had been left while casting.
-        (currentItem?.localConfiguration?.tag as? PlaybackSource)?.let { onReturnToPhone?.invoke(it) }
     }
 
     private fun swapTo(target: Player, fromPosition: Long, fromPlayWhenReady: Boolean) {

@@ -77,7 +77,6 @@ class MainActivity : ComponentActivity() {
                 this, it, exo,
                 reResolve = viewModel::reResolve,
                 onError = { msg -> Toast.makeText(this, msg, Toast.LENGTH_SHORT).show() },
-                onReturnToPhone = { source -> viewModel.showPlaying(source) },
             )
         }
         castController = controller
