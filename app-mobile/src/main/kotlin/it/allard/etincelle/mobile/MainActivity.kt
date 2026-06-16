@@ -140,6 +140,9 @@ class MainActivity : ComponentActivity() {
                         confirmButton = {
                             TextButton(onClick = {
                                 runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(up.apkUrl))) }
+                                    .onFailure {
+                                        Toast.makeText(this@MainActivity, "Impossible d'ouvrir le téléchargement", Toast.LENGTH_SHORT).show()
+                                    }
                                 viewModel.dismissUpdate()
                             }) { Text("Télécharger") }
                         },
