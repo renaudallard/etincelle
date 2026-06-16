@@ -28,7 +28,7 @@ private fun EpgProgramWithAssetsDto.toRecording(): Recording? {
     val assetId = dvrAsset.assetId ?: return null
     return Recording(
         assetId = assetId,
-        title = program.heading,
+        title = program.title ?: program.heading,
         subtitle = program.subheading,
         imageUrl = program.horizontalImage ?: program.verticalImage,
         channelName = dvrAsset.channel?.name,
