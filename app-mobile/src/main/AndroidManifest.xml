@@ -20,7 +20,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|uiMode|density|fontScale|locale"
             android:theme="@style/Theme.Etincelle">
             <!-- Deep links to a show: etincelle://series|program|channel/{id} (e.g. from multistream). -->
             <intent-filter>
