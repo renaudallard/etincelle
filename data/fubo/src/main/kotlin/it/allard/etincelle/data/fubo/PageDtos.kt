@@ -102,7 +102,9 @@ fun PageResponse.toProgramDetail(channelId: String?, vodId: String?, isLive: Boo
         val value = f.value?.text ?: return@mapNotNull null
         key to value
     }.toMap()
-    val credits = about?.description?.text
+    // Blank -> null, so an empty credits string neither wipes the synopsis (contains("") is true) nor
+    // surfaces an empty credits line.
+    val credits = about?.description?.text?.takeIf { it.isNotBlank() }
     // Some descriptions already end with the "Réalisé par … avec …" credits; drop that tail so the
     // cast is not shown twice (once in the synopsis, once as the credits line).
     val rawSynopsis = meta?.description?.text
