@@ -212,8 +212,9 @@ class FuboRepository(
     }
 
     override suspend fun resolveRecording(assetId: String): PlaybackSource = withRefresh {
+        // A DVR recording is seekable VOD-like content, so remember and resume its position like VOD.
         api.playbackAsset(id = assetId, type = "dvr").toPlaybackSource()
-            .copy(originRecordingAssetId = assetId)
+            .copy(resumeKey = assetId, startPositionMs = progress.read(assetId), originRecordingAssetId = assetId)
     }
 
     override suspend fun resolveLiveChannel(channelId: String): PlaybackSource = withRefresh {
