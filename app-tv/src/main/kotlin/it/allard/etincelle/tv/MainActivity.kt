@@ -24,6 +24,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import it.allard.etincelle.core.designsystem.theme.EtincelleTheme
@@ -40,11 +42,22 @@ class MainActivity : ComponentActivity() {
         MainViewModelFactory((application as EtincelleTvApp).container.repository)
     }
     private var player: ExoPlayer? = null
+    private var pausedForBackground = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        val exo = ExoPlayer.Builder(this).build()
+        val exo = ExoPlayer.Builder(this)
+            // Pause on audio-focus loss (other media) and on a headset disconnect.
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(C.USAGE_MEDIA)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                    .build(),
+                true,
+            )
+            .setHandleAudioBecomingNoisy(true)
+            .build()
         player = exo
         handleDeepLink(intent)
         viewModel.checkForUpdate(BuildConfig.VERSION_NAME)
@@ -128,6 +141,25 @@ class MainActivity : ComponentActivity() {
         viewModel.onDeepLink(id, kind)
     }
 
+    override fun onStop() {
+        // Pause playback in the background (no decoding/audio); resume on return.
+        player?.let {
+            if (it.isPlaying) {
+                pausedForBackground = true
+                it.playWhenReady = false
+            }
+        }
+        super.onStop()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (pausedForBackground) {
+            pausedForBackground = false
+            player?.playWhenReady = true
+        }
+    }
+
     override fun onDestroy() {
         player?.release()
         player = null
@@ -150,6 +182,7 @@ private fun TvPlayerSurface(source: PlaybackSource, player: ExoPlayer, onSavePos
     }
     AndroidView(
         factory = { context -> PlayerView(context).apply { this.player = player } },
+        onRelease = { it.player = null },
         modifier = Modifier.fillMaxSize(),
     )
 }
