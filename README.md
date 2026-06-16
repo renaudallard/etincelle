@@ -43,7 +43,8 @@ expérimentale du **récepteur Cast Fubo officiel** (redémarrage requis), un bo
 mises à jour** (compare la version installée à la dernière publiée sur GitHub) et la **déconnexion**
 (avec confirmation). Sur
 téléphone, vous pouvez **diffuser** le flux en cours vers un **Chromecast** et transférer la lecture
-d'un appareil à l'autre.
+d'un appareil à l'autre. La diffusion s'appuie sur un récepteur Cast Widevine personnalisé, hébergé
+séparément : [etincelle_receiver](https://github.com/renaudallard/etincelle_receiver).
 À chaque démarrage, etincelle **vérifie les mises à jour** sur GitHub et propose de télécharger la
 dernière version lorsqu'une plus récente est disponible.
 
