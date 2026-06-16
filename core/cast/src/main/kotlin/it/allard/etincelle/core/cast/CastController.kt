@@ -64,14 +64,16 @@ open class CastController(
         castContext.sessionManager.currentCastSession?.let(::onSessionConnected) ?: onSessionDisconnected()
     }
 
-    fun stop() {
+    open fun stop() {
         mediaRouter.removeCallback(routerCallback)
         castContext.sessionManager.removeSessionManagerListener(sessionListener, CastSession::class.java)
     }
 
-    /** Route playback to the given Cast device. */
-    open fun connectTo(routeId: String) {
-        mediaRouter.routes.firstOrNull { it.id == routeId }?.let(mediaRouter::selectRoute)
+    /** Route playback to the given Cast device. Returns true only when a matching route was selected. */
+    open fun connectTo(routeId: String): Boolean {
+        val route = mediaRouter.routes.firstOrNull { it.id == routeId } ?: return false
+        mediaRouter.selectRoute(route)
+        return true
     }
 
     /** End the Cast session and stop the receiver (returns playback to the phone). */

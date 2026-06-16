@@ -93,6 +93,15 @@ class CastPlayerController(
 
     /** Load + play [item] on whichever player is current (phone or cast). */
     fun play(item: MediaItem, startPositionMs: Long) {
+        // Re-entering the player while this exact stream is already running on a Chromecast: leave it
+        // alone instead of reloading and restarting it from the original position.
+        if (_currentPlayer.value === castPlayer &&
+            castContext.sessionManager.currentCastSession != null &&
+            sameContent(currentItem, item)
+        ) {
+            leftPlayerWhileCasting = false
+            return
+        }
         reResolveJob?.cancel()
         hasRetried = false
         leftPlayerWhileCasting = false
@@ -106,13 +115,48 @@ class CastPlayerController(
      * current position/state so the new device resumes there, and flag a transfer so the old
      * session's end does not bounce playback back to the phone.
      */
-    override fun connectTo(routeId: String) {
-        if (_currentPlayer.value === castPlayer && castContext.sessionManager.currentCastSession != null) {
-            transferPosition = castPlayer.currentPosition
-            transferPlayWhenReady = castPlayer.playWhenReady
+    override fun connectTo(routeId: String): Boolean {
+        val willTransfer = _currentPlayer.value === castPlayer && castContext.sessionManager.currentCastSession != null
+        val position = if (willTransfer) castPlayer.currentPosition else 0L
+        val playWhenReady = if (willTransfer) castPlayer.playWhenReady else true
+        val selected = super.connectTo(routeId)
+        // Arm the transfer only once a route was actually selected, so a stale/removed routeId cannot
+        // leave `transferring` stuck and mis-handle the next session as a transfer.
+        if (willTransfer && selected) {
+            transferPosition = position
+            transferPlayWhenReady = playWhenReady
             transferring = true
         }
-        super.connectTo(routeId)
+        return selected
+    }
+
+    override fun stop() {
+        super.stop()
+        // Backgrounding mid-transfer: drop the pending fallback so it cannot start the phone in the
+        // background, and forget the transfer (the session is re-evaluated on the next start()).
+        transferFallbackJob?.cancel()
+        transferring = false
+    }
+
+    // True when [a] and [b] are the same content (by its stable origin ids), ignoring the per-resolve
+    // URL/token differences.
+    private fun sameContent(a: MediaItem?, b: MediaItem): Boolean {
+        val sa = (a?.localConfiguration?.tag as? PlaybackSource) ?: return false
+        val sb = (b.localConfiguration?.tag as? PlaybackSource) ?: return false
+        if (sa.originChannelId == null && sa.originVodId == null && sa.originRecordingAssetId == null) return false
+        return sa.originChannelId == sb.originChannelId &&
+            sa.originVodId == sb.originVodId &&
+            sa.originRecordingAssetId == sb.originRecordingAssetId
+    }
+
+    // Tear down to the phone without resuming playback (used when the user left the player while
+    // casting and the session then ended or a transfer failed).
+    private fun stopQuietly() {
+        clearDeferredStop()
+        runCatching { castPlayer.stop() }
+        runCatching { localPlayer.stop() }
+        currentItem = null
+        _currentPlayer.value = localPlayer
     }
 
     /**
@@ -183,7 +227,13 @@ class CastPlayerController(
                 delay(8000)
                 if (transferring) {
                     transferring = false
-                    swapTo(localPlayer, transferPosition, transferPlayWhenReady)
+                    // If the user left the player during the transfer, do not resume on the phone.
+                    if (leftPlayerWhileCasting) {
+                        leftPlayerWhileCasting = false
+                        stopQuietly()
+                    } else {
+                        swapTo(localPlayer, transferPosition, transferPlayWhenReady)
+                    }
                 }
             }
             return
@@ -199,11 +249,7 @@ class CastPlayerController(
             // The user had left the player to keep casting; the session ended, so stop quietly rather
             // than resuming on the phone or popping the player over what they are now browsing.
             leftPlayerWhileCasting = false
-            clearDeferredStop()
-            runCatching { castPlayer.stop() }
-            runCatching { localPlayer.stop() }
-            currentItem = null
-            _currentPlayer.value = localPlayer
+            stopQuietly()
             return
         }
         // Re-resolve when coming back to the phone: the cast may have run for a while and the
