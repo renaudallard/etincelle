@@ -65,6 +65,9 @@ class FuboRepository(
     override suspend fun logout() {
         session.session = null
         store.clear()
+        // Drop the cached channel data so the next account does not see the previous one's channels.
+        channelsPageCache = null
+        channelDirectory = null
     }
 
     override fun currentSession(): UserSession? = session.session
