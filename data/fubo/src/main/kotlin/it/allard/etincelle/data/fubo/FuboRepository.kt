@@ -18,6 +18,8 @@ import it.allard.etincelle.core.network.NetworkClient
 import it.allard.etincelle.core.network.ProgressStore
 import it.allard.etincelle.core.network.SessionManager
 import it.allard.etincelle.core.network.SessionStore
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import retrofit2.HttpException
 import java.io.IOException
 
@@ -225,8 +227,16 @@ class FuboRepository(
         if (positionMs > 0) progress.save(key, positionMs) else progress.clear(key)
     }
 
-    private suspend fun refreshTokens() {
+    private val refreshMutex = Mutex()
+
+    /**
+     * Refreshes the access token, single-flighted: concurrent 401s coalesce into one /refresh so the
+     * rotating refresh token is not spent twice. [usedAccessToken] is the token whose request 401'd;
+     * if another coroutine already refreshed it, this returns without a second network call.
+     */
+    private suspend fun refreshTokens(usedAccessToken: String?) = refreshMutex.withLock {
         val current = session.session ?: throw AppError.Unauthorized
+        if (usedAccessToken != null && current.accessToken != usedAccessToken) return@withLock
         val refreshToken = current.refreshToken ?: throw AppError.Unauthorized
         val tokens = api.refresh("Bearer $refreshToken")
         val newAccess = tokens.accessToken ?: throw AppError.Unauthorized
@@ -241,15 +251,33 @@ class FuboRepository(
             block()
         } catch (e: HttpException) {
             if (e.code() != 401) throw e
+            val usedToken = session.session?.accessToken
             try {
-                refreshTokens()
+                refreshTokens(usedToken)
             } catch (refreshError: Exception) {
-                logout()
-                throw AppError.Unauthorized
+                // Only a genuine auth rejection means the session is dead. A transient network/5xx
+                // failure during refresh must leave the saved session intact (do not log out offline).
+                if (refreshError.isAuthFailure()) {
+                    logout()
+                    throw AppError.Unauthorized
+                }
+                throw refreshError
             }
-            block()
+            // The retry runs with the fresh token; if it is itself rejected, the session is truly dead.
+            try {
+                block()
+            } catch (retryError: HttpException) {
+                if (retryError.code() == 401 || retryError.code() == 403) {
+                    logout()
+                    throw AppError.Unauthorized
+                }
+                throw retryError
+            }
         }
     }
+
+    private fun Throwable.isAuthFailure(): Boolean =
+        this is AppError.Unauthorized || (this is HttpException && (code() == 401 || code() == 403))
 
     /** Turns raw transport failures into friendly domain errors; passes [AppError]s through. */
     private suspend fun <T> translateErrors(block: suspend () -> T): T = try {
