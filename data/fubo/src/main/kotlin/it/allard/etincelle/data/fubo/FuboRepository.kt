@@ -187,13 +187,13 @@ class FuboRepository(
     }
 
     override suspend fun recordEpisode(assetId: String) = withRefresh {
+        // The response body is unused, but a raw ResponseBody must be closed or the connection leaks.
         api.addRecording(
             AddRecordingRequest(
                 params = AddRecordingParams(assetId = assetId),
                 metadatas = mapOf("asset.asset_id" to assetId),
             ),
-        )
-        Unit
+        ).close()
     }
 
     override suspend fun loadRecordings(): List<Recording> = withRefresh {
