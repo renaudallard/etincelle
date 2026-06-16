@@ -49,7 +49,9 @@ open class CastController(
         override fun onSessionStarted(session: CastSession, sessionId: String) = onSessionConnected(session)
         override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) = onSessionConnected(session)
         override fun onSessionEnded(session: CastSession, error: Int) = onSessionDisconnected()
-        override fun onSessionSuspended(session: CastSession, reason: Int) = onSessionDisconnected()
+        // A suspend is transient (brief network drop); keep the cast player current and wait for
+        // onSessionResumed/onSessionEnded, rather than bouncing playback to the phone and back.
+        override fun onSessionSuspended(session: CastSession, reason: Int) = Unit
         override fun onSessionStartFailed(session: CastSession, error: Int) = onSessionDisconnected()
         override fun onSessionResumeFailed(session: CastSession, error: Int) = onSessionDisconnected()
         override fun onSessionStarting(session: CastSession) = Unit
