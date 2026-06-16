@@ -3,6 +3,7 @@
 
 package it.allard.etincelle.mobile
 
+import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -34,12 +35,15 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
@@ -68,11 +72,21 @@ class MainActivity : ComponentActivity() {
     }
     private var player: ExoPlayer? = null
     private var castController: CastPlayerController? = null
+    private var pausedForBackground = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        val exo = ExoPlayer.Builder(this).build()
+        val exo = ExoPlayer.Builder(this)
+            // Pause on audio-focus loss (calls, other media) and on headphones unplugged.
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(C.USAGE_MEDIA)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                    .build(),
+                true,
+            )
+            .setHandleAudioBecomingNoisy(true)
+            .build()
         player = exo
         val controller = (application as EtincelleApp).castContext?.let {
             CastPlayerController(
@@ -181,10 +195,22 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         castController?.start()
+        if (pausedForBackground) {
+            pausedForBackground = false
+            player?.playWhenReady = true
+        }
     }
 
     override fun onStop() {
         castController?.stop()
+        // Pause local playback in the background (no decoding/audio); resume on return. While casting
+        // the local player is idle, so this is a no-op and the Chromecast keeps playing.
+        player?.let {
+            if (it.isPlaying) {
+                pausedForBackground = true
+                it.playWhenReady = false
+            }
+        }
         super.onStop()
     }
 
@@ -367,14 +393,24 @@ private fun PlayerSurface(
         onPlay(source)
         onDispose { onStop(source) }
     }
+    val deviceName = castState.connectedDeviceName
+    val view = LocalView.current
+    DisposableEffect(deviceName) {
+        // Keep the screen awake and block screenshots/recording only while the video plays locally on
+        // the phone (not while browsing, and not while it plays on a Chromecast).
+        val window = (view.context as? Activity)?.window
+        val flags = WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or WindowManager.LayoutParams.FLAG_SECURE
+        if (deviceName == null) window?.addFlags(flags) else window?.clearFlags(flags)
+        onDispose { window?.clearFlags(flags) }
+    }
     Box(Modifier.fillMaxSize()) {
-        val deviceName = castState.connectedDeviceName
         if (deviceName != null) {
             CastingPlaceholder(source.title, deviceName)
         } else {
             AndroidView(
                 factory = { context -> PlayerView(context).apply { player = currentPlayer } },
                 update = { it.player = currentPlayer },
+                onRelease = { it.player = null },
                 modifier = Modifier.fillMaxSize(),
             )
         }
