@@ -20,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -73,6 +74,14 @@ class CastPlayerController(
     private var deferStopTarget: Player? = null
     private var deferStopListener: Player.Listener? = null
 
+    // A Chromecast -> Chromecast switch: the old session ends before the new one connects, so capture
+    // the position up front, hold it across the gap, and load it on the new device when it connects
+    // (instead of bouncing playback back to the phone in between).
+    private var transferring = false
+    private var transferPosition = 0L
+    private var transferPlayWhenReady = true
+    private var transferFallbackJob: Job? = null
+
     private val errorListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) = onPlaybackError()
     }
@@ -87,7 +96,23 @@ class CastPlayerController(
         reResolveJob?.cancel()
         hasRetried = false
         leftPlayerWhileCasting = false
+        transferring = false
+        transferFallbackJob?.cancel()
         loadOn(_currentPlayer.value, item, startPositionMs)
+    }
+
+    /**
+     * Route to a Cast device. When already casting, this is a device-to-device switch: capture the
+     * current position/state so the new device resumes there, and flag a transfer so the old
+     * session's end does not bounce playback back to the phone.
+     */
+    override fun connectTo(routeId: String) {
+        if (_currentPlayer.value === castPlayer && castContext.sessionManager.currentCastSession != null) {
+            transferPosition = castPlayer.currentPosition
+            transferPlayWhenReady = castPlayer.playWhenReady
+            transferring = true
+        }
+        super.connectTo(routeId)
     }
 
     /**
@@ -121,6 +146,19 @@ class CastPlayerController(
 
     override fun onSessionConnected(session: CastSession) {
         super.onSessionConnected(session)
+        if (transferring) {
+            // The new Chromecast connected: load the held stream on it at the captured position,
+            // re-resolving for fresh tokens. The old receiver was stopped by the session switch.
+            transferring = false
+            transferFallbackJob?.cancel()
+            endingCaptured = false
+            reResolveJob?.cancel()
+            hasRetried = false
+            clearDeferredStop()
+            val item = currentItem ?: return
+            loadResolved(castPlayer, item, transferPosition, transferPlayWhenReady)
+            return
+        }
         // Re-resolve when casting out too: the local stream may have been playing for a while and
         // its tokens are stale, so the receiver needs a freshly minted URL to load.
         swapTo(castPlayer, localPlayer.currentPosition, localPlayer.playWhenReady)
@@ -135,6 +173,21 @@ class CastPlayerController(
 
     override fun onSessionDisconnected() {
         super.onSessionDisconnected()
+        if (transferring) {
+            // Device-to-device switch in flight: the old session ended; keep the cast player current
+            // and wait for the new device to connect. If it never does (transfer failed), fall back
+            // to the phone at the captured position so playback is not lost.
+            endingCaptured = false
+            transferFallbackJob?.cancel()
+            transferFallbackJob = scope.launch {
+                delay(8000)
+                if (transferring) {
+                    transferring = false
+                    swapTo(localPlayer, transferPosition, transferPlayWhenReady)
+                }
+            }
+            return
+        }
         // The suspend and failure paths never fire onSessionEnding, so capture the position here
         // instead of trusting a stale value from the last clean end.
         if (!endingCaptured) {
@@ -168,6 +221,13 @@ class CastPlayerController(
         _currentPlayer.value = target
         hasRetried = false
         val item = currentItem ?: run { runCatching { from.stop() }; return }
+        loadResolved(target, item, fromPosition, fromPlayWhenReady)
+        deferStop(from, target)
+    }
+
+    // Load [item] on [target] at [fromPosition] (a live stream clamps to the edge), re-resolving for
+    // a fresh token/URL first when possible. Shared by player swaps and Chromecast->Chromecast moves.
+    private fun loadResolved(target: Player, item: MediaItem, fromPosition: Long, fromPlayWhenReady: Boolean) {
         val source = item.localConfiguration?.tag as? PlaybackSource
         val position = if (source?.isLive == true) 0 else fromPosition
         val resolver = reResolve
@@ -185,7 +245,6 @@ class CastPlayerController(
             loadOn(target, item, position)
             target.playWhenReady = fromPlayWhenReady
         }
-        deferStop(from, target)
     }
 
     // Stop `from` only once `target` is actually playing (or immediately if it already is).

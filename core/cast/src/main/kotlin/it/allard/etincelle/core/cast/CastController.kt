@@ -70,7 +70,7 @@ open class CastController(
     }
 
     /** Route playback to the given Cast device. */
-    fun connectTo(routeId: String) {
+    open fun connectTo(routeId: String) {
         mediaRouter.routes.firstOrNull { it.id == routeId }?.let(mediaRouter::selectRoute)
     }
 
