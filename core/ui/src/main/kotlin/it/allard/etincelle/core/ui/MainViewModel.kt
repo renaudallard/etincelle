@@ -136,11 +136,12 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
             Result.failure(e)
         }
 
-    // Surfaces a failure: an unrecoverable auth error means the repo already cleared the dead session,
-    // so return to login rather than leaving a logged-in shell that 401s on every further action.
+    // Surfaces a failure. Only when the session is genuinely gone (the repo cleared it) do we return
+    // to login - a plain 403 (forbidden/not-entitled/geo) also maps to Unauthorized but the session is
+    // still valid, so it must stay an in-place banner. Local prefs survive the reset.
     private fun applyFailure(e: Throwable, fallback: String) {
-        if (e is AppError.Unauthorized) {
-            _state.value = UiState(checking = false, error = e.message)
+        if (e is AppError.Unauthorized && repo.currentSession() == null) {
+            _state.update { UiState(checking = false, error = e.message, hideLocked = it.hideLocked, update = it.update) }
         } else {
             _state.update { it.copy(busy = false, refreshing = false, error = e.message ?: fallback) }
         }
@@ -434,11 +435,9 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         }
     } catch (c: CancellationException) {
         throw c
-    } catch (e: AppError.Unauthorized) {
-        // The session died mid-cast; do not silently swallow it - return to login.
-        applyFailure(e, "")
-        null
     } catch (e: Throwable) {
+        // Let the re-resolve fail in place (the cast/player shows an error); a dead session is caught
+        // by the next foreground action, which ejects to login - and not from this background callback.
         null
     }
 
