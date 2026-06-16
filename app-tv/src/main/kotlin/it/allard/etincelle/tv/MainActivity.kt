@@ -3,6 +3,7 @@
 
 package it.allard.etincelle.tv
 
+import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -20,6 +21,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -172,6 +174,14 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun TvPlayerSurface(source: PlaybackSource, player: ExoPlayer, onSavePosition: (String?, Long) -> Unit) {
+    val view = LocalView.current
+    DisposableEffect(Unit) {
+        // Mark the window secure while a stream is on screen (parity with mobile); protects the
+        // software/L3 decode path on top of Widevine L1 + HDCP.
+        val window = (view.context as? Activity)?.window
+        window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
+    }
     DisposableEffect(source) {
         val item = MediaItemFactory.create(source)
         if (source.startPositionMs > 0) player.setMediaItem(item, source.startPositionMs) else player.setMediaItem(item)
