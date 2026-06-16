@@ -13,6 +13,7 @@ import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramDetail
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -84,7 +85,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         viewModelScope.launch {
             val restored = runCatching { repo.restoreSession() }.getOrDefault(false)
             if (restored) {
-                runCatching { repo.loadHome() }
+                runCatchingNav { repo.loadHome() }
                     .onSuccess { page ->
                         _state.update { it.copy(checking = false, loggedIn = true, tab = Tab.HOME, backStack = listOf(page)) }
                         consumeDeepLink()
@@ -122,6 +123,18 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         navJob = viewModelScope.launch { block() }
     }
 
+    // Like runCatching, but lets coroutine cancellation propagate: when navJob cancels a superseded
+    // load, its suspend call throws CancellationException, which must NOT be turned into an onFailure
+    // (that would flash a spurious error, clear busy, or - in showRecordingDetail - start playback).
+    private inline fun <T> runCatchingNav(block: () -> T): Result<T> =
+        try {
+            Result.success(block())
+        } catch (c: CancellationException) {
+            throw c
+        } catch (e: Throwable) {
+            Result.failure(e)
+        }
+
     /** Opens a show from an external deep link (etincelle://series|program|channel/{id}); defers until login. */
     fun onDeepLink(id: String, kind: DetailKind) {
         pendingDeepLink = id to kind
@@ -137,7 +150,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
             it.copy(busy = true, error = null, detailStack = emptyList(), playing = null, settings = false)
         }
         navLaunch {
-            runCatching { repo.fetchProgramDetail(id, kind) }
+            runCatchingNav { repo.fetchProgramDetail(id, kind) }
                 .onSuccess { d -> _state.update { it.copy(busy = false, detailStack = listOf(DetailEntry(d, null))) } }
                 .onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Contenu introuvable") } }
         }
@@ -173,7 +186,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
             else it.copy(tab = Tab.GUIDE, error = null, busy = true, backStack = emptyList())
         }
         navLaunch {
-            runCatching { repo.loadGuide() }
+            runCatchingNav { repo.loadGuide() }
                 .onSuccess { page -> _state.update { it.copy(busy = false, refreshing = false, backStack = listOf(page)) } }
                 .onFailure { e -> _state.update { it.copy(busy = false, refreshing = false, error = e.message ?: "Guide indisponible") } }
         }
@@ -185,7 +198,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
             else it.copy(tab = Tab.HOME, error = null, busy = true, backStack = emptyList())
         }
         navLaunch {
-            runCatching { repo.loadHome() }
+            runCatchingNav { repo.loadHome() }
                 .onSuccess { page -> _state.update { it.copy(busy = false, refreshing = false, backStack = listOf(page)) } }
                 .onFailure { e -> _state.update { it.copy(busy = false, refreshing = false, error = e.message ?: "Accueil indisponible") } }
         }
@@ -220,7 +233,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
     private fun reloadPageTop(url: String, grid: Boolean) {
         _state.update { it.copy(refreshing = true, error = null) }
         navLaunch {
-            runCatching { repo.loadPage(url) }
+            runCatchingNav { repo.loadPage(url) }
                 .onSuccess { page ->
                     _state.update {
                         val current = it.backStack.lastOrNull()
@@ -243,7 +256,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         lastQuery = query.trim()
         _state.update { if (silent) it.copy(refreshing = true, error = null) else it.copy(busy = true, error = null) }
         navLaunch {
-            runCatching { repo.search(query.trim()) }
+            runCatchingNav { repo.search(query.trim()) }
                 .onSuccess { page -> _state.update { it.copy(busy = false, refreshing = false, backStack = listOf(page.copy(title = "Résultats"))) } }
                 .onFailure { e -> _state.update { it.copy(busy = false, refreshing = false, error = e.message ?: "Échec de recherche") } }
         }
@@ -292,8 +305,8 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
     /** Plays a DVR recording by its dvr asset id (from a recording card or a detail's recordings list). */
     fun watchRecording(assetId: String) {
         _state.update { it.copy(busy = true, error = null, info = null) }
-        viewModelScope.launch {
-            runCatching { repo.resolveRecording(assetId) }
+        navLaunch {
+            runCatchingNav { repo.resolveRecording(assetId) }
                 .onSuccess { src -> _state.update { it.copy(busy = false, playing = src) } }
                 .onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Échec de lecture") } }
         }
@@ -307,7 +320,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         }
         _state.update { it.copy(busy = true, error = null, info = null) }
         navLaunch {
-            runCatching { repo.fetchProgramDetail(id, kind) }
+            runCatchingNav { repo.fetchProgramDetail(id, kind) }
                 .onSuccess { d -> _state.update { it.copy(busy = false, detailStack = it.detailStack + DetailEntry(d, null)) } }
                 .onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Détail indisponible") } }
         }
@@ -320,7 +333,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
     private fun showRecordingDetail(card: ContentCard, id: String, kind: DetailKind, assetId: String) {
         _state.update { it.copy(busy = true, error = null, info = null) }
         navLaunch {
-            runCatching { repo.fetchProgramDetail(id, kind) }
+            runCatchingNav { repo.fetchProgramDetail(id, kind) }
                 .onSuccess { d -> _state.update { it.copy(busy = false, detailStack = it.detailStack + DetailEntry(d, assetId)) } }
                 .onFailure { watchRecording(assetId) }
         }
@@ -334,8 +347,8 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         val vodId = d.vodId
         val channelId = d.channelId
         _state.update { it.copy(busy = true, error = null) }
-        viewModelScope.launch {
-            runCatching {
+        navLaunch {
+            runCatchingNav {
                 when {
                     d.isLive && channelId != null -> repo.resolveLiveChannel(channelId)
                     vodId != null -> repo.resolveVod(vodId)
@@ -361,11 +374,15 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
 
     /** Closes the detail page, back to browsing. */
     /** Closes the top detail page: back to its parent detail if any, otherwise back to browsing. */
-    fun closeDetail() = _state.update { it.copy(detailStack = it.detailStack.dropLast(1), error = null, info = null) }
+    fun closeDetail() {
+        // Drop any in-flight load/play so it cannot re-open this screen after the user backed out.
+        navJob?.cancel()
+        _state.update { it.copy(detailStack = it.detailStack.dropLast(1), busy = false, error = null, info = null) }
+    }
 
     private fun loadPageInto(url: String, replace: Boolean, fallbackTitle: String?, grid: Boolean = false) {
         navLaunch {
-            runCatching { repo.loadPage(url) }
+            runCatchingNav { repo.loadPage(url) }
                 .onSuccess { page ->
                     val titled = page.copy(title = page.title ?: fallbackTitle, isGrid = grid, reloadUrl = url)
                     _state.update {
@@ -377,9 +394,15 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         }
     }
 
-    fun back() = _state.update { if (it.canGoBack) it.copy(backStack = it.backStack.dropLast(1)) else it }
+    fun back() {
+        navJob?.cancel()
+        _state.update { if (it.canGoBack) it.copy(backStack = it.backStack.dropLast(1), busy = false) else it }
+    }
 
-    fun stopPlaying() = _state.update { it.copy(playing = null) }
+    fun stopPlaying() {
+        navJob?.cancel()
+        _state.update { it.copy(playing = null) }
+    }
 
     /** Persists a VOD/replay resume position; a null [key] (live) is ignored. */
     fun savePlaybackPosition(key: String?, positionMs: Long) {
