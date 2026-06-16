@@ -105,7 +105,10 @@ class FuboRepository(
     private var channelsPageCache: PageResponse? = null
     private suspend fun channelsPage(): PageResponse? {
         channelsPageCache?.let { return it }
-        return runCatching { api.channelsPage() }.getOrNull()?.also { channelsPageCache = it }
+        return runCatching { api.channelsPage() }
+            .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+            .getOrNull()
+            ?.also { channelsPageCache = it }
     }
 
     // Cached channel id -> name directory, loaded lazily the first time a page carries live cards.
