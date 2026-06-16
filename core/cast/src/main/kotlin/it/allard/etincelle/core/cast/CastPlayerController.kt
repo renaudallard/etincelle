@@ -132,10 +132,10 @@ class CastPlayerController(
 
     override fun stop() {
         super.stop()
-        // Backgrounding mid-transfer: drop the pending fallback so it cannot start the phone in the
-        // background, and forget the transfer (the session is re-evaluated on the next start()).
+        // Backgrounding: drop the pending fallback so it cannot start the phone in the background, but
+        // KEEP `transferring` and the captured position - start()'s session re-check then completes the
+        // transfer (loads the new device) or re-arms the fallback, instead of bouncing to the phone.
         transferFallbackJob?.cancel()
-        transferring = false
     }
 
     // True when [a] and [b] are the same content (by its stable origin ids), ignoring the per-resolve
