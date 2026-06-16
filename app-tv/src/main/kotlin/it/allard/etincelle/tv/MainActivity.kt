@@ -59,7 +59,8 @@ class MainActivity : ComponentActivity() {
             .setHandleAudioBecomingNoisy(true)
             .build()
         player = exo
-        handleDeepLink(intent)
+        // Only on a fresh launch; a process recreation must not replay the original deep link.
+        if (savedInstanceState == null) handleDeepLink(intent)
         viewModel.checkForUpdate(BuildConfig.VERSION_NAME)
         setContent {
             EtincelleTheme {
@@ -138,6 +139,8 @@ class MainActivity : ComponentActivity() {
             else -> return
         }
         val id = data.pathSegments.firstOrNull() ?: return
+        // Mark the intent consumed so getIntent() does not hand the same link back after a recreation.
+        intent.data = null
         viewModel.onDeepLink(id, kind)
     }
 
