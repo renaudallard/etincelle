@@ -13,6 +13,7 @@ import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramDetail
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -103,6 +104,15 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
 
     private var pendingDeepLink: Pair<String, DetailKind>? = null
 
+    // One in-flight navigation (page/detail load) at a time: launching a new one cancels the previous
+    // so a slower earlier load cannot overwrite the state of a newer one (last-writer-wins races).
+    private var navJob: Job? = null
+
+    private fun navLaunch(block: suspend () -> Unit) {
+        navJob?.cancel()
+        navJob = viewModelScope.launch { block() }
+    }
+
     /** Opens a show from an external deep link (etincelle://series|program|channel/{id}); defers until login. */
     fun onDeepLink(id: String, kind: DetailKind) {
         pendingDeepLink = id to kind
@@ -112,8 +122,12 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
     private fun consumeDeepLink() {
         val (id, kind) = pendingDeepLink ?: return
         pendingDeepLink = null
-        _state.update { it.copy(busy = true, error = null, detail = null, detailRecordingAssetId = null) }
-        viewModelScope.launch {
+        // Clear any open player/settings too, so the deep-linked show surfaces instead of being
+        // stranded behind them.
+        _state.update {
+            it.copy(busy = true, error = null, detail = null, detailRecordingAssetId = null, playing = null, settings = false)
+        }
+        navLaunch {
             runCatching { repo.fetchProgramDetail(id, kind) }
                 .onSuccess { d -> _state.update { it.copy(busy = false, detail = d, detailRecordingAssetId = null) } }
                 .onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Contenu introuvable") } }
@@ -149,7 +163,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
             if (silent) it.copy(tab = Tab.GUIDE, error = null, refreshing = true)
             else it.copy(tab = Tab.GUIDE, error = null, busy = true, backStack = emptyList())
         }
-        viewModelScope.launch {
+        navLaunch {
             runCatching { repo.loadGuide() }
                 .onSuccess { page -> _state.update { it.copy(busy = false, refreshing = false, backStack = listOf(page)) } }
                 .onFailure { e -> _state.update { it.copy(busy = false, refreshing = false, error = e.message ?: "Guide indisponible") } }
@@ -161,7 +175,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
             if (silent) it.copy(tab = Tab.HOME, error = null, refreshing = true)
             else it.copy(tab = Tab.HOME, error = null, busy = true, backStack = emptyList())
         }
-        viewModelScope.launch {
+        navLaunch {
             runCatching { repo.loadHome() }
                 .onSuccess { page -> _state.update { it.copy(busy = false, refreshing = false, backStack = listOf(page)) } }
                 .onFailure { e -> _state.update { it.copy(busy = false, refreshing = false, error = e.message ?: "Accueil indisponible") } }
@@ -196,7 +210,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
     /** Re-fetches the top page's papi url, replacing only that entry so the back stack is kept. */
     private fun reloadPageTop(url: String, grid: Boolean) {
         _state.update { it.copy(refreshing = true, error = null) }
-        viewModelScope.launch {
+        navLaunch {
             runCatching { repo.loadPage(url) }
                 .onSuccess { page ->
                     _state.update {
@@ -219,7 +233,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         if (query.isBlank()) return
         lastQuery = query.trim()
         _state.update { if (silent) it.copy(refreshing = true, error = null) else it.copy(busy = true, error = null) }
-        viewModelScope.launch {
+        navLaunch {
             runCatching { repo.search(query.trim()) }
                 .onSuccess { page -> _state.update { it.copy(busy = false, refreshing = false, backStack = listOf(page.copy(title = "Résultats"))) } }
                 .onFailure { e -> _state.update { it.copy(busy = false, refreshing = false, error = e.message ?: "Échec de recherche") } }
@@ -283,7 +297,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
             return
         }
         _state.update { it.copy(busy = true, error = null, info = null) }
-        viewModelScope.launch {
+        navLaunch {
             runCatching { repo.fetchProgramDetail(id, kind) }
                 .onSuccess { d -> _state.update { it.copy(busy = false, detail = d, detailRecordingAssetId = null) } }
                 .onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Détail indisponible") } }
@@ -296,7 +310,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
      */
     private fun showRecordingDetail(card: ContentCard, id: String, kind: DetailKind, assetId: String) {
         _state.update { it.copy(busy = true, error = null, info = null) }
-        viewModelScope.launch {
+        navLaunch {
             runCatching { repo.fetchProgramDetail(id, kind) }
                 .onSuccess { d -> _state.update { it.copy(busy = false, detail = d, detailRecordingAssetId = assetId) } }
                 .onFailure { watchRecording(assetId) }
@@ -340,7 +354,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
     fun closeDetail() = _state.update { it.copy(detail = null, detailRecordingAssetId = null, error = null, info = null) }
 
     private fun loadPageInto(url: String, replace: Boolean, fallbackTitle: String?, grid: Boolean = false) {
-        viewModelScope.launch {
+        navLaunch {
             runCatching { repo.loadPage(url) }
                 .onSuccess { page ->
                     val titled = page.copy(title = page.title ?: fallbackTitle, isGrid = grid, reloadUrl = url)
