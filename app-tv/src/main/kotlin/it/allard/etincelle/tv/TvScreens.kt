@@ -4,6 +4,7 @@
 package it.allard.etincelle.tv
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -284,7 +285,14 @@ fun TvProgramDetailScreen(
     isRecording: Boolean = false,
 ) {
     val watchFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { watchFocus.requestFocus() } }
+    val showWatch = !(detail.isSeries && !isRecording)
+    // A page with no playable element at all (a series with no catch-up episodes and no recordings)
+    // would otherwise leave the D-pad nothing to focus; make the column itself focusable as a fallback.
+    val nothingFocusable = !showWatch && detail.recordAssetId == null &&
+        detail.episodes.isEmpty() && detail.recordings.isEmpty()
+    // Re-key on the shown detail so focus is re-established when navigating detail -> detail, not only
+    // for the first detail page.
+    LaunchedEffect(detail.vodId, detail.channelId, detail.title) { runCatching { watchFocus.requestFocus() } }
     Row(Modifier.fillMaxSize().padding(OVERSCAN)) {
         if (detail.posterUrl != null) {
             AsyncImage(
@@ -296,7 +304,8 @@ fun TvProgramDetailScreen(
             Spacer(Modifier.width(32.dp))
         }
         Column(
-            Modifier.weight(1f).verticalScroll(rememberScrollState()),
+            Modifier.weight(1f).verticalScroll(rememberScrollState())
+                .then(if (nothingFocusable) Modifier.focusRequester(watchFocus).focusable() else Modifier),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(detail.title ?: "", style = MaterialTheme.typography.displaySmall)
@@ -307,7 +316,6 @@ fun TvProgramDetailScreen(
             }
             // A multi-episode series has no directly playable asset (its id is not a VOD), so it has
             // no "Regarder"; the user picks an episode. A recorded series keeps it (plays the recording).
-            val showWatch = !(detail.isSeries && !isRecording)
             if (showWatch || detail.recordAssetId != null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (showWatch) {
