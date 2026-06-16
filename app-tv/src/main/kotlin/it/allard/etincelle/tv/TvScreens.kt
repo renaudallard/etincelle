@@ -346,8 +346,17 @@ fun TvProgramDetailScreen(
             if (detail.recordings.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 Text("Vos enregistrements", style = MaterialTheme.typography.titleMedium, color = Color.White)
-                detail.recordings.forEach { recording ->
-                    TvRecordingRow(recording, enabled = !busy, onWatch = { onWatchRecording(recording.assetId) })
+                // When nothing above claimed initial focus (no Regarder, no episodes), give it to the
+                // first recording so the page is not a D-pad dead-end.
+                val recordingsOwnFocus = !showWatch && detail.recordAssetId == null &&
+                    !(detail.episodes.isNotEmpty() && !isRecording)
+                detail.recordings.forEachIndexed { i, recording ->
+                    TvRecordingRow(
+                        recording,
+                        enabled = !busy,
+                        onWatch = { onWatchRecording(recording.assetId) },
+                        focus = watchFocus.takeIf { recordingsOwnFocus && i == 0 },
+                    )
                 }
             }
         }
@@ -409,7 +418,8 @@ private fun TvEpisodeRow(card: ContentCard, enabled: Boolean, onClick: () -> Uni
 
 /** One DVR recording on the TV detail: its subtitle/channel plus a "Regarder l'enregistrement" action. */
 @Composable
-private fun TvRecordingRow(recording: Recording, enabled: Boolean, onWatch: () -> Unit) {
+private fun TvRecordingRow(recording: Recording, enabled: Boolean, onWatch: () -> Unit, focus: FocusRequester? = null) {
+    if (focus != null) LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     val label = listOfNotNull(recording.subtitle, recording.channelName).joinToString(" • ")
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(
@@ -421,7 +431,11 @@ private fun TvRecordingRow(recording: Recording, enabled: Boolean, onWatch: () -
             modifier = Modifier.weight(1f),
         )
         Spacer(Modifier.width(8.dp))
-        TextButton(onClick = onWatch, enabled = enabled) { Text("Regarder l'enregistrement") }
+        TextButton(
+            onClick = onWatch,
+            enabled = enabled,
+            modifier = if (focus != null) Modifier.focusRequester(focus) else Modifier,
+        ) { Text("Regarder l'enregistrement") }
     }
 }
 
