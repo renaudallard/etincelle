@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import it.allard.etincelle.core.domain.DetailKind
 import it.allard.etincelle.core.domain.MolotovRepository
+import it.allard.etincelle.core.model.AppError
 import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.ContentRail
@@ -107,7 +108,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
                 _state.update { it.copy(busy = false, loggedIn = true, tab = Tab.HOME, backStack = listOf(page)) }
                 consumeDeepLink()
             }.onFailure { e ->
-                _state.update { it.copy(busy = false, error = e.message ?: "Échec de connexion") }
+                applyFailure(e, "Échec de connexion")
             }
         }
     }
@@ -135,6 +136,16 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
             Result.failure(e)
         }
 
+    // Surfaces a failure: an unrecoverable auth error means the repo already cleared the dead session,
+    // so return to login rather than leaving a logged-in shell that 401s on every further action.
+    private fun applyFailure(e: Throwable, fallback: String) {
+        if (e is AppError.Unauthorized) {
+            _state.value = UiState(checking = false, error = e.message)
+        } else {
+            _state.update { it.copy(busy = false, refreshing = false, error = e.message ?: fallback) }
+        }
+    }
+
     /** Opens a show from an external deep link (etincelle://series|program|channel/{id}); defers until login. */
     fun onDeepLink(id: String, kind: DetailKind) {
         pendingDeepLink = id to kind
@@ -152,7 +163,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         navLaunch {
             runCatchingNav { repo.fetchProgramDetail(id, kind) }
                 .onSuccess { d -> _state.update { it.copy(busy = false, detailStack = listOf(DetailEntry(d, null))) } }
-                .onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Contenu introuvable") } }
+                .onFailure { e -> applyFailure(e, "Contenu introuvable") }
         }
     }
 
@@ -188,7 +199,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         navLaunch {
             runCatchingNav { repo.loadGuide() }
                 .onSuccess { page -> _state.update { it.copy(busy = false, refreshing = false, backStack = listOf(page)) } }
-                .onFailure { e -> _state.update { it.copy(busy = false, refreshing = false, error = e.message ?: "Guide indisponible") } }
+                .onFailure { e -> applyFailure(e, "Guide indisponible") }
         }
     }
 
@@ -200,7 +211,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         navLaunch {
             runCatchingNav { repo.loadHome() }
                 .onSuccess { page -> _state.update { it.copy(busy = false, refreshing = false, backStack = listOf(page)) } }
-                .onFailure { e -> _state.update { it.copy(busy = false, refreshing = false, error = e.message ?: "Accueil indisponible") } }
+                .onFailure { e -> applyFailure(e, "Accueil indisponible") }
         }
     }
 
@@ -245,7 +256,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
                         }
                     }
                 }
-                .onFailure { e -> _state.update { it.copy(refreshing = false, error = e.message ?: "Échec de chargement") } }
+                .onFailure { e -> applyFailure(e, "Échec de chargement") }
         }
     }
 
@@ -258,7 +269,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         navLaunch {
             runCatchingNav { repo.search(query.trim()) }
                 .onSuccess { page -> _state.update { it.copy(busy = false, refreshing = false, backStack = listOf(page.copy(title = "Résultats"))) } }
-                .onFailure { e -> _state.update { it.copy(busy = false, refreshing = false, error = e.message ?: "Échec de recherche") } }
+                .onFailure { e -> applyFailure(e, "Échec de recherche") }
         }
     }
 
@@ -308,7 +319,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         navLaunch {
             runCatchingNav { repo.resolveRecording(assetId) }
                 .onSuccess { src -> _state.update { it.copy(busy = false, playing = src) } }
-                .onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Échec de lecture") } }
+                .onFailure { e -> applyFailure(e, "Échec de lecture") }
         }
     }
 
@@ -322,7 +333,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         navLaunch {
             runCatchingNav { repo.fetchProgramDetail(id, kind) }
                 .onSuccess { d -> _state.update { it.copy(busy = false, detailStack = it.detailStack + DetailEntry(d, null)) } }
-                .onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Détail indisponible") } }
+                .onFailure { e -> applyFailure(e, "Détail indisponible") }
         }
     }
 
@@ -357,7 +368,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
                 }
             }.onSuccess { src ->
                 _state.update { if (src != null) it.copy(busy = false, playing = src) else it.copy(busy = false) }
-            }.onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Échec de lecture") } }
+            }.onFailure { e -> applyFailure(e, "Échec de lecture") }
         }
     }
 
@@ -368,7 +379,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         viewModelScope.launch {
             runCatching { repo.recordEpisode(assetId) }
                 .onSuccess { _state.update { it.copy(busy = false, info = "Enregistrement programmé") } }
-                .onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Échec de l'enregistrement") } }
+                .onFailure { e -> applyFailure(e, "Échec de l'enregistrement") }
         }
     }
 
@@ -390,7 +401,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
                         it.copy(busy = false, backStack = stack)
                     }
                 }
-                .onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Échec de chargement") } }
+                .onFailure { e -> applyFailure(e, "Échec de chargement") }
         }
     }
 
@@ -411,7 +422,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
     }
 
     /** Re-resolves a stream (fresh tokens/URL), used by Cast transfers when a token has expired. */
-    suspend fun reResolve(source: PlaybackSource): PlaybackSource? = runCatching {
+    suspend fun reResolve(source: PlaybackSource): PlaybackSource? = try {
         val channelId = source.originChannelId
         val vodId = source.originVodId
         val recordingAssetId = source.originRecordingAssetId
@@ -421,7 +432,15 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
             recordingAssetId != null -> repo.resolveRecording(recordingAssetId)
             else -> null
         }
-    }.getOrNull()
+    } catch (c: CancellationException) {
+        throw c
+    } catch (e: AppError.Unauthorized) {
+        // The session died mid-cast; do not silently swallow it - return to login.
+        applyFailure(e, "")
+        null
+    } catch (e: Throwable) {
+        null
+    }
 
     fun openSettings() = _state.update { it.copy(settings = true, updateStatus = null) }
 
