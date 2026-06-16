@@ -10,7 +10,8 @@ object PlaybackProgress {
 
     /**
      * The position to persist for [positionMs] in a stream of [durationMs], or 0 to start fresh
-     * next time. Returns 0 when barely started, near the end, or the duration is unknown (live).
+     * next time. Returns 0 when barely started, near the end, or the duration is unknown
+     * (durationMs <= 0). Live playback is filtered out upstream by a null resume key, not here.
      */
     fun positionToSave(positionMs: Long, durationMs: Long): Long =
         if (positionMs > MIN_MS && durationMs > 0 && positionMs < durationMs - END_MS) positionMs else 0L
