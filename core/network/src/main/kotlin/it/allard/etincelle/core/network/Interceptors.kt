@@ -66,15 +66,17 @@ class RetryInterceptor(
             val response = try {
                 chain.proceed(request)
             } catch (e: IOException) {
-                if (networkAttempt >= maxNetworkRetries) throw e
+                // Only replay idempotent GETs; replaying a POST/PUT could duplicate a recording or
+                // a sign-in if the request actually reached the server before the failure.
+                if (request.method != "GET" || networkAttempt >= maxNetworkRetries) throw e
                 networkAttempt++
-                backoff(networkAttempt)
+                backoff(chain, networkAttempt)
                 continue
             }
             if (request.method == "GET" && statusAttempt < maxStatusRetries && response.code.isTransientStatus()) {
                 response.close()
                 statusAttempt++
-                backoff(statusAttempt)
+                backoff(chain, statusAttempt)
                 continue
             }
             return response
@@ -83,12 +85,18 @@ class RetryInterceptor(
 
     private fun Int.isTransientStatus(): Boolean = this == 404 || this in 500..599
 
-    private fun backoff(attempt: Int) {
-        try {
-            Thread.sleep(400L * attempt)
-        } catch (ie: InterruptedException) {
-            Thread.currentThread().interrupt()
-            throw IOException("Interrupted during retry backoff", ie)
+    // Sleep in short slices so a cancelled call aborts the backoff promptly instead of blocking the
+    // OkHttp thread for the full delay.
+    private fun backoff(chain: Interceptor.Chain, attempt: Int) {
+        val deadline = System.nanoTime() + 400L * attempt * 1_000_000
+        while (System.nanoTime() < deadline) {
+            if (chain.call().isCanceled()) throw IOException("Cancelled during retry backoff")
+            try {
+                Thread.sleep(50)
+            } catch (ie: InterruptedException) {
+                Thread.currentThread().interrupt()
+                throw IOException("Interrupted during retry backoff", ie)
+            }
         }
     }
 }
