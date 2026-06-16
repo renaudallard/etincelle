@@ -28,7 +28,10 @@ class TokenStore(private val context: Context) : SessionStore {
     override suspend fun save(session: UserSession) {
         context.dataStore.edit { prefs ->
             prefs[ACCESS] = TokenCrypto.encrypt(session.accessToken)
-            session.refreshToken?.let { prefs[REFRESH] = TokenCrypto.encrypt(it) }
+            // Mirror the session exactly: a null refresh token must clear any previously stored one,
+            // not leave a stale value behind.
+            val refresh = session.refreshToken
+            if (refresh != null) prefs[REFRESH] = TokenCrypto.encrypt(refresh) else prefs.remove(REFRESH)
             prefs[USER_ID] = session.userId
             prefs[PROFILE_ID] = session.profileId
         }
