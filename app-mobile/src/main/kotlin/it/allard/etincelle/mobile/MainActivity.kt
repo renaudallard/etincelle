@@ -283,7 +283,8 @@ private fun AppRoot(
             BackHandler { vm.closeSettings() }
             SettingsScreen(
                 onBack = { vm.closeSettings() },
-                onLogout = { vm.logout() },
+                // End any active Cast session on logout, so the Chromecast stops the old account's stream.
+                onLogout = { onCastDisconnect(); vm.logout() },
                 hideLocked = state.hideLocked,
                 onHideLocked = vm::setHideLocked,
                 appVersion = BuildConfig.VERSION_NAME,
