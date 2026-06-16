@@ -75,10 +75,13 @@ private fun localHourMinute(rfc3339: String?): String? {
 
 /** Maps the /epg guide into a page: one rail per channel, one card per program (tap plays live). */
 fun EpgResponse.toGuidePage(): ContentPage {
+    val seen = HashSet<String>()
     val rails = response.orEmpty().mapNotNull { entry ->
         val data = entry.data ?: return@mapNotNull null
         val channel = data.channel ?: return@mapNotNull null
         val channelId = channel.id ?: return@mapNotNull null
+        // A repeated channel id would make two rails with the same "guide-<id>" key (a LazyColumn crash).
+        if (!seen.add(channelId)) return@mapNotNull null
         val cards = data.programsWithAssets.orEmpty()
             .mapIndexedNotNull { index, p -> p.toCard(channelId, channel.logoOnDarkUrl, index) }
         if (cards.isEmpty()) null else ContentRail("guide-$channelId", channel.displayName ?: channel.name, cards)
