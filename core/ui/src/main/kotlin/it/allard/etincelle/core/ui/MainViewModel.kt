@@ -29,15 +29,18 @@ enum class Tab(val label: String, val icon: String, val path: String) {
     SEARCH("Recherche", "🔍", ""),
 }
 
+/** One open detail page plus the DVR recording (if any) that its "Regarder" should play. */
+data class DetailEntry(val detail: ProgramDetail, val recordingAssetId: String?)
+
 data class UiState(
     val checking: Boolean = true,
     val loggedIn: Boolean = false,
     val busy: Boolean = false,
     val tab: Tab = Tab.HOME,
     val backStack: List<ContentPage> = emptyList(),
-    val detail: ProgramDetail? = null,
-    // When the detail was opened from a DVR recording, the recording to play on "Regarder".
-    val detailRecordingAssetId: String? = null,
+    // A stack of open detail pages, so a detail opened from within one (e.g. an episode) backs out to
+    // its parent rather than jumping straight to browse.
+    val detailStack: List<DetailEntry> = emptyList(),
     val playing: PlaybackSource? = null,
     val settings: Boolean = false,
     val update: UpdateInfo? = null,
@@ -52,6 +55,12 @@ data class UiState(
 ) {
     val current: ContentPage? get() = backStack.lastOrNull()
     val canGoBack: Boolean get() = backStack.size > 1
+
+    /** The detail page currently shown (the top of the stack), or null when browsing. */
+    val detail: ProgramDetail? get() = detailStack.lastOrNull()?.detail
+
+    /** When the open detail was reached from a DVR recording, the recording its "Regarder" plays. */
+    val detailRecordingAssetId: String? get() = detailStack.lastOrNull()?.recordingAssetId
 
     /** The current page's rails with locked (unentitled) cards removed when the user hid them. */
     val visibleRails: List<ContentRail>
@@ -125,11 +134,11 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         // Clear any open player/settings too, so the deep-linked show surfaces instead of being
         // stranded behind them.
         _state.update {
-            it.copy(busy = true, error = null, detail = null, detailRecordingAssetId = null, playing = null, settings = false)
+            it.copy(busy = true, error = null, detailStack = emptyList(), playing = null, settings = false)
         }
         navLaunch {
             runCatching { repo.fetchProgramDetail(id, kind) }
-                .onSuccess { d -> _state.update { it.copy(busy = false, detail = d, detailRecordingAssetId = null) } }
+                .onSuccess { d -> _state.update { it.copy(busy = false, detailStack = listOf(DetailEntry(d, null))) } }
                 .onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Contenu introuvable") } }
         }
     }
@@ -299,7 +308,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         _state.update { it.copy(busy = true, error = null, info = null) }
         navLaunch {
             runCatching { repo.fetchProgramDetail(id, kind) }
-                .onSuccess { d -> _state.update { it.copy(busy = false, detail = d, detailRecordingAssetId = null) } }
+                .onSuccess { d -> _state.update { it.copy(busy = false, detailStack = it.detailStack + DetailEntry(d, null)) } }
                 .onFailure { e -> _state.update { it.copy(busy = false, error = e.message ?: "Détail indisponible") } }
         }
     }
@@ -312,7 +321,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         _state.update { it.copy(busy = true, error = null, info = null) }
         navLaunch {
             runCatching { repo.fetchProgramDetail(id, kind) }
-                .onSuccess { d -> _state.update { it.copy(busy = false, detail = d, detailRecordingAssetId = assetId) } }
+                .onSuccess { d -> _state.update { it.copy(busy = false, detailStack = it.detailStack + DetailEntry(d, assetId)) } }
                 .onFailure { watchRecording(assetId) }
         }
     }
@@ -351,7 +360,8 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
     }
 
     /** Closes the detail page, back to browsing. */
-    fun closeDetail() = _state.update { it.copy(detail = null, detailRecordingAssetId = null, error = null, info = null) }
+    /** Closes the top detail page: back to its parent detail if any, otherwise back to browsing. */
+    fun closeDetail() = _state.update { it.copy(detailStack = it.detailStack.dropLast(1), error = null, info = null) }
 
     private fun loadPageInto(url: String, replace: Boolean, fallbackTitle: String?, grid: Boolean = false) {
         navLaunch {
