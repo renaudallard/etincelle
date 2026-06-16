@@ -79,18 +79,21 @@ fun EpgResponse.toGuidePage(): ContentPage {
         val data = entry.data ?: return@mapNotNull null
         val channel = data.channel ?: return@mapNotNull null
         val channelId = channel.id ?: return@mapNotNull null
-        val cards = data.programsWithAssets.orEmpty().mapNotNull { it.toCard(channelId, channel.logoOnDarkUrl) }
+        val cards = data.programsWithAssets.orEmpty()
+            .mapIndexedNotNull { index, p -> p.toCard(channelId, channel.logoOnDarkUrl, index) }
         if (cards.isEmpty()) null else ContentRail("guide-$channelId", channel.displayName ?: channel.name, cards)
     }
     return ContentPage("Guide", rails)
 }
 
-private fun EpgProgramWithAssetsDto.toCard(channelId: String, channelLogo: String?): ContentCard? {
+private fun EpgProgramWithAssetsDto.toCard(channelId: String, channelLogo: String?, index: Int): ContentCard? {
     val name = program?.title ?: program?.heading ?: return null
     val start = assets?.firstOrNull()?.accessRights?.startTime
     val time = localHourMinute(start)
     return ContentCard(
-        id = "$channelId-${start ?: name}",
+        // Index-based id: two same-titled programs with missing/equal start times must not collide,
+        // or the guide's LazyRow throws on a duplicate key.
+        id = "$channelId-$index",
         title = if (time != null) "$time · $name" else name,
         imageUrl = program?.horizontalImage ?: channelLogo,
         isLocked = false,
