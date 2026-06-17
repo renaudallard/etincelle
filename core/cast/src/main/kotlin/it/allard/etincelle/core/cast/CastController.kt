@@ -79,7 +79,7 @@ open class CastController(
     }
 
     /** End the Cast session and stop the receiver (returns playback to the phone). */
-    fun disconnect() = castContext.sessionManager.endCurrentSession(true)
+    open fun disconnect() = castContext.sessionManager.endCurrentSession(true)
 
     /** Subclass hooks for the player swap (overridden by the M2 cast-player controller). */
     protected open fun onSessionConnected(session: CastSession) {

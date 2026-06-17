@@ -4,6 +4,7 @@
 package it.allard.etincelle.core.cast
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.media3.cast.CastPlayer
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
@@ -30,6 +31,10 @@ import kotlinx.coroutines.launch
 // A live DASH DVR window spans at most a few hours; this is comfortably past any of them, so a load
 // at this position clamps to the receiver's live edge.
 private const val LIVE_EDGE_POSITION_MS = 24L * 60 * 60 * 1000
+
+// How long to wait for the new device to connect during a Chromecast-to-Chromecast transfer before
+// falling back to the phone.
+private const val TRANSFER_TIMEOUT_MS = 8000L
 
 private const val PLAYBACK_ERROR_MESSAGE = "Lecture impossible, réessayez"
 
@@ -81,6 +86,7 @@ class CastPlayerController(
     private var transferPosition = 0L
     private var transferPlayWhenReady = true
     private var transferFallbackJob: Job? = null
+    private var transferDeadline = 0L
 
     private val errorListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) = onPlaybackError()
@@ -93,6 +99,14 @@ class CastPlayerController(
 
     /** Load + play [item] on whichever player is current (phone or cast). */
     fun play(item: MediaItem, startPositionMs: Long) {
+        // Nominally on the cast player but the session is gone (e.g. an abandoned transfer): drop back
+        // to local first so the load below does not target a dead CastPlayer.
+        if (_currentPlayer.value === castPlayer && castContext.sessionManager.currentCastSession == null) {
+            clearDeferredStop()
+            transferring = false
+            transferFallbackJob?.cancel()
+            _currentPlayer.value = localPlayer
+        }
         // Re-entering the player while this exact stream is already running on a Chromecast: leave it
         // alone instead of reloading and restarting it from the original position.
         if (_currentPlayer.value === castPlayer &&
@@ -126,16 +140,27 @@ class CastPlayerController(
             transferPosition = position
             transferPlayWhenReady = playWhenReady
             transferring = true
+            // Wall-clock deadline so accumulated background time counts (the fallback below honours it).
+            transferDeadline = SystemClock.elapsedRealtime() + TRANSFER_TIMEOUT_MS
         }
         return selected
     }
 
     override fun stop() {
-        super.stop()
-        // Backgrounding: drop the pending fallback so it cannot start the phone in the background, but
-        // KEEP `transferring` and the captured position - start()'s session re-check then completes the
-        // transfer (loads the new device) or re-arms the fallback, instead of bouncing to the phone.
+        // Drop the pending fallback so it cannot start the phone in the background. Keep `transferring`
+        // ONLY if the old session has actually ended (a transfer is truly in flight); if it is still
+        // live, no transfer is pending, so clearing it avoids mis-handling the resumed session.
         transferFallbackJob?.cancel()
+        if (castContext.sessionManager.currentCastSession != null) transferring = false
+        super.stop()
+    }
+
+    override fun disconnect() {
+        // An explicit disconnect is not a transfer hand-off; clear the flag so the session end runs the
+        // normal stop path instead of arming the wait-for-new-device fallback.
+        transferring = false
+        transferFallbackJob?.cancel()
+        super.disconnect()
     }
 
     // True when [a] and [b] are the same content (by its stable origin ids), ignoring the per-resolve
@@ -224,7 +249,9 @@ class CastPlayerController(
             endingCaptured = false
             transferFallbackJob?.cancel()
             transferFallbackJob = scope.launch {
-                delay(8000)
+                // Honour the wall-clock deadline so background time spent waiting still counts (a brief
+                // background then return does not restart a fresh 8s window).
+                delay((transferDeadline - SystemClock.elapsedRealtime()).coerceAtLeast(0))
                 if (transferring) {
                     transferring = false
                     // If the user left the player during the transfer, do not resume on the phone.
