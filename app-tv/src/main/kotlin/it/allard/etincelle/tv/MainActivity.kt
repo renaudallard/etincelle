@@ -19,8 +19,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -72,6 +76,9 @@ class MainActivity : ComponentActivity() {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val playing = state.playing
                     val detail = state.detail
+                    val context = LocalContext.current
+                    // Grid density (cards per row on the "tout voir" pages); persisted, set live from settings.
+                    var gridColumns by remember { mutableStateOf(TvPrefs.gridColumns(context)) }
                     Box(Modifier.fillMaxSize()) {
                     when {
                         state.checking -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -95,14 +102,19 @@ class MainActivity : ComponentActivity() {
 
                         state.settings -> {
                             BackHandler { viewModel.closeSettings() }
-                            TvSettingsScreen(onBack = viewModel::closeSettings, onLogout = viewModel::logout)
+                            TvSettingsScreen(
+                                onBack = viewModel::closeSettings,
+                                onLogout = viewModel::logout,
+                                gridColumns = gridColumns,
+                                onGridColumns = { gridColumns = it },
+                            )
                         }
 
                         state.loggedIn -> {
                             BackHandler(enabled = state.canGoBack) { viewModel.back() }
                             TvBrowseScreen(
                                 state, viewModel::selectTab, viewModel::onCardClick, viewModel::search,
-                                viewModel::openSettings, viewModel::onRailSeeAll,
+                                viewModel::openSettings, viewModel::onRailSeeAll, gridColumns,
                             )
                         }
 

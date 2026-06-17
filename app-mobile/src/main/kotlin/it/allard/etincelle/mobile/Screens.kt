@@ -45,6 +45,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -83,6 +84,7 @@ import it.allard.etincelle.core.model.expandable
 import it.allard.etincelle.core.model.groupBySeason
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.Recording
+import kotlin.math.roundToInt
 
 @Composable
 fun LoginScreen(busy: Boolean, error: String?, onLogin: (String, String) -> Unit) {
@@ -212,6 +214,7 @@ fun GridContent(
     onCardClick: (ContentCard) -> Unit,
     refreshing: Boolean = false,
     onRefresh: () -> Unit = {},
+    columns: Int = LocalPrefs.DEFAULT_GRID_COLUMNS,
     modifier: Modifier = Modifier,
 ) {
     // A multi-section page (e.g. the channels page, with an "Apps" group) keeps its section headers;
@@ -227,7 +230,7 @@ fun GridContent(
     ) {
         LazyVerticalGrid(
             state = gridState,
-            columns = GridCells.Fixed(3),
+            columns = GridCells.Fixed(columns),
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -331,6 +334,8 @@ fun SettingsScreen(
     onLogout: () -> Unit,
     hideLocked: Boolean = false,
     onHideLocked: (Boolean) -> Unit = {},
+    gridColumns: Int = LocalPrefs.DEFAULT_GRID_COLUMNS,
+    onGridColumns: (Int) -> Unit = {},
     appVersion: String = "",
     checkingUpdate: Boolean = false,
     updateStatus: String? = null,
@@ -357,6 +362,27 @@ fun SettingsScreen(
             checked = hideLocked,
             onCheckedChange = { LocalPrefs.setHideLocked(context, it); onHideLocked(it) },
         )
+        HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Text("Vignettes par ligne : $gridColumns", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "Densité des grilles (films, séries, enregistrements)",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Slider(
+                value = gridColumns.toFloat(),
+                onValueChange = {
+                    val n = it.roundToInt().coerceIn(LocalPrefs.MIN_GRID_COLUMNS, LocalPrefs.MAX_GRID_COLUMNS)
+                    if (n != gridColumns) {
+                        LocalPrefs.setGridColumns(context, n)
+                        onGridColumns(n)
+                    }
+                },
+                valueRange = LocalPrefs.MIN_GRID_COLUMNS.toFloat()..LocalPrefs.MAX_GRID_COLUMNS.toFloat(),
+                steps = LocalPrefs.MAX_GRID_COLUMNS - LocalPrefs.MIN_GRID_COLUMNS - 1,
+            )
+        }
         HorizontalDivider(Modifier.padding(horizontal = 16.dp))
         SettingToggle(
             title = "Icône monochrome",

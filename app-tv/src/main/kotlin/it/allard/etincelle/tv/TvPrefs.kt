@@ -1,24 +1,17 @@
 // Copyright (c) 2026 Renaud Allard <renaud@allard.it>
 // SPDX-License-Identifier: BSD-2-Clause
 
-package it.allard.etincelle.mobile
+package it.allard.etincelle.tv
 
 import android.content.Context
 
-/** Small persisted UI preferences (the ViewModel is Context-free, so the app layer stores these). */
-object LocalPrefs {
+/** Small persisted TV UI preferences (the ViewModel is Context-free, so the app layer stores these). */
+object TvPrefs {
     private const val PREFS = "etincelle"
-    private const val HIDE_LOCKED = "hide_locked"
     private const val GRID_COLUMNS = "grid_columns"
     const val MIN_GRID_COLUMNS = 1
     const val MAX_GRID_COLUMNS = 5
-    const val DEFAULT_GRID_COLUMNS = 3
-
-    fun hideLocked(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(HIDE_LOCKED, false)
-
-    fun setHideLocked(context: Context, hide: Boolean) =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(HIDE_LOCKED, hide).apply()
+    const val DEFAULT_GRID_COLUMNS = 5
 
     /** Number of cards per row on the grid ("tout voir") pages, 1 to 5. */
     fun gridColumns(context: Context): Int =

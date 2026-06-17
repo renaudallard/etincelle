@@ -34,8 +34,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -258,6 +262,9 @@ private fun AppRoot(
 ) {
     val playing = state.playing
     val detail = state.detail
+    val context = LocalContext.current
+    // Grid density (cards per row on the "tout voir" pages); persisted, set live from the settings.
+    var gridColumns by remember { mutableStateOf(LocalPrefs.gridColumns(context)) }
     when {
         state.checking -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
@@ -295,6 +302,8 @@ private fun AppRoot(
                 onLogout = { vm.logout() },
                 hideLocked = state.hideLocked,
                 onHideLocked = vm::setHideLocked,
+                gridColumns = gridColumns,
+                onGridColumns = { gridColumns = it },
                 appVersion = BuildConfig.VERSION_NAME,
                 checkingUpdate = state.checkingUpdate,
                 updateStatus = state.updateStatus,
@@ -367,6 +376,7 @@ private fun AppRoot(
                         onCardClick = vm::onCardClick,
                         refreshing = state.refreshing,
                         onRefresh = vm::refreshCurrent,
+                        columns = gridColumns,
                         modifier = modifier,
                     )
                 } else {

@@ -57,6 +57,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.window.Dialog
@@ -115,6 +116,7 @@ fun TvBrowseScreen(
     onSearch: (String) -> Unit,
     onSettings: () -> Unit,
     onSeeAll: (ContentRail) -> Unit,
+    gridColumns: Int,
 ) {
     val firstTab = remember { FocusRequester() }
     val railsFocus = remember { FocusRequester() }
@@ -155,7 +157,7 @@ fun TvBrowseScreen(
             Box(Modifier.fillMaxSize()) {
                 val page = state.current
                 if (page?.isGrid == true) {
-                    TvGridContent(page.rails, onCardClick, railsFocus)
+                    TvGridContent(page.rails, onCardClick, railsFocus, gridColumns)
                 } else {
                     LazyColumn(
                         modifier = Modifier.focusGroup().focusRequester(railsFocus),
@@ -228,9 +230,15 @@ private fun TvTab(label: String, selected: Boolean, onClick: () -> Unit, modifie
 
 /** Settings page on TV. For now its only entry is Déconnexion, with an inline confirmation. */
 @Composable
-fun TvSettingsScreen(onBack: () -> Unit, onLogout: () -> Unit) {
+fun TvSettingsScreen(
+    onBack: () -> Unit,
+    onLogout: () -> Unit,
+    gridColumns: Int,
+    onGridColumns: (Int) -> Unit,
+) {
     var confirm by remember { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
+    val context = LocalContext.current
     LaunchedEffect(confirm) { runCatching { focus.requestFocus() } }
     Column(Modifier.fillMaxSize().padding(OVERSCAN), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Paramètres", style = MaterialTheme.typography.displaySmall)
@@ -241,6 +249,12 @@ fun TvSettingsScreen(onBack: () -> Unit, onLogout: () -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(onClick = { confirm = false }, modifier = Modifier.focusRequester(focus)) { Text("Annuler") }
                 Button(onClick = onLogout) { Text("Se déconnecter") }
+            }
+        }
+        Text("Vignettes par ligne : $gridColumns", style = MaterialTheme.typography.titleMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (n in TvPrefs.MIN_GRID_COLUMNS..TvPrefs.MAX_GRID_COLUMNS) {
+                Button(onClick = { TvPrefs.setGridColumns(context, n); onGridColumns(n) }) { Text("$n") }
             }
         }
     }
@@ -466,10 +480,10 @@ private fun TvRail(rail: ContentRail, onCardClick: (ContentCard) -> Unit, onSeeA
 
 /** A "see all" / Direct page on TV as a D-pad grid (5 per row), keeping section headers. */
 @Composable
-private fun TvGridContent(rails: List<ContentRail>, onCardClick: (ContentCard) -> Unit, focus: FocusRequester) {
+private fun TvGridContent(rails: List<ContentRail>, onCardClick: (ContentCard) -> Unit, focus: FocusRequester, columns: Int) {
     val multiSection = rails.size > 1
     LazyVerticalGrid(
-        columns = GridCells.Fixed(5),
+        columns = GridCells.Fixed(columns),
         modifier = Modifier.fillMaxSize().focusGroup().focusRequester(focus),
         contentPadding = PaddingValues(bottom = 48.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
