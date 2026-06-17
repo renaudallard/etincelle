@@ -31,6 +31,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -254,7 +255,14 @@ fun TvSettingsScreen(
         Text("Vignettes par ligne : $gridColumns", style = MaterialTheme.typography.titleMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for (n in TvPrefs.MIN_GRID_COLUMNS..TvPrefs.MAX_GRID_COLUMNS) {
-                Button(onClick = { TvPrefs.setGridColumns(context, n); onGridColumns(n) }) { Text("$n") }
+                Button(
+                    onClick = { TvPrefs.setGridColumns(context, n); onGridColumns(n) },
+                    colors = if (n == gridColumns) {
+                        ButtonDefaults.buttonColors(containerColor = BrandYellow, contentColor = BrandBlack)
+                    } else {
+                        ButtonDefaults.buttonColors()
+                    },
+                ) { Text("$n") }
             }
         }
     }
