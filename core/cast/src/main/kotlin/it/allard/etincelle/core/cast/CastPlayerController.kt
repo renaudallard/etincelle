@@ -4,7 +4,6 @@
 package it.allard.etincelle.core.cast
 
 import android.content.Context
-import android.os.SystemClock
 import androidx.media3.cast.CastPlayer
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
@@ -86,10 +85,10 @@ class CastPlayerController(
     private var transferPosition = 0L
     private var transferPlayWhenReady = true
     private var transferFallbackJob: Job? = null
-    private var transferDeadline = 0L
-    // The id of the session we are transferring away from, so onSessionConnected can tell the genuinely
-    // new device (complete the transfer) from the same session merely resuming or still being alive.
-    private var transferFromSessionId: String? = null
+    // The id of the Cast session our content is currently loaded on. A connecting session with a
+    // different id is a genuinely new receiver (a device switch or a reconnect) and gets our content
+    // loaded onto it; the same id is just the session resuming, so nothing is reloaded.
+    private var castSessionId: String? = null
 
     private val errorListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) = onPlaybackError()
@@ -108,6 +107,7 @@ class CastPlayerController(
             clearDeferredStop()
             transferring = false
             transferFallbackJob?.cancel()
+            castSessionId = null
             _currentPlayer.value = localPlayer
         }
         // Re-entering the player while this exact stream is already running on a Chromecast: leave it
@@ -136,32 +136,28 @@ class CastPlayerController(
         val willTransfer = _currentPlayer.value === castPlayer && castContext.sessionManager.currentCastSession != null
         val position = if (willTransfer) castPlayer.currentPosition else 0L
         val playWhenReady = if (willTransfer) castPlayer.playWhenReady else true
-        val fromSessionId = if (willTransfer) castContext.sessionManager.currentCastSession?.sessionId else null
         val selected = super.connectTo(routeId)
-        // Arm the transfer only once a route was actually selected, so a stale/removed routeId cannot
-        // leave `transferring` stuck and mis-handle the next session as a transfer.
+        // Arm the transfer only once a route was actually selected; it just records the position the
+        // new device should resume at (the actual load happens in onSessionConnected by session id).
         if (willTransfer && selected) {
             transferPosition = position
             transferPlayWhenReady = playWhenReady
-            transferFromSessionId = fromSessionId
             transferring = true
-            // Wall-clock deadline so accumulated background time counts (the fallback below honours it).
-            transferDeadline = SystemClock.elapsedRealtime() + TRANSFER_TIMEOUT_MS
         }
         return selected
     }
 
     override fun stop() {
-        // Pause the fallback while backgrounded; keep `transferring` so start()'s session re-check can
-        // still complete a real transfer. onSessionConnected tells the new device from the same session
-        // by id, so a still-live old session is no longer mistaken for the transfer target.
+        // Pause the fallback while backgrounded. The transfer needs no special survival logic: on
+        // return, a connected new device is loaded by onSessionConnected (different session id) and a
+        // failed one re-arms its fallback. Nothing here can mis-fire because no flag is force-cleared.
         transferFallbackJob?.cancel()
         super.stop()
     }
 
     override fun disconnect() {
-        // An explicit disconnect is not a transfer hand-off; clear the flag so the session end runs the
-        // normal stop path, and drop any pending re-resolve so it cannot eject after we tore down.
+        // An explicit disconnect is not a transfer hand-off; clear transfer state so the session end
+        // runs the normal stop path, and drop any pending re-resolve so it cannot eject after teardown.
         transferring = false
         transferFallbackJob?.cancel()
         reResolveJob?.cancel()
@@ -186,6 +182,7 @@ class CastPlayerController(
         runCatching { castPlayer.stop() }
         runCatching { localPlayer.stop() }
         currentItem = null
+        castSessionId = null
         _currentPlayer.value = localPlayer
     }
 
@@ -220,28 +217,30 @@ class CastPlayerController(
 
     override fun onSessionConnected(session: CastSession) {
         super.onSessionConnected(session)
-        if (transferring) {
-            if (session.sessionId != transferFromSessionId) {
-                // A genuinely NEW Chromecast connected: load the held stream on it at the captured
-                // position, re-resolving for fresh tokens. The old receiver was stopped by the switch.
-                transferring = false
-                transferFallbackJob?.cancel()
-                endingCaptured = false
-                reResolveJob?.cancel()
-                hasRetried = false
-                clearDeferredStop()
-                val item = currentItem ?: return
-                loadResolved(castPlayer, item, transferPosition, transferPlayWhenReady)
-                return
-            }
-            // The same session resumed / was still live (no actual device switch): drop the transfer
-            // flag and fall through to the normal path (which no-ops since we are already on cast).
+        if (_currentPlayer.value !== castPlayer) {
+            // Casting out from the phone: swap to the cast player (re-resolves a fresh URL).
             transferring = false
             transferFallbackJob?.cancel()
+            castSessionId = session.sessionId
+            swapTo(castPlayer, localPlayer.currentPosition, localPlayer.playWhenReady)
+            return
         }
-        // Re-resolve when casting out too: the local stream may have been playing for a while and
-        // its tokens are stale, so the receiver needs a freshly minted URL to load.
-        swapTo(castPlayer, localPlayer.currentPosition, localPlayer.playWhenReady)
+        // Already on the cast player. The same session resuming needs no reload; a different session id
+        // is a new receiver (a device switch, or a reconnect after the old one dropped) - load onto it.
+        if (session.sessionId == castSessionId) return
+        val item = currentItem ?: return
+        // A deliberate switch resumes at the captured position; an unexpected reconnect just clamps live
+        // to the edge / starts VOD afresh (the old position is unreadable once the session is gone).
+        val position = if (transferring) transferPosition else 0L
+        val playWhenReady = if (transferring) transferPlayWhenReady else true
+        transferring = false
+        transferFallbackJob?.cancel()
+        endingCaptured = false
+        reResolveJob?.cancel()
+        hasRetried = false
+        clearDeferredStop()
+        castSessionId = session.sessionId
+        loadResolved(castPlayer, item, position, playWhenReady)
     }
 
     override fun onSessionEndingInternal(session: CastSession) {
@@ -253,16 +252,15 @@ class CastPlayerController(
 
     override fun onSessionDisconnected() {
         super.onSessionDisconnected()
+        castSessionId = null
         if (transferring) {
             // Device-to-device switch in flight: the old session ended; keep the cast player current
-            // and wait for the new device to connect. If it never does (transfer failed), fall back
-            // to the phone at the captured position so playback is not lost.
+            // and wait for the new device to connect (onSessionConnected loads it). If it never does
+            // (transfer failed), fall back to the phone at the captured position so playback survives.
             endingCaptured = false
             transferFallbackJob?.cancel()
             transferFallbackJob = scope.launch {
-                // Honour the wall-clock deadline so background time spent waiting still counts (a brief
-                // background then return does not restart a fresh 8s window).
-                delay((transferDeadline - SystemClock.elapsedRealtime()).coerceAtLeast(0))
+                delay(TRANSFER_TIMEOUT_MS)
                 if (transferring) {
                     transferring = false
                     // If the user left the player during the transfer, do not resume on the phone.
