@@ -23,7 +23,9 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import retrofit2.HttpException
 import java.io.IOException
 
@@ -113,6 +115,9 @@ class FuboRepository(
     // The genre of each recorded show, fetched once from its detail page and cached for the session.
     private val recordingGenres = mutableMapOf<String, String?>()
 
+    // Caps how many show-detail fetches run at once when the recordings page is built on a cold cache.
+    private val genreFetchLimit = Semaphore(6)
+
     private suspend fun recordingGenre(rec: Recording): String? {
         val seriesId = rec.seriesId
         val key = seriesId ?: rec.programId ?: return null
@@ -120,16 +125,18 @@ class FuboRepository(
         if (recordingGenres.containsKey(key)) return null
         // loadRecordings already refreshed the token, so a failure here is the show's own (e.g. a
         // missing detail); treat it as no genre rather than failing the whole page.
-        val genre = try {
-            if (seriesId != null) {
-                api.seriesDetail(seriesId).toProgramDetail(channelId = null, vodId = seriesId, isLive = false).genre
-            } else {
-                api.programDetail(key).toProgramDetail(channelId = null, vodId = key, isLive = false).genre
+        val genre = genreFetchLimit.withPermit {
+            try {
+                if (seriesId != null) {
+                    api.seriesDetail(seriesId).toProgramDetail(channelId = null, vodId = seriesId, isLive = false).genre
+                } else {
+                    api.programDetail(key).toProgramDetail(channelId = null, vodId = key, isLive = false).genre
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                null
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            null
         }
         recordingGenres[key] = genre
         return genre
@@ -143,11 +150,13 @@ class FuboRepository(
             async { Triple(rec, count, recordingGenre(rec)) }
         }.awaitAll()
         val sections = withGenre
-            .groupBy { it.third ?: "Autres" }
+            // Group on the nullable genre so a real backend genre named "Autres" is not merged with the
+            // unknown-genre bucket; unknown (null) is labelled and sorted last only at render time.
+            .groupBy { it.third }
             .entries
-            .sortedWith(compareBy({ it.key == "Autres" }, { it.key.lowercase() }))
+            .sortedWith(compareBy({ it.key == null }, { it.key?.lowercase() }))
             .map { (genre, items) ->
-                ContentRail("rec-$genre", genre, items.map { (rec, count, _) -> rec.toCollapsedCard(count) })
+                ContentRail("rec-${genre ?: "__unknown"}", genre ?: "Autres", items.map { (rec, count, _) -> rec.toCollapsedCard(count) })
             }
         ContentPage("Vos enregistrements", sections, isGrid = true)
     }
