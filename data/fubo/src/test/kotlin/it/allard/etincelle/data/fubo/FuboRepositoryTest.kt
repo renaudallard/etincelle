@@ -169,11 +169,13 @@ class FuboRepositoryTest {
     }
 
     @Test
-    fun `reportProgress is a no-op without a playhead or at a zero-second offset`() = runTest {
+    fun `reportProgress is a no-op for live, barely-started, or unknown-duration playback`() = runTest {
         // live source carries no playhead
-        repo.reportProgress(PlaybackSource("https://cdn/m.mpd", DrmSpec.None, isLive = true), 5_000L, 60_000L)
-        // under a second rounds to zero, which the server rejects
-        repo.reportProgress(playheadSource(mapOf("lastOffset" to "@")), positionMs = 500L, durationMs = 60_000L)
+        repo.reportProgress(PlaybackSource("https://cdn/m.mpd", DrmSpec.None, isLive = true), 30_000L, 60_000L)
+        // barely started (< 10s): skipped, matching the local resume policy
+        repo.reportProgress(playheadSource(mapOf("lastOffset" to "@")), positionMs = 5_000L, durationMs = 60_000L)
+        // unknown duration: skipped (cannot mirror the local store)
+        repo.reportProgress(playheadSource(mapOf("lastOffset" to "@")), positionMs = 30_000L, durationMs = -1L)
 
         assertEquals(0, server.requestCount)
     }

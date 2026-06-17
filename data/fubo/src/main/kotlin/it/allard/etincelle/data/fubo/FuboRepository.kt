@@ -32,6 +32,7 @@ private const val GUIDE_WINDOW_MS = 24L * 60 * 60 * 1000
 private const val GUIDE_CHANNEL_LIMIT = 40
 private const val PROGRESS_OFFSET_KEY = "lastOffset"
 private const val PROGRESS_END_MS = 15_000L
+private const val PROGRESS_MIN_MS = 10_000L
 // See-all target for the injected recordings rail; loadPage routes any selectedTab=recordings url to
 // the genre-grouped recordings page.
 private const val RECORDINGS_PAGE_URL = "etincelle:recordings?selectedTab=recordings"
@@ -284,9 +285,11 @@ class FuboRepository(
     override suspend fun reportProgress(source: PlaybackSource, positionMs: Long, durationMs: Long) {
         val url = source.progressUrl ?: return
         val payload = source.progressPayload ?: return
-        // Near the end, mark the item watched at its full duration, like the official app; otherwise
-        // report the current position. Seconds, since the server stores lastOffset in seconds.
-        val nearEnd = durationMs > 0 && positionMs >= durationMs - PROGRESS_END_MS
+        // Mirror the local resume policy (PlaybackProgress.positionToSave) so the server and the local
+        // store agree: skip a barely-started item or one with an unknown duration. Near the end, mark
+        // it watched at its full duration, like the official app; otherwise report the position.
+        if (durationMs <= 0 || positionMs < PROGRESS_MIN_MS) return
+        val nearEnd = positionMs >= durationMs - PROGRESS_END_MS
         val offsetSeconds = (if (nearEnd) durationMs else positionMs) / 1000
         if (offsetSeconds <= 0) return // the server rejects lastOffset <= 0
         val body = payload.mapValues { (key, value) ->
@@ -297,7 +300,10 @@ class FuboRepository(
                 else -> value
             }
         }
-        api.pingProgress(url, body).close()
+        // Best-effort: refresh on a 401 like every other call, and never let a transport error reach
+        // the caller; a failed continue-watching ping must not disrupt playback.
+        runCatching { withRefresh { api.pingProgress(url, body).close() } }
+            .onFailure { if (it is CancellationException) throw it }
     }
 
     private val refreshMutex = Mutex()
