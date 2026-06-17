@@ -17,7 +17,7 @@ class MapperTest {
         val response = PlaybackResponse(
             stream = StreamDto("https://cdn/manifest.mpd", "dash", drmProtected = true, live = true),
             drmV2 = DrmV2Dto("widevine", LicenseDto("https://lic", mapOf("x-dt-auth-token" to "tok"))),
-            drm = null, heartbeat = null, concurrency = null, type = "live", program = ProgramDto("Title"),
+            drm = null, heartbeat = null, concurrency = null, playhead = null, type = "live", program = ProgramDto("Title"),
         )
         val source = response.toPlaybackSource()
         assertEquals("https://cdn/manifest.mpd", source.manifestUrl)
@@ -31,7 +31,7 @@ class MapperTest {
     fun `a dvr recording is not live even when its manifest reports live`() {
         val response = PlaybackResponse(
             stream = StreamDto("https://cdn/dvr.mpd", "dash", drmProtected = false, live = true),
-            drmV2 = null, drm = null, heartbeat = null, concurrency = null, type = "dvr", program = null,
+            drmV2 = null, drm = null, heartbeat = null, concurrency = null, playhead = null, type = "dvr", program = null,
         )
         assertFalse(response.toPlaybackSource().isLive)
     }
@@ -40,7 +40,7 @@ class MapperTest {
     fun `unprotected stream maps to no drm`() {
         val response = PlaybackResponse(
             stream = StreamDto("https://cdn/m.mpd", "dash", drmProtected = false, live = false),
-            drmV2 = null, drm = null, heartbeat = null, concurrency = null, type = "vod", program = null,
+            drmV2 = null, drm = null, heartbeat = null, concurrency = null, playhead = null, type = "vod", program = null,
         )
         assertEquals(DrmSpec.None, response.toPlaybackSource().drm)
     }
@@ -51,11 +51,24 @@ class MapperTest {
             stream = StreamDto("https://cdn/m.mpd", "dash", drmProtected = true, live = false),
             drmV2 = null,
             drm = DrmV1Dto("widevine", "https://lic-v1", mapOf("h" to "v"), "token"),
-            heartbeat = null, concurrency = null, type = "vod", program = null,
+            heartbeat = null, concurrency = null, playhead = null, type = "vod", program = null,
         )
         val drm = response.toPlaybackSource().drm as DrmSpec.Widevine
         assertEquals("https://lic-v1", drm.licenseUrl)
         assertEquals("v", drm.licenseHeaders["h"])
+    }
+
+    @Test
+    fun `playhead maps to the progress url and payload`() {
+        val response = PlaybackResponse(
+            stream = StreamDto("https://cdn/m.mpd", "dash", drmProtected = false, live = false),
+            drmV2 = null, drm = null, heartbeat = null, concurrency = null,
+            playhead = PlayHeadDto("POST", "https://api/playhead/v2", mapOf("assetId" to "175982", "lastOffset" to "@")),
+            type = "vod", program = null,
+        )
+        val source = response.toPlaybackSource()
+        assertEquals("https://api/playhead/v2", source.progressUrl)
+        assertEquals("175982", source.progressPayload?.get("assetId"))
     }
 
     @Test

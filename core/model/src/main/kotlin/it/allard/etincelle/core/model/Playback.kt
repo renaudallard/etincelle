@@ -36,4 +36,8 @@ data class PlaybackSource(
     /** Server session keep-alive endpoints to ping while playing (may be null). */
     val heartbeatUrl: String? = null,
     val concurrencyHeartbeatUrl: String? = null,
+    /** Server playhead (continue-watching) progress write: POST [progressPayload] to [progressUrl]
+     * with its "lastOffset" entry set to the position in seconds. Null for live, which has no resume. */
+    val progressUrl: String? = null,
+    val progressPayload: Map<String, Any?>? = null,
 )

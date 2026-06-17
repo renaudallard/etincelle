@@ -80,7 +80,7 @@ class MainActivity : ComponentActivity() {
 
                         playing != null -> {
                             BackHandler { viewModel.stopPlaying() }
-                            TvPlayerSurface(playing, exo, viewModel::savePlaybackPosition)
+                            TvPlayerSurface(playing, exo, viewModel::savePlaybackPosition, viewModel::reportProgress)
                         }
 
                         detail != null -> {
@@ -173,7 +173,12 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun TvPlayerSurface(source: PlaybackSource, player: ExoPlayer, onSavePosition: (String?, Long) -> Unit) {
+private fun TvPlayerSurface(
+    source: PlaybackSource,
+    player: ExoPlayer,
+    onSavePosition: (String?, Long) -> Unit,
+    onReportProgress: (PlaybackSource, Long, Long) -> Unit,
+) {
     val view = LocalView.current
     DisposableEffect(Unit) {
         // Mark the window secure while a stream is on screen (parity with mobile); protects the
@@ -188,7 +193,10 @@ private fun TvPlayerSurface(source: PlaybackSource, player: ExoPlayer, onSavePos
         player.prepare()
         player.playWhenReady = true
         onDispose {
-            onSavePosition(source.resumeKey, PlaybackProgress.positionToSave(player.currentPosition, player.duration))
+            val pos = player.currentPosition
+            val dur = player.duration
+            onSavePosition(source.resumeKey, PlaybackProgress.positionToSave(pos, dur))
+            onReportProgress(source, pos, dur)
             player.stop()
             player.clearMediaItems()
         }

@@ -6,6 +6,8 @@ package it.allard.etincelle.data.fubo
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import it.allard.etincelle.core.model.AppError
+import it.allard.etincelle.core.model.DrmSpec
+import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.UserSession
 import it.allard.etincelle.core.network.ProgressStore
 import it.allard.etincelle.core.network.SessionManager
@@ -123,6 +125,57 @@ class FuboRepositoryTest {
 
         repo.savePlaybackPosition("VOD_7", 0L)
         assertEquals(null, progress.positions["VOD_7"])
+    }
+
+    private fun playheadSource(payload: Map<String, Any?>) = PlaybackSource(
+        manifestUrl = "https://cdn/m.mpd",
+        drm = DrmSpec.None,
+        isLive = false,
+        progressUrl = server.url("/playhead/v2").toString(),
+        progressPayload = payload,
+    )
+
+    @Test
+    fun `reportProgress posts lastOffset in seconds and echoes the payload as integers`() = runTest {
+        server.enqueue(MockResponse().setBody("""{"playhead":{"ping_interval":10}}"""))
+
+        // Moshi decodes JSON numbers as Double; the body must send them back as integers.
+        repo.reportProgress(
+            playheadSource(mapOf("assetId" to "175982", "duration" to 6054.0, "lastOffset" to "@")),
+            positionMs = 120_000L,
+            durationMs = 6_054_000L,
+        )
+
+        val request = server.takeRequest()
+        assertEquals("POST", request.method)
+        assertEquals("/playhead/v2", request.path)
+        val body = request.body.readUtf8()
+        assertTrue(body, body.contains("\"lastOffset\":120"))
+        assertTrue(body, body.contains("\"duration\":6054"))
+        assertTrue(body, body.contains("\"assetId\":\"175982\""))
+    }
+
+    @Test
+    fun `reportProgress marks watched with full duration near the end`() = runTest {
+        server.enqueue(MockResponse().setBody("{}"))
+
+        repo.reportProgress(
+            playheadSource(mapOf("lastOffset" to "@", "duration" to 6054.0)),
+            positionMs = 6_050_000L,
+            durationMs = 6_054_000L,
+        )
+
+        assertTrue(server.takeRequest().body.readUtf8().contains("\"lastOffset\":6054"))
+    }
+
+    @Test
+    fun `reportProgress is a no-op without a playhead or at a zero-second offset`() = runTest {
+        // live source carries no playhead
+        repo.reportProgress(PlaybackSource("https://cdn/m.mpd", DrmSpec.None, isLive = true), 5_000L, 60_000L)
+        // under a second rounds to zero, which the server rejects
+        repo.reportProgress(playheadSource(mapOf("lastOffset" to "@")), positionMs = 500L, durationMs = 60_000L)
+
+        assertEquals(0, server.requestCount)
     }
 
     @Test

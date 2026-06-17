@@ -66,6 +66,13 @@ interface FuboApi {
     @POST("action/v1/add-recording")
     suspend fun addRecording(@Body body: AddRecordingRequest): okhttp3.ResponseBody
 
+    /** Posts a server playhead (continue-watching) progress update to the response-supplied url. */
+    @POST
+    suspend fun pingProgress(
+        @Url url: String,
+        @Body payload: Map<String, @JvmSuppressWildcards Any?>,
+    ): okhttp3.ResponseBody
+
     /**
      * DVR recordings. [status] must be "recorded" or "scheduled": status=all returns an empty body,
      * so the two statuses are fetched separately and merged.

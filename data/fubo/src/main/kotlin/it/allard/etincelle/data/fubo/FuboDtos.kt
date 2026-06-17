@@ -42,8 +42,20 @@ data class PlaybackResponse(
     val drm: DrmV1Dto?,
     val heartbeat: UrlHolderDto?,
     val concurrency: ConcurrencyDto?,
+    val playhead: PlayHeadDto?,
     val type: String?,
     val program: ProgramDto?,
+)
+
+/**
+ * Server playhead (continue-watching) progress write. Present for VOD/DVR, absent for live. The
+ * [payload] is a template echoed back verbatim on the POST with its "lastOffset" entry replaced by
+ * the position in seconds.
+ */
+data class PlayHeadDto(
+    val method: String?,
+    val url: String?,
+    val payload: Map<String, Any?>?,
 )
 
 data class StreamDto(

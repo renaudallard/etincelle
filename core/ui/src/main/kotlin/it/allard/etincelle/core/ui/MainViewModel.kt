@@ -422,6 +422,11 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         viewModelScope.launch { runCatching { repo.savePlaybackPosition(key, positionMs) } }
     }
 
+    /** Reports progress to the server playhead (continue-watching); best-effort and a no-op for live. */
+    fun reportProgress(source: PlaybackSource, positionMs: Long, durationMs: Long) {
+        viewModelScope.launch { runCatching { repo.reportProgress(source, positionMs, durationMs) } }
+    }
+
     /** Re-resolves a stream (fresh tokens/URL), used by Cast transfers when a token has expired. */
     suspend fun reResolve(source: PlaybackSource): PlaybackSource? = try {
         val channelId = source.originChannelId

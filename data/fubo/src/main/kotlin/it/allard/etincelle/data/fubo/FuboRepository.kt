@@ -26,6 +26,8 @@ import java.io.IOException
 // A full day of guide so a channel's "tout voir" grid covers at least 24h.
 private const val GUIDE_WINDOW_MS = 24L * 60 * 60 * 1000
 private const val GUIDE_CHANNEL_LIMIT = 40
+private const val PROGRESS_OFFSET_KEY = "lastOffset"
+private const val PROGRESS_END_MS = 15_000L
 
 /** Fubo implementation of auth + content + playback, with persisted sessions and token refresh. */
 class FuboRepository(
@@ -231,6 +233,25 @@ class FuboRepository(
         if (positionMs > 0) progress.save(key, positionMs) else progress.clear(key)
     }
 
+    override suspend fun reportProgress(source: PlaybackSource, positionMs: Long, durationMs: Long) {
+        val url = source.progressUrl ?: return
+        val payload = source.progressPayload ?: return
+        // Near the end, mark the item watched at its full duration, like the official app; otherwise
+        // report the current position. Seconds, since the server stores lastOffset in seconds.
+        val nearEnd = durationMs > 0 && positionMs >= durationMs - PROGRESS_END_MS
+        val offsetSeconds = (if (nearEnd) durationMs else positionMs) / 1000
+        if (offsetSeconds <= 0) return // the server rejects lastOffset <= 0
+        val body = payload.mapValues { (key, value) ->
+            when {
+                key == PROGRESS_OFFSET_KEY -> offsetSeconds
+                // Moshi decodes JSON integers as Double; send whole numbers back as integers.
+                value is Double -> value.toLong()
+                else -> value
+            }
+        }
+        api.pingProgress(url, body).close()
+    }
+
     private val refreshMutex = Mutex()
 
     /**
@@ -320,5 +341,7 @@ internal fun PlaybackResponse.toPlaybackSource(): PlaybackSource {
         title = program?.title,
         heartbeatUrl = heartbeat?.url,
         concurrencyHeartbeatUrl = concurrency?.heartbeatUrl,
+        progressUrl = playhead?.url,
+        progressPayload = playhead?.payload,
     )
 }

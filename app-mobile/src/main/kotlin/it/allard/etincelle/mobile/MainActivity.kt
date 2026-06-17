@@ -118,6 +118,7 @@ class MainActivity : ComponentActivity() {
                 // null while casting: the stream keeps playing on the TV, so nothing to stop or save.
                 controller.stopPlayback()?.let { (pos, dur) ->
                     viewModel.savePlaybackPosition(source.resumeKey, PlaybackProgress.positionToSave(pos, dur))
+                    viewModel.reportProgress(source, pos, dur)
                 }
             } else {
                 val pos = exo.currentPosition
@@ -125,6 +126,7 @@ class MainActivity : ComponentActivity() {
                 exo.stop()
                 exo.clearMediaItems()
                 viewModel.savePlaybackPosition(source.resumeKey, PlaybackProgress.positionToSave(pos, dur))
+                viewModel.reportProgress(source, pos, dur)
             }
         }
         val playerFlow: StateFlow<Player> = controller?.currentPlayer ?: MutableStateFlow<Player>(exo).asStateFlow()

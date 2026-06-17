@@ -50,4 +50,8 @@ interface MolotovRepository {
 
     /** Remembers (or, when [positionMs] is 0, forgets) the resume position for a VOD/replay. */
     suspend fun savePlaybackPosition(key: String, positionMs: Long)
+
+    /** Reports playback progress to the server playhead (continue-watching). No-op for live and for
+     * sources without a playhead; best-effort, so failures must not disrupt playback. */
+    suspend fun reportProgress(source: PlaybackSource, positionMs: Long, durationMs: Long)
 }
