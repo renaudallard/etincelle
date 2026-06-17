@@ -76,6 +76,23 @@ class FuboCastMediaItemConverter(
                 put("license_url", licenseUrl)
                 put("drm_token", token)
             }
+            // Let the receiver report continue-watching progress to the playhead itself: the phone is
+            // not reliably present during a cast session, so it cannot be relied on to do it.
+            val s = session()
+            val payload = source?.progressPayload
+            if (s != null && source?.progressUrl != null && payload != null && s.accessToken.isNotEmpty()) {
+                put("playhead_url", source.progressUrl)
+                put(
+                    "playhead_payload",
+                    JSONObject().apply {
+                        // Moshi decoded JSON integers as Double; send whole numbers back as integers.
+                        payload.forEach { (key, value) -> put(key, if (value is Double) value.toLong() else value) }
+                    },
+                )
+                put("access_token", s.accessToken)
+                s.profileId.takeIf { it.isNotEmpty() }?.let { put("profile_id", it) }
+                s.userId.takeIf { it.isNotEmpty() }?.let { put("user_id", it) }
+            }
         }
     }
 
