@@ -34,6 +34,7 @@ private fun EpgProgramWithAssetsDto.toRecording(): Recording? {
         channelName = dvrAsset.channel?.name,
         programId = program.programId,
         seriesId = program.metadata?.seriesId,
+        seriesName = program.heading,
     )
 }
 
@@ -54,3 +55,23 @@ fun Recording.toCard(): ContentCard = ContentCard(
     actionUrl = null,
     recordingAssetId = assetId,
 )
+
+/**
+ * Collapses recordings so each show appears once, paired with how many episodes were recorded. Groups
+ * by series (else programme, else the asset), keeping the first (most recent) as the representative.
+ */
+fun List<Recording>.collapsedByShow(): List<Pair<Recording, Int>> =
+    groupBy { it.seriesId ?: it.programId ?: it.assetId }
+        .map { (_, recs) -> recs.first() to recs.size }
+
+/**
+ * A collapsed show card showing one episode's image: it taps through to the show's detail (the
+ * episode list, since [Recording.seriesId]/[Recording.programId] are kept), and badges the episode
+ * count when more than one was recorded.
+ */
+fun Recording.toCollapsedCard(episodeCount: Int): ContentCard =
+    toCard().copy(
+        // Show the show name, not the representative episode's title.
+        title = seriesName ?: title,
+        badge = if (episodeCount > 1) "$episodeCount épisodes" else null,
+    )

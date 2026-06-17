@@ -18,6 +18,10 @@ import it.allard.etincelle.core.network.NetworkClient
 import it.allard.etincelle.core.network.ProgressStore
 import it.allard.etincelle.core.network.SessionManager
 import it.allard.etincelle.core.network.SessionStore
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import retrofit2.HttpException
@@ -28,6 +32,9 @@ private const val GUIDE_WINDOW_MS = 24L * 60 * 60 * 1000
 private const val GUIDE_CHANNEL_LIMIT = 40
 private const val PROGRESS_OFFSET_KEY = "lastOffset"
 private const val PROGRESS_END_MS = 15_000L
+// See-all target for the injected recordings rail; loadPage routes any selectedTab=recordings url to
+// the genre-grouped recordings page.
+private const val RECORDINGS_PAGE_URL = "etincelle:recordings?selectedTab=recordings"
 
 /** Fubo implementation of auth + content + playback, with persisted sessions and token refresh. */
 class FuboRepository(
@@ -82,7 +89,9 @@ class FuboRepository(
         val recordings = loadRecordings()
         val extra = buildList {
             if (recordings.isNotEmpty()) {
-                add(ContentRail("recordings", "Mes enregistrements", recordings.map { it.toCard() }))
+                // One card per show (collapsed); "tout voir" opens the genre-grouped recordings page.
+                val cards = recordings.collapsedByShow().map { (rec, count) -> rec.toCollapsedCard(count) }
+                add(ContentRail("recordings", "Mes enregistrements", cards, seeAllUrl = RECORDINGS_PAGE_URL))
             }
             if (apps != null) add(apps)
         }
@@ -99,8 +108,47 @@ class FuboRepository(
         }
     }
 
-    private suspend fun recordingsPage(): ContentPage =
-        ContentPage("Vos enregistrements", listOf(ContentRail("recordings", null, loadRecordings().map { it.toCard() })))
+    // The genre of each recorded show, fetched once from its detail page and cached for the session.
+    private val recordingGenres = mutableMapOf<String, String?>()
+
+    private suspend fun recordingGenre(rec: Recording): String? {
+        val seriesId = rec.seriesId
+        val key = seriesId ?: rec.programId ?: return null
+        recordingGenres[key]?.let { return it }
+        if (recordingGenres.containsKey(key)) return null
+        // loadRecordings already refreshed the token, so a failure here is the show's own (e.g. a
+        // missing detail); treat it as no genre rather than failing the whole page.
+        val genre = try {
+            if (seriesId != null) {
+                api.seriesDetail(seriesId).toProgramDetail(channelId = null, vodId = seriesId, isLive = false).genre
+            } else {
+                api.programDetail(key).toProgramDetail(channelId = null, vodId = key, isLive = false).genre
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+        recordingGenres[key] = genre
+        return genre
+    }
+
+    // Recordings as a page separated by genre, each show collapsed to one card. Genres are fetched in
+    // parallel (cached); a show with no known genre falls into "Autres", listed last.
+    private suspend fun recordingsPage(): ContentPage = coroutineScope {
+        val shows = loadRecordings().collapsedByShow()
+        val withGenre = shows.map { (rec, count) ->
+            async { Triple(rec, count, recordingGenre(rec)) }
+        }.awaitAll()
+        val sections = withGenre
+            .groupBy { it.third ?: "Autres" }
+            .entries
+            .sortedWith(compareBy({ it.key == "Autres" }, { it.key.lowercase() }))
+            .map { (genre, items) ->
+                ContentRail("rec-$genre", genre, items.map { (rec, count, _) -> rec.toCollapsedCard(count) })
+            }
+        ContentPage("Vos enregistrements", sections, isGrid = true)
+    }
 
     // The channels page, fetched once and cached; it carries both the channel directory and the
     // broadcaster "Apps" section surfaced on the home page.

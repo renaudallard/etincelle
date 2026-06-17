@@ -256,6 +256,17 @@ fun GridContent(
     }
 }
 
+/** A small badge over a card's image, e.g. "4 épisodes" on a collapsed recordings card. */
+@Composable
+private fun BoxScope.EpisodeCountBadge(text: String) {
+    Box(
+        modifier = Modifier.align(Alignment.BottomStart).padding(4.dp)
+            .clip(RoundedCornerShape(4.dp)).background(BrandYellow).padding(horizontal = 4.dp),
+    ) {
+        Text(text, style = MaterialTheme.typography.labelSmall, color = BrandBlack)
+    }
+}
+
 @Composable
 private fun GridCard(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
     val categoryIcon = if (card.channelId == null && card.vodId == null) categoryIconRes(card.title) else null
@@ -286,6 +297,7 @@ private fun GridCard(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
                     Text("€", style = MaterialTheme.typography.labelSmall, color = BrandBlack)
                 }
             }
+            card.badge?.let { EpisodeCountBadge(it) }
         }
         card.title?.let {
             Spacer(Modifier.height(4.dp))
@@ -675,6 +687,7 @@ private fun CardItem(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
                     Text("€", style = MaterialTheme.typography.labelSmall, color = BrandBlack)
                 }
             }
+            card.badge?.let { EpisodeCountBadge(it) }
         }
         card.title?.let {
             Spacer(Modifier.height(4.dp))

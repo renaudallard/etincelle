@@ -39,7 +39,8 @@ fun ContentRail.expandable(): Boolean = seeAllUrl != null || cards.any {
 
 /**
  * A single card in a rail. Tap behaviour, in priority order:
- * - [recordingAssetId] non-null -> plays that DVR recording directly (no detail page).
+ * - [recordingAssetId] non-null -> opens the show's detail ([seriesId]) or the programme detail
+ *   ([vodId]) to pick an episode, or plays the recording directly when neither is set.
  * - [channelId] non-null -> opens that live channel's detail page.
  * - [vodId] non-null     -> opens that VOD/program detail page.
  * - [seriesId] non-null  -> opens that series detail page.
@@ -61,6 +62,8 @@ data class ContentCard(
     val subtitle: String? = null,
     /** A channel-logo card (drawn as a small square); program/guide cards are landscape. */
     val square: Boolean = false,
+    /** A small overlay badge on the image, e.g. the episode count on a collapsed recordings card. */
+    val badge: String? = null,
 )
 
 /**
@@ -75,6 +78,8 @@ data class Recording(
     val channelName: String?,
     val programId: String?,
     val seriesId: String?,
+    /** The show name (the program heading), distinct from [title] which is the episode name. */
+    val seriesName: String? = null,
 )
 
 /**

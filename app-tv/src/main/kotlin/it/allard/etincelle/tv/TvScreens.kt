@@ -520,6 +520,11 @@ private fun TvCard(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
                     Text("€", color = BrandBlack, style = MaterialTheme.typography.labelSmall)
                 }
             }
+            card.badge?.let {
+                Box(Modifier.align(Alignment.BottomStart).padding(4.dp).clip(RoundedCornerShape(4.dp)).background(BrandYellow).padding(horizontal = 4.dp)) {
+                    Text(it, color = BrandBlack, style = MaterialTheme.typography.labelSmall)
+                }
+            }
         }
         card.title?.let {
             Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelMedium, modifier = Modifier.width(w).padding(top = 4.dp))
