@@ -137,8 +137,11 @@ class MainActivity : ComponentActivity() {
                 // Returning to the foreground refreshes time-sensitive pages (the guide goes stale).
                 LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshOnResume() }
                 // Logging out (manually or on a dead session) must end any active Cast session, so the
-                // Chromecast does not keep playing the previous account's stream.
-                LaunchedEffect(state.loggedIn) { if (!state.loggedIn) controller?.disconnect() }
+                // Chromecast does not keep playing the previous account's stream. Skip the cold-start
+                // checking phase (and process-death restore) so it only fires on a real logout.
+                LaunchedEffect(state.loggedIn) {
+                    if (!state.checking && !state.loggedIn) controller?.disconnect()
+                }
                 Surface(modifier = Modifier.fillMaxSize()) {
                     AppRoot(
                         state = state,
