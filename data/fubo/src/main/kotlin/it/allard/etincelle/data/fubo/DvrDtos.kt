@@ -58,7 +58,7 @@ fun Recording.toCard(): ContentCard = ContentCard(
 
 /**
  * Collapses recordings so each show appears once, paired with how many episodes were recorded. Groups
- * by series (else programme, else the asset), keeping the first (most recent) as the representative.
+ * by series (else programme, else the asset), keeping the first in list order as the representative.
  */
 fun List<Recording>.collapsedByShow(): List<Pair<Recording, Int>> =
     groupBy { it.seriesId ?: it.programId ?: it.assetId }
