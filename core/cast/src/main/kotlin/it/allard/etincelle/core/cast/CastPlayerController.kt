@@ -227,7 +227,13 @@ class CastPlayerController(
         }
         // Already on the cast player. The same session resuming needs no reload; a different session id
         // is a new receiver (a device switch, or a reconnect after the old one dropped) - load onto it.
-        if (session.sessionId == castSessionId) return
+        if (session.sessionId == castSessionId) {
+            // The current session resumed: any in-flight transfer is done, so clear the flag and the
+            // fallback, else a later disconnect is misread as a transfer still in progress.
+            transferring = false
+            transferFallbackJob?.cancel()
+            return
+        }
         val item = currentItem ?: return
         // A deliberate switch resumes at the captured position; an unexpected reconnect just clamps live
         // to the edge / starts VOD afresh (the old position is unreadable once the session is gone).
