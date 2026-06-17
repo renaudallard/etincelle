@@ -356,6 +356,9 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         val d = _state.value.detail ?: return
         // A detail opened from a recording plays that recording, not the (often unavailable) VOD.
         _state.value.detailRecordingAssetId?.let { watchRecording(it); return }
+        // A series has no stream of its own (its vodId is the series id, not a playable asset); the UI
+        // hides the Watch button for it, but guard here too so a stray caller cannot mis-resolve it.
+        if (d.isSeries) return
         val vodId = d.vodId
         val channelId = d.channelId
         _state.update { it.copy(busy = true, error = null) }
