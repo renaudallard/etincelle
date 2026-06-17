@@ -80,6 +80,7 @@ class FuboRepository(
         // Drop the cached channel data so the next account does not see the previous one's channels.
         channelsPageCache = null
         channelDirectory = null
+        recordingGenres.clear()
     }
 
     override fun currentSession(): UserSession? = session.session
