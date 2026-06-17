@@ -152,12 +152,6 @@ fun PageResponse.toEpisodes(): List<ContentCard> = content?.sections.orEmpty()
     .flatMap { it.components.orEmpty() }
     .mapNotNull { it.toCard() }
 
-/** A programme detail's "Détails du programme" CTA links to its series; returns that series id. */
-fun PageResponse.seriesLink(): String? = content?.metadata?.ctas.orEmpty()
-    .flatMap { it.actionItems.orEmpty() }
-    .flatMap { it.actions?.onClick.orEmpty() }
-    .firstNotNullOfOrNull { item -> item.endpoint?.url?.let { SERIES_REGEX.find(it)?.groupValues?.get(1) } }
-
 fun PageResponse.toRails(): List<ContentRail> {
     val sections = content?.sections ?: return emptyList()
     return sections.mapIndexedNotNull { index, section ->

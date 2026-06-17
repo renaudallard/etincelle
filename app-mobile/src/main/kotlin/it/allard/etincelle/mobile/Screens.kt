@@ -50,6 +50,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -501,7 +502,11 @@ fun ProgramDetailScreen(
     castButton: @Composable () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState())) {
+    // Reset to the top whenever a different detail opens, so a pushed episode page shows its title and
+    // "Regarder" rather than inheriting the previous page's scroll position.
+    val scrollState = rememberScrollState()
+    LaunchedEffect(detail) { scrollState.scrollTo(0) }
+    Column(modifier.fillMaxSize().statusBarsPadding().verticalScroll(scrollState)) {
         Row(
             Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,

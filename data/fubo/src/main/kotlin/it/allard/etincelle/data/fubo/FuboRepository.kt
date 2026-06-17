@@ -227,10 +227,9 @@ class FuboRepository(
         var episodes = emptyList<ContentCard>()
         val detail = when (kind) {
             DetailKind.PROGRAM -> {
-                val resp = api.programDetail(id)
-                // A programme episode links to its series; pull that series' catch-up episodes, if any.
-                resp.seriesLink()?.let { episodes = api.seriesDetail(it, "id-tab-watch-now").toEpisodes() }
-                resp.toProgramDetail(channelId = null, vodId = id, isLive = false)
+                // An episode page stays focused on the episode (title, synopsis, Regarder); it does not
+                // re-list the whole series, which is redundant with the series page you came from.
+                api.programDetail(id).toProgramDetail(channelId = null, vodId = id, isLive = false)
             }
             DetailKind.SERIES -> {
                 val resp = api.seriesDetail(id)
