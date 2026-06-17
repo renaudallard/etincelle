@@ -87,6 +87,9 @@ class CastPlayerController(
     private var transferPlayWhenReady = true
     private var transferFallbackJob: Job? = null
     private var transferDeadline = 0L
+    // The id of the session we are transferring away from, so onSessionConnected can tell the genuinely
+    // new device (complete the transfer) from the same session merely resuming or still being alive.
+    private var transferFromSessionId: String? = null
 
     private val errorListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) = onPlaybackError()
@@ -133,12 +136,14 @@ class CastPlayerController(
         val willTransfer = _currentPlayer.value === castPlayer && castContext.sessionManager.currentCastSession != null
         val position = if (willTransfer) castPlayer.currentPosition else 0L
         val playWhenReady = if (willTransfer) castPlayer.playWhenReady else true
+        val fromSessionId = if (willTransfer) castContext.sessionManager.currentCastSession?.sessionId else null
         val selected = super.connectTo(routeId)
         // Arm the transfer only once a route was actually selected, so a stale/removed routeId cannot
         // leave `transferring` stuck and mis-handle the next session as a transfer.
         if (willTransfer && selected) {
             transferPosition = position
             transferPlayWhenReady = playWhenReady
+            transferFromSessionId = fromSessionId
             transferring = true
             // Wall-clock deadline so accumulated background time counts (the fallback below honours it).
             transferDeadline = SystemClock.elapsedRealtime() + TRANSFER_TIMEOUT_MS
@@ -147,19 +152,19 @@ class CastPlayerController(
     }
 
     override fun stop() {
-        // Drop the pending fallback so it cannot start the phone in the background. Keep `transferring`
-        // ONLY if the old session has actually ended (a transfer is truly in flight); if it is still
-        // live, no transfer is pending, so clearing it avoids mis-handling the resumed session.
+        // Pause the fallback while backgrounded; keep `transferring` so start()'s session re-check can
+        // still complete a real transfer. onSessionConnected tells the new device from the same session
+        // by id, so a still-live old session is no longer mistaken for the transfer target.
         transferFallbackJob?.cancel()
-        if (castContext.sessionManager.currentCastSession != null) transferring = false
         super.stop()
     }
 
     override fun disconnect() {
         // An explicit disconnect is not a transfer hand-off; clear the flag so the session end runs the
-        // normal stop path instead of arming the wait-for-new-device fallback.
+        // normal stop path, and drop any pending re-resolve so it cannot eject after we tore down.
         transferring = false
         transferFallbackJob?.cancel()
+        reResolveJob?.cancel()
         super.disconnect()
     }
 
@@ -216,17 +221,23 @@ class CastPlayerController(
     override fun onSessionConnected(session: CastSession) {
         super.onSessionConnected(session)
         if (transferring) {
-            // The new Chromecast connected: load the held stream on it at the captured position,
-            // re-resolving for fresh tokens. The old receiver was stopped by the session switch.
+            if (session.sessionId != transferFromSessionId) {
+                // A genuinely NEW Chromecast connected: load the held stream on it at the captured
+                // position, re-resolving for fresh tokens. The old receiver was stopped by the switch.
+                transferring = false
+                transferFallbackJob?.cancel()
+                endingCaptured = false
+                reResolveJob?.cancel()
+                hasRetried = false
+                clearDeferredStop()
+                val item = currentItem ?: return
+                loadResolved(castPlayer, item, transferPosition, transferPlayWhenReady)
+                return
+            }
+            // The same session resumed / was still live (no actual device switch): drop the transfer
+            // flag and fall through to the normal path (which no-ops since we are already on cast).
             transferring = false
             transferFallbackJob?.cancel()
-            endingCaptured = false
-            reResolveJob?.cancel()
-            hasRetried = false
-            clearDeferredStop()
-            val item = currentItem ?: return
-            loadResolved(castPlayer, item, transferPosition, transferPlayWhenReady)
-            return
         }
         // Re-resolve when casting out too: the local stream may have been playing for a while and
         // its tokens are stale, so the receiver needs a freshly minted URL to load.
@@ -310,6 +321,9 @@ class CastPlayerController(
                 ensureActive()
                 // Bail if a later swap/stop superseded this one while we were resolving.
                 if (target !== _currentPlayer.value || currentItem == null) return@launch
+                // Re-resolve failed while casting: do not push the stale item (its tokens are dead) to
+                // the receiver; bail and let the error surface instead of loading a doomed stream.
+                if (fresh == null && target === castPlayer) return@launch
                 val freshItem = if (fresh != null) MediaItemFactory.create(fresh) else item
                 loadOn(target, freshItem, if ((fresh ?: source).isLive) 0 else position)
                 target.playWhenReady = fromPlayWhenReady
