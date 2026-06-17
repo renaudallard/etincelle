@@ -64,16 +64,16 @@ data class UiState(
     /** When the open detail was reached from a DVR recording, the recording its "Regarder" plays. */
     val detailRecordingAssetId: String? get() = detailStack.lastOrNull()?.recordingAssetId
 
-    /** The current page's rails with locked (unentitled) cards removed when the user hid them. */
-    val visibleRails: List<ContentRail>
-        get() {
-            val rails = current?.rails ?: return emptyList()
-            if (!hideLocked) return rails
-            return rails.mapNotNull { rail ->
-                val cards = rail.cards.filterNot { it.isLocked }
-                if (cards.isEmpty()) null else rail.copy(cards = cards)
-            }
+    /** The current page's rails with locked (unentitled) cards removed when the user hid them. Computed
+     * once per state instance (a getter would re-filter and reallocate on every read/recomposition). */
+    val visibleRails: List<ContentRail> by lazy {
+        val rails = current?.rails ?: return@lazy emptyList()
+        if (!hideLocked) return@lazy rails
+        rails.mapNotNull { rail ->
+            val cards = rail.cards.filterNot { it.isLocked }
+            if (cards.isEmpty()) null else rail.copy(cards = cards)
         }
+    }
 }
 
 /** Shared presentation logic for both the phone and TV apps. */
