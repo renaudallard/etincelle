@@ -377,6 +377,7 @@ private fun AppRoot(
                         refreshing = state.refreshing,
                         onRefresh = vm::refreshCurrent,
                         columns = gridColumns,
+                        pageTitle = state.current?.title,
                         modifier = modifier,
                     )
                 } else {

@@ -215,11 +215,11 @@ fun GridContent(
     refreshing: Boolean = false,
     onRefresh: () -> Unit = {},
     columns: Int = LocalPrefs.DEFAULT_GRID_COLUMNS,
+    pageTitle: String? = null,
     modifier: Modifier = Modifier,
 ) {
-    // A multi-section page (e.g. the channels page, with an "Apps" group) keeps its section headers;
-    // a single-section see-all just shows its cards (its title is already in the top bar).
-    val multiSection = rails.size > 1
+    // Show each rail's section header (genre, "Apps", ...) unless it just repeats the page's top-bar
+    // title, as a plain see-all of a single rail does.
     val gridState = rememberLazyGridState()
     RefreshableBox(
         refreshing,
@@ -237,7 +237,7 @@ fun GridContent(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             rails.forEach { rail ->
-                val header = rail.title?.takeIf { multiSection && it.isNotBlank() }
+                val header = rail.title?.takeIf { it.isNotBlank() && it != pageTitle }
                 if (header != null) {
                     item(span = { GridItemSpan(maxLineSpan) }, key = "h-${rail.id}") {
                         Text(header, style = MaterialTheme.typography.titleMedium)
