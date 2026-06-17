@@ -32,6 +32,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -135,6 +136,9 @@ class MainActivity : ComponentActivity() {
                 val currentPlayer by playerFlow.collectAsStateWithLifecycle()
                 // Returning to the foreground refreshes time-sensitive pages (the guide goes stale).
                 LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshOnResume() }
+                // Logging out (manually or on a dead session) must end any active Cast session, so the
+                // Chromecast does not keep playing the previous account's stream.
+                LaunchedEffect(state.loggedIn) { if (!state.loggedIn) controller?.disconnect() }
                 Surface(modifier = Modifier.fillMaxSize()) {
                     AppRoot(
                         state = state,
@@ -283,8 +287,7 @@ private fun AppRoot(
             BackHandler { vm.closeSettings() }
             SettingsScreen(
                 onBack = { vm.closeSettings() },
-                // End any active Cast session on logout, so the Chromecast stops the old account's stream.
-                onLogout = { onCastDisconnect(); vm.logout() },
+                onLogout = { vm.logout() },
                 hideLocked = state.hideLocked,
                 onHideLocked = vm::setHideLocked,
                 appVersion = BuildConfig.VERSION_NAME,
