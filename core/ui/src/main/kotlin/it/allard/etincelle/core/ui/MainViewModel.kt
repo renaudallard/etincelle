@@ -436,8 +436,9 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
     } catch (c: CancellationException) {
         throw c
     } catch (e: Throwable) {
-        // Let the re-resolve fail in place (the cast/player shows an error); a dead session is caught
-        // by the next foreground action, which ejects to login - and not from this background callback.
+        // Surface a genuinely dead session so the loggedIn shell is not left zombied; applyFailure is
+        // gated on currentSession()==null, so a recoverable 403 still fails in place rather than ejecting.
+        if (e is AppError.Unauthorized) applyFailure(e, "")
         null
     }
 
@@ -475,6 +476,8 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
     }
 
     fun logout() {
+        // Drop any in-flight nav so a stale failure can't stamp a banner onto the reset login screen.
+        navJob?.cancel()
         viewModelScope.launch {
             runCatching { repo.logout() }
             _state.value = UiState(checking = false)
