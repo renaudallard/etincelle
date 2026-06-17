@@ -15,6 +15,7 @@ import com.google.android.gms.cast.MediaQueueItem
 import it.allard.etincelle.core.model.DrmSpec
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.UserSession
+import it.allard.etincelle.core.model.coerceWholeNumbers
 import org.json.JSONObject
 
 private const val DRM_HEADER_TOKEN = "x-dt-auth-token"
@@ -86,7 +87,7 @@ class FuboCastMediaItemConverter(
                     "playhead_payload",
                     JSONObject().apply {
                         // Moshi decoded JSON integers as Double; send whole numbers back as integers.
-                        payload.forEach { (key, value) -> put(key, if (value is Double) value.toLong() else value) }
+                        payload.forEach { (key, value) -> put(key, coerceWholeNumbers(value)) }
                     },
                 )
                 put("access_token", s.accessToken)

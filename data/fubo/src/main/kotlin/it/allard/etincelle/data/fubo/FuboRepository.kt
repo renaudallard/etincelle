@@ -14,6 +14,7 @@ import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.Recording
 import it.allard.etincelle.core.model.UserSession
+import it.allard.etincelle.core.model.coerceWholeNumbers
 import it.allard.etincelle.core.network.NetworkClient
 import it.allard.etincelle.core.network.ProgressStore
 import it.allard.etincelle.core.network.SessionManager
@@ -302,13 +303,9 @@ class FuboRepository(
         val nearEnd = positionMs >= durationMs - PROGRESS_END_MS
         val offsetSeconds = (if (nearEnd) durationMs else positionMs) / 1000
         if (offsetSeconds <= 0) return // the server rejects lastOffset <= 0
+        // Overwrite the offset; restore the other template values to integers (Moshi decoded them as Double).
         val body = payload.mapValues { (key, value) ->
-            when {
-                key == PROGRESS_OFFSET_KEY -> offsetSeconds
-                // Moshi decodes JSON integers as Double; send whole numbers back as integers.
-                value is Double -> value.toLong()
-                else -> value
-            }
+            if (key == PROGRESS_OFFSET_KEY) offsetSeconds else coerceWholeNumbers(value)
         }
         // Best-effort: refresh on a 401 like every other call, and never let a transport error reach
         // the caller; a failed continue-watching ping must not disrupt playback.
