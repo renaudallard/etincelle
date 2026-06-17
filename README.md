@@ -43,8 +43,12 @@ expérimentale du **récepteur Cast Fubo officiel** (redémarrage requis), un bo
 mises à jour** (compare la version installée à la dernière publiée sur GitHub) et la **déconnexion**
 (avec confirmation). Sur
 téléphone, vous pouvez **diffuser** le flux en cours vers un **Chromecast** et transférer la lecture
-d'un appareil à l'autre. La diffusion s'appuie sur un récepteur Cast Widevine personnalisé, hébergé
-séparément : [etincelle_receiver](https://github.com/renaudallard/etincelle_receiver).
+d'un appareil à l'autre. Pendant la diffusion, l'application **reste sur la fiche du programme** : une
+**barre persistante** en bas de l'écran affiche l'appareil, avec une animation du logo Chromecast qui
+se remplit jusqu'à ce que la lecture démarre réellement sur la TV. Les **boutons de volume** du
+téléphone règlent alors le volume du Chromecast (un indicateur s'affiche brièvement). La diffusion
+s'appuie sur un récepteur Cast Widevine personnalisé, hébergé séparément :
+[etincelle_receiver](https://github.com/renaudallard/etincelle_receiver).
 À chaque démarrage, etincelle **vérifie les mises à jour** sur GitHub et propose de télécharger la
 dernière version lorsqu'une plus récente est disponible.
 

@@ -26,9 +26,25 @@ data class CastDevice(val routeId: String, val name: String)
 data class CastUiState(
     val devices: List<CastDevice> = emptyList(),
     val connectedDeviceName: String? = null,
+    // True from the moment a device is tapped until the receiver actually starts playing; with
+    // connectingDeviceName it drives the "filling" connect animation before the session is up.
+    val connecting: Boolean = false,
+    val connectingDeviceName: String? = null,
+    // True once the receiver is actually playing the stream (the animation then snaps full).
+    val playing: Boolean = false,
+    // Last cast-device volume (0..1) and a counter bumped on each change, so the phone can flash a
+    // brief volume overlay while the system volume bar is suppressed.
+    val volumeLevel: Float = 1f,
+    val volumeNonce: Int = 0,
 ) {
     val isCasting: Boolean get() = connectedDeviceName != null
     val available: Boolean get() = devices.isNotEmpty() || isCasting
+    // Whether to show the persistent cast bar: a session is up, or one is being established.
+    val showStatus: Boolean get() = isCasting || connecting
+    // The device to name in the bar. While a connect is in flight (including a device-to-device
+    // switch where the old device is still connected) the target is what matters; otherwise the
+    // connected one.
+    val statusDeviceName: String? get() = if (connecting) connectingDeviceName ?: connectedDeviceName else connectedDeviceName
 }
 
 /**
@@ -44,6 +60,11 @@ open class CastController(
 
     private val _state = MutableStateFlow(CastUiState())
     val state: StateFlow<CastUiState> = _state.asStateFlow()
+
+    // A real Cast session is up right now. Stricter than [CastUiState.isCasting], which can briefly lag
+    // a session that has already torn down: used to gate volume-key interception so a press is never
+    // swallowed once the receiver is gone.
+    val isCastSessionActive: Boolean get() = castContext.sessionManager.currentCastSession != null
 
     // Drives the idle re-discovery loop; recreated on each start() so a fresh start gets a fresh
     // loop and stop() can cancel it cleanly.
@@ -91,7 +112,20 @@ open class CastController(
     open fun connectTo(routeId: String): Boolean {
         val route = mediaRouter.routes.firstOrNull { it.id == routeId } ?: return false
         mediaRouter.selectRoute(route)
+        // Start the connect animation immediately: the bar shows "Connexion à <device>…" with the
+        // glyph filling until the receiver reports playback (or the session fails and clears it).
+        markConnecting(_state.value.devices.firstOrNull { it.routeId == routeId }?.name)
         return true
+    }
+
+    /** Begin (or keep) the connect animation toward [deviceName]. */
+    protected fun markConnecting(deviceName: String?) {
+        _state.value = _state.value.copy(connecting = true, connectingDeviceName = deviceName)
+    }
+
+    /** Clear the connect animation (the session is up and playing, or it gave up). */
+    protected fun clearConnecting() {
+        if (_state.value.connecting) _state.value = _state.value.copy(connecting = false)
     }
 
     /** End the Cast session and stop the receiver (returns playback to the phone). */
@@ -103,10 +137,28 @@ open class CastController(
     }
 
     protected open fun onSessionDisconnected() {
-        _state.value = _state.value.copy(connectedDeviceName = null)
+        _state.value = _state.value.copy(
+            connectedDeviceName = null,
+            connecting = false,
+            connectingDeviceName = null,
+            playing = false,
+        )
     }
 
     protected open fun onSessionEndingInternal(session: CastSession) = Unit
+
+    /** Set by the cast player once the receiver actually plays (clears the connecting animation). */
+    protected fun setReceiverPlaying(playing: Boolean) {
+        val s = _state.value
+        if (s.playing == playing) return
+        _state.value = s.copy(playing = playing, connecting = if (playing) false else s.connecting)
+    }
+
+    /** Publish a new cast-device volume level (0..1) so the UI can flash a brief overlay. */
+    protected fun publishVolume(level: Float) {
+        val s = _state.value
+        _state.value = s.copy(volumeLevel = level.coerceIn(0f, 1f), volumeNonce = s.volumeNonce + 1)
+    }
 
     private fun refreshDevices() {
         val devices = mediaRouter.routes

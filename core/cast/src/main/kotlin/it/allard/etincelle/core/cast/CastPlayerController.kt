@@ -35,7 +35,15 @@ private const val LIVE_EDGE_POSITION_MS = 24L * 60 * 60 * 1000
 // falling back to the phone.
 private const val TRANSFER_TIMEOUT_MS = 8000L
 
+// Safety-net cap on the connect animation: if a session connects but never reports playback within
+// this window, stop showing "Connexion à …" so the bar cannot stick. Generously past a real DRM
+// handshake (seen around fifteen seconds) so it never trips a legitimate connect.
+private const val CONNECT_TIMEOUT_MS = 30_000L
+
 private const val PLAYBACK_ERROR_MESSAGE = "Lecture impossible, réessayez"
+
+// One volume-key press steps the cast device volume by this fraction (the Cast SDK default).
+private const val VOLUME_STEP = 0.05
 
 /**
  * Plays a stream on the phone ([ExoPlayer]) or a Chromecast ([CastPlayer]), swapping between them
@@ -45,6 +53,8 @@ private const val PLAYBACK_ERROR_MESSAGE = "Lecture impossible, réessayez"
  * @param reResolve re-fetches a fresh [PlaybackSource] (new tokens/URL) for the playing item; run on
  *   each player swap and once more on a recoverable playback error (e.g. an expired token).
  * @param onError surfaces an unrecoverable playback error message to the user.
+ * @param onPlaybackStopped fires when a Cast session ended without an explicit return-to-this-phone,
+ *   so the UI can drop its "playing" state instead of re-surfacing the local player over browsing.
  */
 @UnstableApi
 class CastPlayerController(
@@ -53,6 +63,7 @@ class CastPlayerController(
     private val localPlayer: ExoPlayer,
     private val reResolve: (suspend (PlaybackSource) -> PlaybackSource?)? = null,
     private val onError: ((String) -> Unit)? = null,
+    private val onPlaybackStopped: (() -> Unit)? = null,
     sessionProvider: () -> UserSession? = { null },
 ) : CastController(context, castContext) {
 
@@ -69,9 +80,18 @@ class CastPlayerController(
     private var hasRetried = false
     private var reResolveJob: Job? = null
 
-    // True once the player screen was left while a Cast session was running, so a later session end
-    // stops quietly instead of popping the player back over whatever the user is now browsing.
-    private var leftPlayerWhileCasting = false
+    // True only when the user explicitly asked to bring playback back to this phone ("Cet appareil"):
+    // the session end then resumes locally and shows the player. Every other end (TV off, external
+    // stop, logout, failed transfer) stops quietly and clears the UI's playing state instead.
+    private var returnToPhoneOnEnd = false
+
+    // Last cast volume we set (0..1), so rapid volume-key presses step from our own value rather than
+    // a stale read of the receiver's lagging reported volume. Reset on each session end.
+    private var castVolume: Double? = null
+
+    // Safety net so the connect animation can never stick on "Connexion à …" if the receiver connects
+    // but never reports playback (e.g. a stalled load that neither errors nor drops the session).
+    private var connectWatchdogJob: Job? = null
 
     // A transfer keeps the old player running until the new one starts; these track that pending stop.
     private var deferStopSource: Player? = null
@@ -94,9 +114,26 @@ class CastPlayerController(
         override fun onPlayerError(error: PlaybackException) = onPlaybackError()
     }
 
+    // Drives the connect animation: the bar fills while connecting and snaps full once the receiver
+    // actually plays. Only meaningful while the cast player is current.
+    private val castPlaybackListener = object : Player.Listener {
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (_currentPlayer.value === castPlayer) setReceiverPlaying(isPlaying)
+        }
+
+        // Once the receiver has the media ready the connect handshake is done, even if it has not
+        // flipped to actively playing yet (still buffering): stop the connecting animation either way.
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            if (_currentPlayer.value === castPlayer && playbackState == Player.STATE_READY) {
+                setReceiverPlaying(true)
+            }
+        }
+    }
+
     init {
         localPlayer.addListener(errorListener)
         castPlayer.addListener(errorListener)
+        castPlayer.addListener(castPlaybackListener)
     }
 
     /** Load + play [item] on whichever player is current (phone or cast). */
@@ -116,12 +153,10 @@ class CastPlayerController(
             castContext.sessionManager.currentCastSession != null &&
             sameContent(currentItem, item)
         ) {
-            leftPlayerWhileCasting = false
             return
         }
         reResolveJob?.cancel()
         hasRetried = false
-        leftPlayerWhileCasting = false
         transferring = false
         transferFallbackJob?.cancel()
         loadOn(_currentPlayer.value, item, startPositionMs)
@@ -137,6 +172,7 @@ class CastPlayerController(
         val position = if (willTransfer) castPlayer.currentPosition else 0L
         val playWhenReady = if (willTransfer) castPlayer.playWhenReady else true
         val selected = super.connectTo(routeId)
+        if (selected) startConnectWatchdog()
         // Arm the transfer only once a route was actually selected; it just records the position the
         // new device should resume at (the actual load happens in onSessionConnected by session id).
         if (willTransfer && selected) {
@@ -147,6 +183,15 @@ class CastPlayerController(
         return selected
     }
 
+    private fun startConnectWatchdog() {
+        connectWatchdogJob?.cancel()
+        connectWatchdogJob = scope.launch {
+            delay(CONNECT_TIMEOUT_MS)
+            // No-op if the receiver already started (clearConnecting only acts while still connecting).
+            clearConnecting()
+        }
+    }
+
     override fun stop() {
         // Pause the fallback while backgrounded. The transfer needs no special survival logic: on
         // return, a connected new device is loaded by onSessionConnected (different session id) and a
@@ -155,9 +200,22 @@ class CastPlayerController(
         super.stop()
     }
 
+    /**
+     * Bring playback back to this phone ("Cet appareil" in the picker): end the session and resume
+     * locally at the cast position, re-surfacing the player. Distinct from [disconnect], which stops.
+     */
+    fun returnToThisDevice() {
+        returnToPhoneOnEnd = true
+        transferring = false
+        transferFallbackJob?.cancel()
+        reResolveJob?.cancel()
+        super.disconnect()
+    }
+
     override fun disconnect() {
-        // An explicit disconnect is not a transfer hand-off; clear transfer state so the session end
-        // runs the normal stop path, and drop any pending re-resolve so it cannot eject after teardown.
+        // A plain disconnect (e.g. logout) stops casting without resuming on the phone; the session
+        // end takes the quiet-stop path. Clear transfer/re-resolve so nothing ejects after teardown.
+        returnToPhoneOnEnd = false
         transferring = false
         transferFallbackJob?.cancel()
         reResolveJob?.cancel()
@@ -175,8 +233,8 @@ class CastPlayerController(
             sa.originRecordingAssetId == sb.originRecordingAssetId
     }
 
-    // Tear down to the phone without resuming playback (used when the user left the player while
-    // casting and the session then ended or a transfer failed).
+    // Tear down to the phone without resuming playback (a Cast session ended and the user did not ask
+    // to continue here, or a transfer failed).
     private fun stopQuietly() {
         clearDeferredStop()
         runCatching { castPlayer.stop() }
@@ -188,14 +246,13 @@ class CastPlayerController(
 
     /**
      * Stop local playback and return (position, duration) for resume persistence. Returns null while
-     * casting: leaving the player screen must keep the stream running on the Chromecast.
+     * casting (the stream stays on the Chromecast) or when nothing is loaded locally.
      */
     fun stopPlayback(): Pair<Long, Long>? {
-        if (_currentPlayer.value === castPlayer) {
-            // Leaving the player while casting keeps the TV stream running; remember it was left.
-            leftPlayerWhileCasting = true
-            return null
-        }
+        // Casting: leaving or switching the player keeps the TV stream running, nothing to save here.
+        if (_currentPlayer.value === castPlayer) return null
+        // Nothing is loaded locally (e.g. a cast session was just stopped quietly): nothing to save.
+        if (currentItem == null) return null
         reResolveJob?.cancel()
         clearDeferredStop()
         val player = _currentPlayer.value
@@ -207,10 +264,37 @@ class CastPlayerController(
         return pos to dur
     }
 
+    /**
+     * Nudge the cast device volume one step (the phone's volume keys route here while casting). No-op
+     * when no session is active. Publishes the new level so the UI can flash a brief overlay.
+     */
+    fun adjustCastVolume(up: Boolean) {
+        val session = castContext.sessionManager.currentCastSession ?: return
+        // Step from our own last value, not a fresh read: the receiver's reported volume lags the
+        // writes, so reading it on every press would collapse a fast burst of presses into one step.
+        val base = castVolume ?: runCatching { session.volume }.getOrDefault(0.0)
+        val next = (base + if (up) VOLUME_STEP else -VOLUME_STEP).coerceIn(0.0, 1.0)
+        castVolume = next
+        // setVolume throws IOException if the session dropped mid-press; ignore and keep the UI level.
+        runCatching { session.volume = next }
+        publishVolume(next.toFloat())
+    }
+
+    /** Toggle mute on the cast device (the phone's mute key routes here while casting). */
+    fun toggleCastMute() {
+        val session = castContext.sessionManager.currentCastSession ?: return
+        val muted = runCatching { session.isMute }.getOrDefault(false)
+        runCatching { session.isMute = !muted }
+        val level = if (!muted) 0f else (castVolume ?: runCatching { session.volume }.getOrDefault(0.0)).toFloat()
+        publishVolume(level)
+    }
+
     fun release() {
         clearDeferredStop()
+        connectWatchdogJob?.cancel()
         localPlayer.removeListener(errorListener)
         castPlayer.removeListener(errorListener)
+        castPlayer.removeListener(castPlaybackListener)
         scope.cancel()
         castPlayer.release()
     }
@@ -257,25 +341,38 @@ class CastPlayerController(
     }
 
     override fun onSessionDisconnected() {
+        // Capture the in-flight transfer target name before super clears it, so the bar can keep
+        // animating the connect toward the incoming device across the hand-off gap.
+        val transferTargetName = state.value.connectingDeviceName
         super.onSessionDisconnected()
         castSessionId = null
+        castVolume = null
+        // The connect watchdog is left to self-expire (it is a no-op once connecting is cleared); it
+        // must NOT be cancelled here, or a device-to-device transfer would lose its safety net.
+        // If we never actually swapped to the cast player there is nothing remote to wind down and no
+        // local playback to disturb (a foreground tick with no session via start(), or a cast-out that
+        // failed before connecting): leave local playback as it is. super() already cleared cast UI.
+        if (_currentPlayer.value !== castPlayer) {
+            transferring = false
+            transferFallbackJob?.cancel()
+            return
+        }
         if (transferring) {
             // Device-to-device switch in flight: the old session ended; keep the cast player current
-            // and wait for the new device to connect (onSessionConnected loads it). If it never does
-            // (transfer failed), fall back to the phone at the captured position so playback survives.
+            // and the connect animation alive toward the new device, and wait for it to connect
+            // (onSessionConnected loads it). If it never does (transfer failed), stop quietly.
+            markConnecting(transferTargetName)
             endingCaptured = false
             transferFallbackJob?.cancel()
             transferFallbackJob = scope.launch {
                 delay(TRANSFER_TIMEOUT_MS)
                 if (transferring) {
+                    // The new device did not connect in time: fall back to the phone at the captured
+                    // position so the user-initiated transfer survives. A device that connects late
+                    // then swaps onto its content from here instead of becoming an idle session.
                     transferring = false
-                    // If the user left the player during the transfer, do not resume on the phone.
-                    if (leftPlayerWhileCasting) {
-                        leftPlayerWhileCasting = false
-                        stopQuietly()
-                    } else {
-                        swapTo(localPlayer, transferPosition, transferPlayWhenReady)
-                    }
+                    clearConnecting()
+                    swapTo(localPlayer, transferPosition, transferPlayWhenReady)
                 }
             }
             return
@@ -287,16 +384,17 @@ class CastPlayerController(
             endingPlayWhenReady = castPlayer.playWhenReady
         }
         endingCaptured = false
-        if (leftPlayerWhileCasting) {
-            // The user had left the player to keep casting; the session ended, so stop quietly rather
-            // than resuming on the phone or popping the player over what they are now browsing.
-            leftPlayerWhileCasting = false
-            stopQuietly()
+        if (returnToPhoneOnEnd) {
+            // The user asked to continue on this phone ("Cet appareil"): resume locally and re-surface
+            // the player. Re-resolve gives a fresh (live edge) URL since the cast may have run a while.
+            returnToPhoneOnEnd = false
+            swapTo(localPlayer, endingPosition, endingPlayWhenReady)
             return
         }
-        // Re-resolve when coming back to the phone: the cast may have run for a while and the
-        // original (live) URL is stale, so a fresh resolve gives the current edge.
-        swapTo(localPlayer, endingPosition, endingPlayWhenReady)
+        // Any other end (TV off, external stop, logout): stop, and tell the UI to drop its playing
+        // state so the local player is not popped over whatever the user is now browsing.
+        stopQuietly()
+        onPlaybackStopped?.invoke()
     }
 
     private fun swapTo(target: Player, fromPosition: Long, fromPlayWhenReady: Boolean) {
@@ -308,7 +406,9 @@ class CastPlayerController(
         clearDeferredStop()
         _currentPlayer.value = target
         hasRetried = false
-        val item = currentItem ?: run { runCatching { from.stop() }; return }
+        // Nothing to load (e.g. casting was started with nothing playing): do not leave the connect
+        // animation pulsing forever with no stream coming.
+        val item = currentItem ?: run { runCatching { from.stop() }; clearConnecting(); return }
         loadResolved(target, item, fromPosition, fromPlayWhenReady)
         deferStop(from, target)
     }
@@ -326,8 +426,13 @@ class CastPlayerController(
                 // Bail if a later swap/stop superseded this one while we were resolving.
                 if (target !== _currentPlayer.value || currentItem == null) return@launch
                 // Re-resolve failed while casting: do not push the stale item (its tokens are dead) to
-                // the receiver; bail and let the error surface instead of loading a doomed stream.
-                if (fresh == null && target === castPlayer) return@launch
+                // the receiver; stop the connect animation and surface the error instead of leaving
+                // the bar stuck on "Connexion à …" with a stream that will never load.
+                if (fresh == null && target === castPlayer) {
+                    clearConnecting()
+                    onError?.invoke(PLAYBACK_ERROR_MESSAGE)
+                    return@launch
+                }
                 val freshItem = if (fresh != null) MediaItemFactory.create(fresh) else item
                 loadOn(target, freshItem, if ((fresh ?: source).isLive) 0 else position)
                 target.playWhenReady = fromPlayWhenReady
@@ -388,8 +493,9 @@ class CastPlayerController(
         val resolver = reResolve
         if (source == null || resolver == null || hasRetried) {
             // Giving up on the target: cut any source still kept alive for the hand-off so it does
-            // not keep decoding once there is nothing taking over.
+            // not keep decoding once there is nothing taking over, and stop the connect animation.
             clearDeferredStop()
+            clearConnecting()
             onError?.invoke(PLAYBACK_ERROR_MESSAGE)
             return
         }

@@ -7,6 +7,7 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -15,6 +16,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
@@ -24,6 +27,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -65,6 +69,7 @@ import it.allard.etincelle.core.ui.MainViewModel
 import it.allard.etincelle.core.ui.MainViewModelFactory
 import it.allard.etincelle.core.ui.Tab
 import it.allard.etincelle.core.ui.UiState
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -98,6 +103,7 @@ class MainActivity : ComponentActivity() {
                 this, it, exo,
                 reResolve = viewModel::reResolve,
                 onError = { msg -> Toast.makeText(this, msg, Toast.LENGTH_SHORT).show() },
+                onPlaybackStopped = { viewModel.stopPlaying() },
                 sessionProvider = { (application as EtincelleApp).container.repository.currentSession() },
             )
         }
@@ -152,12 +158,14 @@ class MainActivity : ComponentActivity() {
                     AppRoot(
                         state = state,
                         currentPlayer = currentPlayer,
+                        onLocalPlayer = currentPlayer === exo,
                         vm = viewModel,
                         castState = castState,
                         onPlay = onPlay,
                         onStop = onStop,
                         onCastConnect = { controller?.connectTo(it) },
-                        onCastDisconnect = { controller?.disconnect() },
+                        // "Cet appareil" in the picker: bring playback back to this phone (not a stop).
+                        onCastDisconnect = { controller?.returnToThisDevice() },
                     )
                 }
                 state.update?.let { up ->
@@ -181,6 +189,32 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    // While casting, the phone's volume keys drive the cast device (the local stream is idle), and the
+    // system volume HUD is suppressed by consuming the event. Local playback is untouched.
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val controller = castController
+        // Gate on a live session, not the UI isCasting flag: when the session is already gone the keys
+        // must fall through to the system so they still change the phone's own volume.
+        if (controller != null && controller.isCastSessionActive) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_VOLUME_UP -> {
+                    if (event.action == KeyEvent.ACTION_DOWN) controller.adjustCastVolume(true)
+                    return true
+                }
+                KeyEvent.KEYCODE_VOLUME_DOWN -> {
+                    if (event.action == KeyEvent.ACTION_DOWN) controller.adjustCastVolume(false)
+                    return true
+                }
+                KeyEvent.KEYCODE_VOLUME_MUTE -> {
+                    // Mute is a discrete toggle: fire once per press, not on auto-repeat while held.
+                    if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) controller.toggleCastMute()
+                    return true
+                }
+            }
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -237,6 +271,9 @@ class MainActivity : ComponentActivity() {
 
 private val EMPTY_CAST_FLOW: StateFlow<CastUiState> = MutableStateFlow(CastUiState()).asStateFlow()
 
+// How long the cast volume overlay stays up after the last volume-key press.
+private const val VOLUME_OVERLAY_MS = 1500L
+
 /** Brand-pack vector icon for the tabs it covers; the rest keep their emoji glyph. */
 @DrawableRes
 private fun tabIconRes(tab: Tab): Int? = when (tab) {
@@ -253,6 +290,7 @@ private fun tabIconRes(tab: Tab): Int? = when (tab) {
 private fun AppRoot(
     state: UiState,
     currentPlayer: Player,
+    onLocalPlayer: Boolean,
     vm: MainViewModel,
     castState: CastUiState,
     onPlay: (PlaybackSource) -> Unit,
@@ -263,139 +301,189 @@ private fun AppRoot(
     val playing = state.playing
     val detail = state.detail
     val context = LocalContext.current
+    // The immersive local player takes the screen only when the local player is actually current and
+    // we are not casting. Keying on "current player is local" (not just !isCasting) keeps a brief
+    // device-to-device transfer gap on the show page instead of flashing an idle cast surface.
+    val playerFullscreen = playing != null && onLocalPlayer && !castState.isCasting
+    // The cast bar is shown (and the nav bar then drops its bottom inset) only when there is a device
+    // to name and the full-screen player is not up; gating both on one value keeps them in sync.
+    val showCastBar = castState.showStatus && !playerFullscreen && castState.statusDeviceName != null
     // Grid density (cards per row on the "tout voir" pages); persisted, set live from the settings.
     var gridColumns by remember { mutableStateOf(LocalPrefs.gridColumns(context)) }
-    when {
-        state.checking -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
 
-        playing != null -> {
-            BackHandler { vm.stopPlaying() }
-            PlayerSurface(
-                playing, currentPlayer, castState,
-                onPlay, onStop, onCastConnect, onCastDisconnect,
-            )
-        }
+    // Playback follows `playing`, not the player screen. While casting we keep the show page up (the
+    // stream is ambient on the TV), yet the stream must keep running, so this effect stays mounted as
+    // long as something is playing, whichever screen is on top.
+    DisposableEffect(playing) {
+        if (playing != null) onPlay(playing)
+        onDispose { if (playing != null) onStop(playing) }
+    }
 
-        detail != null -> {
-            BackHandler { vm.closeDetail() }
-            ProgramDetailScreen(
-                detail = detail,
-                busy = state.busy,
-                error = state.error,
-                info = state.info,
-                onWatch = { vm.watchDetail() },
-                onRecord = { vm.recordDetail() },
-                onWatchRecording = { vm.watchRecording(it) },
-                onBack = { vm.closeDetail() },
-                onEpisode = { vm.onCardClick(it) },
-                isRecording = state.detailRecordingAssetId != null,
-                castButton = { CastButton(castState, onCastConnect, onCastDisconnect) },
-            )
+    // Flash a brief volume overlay on each cast volume-key press (the system bar is suppressed).
+    var showVolume by remember { mutableStateOf(false) }
+    LaunchedEffect(castState.volumeNonce) {
+        if (castState.volumeNonce > 0) {
+            showVolume = true
+            delay(VOLUME_OVERLAY_MS)
+            showVolume = false
         }
+    }
 
-        state.settings -> {
-            BackHandler { vm.closeSettings() }
-            SettingsScreen(
-                onBack = { vm.closeSettings() },
-                onLogout = { vm.logout() },
-                hideLocked = state.hideLocked,
-                onHideLocked = vm::setHideLocked,
-                gridColumns = gridColumns,
-                onGridColumns = { gridColumns = it },
-                appVersion = BuildConfig.VERSION_NAME,
-                checkingUpdate = state.checkingUpdate,
-                updateStatus = state.updateStatus,
-                onCheckUpdate = { vm.checkForUpdateNow(BuildConfig.VERSION_NAME) },
-            )
-        }
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
+            Box(Modifier.weight(1f)) {
+                when {
+                    state.checking -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
 
-        state.loggedIn -> {
-            BackHandler(enabled = state.canGoBack) { vm.back() }
-            Scaffold(
-                topBar = {
-                    TopAppBar(
-                        title = { Text(state.current?.title ?: state.tab.label) },
-                        navigationIcon = {
-                            if (state.canGoBack) {
-                                IconButton(onClick = { vm.back() }) { Text("←") }
-                            }
-                        },
-                        actions = {
-                            CastButton(castState, onCastConnect, onCastDisconnect)
-                            TextButton(onClick = { vm.openSettings() }) { Text("Paramètres") }
-                        },
-                    )
-                },
-                bottomBar = {
-                    NavigationBar {
-                        Tab.entries.forEach { tab ->
-                            NavigationBarItem(
-                                selected = state.tab == tab && !state.canGoBack,
-                                onClick = { vm.selectTab(tab) },
-                                icon = {
-                                    val iconRes = tabIconRes(tab)
-                                    if (iconRes != null) {
-                                        Icon(painterResource(iconRes), contentDescription = tab.label)
+                    // While casting we stay on the show page (the stream is ambient on the TV); only take
+                    // over the whole screen with the player when playing locally on the phone.
+                    playerFullscreen -> {
+                        BackHandler { vm.stopPlaying() }
+                        PlayerSurface(playing!!, currentPlayer, castState, onCastConnect, onCastDisconnect)
+                    }
+
+                    detail != null -> {
+                        BackHandler { vm.closeDetail() }
+                        ProgramDetailScreen(
+                            detail = detail,
+                            busy = state.busy,
+                            error = state.error,
+                            info = state.info,
+                            onWatch = { vm.watchDetail() },
+                            onRecord = { vm.recordDetail() },
+                            onWatchRecording = { vm.watchRecording(it) },
+                            onBack = { vm.closeDetail() },
+                            onEpisode = { vm.onCardClick(it) },
+                            isRecording = state.detailRecordingAssetId != null,
+                            castButton = { CastButton(castState, onCastConnect, onCastDisconnect) },
+                        )
+                    }
+
+                    state.settings -> {
+                        BackHandler { vm.closeSettings() }
+                        SettingsScreen(
+                            onBack = { vm.closeSettings() },
+                            onLogout = { vm.logout() },
+                            hideLocked = state.hideLocked,
+                            onHideLocked = vm::setHideLocked,
+                            gridColumns = gridColumns,
+                            onGridColumns = { gridColumns = it },
+                            appVersion = BuildConfig.VERSION_NAME,
+                            checkingUpdate = state.checkingUpdate,
+                            updateStatus = state.updateStatus,
+                            onCheckUpdate = { vm.checkForUpdateNow(BuildConfig.VERSION_NAME) },
+                        )
+                    }
+
+                    state.loggedIn -> {
+                        BackHandler(enabled = state.canGoBack) { vm.back() }
+                        Scaffold(
+                            topBar = {
+                                TopAppBar(
+                                    title = { Text(state.current?.title ?: state.tab.label) },
+                                    navigationIcon = {
+                                        if (state.canGoBack) {
+                                            IconButton(onClick = { vm.back() }) { Text("←") }
+                                        }
+                                    },
+                                    actions = {
+                                        CastButton(castState, onCastConnect, onCastDisconnect)
+                                        TextButton(onClick = { vm.openSettings() }) { Text("Paramètres") }
+                                    },
+                                )
+                            },
+                            bottomBar = {
+                                // With the cast bar sitting below, drop the nav bar's own bottom inset so
+                                // the two do not stack a double gap above the gesture area. Gate on the
+                                // same value as the bar so the inset is never dropped without a bar.
+                                NavigationBar(
+                                    windowInsets = if (showCastBar) {
+                                        WindowInsets(0, 0, 0, 0)
                                     } else {
-                                        Text(tab.icon)
+                                        NavigationBarDefaults.windowInsets
+                                    },
+                                ) {
+                                    Tab.entries.forEach { tab ->
+                                        NavigationBarItem(
+                                            selected = state.tab == tab && !state.canGoBack,
+                                            onClick = { vm.selectTab(tab) },
+                                            icon = {
+                                                val iconRes = tabIconRes(tab)
+                                                if (iconRes != null) {
+                                                    Icon(painterResource(iconRes), contentDescription = tab.label)
+                                                } else {
+                                                    Text(tab.icon)
+                                                }
+                                            },
+                                            label = {
+                                                Text(
+                                                    tab.label,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    maxLines = 1,
+                                                    softWrap = false,
+                                                )
+                                            },
+                                        )
                                     }
-                                },
-                                label = {
-                                    Text(
-                                        tab.label,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        maxLines = 1,
-                                        softWrap = false,
-                                    )
-                                },
-                            )
+                                }
+                            },
+                        ) { padding ->
+                            val modifier = Modifier.padding(padding)
+                            if (state.tab == Tab.SEARCH) {
+                                SearchScreen(
+                                    rails = state.visibleRails,
+                                    busy = state.busy,
+                                    error = state.error,
+                                    onSubmit = vm::search,
+                                    onCardClick = vm::onCardClick,
+                                    onSeeAll = vm::onRailSeeAll,
+                                    refreshing = state.refreshing,
+                                    onRefresh = vm::refreshCurrent,
+                                    modifier = modifier,
+                                )
+                            } else if (state.current?.isGrid == true) {
+                                GridContent(
+                                    rails = state.visibleRails,
+                                    busy = state.busy,
+                                    error = state.error,
+                                    onCardClick = vm::onCardClick,
+                                    refreshing = state.refreshing,
+                                    onRefresh = vm::refreshCurrent,
+                                    columns = gridColumns,
+                                    pageTitle = state.current?.title,
+                                    modifier = modifier,
+                                )
+                            } else {
+                                PageContent(
+                                    rails = state.visibleRails,
+                                    busy = state.busy,
+                                    error = state.error,
+                                    onCardClick = vm::onCardClick,
+                                    onSeeAll = vm::onRailSeeAll,
+                                    refreshing = state.refreshing,
+                                    onRefresh = vm::refreshCurrent,
+                                    modifier = modifier,
+                                )
+                            }
                         }
                     }
-                },
-            ) { padding ->
-                val modifier = Modifier.padding(padding)
-                if (state.tab == Tab.SEARCH) {
-                    SearchScreen(
-                        rails = state.visibleRails,
-                        busy = state.busy,
-                        error = state.error,
-                        onSubmit = vm::search,
-                        onCardClick = vm::onCardClick,
-                        onSeeAll = vm::onRailSeeAll,
-                        refreshing = state.refreshing,
-                        onRefresh = vm::refreshCurrent,
-                        modifier = modifier,
-                    )
-                } else if (state.current?.isGrid == true) {
-                    GridContent(
-                        rails = state.visibleRails,
-                        busy = state.busy,
-                        error = state.error,
-                        onCardClick = vm::onCardClick,
-                        refreshing = state.refreshing,
-                        onRefresh = vm::refreshCurrent,
-                        columns = gridColumns,
-                        pageTitle = state.current?.title,
-                        modifier = modifier,
-                    )
-                } else {
-                    PageContent(
-                        rails = state.visibleRails,
-                        busy = state.busy,
-                        error = state.error,
-                        onCardClick = vm::onCardClick,
-                        onSeeAll = vm::onRailSeeAll,
-                        refreshing = state.refreshing,
-                        onRefresh = vm::refreshCurrent,
-                        modifier = modifier,
-                    )
+
+                    else -> LoginScreen(state.busy, state.error, vm::login)
                 }
             }
+            if (showCastBar) {
+                CastStatusBar(castState)
+            }
         }
-
-        else -> LoginScreen(state.busy, state.error, vm::login)
+        if (castState.isCasting && showVolume) {
+            CastVolumeOverlay(
+                level = castState.volumeLevel,
+                deviceName = castState.connectedDeviceName,
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
     }
 }
 
@@ -404,36 +492,25 @@ private fun PlayerSurface(
     source: PlaybackSource,
     currentPlayer: Player,
     castState: CastUiState,
-    onPlay: (PlaybackSource) -> Unit,
-    onStop: (PlaybackSource) -> Unit,
     onCastConnect: (String) -> Unit,
     onCastDisconnect: () -> Unit,
 ) {
-    DisposableEffect(source) {
-        onPlay(source)
-        onDispose { onStop(source) }
-    }
-    val deviceName = castState.connectedDeviceName
     val view = LocalView.current
-    DisposableEffect(deviceName) {
-        // Keep the screen awake and block screenshots/recording only while the video plays locally on
-        // the phone (not while browsing, and not while it plays on a Chromecast).
+    DisposableEffect(Unit) {
+        // Keep the screen awake and block screenshots/recording while the video plays locally on the
+        // phone. This surface is shown only for local playback (casting stays on the show page).
         val window = (view.context as? Activity)?.window
         val flags = WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or WindowManager.LayoutParams.FLAG_SECURE
-        if (deviceName == null) window?.addFlags(flags) else window?.clearFlags(flags)
+        window?.addFlags(flags)
         onDispose { window?.clearFlags(flags) }
     }
     Box(Modifier.fillMaxSize()) {
-        if (deviceName != null) {
-            CastingPlaceholder(source.title, deviceName)
-        } else {
-            AndroidView(
-                factory = { context -> PlayerView(context).apply { player = currentPlayer } },
-                update = { it.player = currentPlayer },
-                onRelease = { it.player = null },
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
+        AndroidView(
+            factory = { context -> PlayerView(context).apply { player = currentPlayer } },
+            update = { it.player = currentPlayer },
+            onRelease = { it.player = null },
+            modifier = Modifier.fillMaxSize(),
+        )
         Box(Modifier.align(Alignment.TopEnd).padding(8.dp)) {
             CastButton(castState, onCastConnect, onCastDisconnect)
         }
