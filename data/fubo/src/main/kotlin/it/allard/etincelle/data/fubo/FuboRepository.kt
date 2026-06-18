@@ -369,11 +369,15 @@ class FuboRepository(
 
     /** Runs an authenticated call, refreshing the token once on a 401, and mapping errors for the UI. */
     private suspend fun <T> withRefresh(block: suspend () -> T): T = translateErrors {
+        // Snapshot the access token this call carries BEFORE running it: if a concurrent 401 refreshes
+        // the session while we are suspended in block(), reading the token afterwards would capture the
+        // already-rotated one, defeat refreshTokens' single-flight guard, and spend the refresh token a
+        // second time.
+        val usedToken = session.session?.accessToken
         try {
             block()
         } catch (e: HttpException) {
             if (e.code() != 401) throw e
-            val usedToken = session.session?.accessToken
             try {
                 refreshTokens(usedToken)
             } catch (refreshError: Exception) {
