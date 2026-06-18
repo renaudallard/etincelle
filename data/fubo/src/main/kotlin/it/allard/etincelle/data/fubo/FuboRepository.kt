@@ -385,11 +385,13 @@ class FuboRepository(
                 }
                 throw refreshError
             }
-            // The retry runs with the fresh token; if it is itself rejected, the session is truly dead.
+            // The retry runs with the fresh token: a 401 now means the session is truly dead, so log
+            // out. A 403 is a forbidden/not-entitled/geo error on a valid session, so let it surface as
+            // an in-place banner like any other 403 rather than ejecting to login.
             try {
                 block()
             } catch (retryError: HttpException) {
-                if (retryError.code() == 401 || retryError.code() == 403) {
+                if (retryError.code() == 401) {
                     logout()
                     throw AppError.Unauthorized
                 }
