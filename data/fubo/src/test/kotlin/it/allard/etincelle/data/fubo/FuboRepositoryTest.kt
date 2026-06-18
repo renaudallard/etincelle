@@ -203,5 +203,6 @@ class FuboRepositoryTest {
         override suspend fun read(key: String) = positions[key] ?: 0L
         override suspend fun save(key: String, positionMs: Long) { positions[key] = positionMs }
         override suspend fun clear(key: String) { positions.remove(key) }
+        override suspend fun clearAll() { positions.clear() }
     }
 }

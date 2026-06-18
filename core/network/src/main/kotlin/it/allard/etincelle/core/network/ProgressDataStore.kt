@@ -24,4 +24,8 @@ class ProgressDataStore(private val context: Context) : ProgressStore {
     override suspend fun clear(key: String) {
         context.progressDataStore.edit { it.remove(longPreferencesKey(key)) }
     }
+
+    override suspend fun clearAll() {
+        context.progressDataStore.edit { it.clear() }
+    }
 }

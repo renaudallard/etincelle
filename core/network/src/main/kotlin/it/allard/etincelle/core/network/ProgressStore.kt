@@ -9,4 +9,7 @@ interface ProgressStore {
     suspend fun read(key: String): Long
     suspend fun save(key: String, positionMs: Long)
     suspend fun clear(key: String)
+
+    /** Wipes every saved position (on logout, so the next account starts clean). */
+    suspend fun clearAll()
 }

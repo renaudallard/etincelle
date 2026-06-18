@@ -117,6 +117,9 @@ class FuboRepository(
     override suspend fun logout() {
         session.session = null
         store.clear()
+        // Wipe continue-watching positions so a different account on this device does not resume into
+        // the previous account's history.
+        progress.clearAll()
         // Drop the cached channel data so the next account does not see the previous one's channels.
         channelsPageCache = null
         channelDirectory = null
