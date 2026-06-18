@@ -10,7 +10,8 @@ import java.io.IOException
 /** Adds the static Molotov client + device headers to every request. */
 class FuboHeadersInterceptor(private val device: DeviceInfo) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
-        val request = chain.request().newBuilder()
+        val original = chain.request()
+        val builder = original.newBuilder()
             .header("user-agent", EnvConfig.USER_AGENT)
             .header("x-application-id", EnvConfig.APPLICATION_ID)
             .header("x-client-version", EnvConfig.CLIENT_VERSION)
@@ -22,13 +23,14 @@ class FuboHeadersInterceptor(private val device: DeviceInfo) : Interceptor {
             .header("x-device-group", "mobile")
             .header("x-device-brand", device.brand)
             .header("x-device-model", device.model)
-            .header("x-device-id", device.deviceId)
             .header("x-preferred-language", "fr-FR")
             .header("x-supported-streaming-protocols", "hls,dash")
             .header("x-drm-scheme", "widevine")
             .header("x-supported-features", EnvConfig.SUPPORTED_FEATURES)
-            .build()
-        return chain.proceed(request)
+        // A call may pin its own x-device-id (TV pairing uses a fresh one per attempt so each generated
+        // code is distinct); otherwise use this install's stable id.
+        if (original.header("x-device-id") == null) builder.header("x-device-id", device.deviceId)
+        return chain.proceed(builder.build())
     }
 }
 

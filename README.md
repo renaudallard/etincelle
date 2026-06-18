@@ -85,6 +85,12 @@ Android TV (Compose for TV, navigation D-pad) :
   <img src="docs/screenshots/tv-browse.png" width="640" alt="Android TV, navigation avec onglets en haut et carrousels de chaînes">
 </p>
 
+Sur Android TV, la connexion se fait par **code** plutôt qu'en tapant un mot de passe à la
+télécommande : le téléviseur affiche un **QR code** et un code à six chiffres. Sur votre téléphone,
+ouvrez etincelle, allez dans **Paramètres > Connecter une TV** (ou sur molotov.tv/tv), connectez-vous
+et saisissez le code : le téléviseur se connecte automatiquement. La connexion par email reste
+disponible en secours.
+
 ## Installation
 
 Téléchargez l'APK signé pour votre appareil depuis la

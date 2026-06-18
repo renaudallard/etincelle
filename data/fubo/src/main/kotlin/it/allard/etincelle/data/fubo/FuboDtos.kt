@@ -28,6 +28,26 @@ data class SigninResponse(
     @Json(name = "id_token") val idToken: String?,
 )
 
+// --- TV code/QR pairing (signin/code) ---
+
+/** Response of `GET signin/code`: a short code the user confirms on their phone, with its lifetime. */
+data class SignInCodeResponse(
+    val code: String?,
+    @Json(name = "issued_at") val issuedAt: Long?,
+    @Json(name = "expires_at") val expiresAt: Long?,
+)
+
+data class SignInCodePollRequest(val code: String)
+
+/**
+ * Response of `POST signin/code` while the TV polls: [status] is "CODE_VALIDATING" until the user
+ * confirms, then [data] carries the tokens (same shape as a normal sign-in).
+ */
+data class SignInCodeValidationResponse(
+    val status: String?,
+    val data: SigninResponse?,
+)
+
 data class UserResponse(val data: UserData?)
 
 data class UserData(val id: String?, val profiles: List<ProfileDto>?)

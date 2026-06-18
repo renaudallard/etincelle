@@ -341,9 +341,16 @@ fun SettingsScreen(
     checkingUpdate: Boolean = false,
     updateStatus: String? = null,
     onCheckUpdate: () -> Unit = {},
+    onConnectTv: (String) -> Unit = {},
+    onClearTvConnect: () -> Unit = {},
+    connectInfo: String? = null,
+    connectError: String? = null,
+    connecting: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     var confirm by remember { mutableStateOf(false) }
+    var connectTv by remember { mutableStateOf(false) }
+    var tvCode by remember { mutableStateOf("") }
     val context = LocalContext.current
     var mono by remember { mutableStateOf(AppIcon.isMono(context)) }
     var officialReceiver by remember { mutableStateOf(CastReceiver.isOfficial(context)) }
@@ -399,6 +406,18 @@ fun SettingsScreen(
             onCheckedChange = { officialReceiver = it; CastReceiver.setOfficial(context, it) },
         )
         HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+        Column(
+            Modifier.fillMaxWidth().clickable { onClearTvConnect(); tvCode = ""; connectTv = true }
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+        ) {
+            Text("Connecter une TV", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "Saisissez le code affiché sur votre téléviseur",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        HorizontalDivider(Modifier.padding(horizontal = 16.dp))
         Row(
             Modifier.fillMaxWidth().clickable(enabled = !checkingUpdate) { onCheckUpdate() }
                 .padding(horizontal = 16.dp, vertical = 12.dp),
@@ -430,6 +449,36 @@ fun SettingsScreen(
             text = { Text("Voulez-vous vraiment vous déconnecter ?") },
             confirmButton = { TextButton(onClick = { confirm = false; onLogout() }) { Text("Se déconnecter") } },
             dismissButton = { TextButton(onClick = { confirm = false }) { Text("Annuler") } },
+        )
+    }
+    if (connectTv) {
+        AlertDialog(
+            onDismissRequest = { connectTv = false; tvCode = ""; onClearTvConnect() },
+            title = { Text("Connecter une TV") },
+            text = {
+                Column {
+                    Text("Saisissez le code affiché sur l'écran de connexion de votre téléviseur.")
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = tvCode,
+                        onValueChange = { tvCode = it.filter(Char::isDigit).take(8) },
+                        label = { Text("Code") },
+                        singleLine = true,
+                        enabled = !connecting,
+                    )
+                    if (connectError != null) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(connectError, color = MaterialTheme.colorScheme.error)
+                    } else if (connectInfo != null) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(connectInfo, color = BrandYellow)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { onConnectTv(tvCode) }, enabled = tvCode.length >= 4 && !connecting) { Text("Connecter") }
+            },
+            dismissButton = { TextButton(onClick = { connectTv = false; tvCode = ""; onClearTvConnect() }) { Text("Fermer") } },
         )
     }
 }

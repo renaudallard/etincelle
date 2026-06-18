@@ -374,6 +374,11 @@ private fun AppRoot(
                             checkingUpdate = state.checkingUpdate,
                             updateStatus = state.updateStatus,
                             onCheckUpdate = { vm.checkForUpdateNow(BuildConfig.VERSION_NAME) },
+                            onConnectTv = { vm.confirmTvCode(it) },
+                            onClearTvConnect = { vm.clearTvConnect() },
+                            connectInfo = state.tvConnectInfo,
+                            connectError = state.tvConnectError,
+                            connecting = state.busy,
                         )
                     }
 

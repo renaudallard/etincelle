@@ -118,7 +118,10 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        else -> TvLoginScreen(state.busy, state.error, viewModel::login)
+                        else -> TvLoginScreen(
+                            state.pairingCode, state.busy, state.error,
+                            viewModel::loginWithCode, viewModel::stopPairingPoll, viewModel::cancelCodeLogin, viewModel::login,
+                        )
                     }
                     state.update?.let { up ->
                         TvUpdateDialog(

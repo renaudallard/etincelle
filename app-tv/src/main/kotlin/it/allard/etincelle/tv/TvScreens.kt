@@ -3,6 +3,7 @@
 
 package it.allard.etincelle.tv
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.border
@@ -39,6 +40,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -82,8 +84,82 @@ import it.allard.etincelle.core.ui.UpdateInfo
 
 private val OVERSCAN = 48.dp
 
+// The web page where the user confirms a TV: scanning the QR opens it; etincelle on a phone can
+// confirm too (Paramètres > Connecter une TV).
+private const val TV_CONNECT_URL = "https://www.molotov.tv/tv"
+
 @Composable
-fun TvLoginScreen(busy: Boolean, error: String?, onLogin: (String, String) -> Unit) {
+fun TvLoginScreen(
+    pairingCode: String?,
+    busy: Boolean,
+    error: String?,
+    onStartPairing: () -> Unit,
+    onStopPairing: () -> Unit,
+    onCancelPairing: () -> Unit,
+    onEmailLogin: (String, String) -> Unit,
+) {
+    var emailMode by remember { mutableStateOf(false) }
+    if (emailMode) {
+        TvEmailLoginScreen(busy, error, onEmailLogin, onUseCode = { emailMode = false })
+    } else {
+        TvCodeLoginScreen(pairingCode, error, onStartPairing, onStopPairing, onUseEmail = {
+            onCancelPairing()
+            emailMode = true
+        })
+    }
+}
+
+@Composable
+private fun TvCodeLoginScreen(code: String?, error: String?, onStart: () -> Unit, onStop: () -> Unit, onUseEmail: () -> Unit) {
+    LaunchedEffect(Unit) { onStart() }
+    // Stop polling when the code screen leaves (email toggle / sign-in), so the loop does not linger.
+    DisposableEffect(Unit) { onDispose { onStop() } }
+    val emailBtn = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { emailBtn.requestFocus() } }
+    val qr = remember { qrImageBitmap(TV_CONNECT_URL, 480) }
+    Row(
+        modifier = Modifier.fillMaxSize().padding(OVERSCAN),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(56.dp, Alignment.CenterHorizontally),
+    ) {
+        if (qr != null) {
+            Image(
+                bitmap = qr,
+                contentDescription = "Code QR",
+                modifier = Modifier.size(300.dp).clip(RoundedCornerShape(12.dp)),
+            )
+        }
+        Column(horizontalAlignment = Alignment.Start, verticalArrangement = Arrangement.Center) {
+            Text("etincelle", style = MaterialTheme.typography.displaySmall)
+            Spacer(Modifier.height(16.dp))
+            Text("Connectez votre téléviseur", style = MaterialTheme.typography.headlineSmall)
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "Sur votre téléphone, dans etincelle : Paramètres > Connecter une TV (ou sur " +
+                    "molotov.tv/tv), connectez-vous et saisissez ce code :",
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.width(560.dp),
+            )
+            Spacer(Modifier.height(20.dp))
+            if (code != null) {
+                Text(code, style = MaterialTheme.typography.displayMedium, color = BrandYellow)
+            } else if (error == null) {
+                CircularProgressIndicator()
+            }
+            Spacer(Modifier.height(28.dp))
+            Button(onClick = onUseEmail, modifier = Modifier.focusRequester(emailBtn)) {
+                Text("Se connecter par email")
+            }
+            if (error != null) {
+                Spacer(Modifier.height(12.dp))
+                Text(error, color = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TvEmailLoginScreen(busy: Boolean, error: String?, onLogin: (String, String) -> Unit, onUseCode: () -> Unit) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     val first = remember { FocusRequester() }
@@ -103,6 +179,8 @@ fun TvLoginScreen(busy: Boolean, error: String?, onLogin: (String, String) -> Un
         )
         Spacer(Modifier.height(20.dp))
         Button(onClick = { onLogin(email, password) }, enabled = !busy) { Text("Se connecter") }
+        Spacer(Modifier.height(12.dp))
+        TextButton(onClick = onUseCode) { Text("Utiliser un code") }
         Spacer(Modifier.height(16.dp))
         if (busy) CircularProgressIndicator()
         if (error != null) Text(error, color = MaterialTheme.colorScheme.error)

@@ -13,6 +13,7 @@ import it.allard.etincelle.core.model.DrmSpec
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.Recording
+import it.allard.etincelle.core.model.PairingCode
 import it.allard.etincelle.core.model.UserSession
 import it.allard.etincelle.core.model.coerceWholeNumbers
 import it.allard.etincelle.core.network.NetworkClient
@@ -68,6 +69,42 @@ class FuboRepository(
             session.session = it
             store.save(it)
         }
+    }
+
+    /** TV pairing: fetch a fresh code and its lifetime for the user to confirm on their phone. A fresh
+     * device id per attempt makes each generated code distinct (the backend ties the code to it). */
+    override suspend fun startCodeLogin(): PairingCode {
+        val deviceId = java.util.UUID.randomUUID().toString()
+        val resp = api.signInCode(deviceId)
+        val code = resp.code ?: throw AppError.Unknown("Empty pairing code")
+        val ttl = ((resp.expiresAt ?: 0L) - (resp.issuedAt ?: 0L)).coerceAtLeast(60L)
+        return PairingCode(code, ttl, deviceId)
+    }
+
+    /**
+     * TV pairing: poll a code (with the device id that generated it). While pending the response
+     * carries no tokens, so this returns null; once confirmed, the tokens arrive and we finish the
+     * same way as a password sign-in.
+     */
+    override suspend fun pollCodeLogin(code: String, deviceId: String): UserSession? {
+        val tokens = api.pollSignInCode(deviceId, SignInCodePollRequest(code)).data ?: return null
+        val accessToken = tokens.accessToken ?: return null
+        val refreshToken = tokens.refreshToken
+        session.session = UserSession(accessToken, refreshToken, userId = "", profileId = "")
+
+        val user = api.user().data ?: throw AppError.Unknown("Empty user response")
+        val userId = user.id ?: throw AppError.Unknown("Missing user id")
+        val profileId = user.profiles?.firstOrNull()?.id ?: throw AppError.Unknown("Missing profile")
+
+        return UserSession(accessToken, refreshToken, userId, profileId).also {
+            session.session = it
+            store.save(it)
+        }
+    }
+
+    /** Confirms a TV's pairing code from this signed-in account (authenticated PUT). */
+    override suspend fun confirmTvCode(code: String) = withRefresh {
+        api.confirmSignInCode(SignInCodePollRequest(code)).close()
     }
 
     /** Loads a persisted session into memory; returns true if one was present. */

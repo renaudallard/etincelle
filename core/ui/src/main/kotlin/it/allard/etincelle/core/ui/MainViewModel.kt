@@ -16,11 +16,21 @@ import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramDetail
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+// TV pairing poll cadence: poll every few seconds, and regenerate the code a little before its
+// server expiry so a confirm racing the deadline is not lost.
+private const val PAIRING_POLL_SEC = 3L
+private const val PAIRING_EXPIRY_MARGIN_SEC = 15L
+private const val PAIRING_RETRY_MS = 5000L
+// Cap on how many codes the login screen will cycle through before giving up, so a TV left idle on
+// the login screen cannot poll indefinitely.
+private const val PAIRING_MAX_ROUNDS = 12
 
 enum class Tab(val label: String, val icon: String, val path: String) {
     HOME("Accueil", "🏠", "papi/v1/page/home"),
@@ -51,6 +61,12 @@ data class UiState(
     val updateStatus: String? = null,
     val error: String? = null,
     val info: String? = null,
+    // The TV pairing code currently displayed (and being polled), null when not pairing.
+    val pairingCode: String? = null,
+    // Result of the phone-side "Connecter une TV" confirm, kept separate from the global info/error so
+    // the dialog never shows a stale or unrelated message.
+    val tvConnectInfo: String? = null,
+    val tvConnectError: String? = null,
     val hideLocked: Boolean = false,
     // A lightweight reload is running (pull to refresh / resume), as opposed to a full-screen [busy] load.
     val refreshing: Boolean = false,
@@ -112,6 +128,92 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
             }
         }
     }
+
+    private var pairingJob: Job? = null
+    private var confirmJob: Job? = null
+
+    // Run [block], returning null on a plain failure but rethrowing CancellationException so cancelling
+    // the pairing job actually stops the loop instead of being swallowed into another poll iteration.
+    private suspend fun <T> orNull(block: suspend () -> T): T? =
+        try { block() } catch (c: CancellationException) { throw c } catch (e: Exception) { null }
+
+    /**
+     * TV "connect my TV" login: shows a code (in [UiState.pairingCode]) and polls until the user
+     * confirms it from a signed-in device, regenerating a fresh code each time one expires.
+     */
+    fun loginWithCode() {
+        pairingJob?.cancel()
+        _state.update { it.copy(busy = true, error = null, pairingCode = null) }
+        pairingJob = viewModelScope.launch {
+            var rounds = 0
+            while (rounds < PAIRING_MAX_ROUNDS) {
+                rounds++
+                val pairing = orNull { repo.startCodeLogin() }
+                if (pairing == null) {
+                    _state.update { it.copy(busy = false, pairingCode = null, error = "Connexion impossible, nouvel essai…") }
+                    delay(PAIRING_RETRY_MS)
+                    continue
+                }
+                _state.update { it.copy(busy = false, error = null, pairingCode = pairing.code) }
+                // Poll until confirmed or the code is about to expire (then loop to regenerate). Count
+                // polls locally with a margin rather than trusting the wall clock against server time.
+                val polls = ((pairing.ttlSeconds - PAIRING_EXPIRY_MARGIN_SEC) / PAIRING_POLL_SEC).coerceAtLeast(1)
+                repeat(polls.toInt()) {
+                    delay(PAIRING_POLL_SEC * 1000)
+                    val session = orNull { repo.pollCodeLogin(pairing.code, pairing.deviceId) }
+                    if (session != null) {
+                        // Session is valid and persisted; if the home fails to load (a transient blip),
+                        // still sign in but surface it so the user can reload a tab, rather than landing
+                        // on a silent empty browse screen.
+                        val page = orNull { repo.loadHome() }
+                        _state.update {
+                            if (page != null) {
+                                it.copy(loggedIn = true, pairingCode = null, error = null, busy = false, tab = Tab.HOME, backStack = listOf(page))
+                            } else {
+                                it.copy(loggedIn = true, pairingCode = null, busy = false, tab = Tab.HOME, error = "Échec du chargement de l'accueil")
+                            }
+                        }
+                        consumeDeepLink()
+                        return@launch
+                    }
+                }
+            }
+            // Polled across many codes without a confirmation: stop and let the user retry, so the loop
+            // cannot keep polling forever (e.g. a TV left idle on the login screen).
+            _state.update { it.copy(busy = false, pairingCode = null, error = "Code expiré, réessayez.") }
+        }
+    }
+
+    /** Stops the pairing poll without changing the visible state (when the login screen leaves). */
+    fun stopPairingPoll() {
+        pairingJob?.cancel()
+        pairingJob = null
+    }
+
+    /** Stops the TV pairing poll and clears its UI (the user switched to email login). */
+    fun cancelCodeLogin() {
+        pairingJob?.cancel()
+        pairingJob = null
+        _state.update { it.copy(pairingCode = null, busy = false, error = null) }
+    }
+
+    /** Confirms a TV's pairing code from this signed-in device, logging that TV into this account. */
+    fun confirmTvCode(code: String) {
+        val trimmed = code.trim()
+        if (trimmed.isEmpty() || confirmJob?.isActive == true) return
+        _state.update { it.copy(busy = true, tvConnectInfo = null, tvConnectError = null) }
+        confirmJob = viewModelScope.launch {
+            runCatching { repo.confirmTvCode(trimmed) }
+                .onSuccess { _state.update { it.copy(busy = false, tvConnectInfo = "TV connectée") } }
+                .onFailure { e ->
+                    if (e is CancellationException) throw e
+                    _state.update { it.copy(busy = false, tvConnectError = "Code invalide ou expiré") }
+                }
+        }
+    }
+
+    /** Clears the "Connecter une TV" result (when the dialog opens or closes). */
+    fun clearTvConnect() = _state.update { it.copy(tvConnectInfo = null, tvConnectError = null) }
 
     private var pendingDeepLink: Pair<String, DetailKind>? = null
 

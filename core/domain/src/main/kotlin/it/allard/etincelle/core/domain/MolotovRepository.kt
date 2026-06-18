@@ -4,6 +4,7 @@
 package it.allard.etincelle.core.domain
 
 import it.allard.etincelle.core.model.ContentPage
+import it.allard.etincelle.core.model.PairingCode
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.Recording
@@ -20,6 +21,16 @@ interface MolotovRepository {
     suspend fun login(email: String, password: String): UserSession
     suspend fun restoreSession(): Boolean
     suspend fun logout()
+
+    /** Starts the TV "connect my TV" flow: returns a code to display while the user confirms it. */
+    suspend fun startCodeLogin(): PairingCode
+
+    /** Polls a pairing code (with the device id that generated it); returns the signed-in session once
+     * confirmed, or null while pending. */
+    suspend fun pollCodeLogin(code: String, deviceId: String): UserSession?
+
+    /** Confirms a TV's pairing code from this signed-in account (authorizes the waiting TV). */
+    suspend fun confirmTvCode(code: String)
 
     /** The current in-memory session (tokens + ids), used to build the official Cast session handoff. */
     fun currentSession(): UserSession?

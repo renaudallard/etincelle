@@ -18,6 +18,23 @@ interface FuboApi {
     @PUT("signin")
     suspend fun signin(@Body body: SigninRequest): SigninResponse
 
+    /** TV pairing: generates a short pairing code (no auth) tied to [deviceId] (a fresh id per attempt
+     * so each generated code is distinct; the poll must reuse the same id). */
+    @GET("signin/code")
+    suspend fun signInCode(@Header("x-device-id") deviceId: String): SignInCodeResponse
+
+    /** TV pairing: polls a code's status (with the same device id that generated it); `data` carries
+     * the tokens once the user confirms it. */
+    @POST("signin/code")
+    suspend fun pollSignInCode(
+        @Header("x-device-id") deviceId: String,
+        @Body body: SignInCodePollRequest,
+    ): SignInCodeValidationResponse
+
+    /** TV pairing: confirms a code from a signed-in device (authenticated; authorizes the TV). */
+    @PUT("signin/code")
+    suspend fun confirmSignInCode(@Body body: SignInCodePollRequest): okhttp3.ResponseBody
+
     /** Exchanges the refresh token (passed as the Authorization bearer) for fresh tokens. */
     @POST("refresh")
     suspend fun refresh(@Header("Authorization") bearer: String): SigninResponse
