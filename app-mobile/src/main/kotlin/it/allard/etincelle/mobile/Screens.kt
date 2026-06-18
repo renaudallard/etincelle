@@ -28,11 +28,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -244,7 +246,9 @@ fun GridContent(
                         Text(header, style = MaterialTheme.typography.titleMedium)
                     }
                 }
-                items(rail.cards, key = { "${rail.id}-${it.id}" }) { card -> GridCard(card, onCardClick) }
+                // Index in the key too: a card id falls back to its label/image, which can repeat
+                // within a rail, and a duplicate lazy-list key crashes the list.
+                itemsIndexed(rail.cards, key = { i, c -> "${rail.id}-${c.id}#$i" }) { _, card -> GridCard(card, onCardClick) }
             }
         }
         if (busy) CircularProgressIndicator(Modifier.align(Alignment.Center))
@@ -721,7 +725,9 @@ private fun Rail(rail: ContentRail, onCardClick: (ContentCard) -> Unit, onSeeAll
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            items(rail.cards, key = { it.id }) { card -> CardItem(card, onCardClick) }
+            // Index in the key: a card id can repeat within a rail (it falls back to label/image), and
+            // a duplicate lazy-list key crashes the row.
+            itemsIndexed(rail.cards, key = { i, c -> "${c.id}#$i" }) { _, card -> CardItem(card, onCardClick) }
         }
     }
 }
