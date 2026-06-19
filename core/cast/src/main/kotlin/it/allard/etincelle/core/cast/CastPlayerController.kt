@@ -4,6 +4,7 @@
 package it.allard.etincelle.core.cast
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.media3.cast.CastPlayer
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
@@ -44,6 +45,18 @@ private const val CONNECT_TIMEOUT_MS = 30_000L
 
 private const val PLAYBACK_ERROR_MESSAGE = "Lecture impossible, réessayez"
 
+// Recover a failing cast by re-resolving fresh credentials (the receiver cannot refresh its own
+// short-lived stream/DRM tokens, so reloading them on the receiver loops forever). Retry up to this
+// many times per failure burst, backing off between tries, before surfacing an error.
+private const val MAX_CAST_RECOVERIES = 5
+private const val CAST_RETRY_BACKOFF_MS = 1500L
+// Cap the backoff well under the receiver's reconnect grace window so this fresh cast lands before the
+// receiver starts its own (stale-token) reload.
+private const val CAST_RETRY_MAX_BACKOFF_MS = 2000L
+// Failures more than this far apart are separate incidents, not one burst: restore the retry budget so
+// a long cast that self-heals occasionally is never eventually refused recovery.
+private const val CAST_RETRY_RESET_MS = 60_000L
+
 // One volume-key press steps the cast device volume by this fraction (the Cast SDK default).
 private const val VOLUME_STEP = 0.05
 
@@ -82,7 +95,8 @@ class CastPlayerController(
     private var endingPosition = 0L
     private var endingPlayWhenReady = true
     private var endingCaptured = false
-    private var hasRetried = false
+    private var castRetryCount = 0
+    private var lastCastErrorAt = 0L
     private var reResolveJob: Job? = null
 
     // True only when the user explicitly asked to bring playback back to this phone ("Cet appareil"):
@@ -162,7 +176,7 @@ class CastPlayerController(
             return
         }
         reResolveJob?.cancel()
-        hasRetried = false
+        castRetryCount = 0
         transferring = false
         transferFallbackJob?.cancel()
         loadOn(_currentPlayer.value, item, startPositionMs)
@@ -340,7 +354,7 @@ class CastPlayerController(
         transferFallbackJob?.cancel()
         endingCaptured = false
         reResolveJob?.cancel()
-        hasRetried = false
+        castRetryCount = 0
         clearDeferredStop()
         castSessionId = session.sessionId
         loadResolved(castPlayer, item, position, playWhenReady, rewind)
@@ -418,7 +432,7 @@ class CastPlayerController(
         // deferStop cuts the old screen once the new one is actually playing.
         clearDeferredStop()
         _currentPlayer.value = target
-        hasRetried = false
+        castRetryCount = 0
         // Nothing to load (e.g. casting was started with nothing playing): do not leave the connect
         // animation pulsing forever with no stream coming.
         val item = currentItem ?: run { runCatching { from.stop() }; clearConnecting(); return }
@@ -520,15 +534,23 @@ class CastPlayerController(
     private fun onPlaybackError() {
         val source = currentItem?.localConfiguration?.tag as? PlaybackSource
         val resolver = reResolve
-        if (source == null || resolver == null || hasRetried) {
-            // Giving up on the target: cut any source still kept alive for the hand-off so it does
-            // not keep decoding once there is nothing taking over, and stop the connect animation.
+        // A failure long after the previous one is a fresh incident, not part of a burst: restore the
+        // retry budget so a long cast that self-heals occasionally is never eventually refused recovery.
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastCastErrorAt > CAST_RETRY_RESET_MS) castRetryCount = 0
+        lastCastErrorAt = now
+        if (source == null || resolver == null || castRetryCount >= MAX_CAST_RECOVERIES) {
+            // Out of recovery attempts (or nothing to re-resolve): cut any source kept alive for the
+            // hand-off so it stops decoding with nothing taking over, and stop the connect animation.
             clearDeferredStop()
             clearConnecting()
             onError?.invoke(PLAYBACK_ERROR_MESSAGE)
             return
         }
-        hasRetried = true
+        castRetryCount++
+        // Back off on each consecutive failure (capped) so a persistently broken stream is not hammered,
+        // staying under the receiver's reconnect grace so its own stale-token reload does not fire first.
+        val backoff = ((castRetryCount - 1) * CAST_RETRY_BACKOFF_MS).coerceAtMost(CAST_RETRY_MAX_BACKOFF_MS)
         val target = _currentPlayer.value
         val position = target.currentPosition.coerceAtLeast(0)
         // Capture the live rewind from the failing player before re-resolving so recovery resumes the
@@ -537,11 +559,20 @@ class CastPlayerController(
         val rewind = if (target === castPlayer && source.isLive) LivePlayback.castRewindOffsetMs(target, liveWindow) else 0L
         reResolveJob?.cancel()
         reResolveJob = scope.launch {
+            if (backoff > 0) delay(backoff)
+            ensureActive()
+            if (target !== _currentPlayer.value || currentItem == null) return@launch
+            // Re-resolve a fresh stream URL + DRM token each try: the failure is usually a stale token
+            // the receiver cannot refresh by itself, so reloading the same one on the receiver loops.
             val fresh = runCatching { resolver(source) }.getOrNull()
             ensureActive()
             // Bail if a swap/stop superseded this stream while we were resolving.
             if (target !== _currentPlayer.value || currentItem == null) return@launch
             if (fresh == null) {
+                // Re-resolve itself failed: tear down the kept-alive source and connect animation too,
+                // not just the toast, like the give-up branch above.
+                clearDeferredStop()
+                clearConnecting()
                 onError?.invoke(PLAYBACK_ERROR_MESSAGE)
                 return@launch
             }
