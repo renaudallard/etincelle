@@ -8,6 +8,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.view.KeyEvent
+import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -537,17 +538,31 @@ private fun PlayerSurface(
             delay(1000)
         }
     }
+    // Follow the player controls' show/hide so the cast button and the back-to-live pill fade with the
+    // position bar (tap to bring them back) instead of sitting permanently over the video.
+    var controlsVisible by remember { mutableStateOf(true) }
     Box(Modifier.fillMaxSize()) {
         AndroidView(
-            factory = { context -> PlayerView(context).apply { player = currentPlayer } },
+            factory = { context ->
+                PlayerView(context).apply {
+                    player = currentPlayer
+                    setControllerVisibilityListener(
+                        PlayerView.ControllerVisibilityListener { visibility ->
+                            controlsVisible = visibility == View.VISIBLE
+                        },
+                    )
+                }
+            },
             update = { it.player = currentPlayer },
             onRelease = { it.player = null },
             modifier = Modifier.fillMaxSize(),
         )
-        Box(Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(8.dp)) {
-            CastButton(castState, onCastConnect, onCastDisconnect)
+        if (controlsVisible) {
+            Box(Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(8.dp)) {
+                CastButton(castState, onCastConnect, onCastDisconnect)
+            }
         }
-        if (behindLive) {
+        if (behindLive && controlsVisible) {
             ReturnToLiveButton(
                 onClick = { currentPlayer.seekToDefaultPosition() },
                 modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 12.dp),
