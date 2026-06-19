@@ -320,11 +320,21 @@ private fun AppRoot(
     // we are not casting. Keying on "current player is local" (not just !isCasting) keeps a brief
     // device-to-device transfer gap on the show page instead of flashing an idle cast surface.
     val playerFullscreen = playing != null && onLocalPlayer && !castState.isCasting
+    // Tapping the cast bar opens a full-screen controller for the active cast (play/pause + seek that
+    // drive the receiver); Back returns to browsing while the cast keeps playing. Closed when casting
+    // ends. Gated on the app holding the playing source: the controls only drive the receiver while the
+    // app is the caster. After an app kill the cast session resumes but the cast player carries no
+    // loaded media (its transport stays inert), so leave that case to the system cast notification.
+    var castControlsOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(castState.isCasting) { if (!castState.isCasting) castControlsOpen = false }
+    val castControls = playing != null && castState.isCasting && castControlsOpen
     // The cast bar is shown (and the nav bar then drops its bottom inset) when there is a device to
     // name and the full-screen player is not up - except while a connect is in flight, so casting
-    // from the player still shows the "Connexion à …" animation instead of no feedback at all.
+    // from the player still shows the "Connexion à …" animation instead of no feedback at all. It is
+    // also hidden while its own controller is open (the bar is what you tapped to get there).
     val showCastBar = castState.showStatus &&
         (!playerFullscreen || castState.connecting) &&
+        !castControls &&
         castState.statusDeviceName != null
     // Grid density (cards per row on the "tout voir" pages); persisted, set live from the settings.
     var gridColumns by remember { mutableStateOf(LocalPrefs.gridColumns(context)) }
@@ -360,6 +370,15 @@ private fun AppRoot(
                     playerFullscreen -> {
                         BackHandler { vm.stopPlaying() }
                         PlayerSurface(playing!!, currentPlayer, castState, onCastConnect, onCastDisconnect)
+                    }
+
+                    // The cast controller: the same player surface bound to the cast player, so its
+                    // transport controls drive the receiver. Back closes it; the cast keeps playing.
+                    castControls -> {
+                        BackHandler { castControlsOpen = false }
+                        PlayerSurface(
+                            playing!!, currentPlayer, castState, onCastConnect, onCastDisconnect, secure = false,
+                        )
                     }
 
                     detail != null -> {
@@ -497,7 +516,7 @@ private fun AppRoot(
                 }
             }
             if (showCastBar) {
-                CastStatusBar(castState)
+                CastStatusBar(castState, onClick = { castControlsOpen = true })
             }
         }
         if (castState.isCasting && showVolume) {
@@ -517,13 +536,18 @@ private fun PlayerSurface(
     castState: CastUiState,
     onCastConnect: (String) -> Unit,
     onCastDisconnect: () -> Unit,
+    secure: Boolean = true,
 ) {
     val view = LocalView.current
-    DisposableEffect(Unit) {
-        // Keep the screen awake and block screenshots/recording while the video plays locally on the
-        // phone. This surface is shown only for local playback (casting stays on the show page).
+    DisposableEffect(secure) {
+        // Keep the screen awake while playing. For local playback also block screenshots/recording
+        // (FLAG_SECURE); the cast controller (secure=false) renders no video here, so it does not need it.
         val window = (view.context as? Activity)?.window
-        val flags = WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or WindowManager.LayoutParams.FLAG_SECURE
+        val flags = if (secure) {
+            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or WindowManager.LayoutParams.FLAG_SECURE
+        } else {
+            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+        }
         window?.addFlags(flags)
         onDispose { window?.clearFlags(flags) }
     }
@@ -546,6 +570,12 @@ private fun PlayerSurface(
             factory = { context ->
                 PlayerView(context).apply {
                     player = currentPlayer
+                    if (!secure) {
+                        // The cast controller has no video to reveal, so pin the transport controls on
+                        // screen instead of auto-hiding to a black surface.
+                        controllerShowTimeoutMs = 0
+                        setControllerHideOnTouch(false)
+                    }
                     setControllerVisibilityListener(
                         PlayerView.ControllerVisibilityListener { visibility ->
                             controlsVisible = visibility == View.VISIBLE
@@ -553,7 +583,12 @@ private fun PlayerSurface(
                     )
                 }
             },
-            update = { it.player = currentPlayer },
+            update = {
+                it.player = currentPlayer
+                // The cast player never auto-shows the controller, so show it explicitly and keep it
+                // pinned (controllerShowTimeoutMs=0 / hideOnTouch=false) for the cast controller.
+                if (!secure) it.showController()
+            },
             onRelease = { it.player = null },
             modifier = Modifier.fillMaxSize(),
         )
