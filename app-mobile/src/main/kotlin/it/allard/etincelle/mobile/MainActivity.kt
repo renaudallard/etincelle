@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -533,13 +534,13 @@ private fun PlayerSurface(
             onRelease = { it.player = null },
             modifier = Modifier.fillMaxSize(),
         )
-        Box(Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+        Box(Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(8.dp)) {
             CastButton(castState, onCastConnect, onCastDisconnect)
         }
         if (behindLive) {
             ReturnToLiveButton(
                 onClick = { currentPlayer.seekToDefaultPosition() },
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 12.dp),
+                modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 12.dp),
             )
         }
     }
