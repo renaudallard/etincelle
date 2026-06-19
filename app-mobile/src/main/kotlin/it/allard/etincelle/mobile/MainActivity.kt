@@ -170,7 +170,14 @@ class MainActivity : ComponentActivity() {
                         castState = castState,
                         onPlay = onPlay,
                         onStop = onStop,
-                        onCastConnect = { controller?.connectTo(it) },
+                        // connectTo returns false when the tapped route is already gone (a Chromecast
+                        // that dropped between opening the picker and tapping); tell the user instead
+                        // of failing silently with no connect animation.
+                        onCastConnect = {
+                            if (controller?.connectTo(it) == false) {
+                                Toast.makeText(this@MainActivity, "Connexion impossible, réessayez", Toast.LENGTH_SHORT).show()
+                            }
+                        },
                         // "Cet appareil" in the picker: bring playback back to this phone (not a stop).
                         onCastDisconnect = { controller?.returnToThisDevice() },
                     )
@@ -312,9 +319,12 @@ private fun AppRoot(
     // we are not casting. Keying on "current player is local" (not just !isCasting) keeps a brief
     // device-to-device transfer gap on the show page instead of flashing an idle cast surface.
     val playerFullscreen = playing != null && onLocalPlayer && !castState.isCasting
-    // The cast bar is shown (and the nav bar then drops its bottom inset) only when there is a device
-    // to name and the full-screen player is not up; gating both on one value keeps them in sync.
-    val showCastBar = castState.showStatus && !playerFullscreen && castState.statusDeviceName != null
+    // The cast bar is shown (and the nav bar then drops its bottom inset) when there is a device to
+    // name and the full-screen player is not up - except while a connect is in flight, so casting
+    // from the player still shows the "Connexion à …" animation instead of no feedback at all.
+    val showCastBar = castState.showStatus &&
+        (!playerFullscreen || castState.connecting) &&
+        castState.statusDeviceName != null
     // Grid density (cards per row on the "tout voir" pages); persisted, set live from the settings.
     var gridColumns by remember { mutableStateOf(LocalPrefs.gridColumns(context)) }
 
