@@ -8,12 +8,14 @@ import androidx.media3.cast.CastPlayer
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.CastSession
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.UserSession
+import it.allard.etincelle.core.player.LivePlayback
 import it.allard.etincelle.core.player.MediaItemFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -70,6 +72,9 @@ class CastPlayerController(
     private val castPlayer = CastPlayer(castContext, FuboCastMediaItemConverter(context, sessionProvider))
     private val scope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
 
+    // Scratch window for measuring how far the local player is behind the live edge at cast-out.
+    private val liveWindow = Timeline.Window()
+
     private val _currentPlayer = MutableStateFlow<Player>(localPlayer)
     val currentPlayer: StateFlow<Player> = _currentPlayer.asStateFlow()
 
@@ -103,6 +108,7 @@ class CastPlayerController(
     // (instead of bouncing playback back to the phone in between).
     private var transferring = false
     private var transferPosition = 0L
+    private var transferRewindMs = 0L
     private var transferPlayWhenReady = true
     private var transferFallbackJob: Job? = null
     // The id of the Cast session our content is currently loaded on. A connecting session with a
@@ -171,12 +177,16 @@ class CastPlayerController(
         val willTransfer = _currentPlayer.value === castPlayer && castContext.sessionManager.currentCastSession != null
         val position = if (willTransfer) castPlayer.currentPosition else 0L
         val playWhenReady = if (willTransfer) castPlayer.playWhenReady else true
+        // Capture the live rewind now, while the outgoing cast player still has a timeline, so a
+        // rewound live stream keeps its position across the device switch.
+        val rewind = if (willTransfer) LivePlayback.castRewindOffsetMs(castPlayer, liveWindow) else 0L
         val selected = super.connectTo(routeId)
         if (selected) startConnectWatchdog()
         // Arm the transfer only once a route was actually selected; it just records the position the
         // new device should resume at (the actual load happens in onSessionConnected by session id).
         if (willTransfer && selected) {
             transferPosition = position
+            transferRewindMs = rewind
             transferPlayWhenReady = playWhenReady
             transferring = true
         }
@@ -323,6 +333,9 @@ class CastPlayerController(
         // to the edge / starts VOD afresh (the old position is unreadable once the session is gone).
         val position = if (transferring) transferPosition else 0L
         val playWhenReady = if (transferring) transferPlayWhenReady else true
+        // A deliberate switch keeps the live rewind; an unexpected reconnect drops it (the live edge
+        // has moved on and the offset captured at connect would no longer line up).
+        val rewind = if (transferring) transferRewindMs else 0L
         transferring = false
         transferFallbackJob?.cancel()
         endingCaptured = false
@@ -330,7 +343,7 @@ class CastPlayerController(
         hasRetried = false
         clearDeferredStop()
         castSessionId = session.sessionId
-        loadResolved(castPlayer, item, position, playWhenReady)
+        loadResolved(castPlayer, item, position, playWhenReady, rewind)
     }
 
     override fun onSessionEndingInternal(session: CastSession) {
@@ -409,13 +422,23 @@ class CastPlayerController(
         // Nothing to load (e.g. casting was started with nothing playing): do not leave the connect
         // animation pulsing forever with no stream coming.
         val item = currentItem ?: run { runCatching { from.stop() }; clearConnecting(); return }
-        loadResolved(target, item, fromPosition, fromPlayWhenReady)
+        // Casting out a rewound live stream: carry how far behind the edge the phone is so the
+        // receiver resumes there instead of clamping to the live edge.
+        val isLive = (item.localConfiguration?.tag as? PlaybackSource)?.isLive == true
+        val castRewindMs = if (target === castPlayer && isLive) LivePlayback.castRewindOffsetMs(from, liveWindow) else 0L
+        loadResolved(target, item, fromPosition, fromPlayWhenReady, castRewindMs)
         deferStop(from, target)
     }
 
     // Load [item] on [target] at [fromPosition] (a live stream clamps to the edge), re-resolving for
     // a fresh token/URL first when possible. Shared by player swaps and Chromecast->Chromecast moves.
-    private fun loadResolved(target: Player, item: MediaItem, fromPosition: Long, fromPlayWhenReady: Boolean) {
+    private fun loadResolved(
+        target: Player,
+        item: MediaItem,
+        fromPosition: Long,
+        fromPlayWhenReady: Boolean,
+        castRewindMs: Long = 0L,
+    ) {
         val source = item.localConfiguration?.tag as? PlaybackSource
         val position = if (source?.isLive == true) 0 else fromPosition
         val resolver = reResolve
@@ -433,7 +456,13 @@ class CastPlayerController(
                     onError?.invoke(PLAYBACK_ERROR_MESSAGE)
                     return@launch
                 }
-                val freshItem = if (fresh != null) MediaItemFactory.create(fresh) else item
+                // Carry the live rewind (if any) onto the fresh source so the receiver's customData
+                // tells it where to resume.
+                val freshItem = if (fresh != null) {
+                    MediaItemFactory.create(fresh.copy(liveRewindOffsetMs = castRewindMs))
+                } else {
+                    item
+                }
                 loadOn(target, freshItem, if ((fresh ?: source).isLive) 0 else position)
                 target.playWhenReady = fromPlayWhenReady
             }
@@ -502,6 +531,10 @@ class CastPlayerController(
         hasRetried = true
         val target = _currentPlayer.value
         val position = target.currentPosition.coerceAtLeast(0)
+        // Capture the live rewind from the failing player before re-resolving so recovery resumes the
+        // viewer's position on the receiver instead of snapping to the live edge (0 if not applicable
+        // or its timeline is already gone).
+        val rewind = if (target === castPlayer && source.isLive) LivePlayback.castRewindOffsetMs(target, liveWindow) else 0L
         reResolveJob?.cancel()
         reResolveJob = scope.launch {
             val fresh = runCatching { resolver(source) }.getOrNull()
@@ -512,7 +545,7 @@ class CastPlayerController(
                 onError?.invoke(PLAYBACK_ERROR_MESSAGE)
                 return@launch
             }
-            loadOn(target, MediaItemFactory.create(fresh), if (fresh.isLive) 0 else position)
+            loadOn(target, MediaItemFactory.create(fresh.copy(liveRewindOffsetMs = rewind)), if (fresh.isLive) 0 else position)
         }
     }
 }

@@ -73,6 +73,12 @@ class FuboCastMediaItemConverter(
         return JSONObject().apply {
             put("stream_url", streamUrl)
             put("content_type", MimeTypes.APPLICATION_MPD)
+            // A rewound live cast: ask the receiver to start this many seconds behind the live edge
+            // (it seeks there once the window is known) instead of clamping to the edge. Round to the
+            // nearest second so the resume does not creep toward the edge on each cast.
+            if (source?.isLive == true && source.liveRewindOffsetMs > 0) {
+                put("live_rewind_sec", (source.liveRewindOffsetMs + 500) / 1000)
+            }
             if (!licenseUrl.isNullOrEmpty() && !token.isNullOrEmpty()) {
                 put("license_url", licenseUrl)
                 put("drm_token", token)
