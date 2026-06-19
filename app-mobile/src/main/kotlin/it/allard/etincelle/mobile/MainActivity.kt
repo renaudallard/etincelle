@@ -54,15 +54,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.Player
+import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import it.allard.etincelle.core.cast.CastPlayerController
 import it.allard.etincelle.core.cast.CastUiState
 import it.allard.etincelle.core.designsystem.R as DesignR
+import it.allard.etincelle.core.designsystem.ReturnToLiveButton
 import it.allard.etincelle.core.designsystem.theme.EtincelleTheme
 import it.allard.etincelle.core.domain.DetailKind
 import it.allard.etincelle.core.model.PlaybackSource
+import it.allard.etincelle.core.player.LivePlayback
 import it.allard.etincelle.core.player.MediaItemFactory
 import it.allard.etincelle.core.player.PlaybackProgress
 import it.allard.etincelle.core.ui.MainViewModel
@@ -96,6 +99,9 @@ class MainActivity : ComponentActivity() {
                 true,
             )
             .setHandleAudioBecomingNoisy(true)
+            // Skip steps for the player's rewind/forward controls (live shows a seekable DVR window).
+            .setSeekBackIncrementMs(LivePlayback.SEEK_BACK_MS)
+            .setSeekForwardIncrementMs(LivePlayback.SEEK_FORWARD_MS)
             .build()
         player = exo
         val controller = (application as EtincelleApp).castContext?.let {
@@ -509,6 +515,17 @@ private fun PlayerSurface(
         window?.addFlags(flags)
         onDispose { window?.clearFlags(flags) }
     }
+    // Track how far behind the live edge we are, so a "back to live" pill can appear once the viewer
+    // has scrubbed into the DVR window of a live show (and disappear again at the edge).
+    val liveWindow = remember { Timeline.Window() }
+    var behindLive by remember { mutableStateOf(false) }
+    LaunchedEffect(currentPlayer, source.isLive) {
+        while (true) {
+            behindLive = source.isLive &&
+                LivePlayback.behindLiveEdgeMs(currentPlayer, liveWindow) > LivePlayback.LIVE_REWIND_THRESHOLD_MS
+            delay(1000)
+        }
+    }
     Box(Modifier.fillMaxSize()) {
         AndroidView(
             factory = { context -> PlayerView(context).apply { player = currentPlayer } },
@@ -518,6 +535,12 @@ private fun PlayerSurface(
         )
         Box(Modifier.align(Alignment.TopEnd).padding(8.dp)) {
             CastButton(castState, onCastConnect, onCastDisconnect)
+        }
+        if (behindLive) {
+            ReturnToLiveButton(
+                onClick = { currentPlayer.seekToDefaultPosition() },
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 12.dp),
+            )
         }
     }
 }

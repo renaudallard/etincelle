@@ -14,33 +14,42 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.Timeline
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import it.allard.etincelle.core.designsystem.ReturnToLiveButton
 import it.allard.etincelle.core.designsystem.theme.EtincelleTheme
 import it.allard.etincelle.core.domain.DetailKind
 import it.allard.etincelle.core.model.PlaybackSource
+import it.allard.etincelle.core.player.LivePlayback
 import it.allard.etincelle.core.player.MediaItemFactory
 import it.allard.etincelle.core.player.PlaybackProgress
 import it.allard.etincelle.core.ui.MainViewModel
 import it.allard.etincelle.core.ui.MainViewModelFactory
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
 
@@ -63,6 +72,9 @@ class MainActivity : ComponentActivity() {
                 true,
             )
             .setHandleAudioBecomingNoisy(true)
+            // Skip steps for the player's rewind/forward controls (live shows a seekable DVR window).
+            .setSeekBackIncrementMs(LivePlayback.SEEK_BACK_MS)
+            .setSeekForwardIncrementMs(LivePlayback.SEEK_FORWARD_MS)
             .build()
         player = exo
         // Only on a fresh launch; a process recreation must not replay the original deep link.
@@ -216,9 +228,32 @@ private fun TvPlayerSurface(
             player.clearMediaItems()
         }
     }
-    AndroidView(
-        factory = { context -> PlayerView(context).apply { this.player = player } },
-        onRelease = { it.player = null },
-        modifier = Modifier.fillMaxSize(),
-    )
+    // Track how far behind the live edge we are, so a focusable "back to live" pill appears once the
+    // viewer has scrubbed into the DVR window of a live show (and disappears again at the edge).
+    val liveWindow = remember { Timeline.Window() }
+    var behindLive by remember { mutableStateOf(false) }
+    LaunchedEffect(source.isLive) {
+        while (true) {
+            behindLive = source.isLive &&
+                LivePlayback.behindLiveEdgeMs(player, liveWindow) > LivePlayback.LIVE_REWIND_THRESHOLD_MS
+            delay(1000)
+        }
+    }
+    Box(Modifier.fillMaxSize()) {
+        AndroidView(
+            factory = { context -> PlayerView(context).apply { this.player = player } },
+            onRelease = { it.player = null },
+            modifier = Modifier.fillMaxSize(),
+        )
+        if (behindLive) {
+            // The PlayerView controller owns D-pad focus, so claim it for the pill while it is shown
+            // (as the rest of the TV UI does) - otherwise the remote could never reach it.
+            val pillFocus = remember { FocusRequester() }
+            LaunchedEffect(Unit) { runCatching { pillFocus.requestFocus() } }
+            ReturnToLiveButton(
+                onClick = { player.seekToDefaultPosition() },
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 24.dp).focusRequester(pillFocus),
+            )
+        }
+    }
 }

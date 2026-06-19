@@ -18,7 +18,9 @@ interface Molotov **4.27**. Elle fonctionne sur **téléphone/tablette** et **An
 contenus directement sur l'appareil avec le **DRM Widevine** via AndroidX Media3.
 
 Elle donne accès au **direct**, au **guide des programmes** (EPG), à la **recherche**, au
-**rattrapage** et à la **VOD**. Cliquer sur un programme ouvre d'abord sa **fiche détaillée**
+**rattrapage** et à la **VOD**. Le **direct** se **rembobine** : la barre de progression du lecteur
+parcourt la fenêtre de différé (jusqu'à plusieurs heures), et un bouton **Revenir au direct**
+apparaît dès que l'on s'éloigne du bord pour y ramener d'un appui. Cliquer sur un programme ouvre d'abord sa **fiche détaillée**
 (synopsis, casting, année, classification) plutôt que de le lire aussitôt, et la fiche regroupe ses
 autres diffusions disponibles. Pour une série en rattrapage, la fiche liste les **épisodes
 disponibles** avec leur vignette ; pour une série **enregistrée**, elle propose directement vos
