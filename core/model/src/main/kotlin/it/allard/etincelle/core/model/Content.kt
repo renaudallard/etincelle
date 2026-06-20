@@ -113,4 +113,7 @@ data class ProgramDetail(
     val episodes: List<ContentCard> = emptyList(),
     /** A series page (vodId is the series id, not a playable asset), so it has no direct "Regarder". */
     val isSeries: Boolean = false,
+    /** Set when the programme is not yet aired: the backend's own localized reason (e.g. "… en direct
+     * dans 4 jours."). Non-null means it is not playable, so no "Regarder" is offered. */
+    val upcomingMessage: String? = null,
 )

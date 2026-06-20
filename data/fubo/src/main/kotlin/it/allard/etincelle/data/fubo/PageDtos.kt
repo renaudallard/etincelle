@@ -17,6 +17,15 @@ data class PageContentDto(
     val template: String?,
     val metadata: MetadataDto? = null,
     val sections: List<SectionDto>?,
+    val player: PlayerDto? = null,
+)
+
+// For an upcoming (not-yet-aired) programme the detail's player block is not playable: is_upcoming is
+// true and title/subtitle carry the backend's own localized reason (e.g. "… en direct dans 4 jours.").
+data class PlayerDto(
+    @Json(name = "is_upcoming") val isUpcoming: Boolean? = null,
+    val title: TextDto? = null,
+    val subtitle: TextDto? = null,
 )
 
 data class MetadataDto(
@@ -120,6 +129,9 @@ fun PageResponse.toProgramDetail(channelId: String?, vodId: String?, isLive: Boo
         .flatMap { it.content?.menuItems.orEmpty() }
         .firstNotNullOfOrNull { item -> item.id?.let { RECORD_REGEX.find(it)?.groupValues?.get(1) } }
     val programId = meta?.id?.let { PROGRAM_ID_REGEX.find(it)?.groupValues?.get(1) }
+    // An upcoming (not-yet-aired) programme is not playable; surface the backend's own localized reason
+    // (e.g. "Ce programme sera en direct dans 4 jours.") instead of letting Regarder 5xx.
+    val upcomingMessage = content?.player?.let { p -> p.title?.text?.takeIf { p.isUpcoming == true && it.isNotBlank() } }
     return ProgramDetail(
         title = meta?.title?.text,
         subtitle = meta?.subtitle?.text,
@@ -137,6 +149,7 @@ fun PageResponse.toProgramDetail(channelId: String?, vodId: String?, isLive: Boo
         isLive = isLive,
         recordAssetId = recordAssetId,
         programId = programId,
+        upcomingMessage = upcomingMessage,
     )
 }
 

@@ -589,7 +589,11 @@ fun ProgramDetailScreen(
             }
             // A multi-episode series has no directly playable asset (its id is not a VOD), so it has
             // no "Regarder"; the user picks an episode. A recorded series keeps it (plays the recording).
-            val showWatch = !(detail.isSeries && !isRecording)
+            // An upcoming (not-yet-aired) programme is not playable either: show the backend's reason.
+            val showWatch = !(detail.isSeries && !isRecording) && detail.upcomingMessage == null
+            detail.upcomingMessage?.let {
+                Text(it, style = MaterialTheme.typography.titleSmall, color = BrandYellow)
+            }
             if (showWatch || detail.recordAssetId != null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     if (showWatch) {

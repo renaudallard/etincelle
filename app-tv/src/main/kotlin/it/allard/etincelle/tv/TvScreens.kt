@@ -385,7 +385,7 @@ fun TvProgramDetailScreen(
     isRecording: Boolean = false,
 ) {
     val watchFocus = remember { FocusRequester() }
-    val showWatch = !(detail.isSeries && !isRecording)
+    val showWatch = !(detail.isSeries && !isRecording) && detail.upcomingMessage == null
     // A page with no playable element at all (a series with no catch-up episodes and no recordings)
     // would otherwise leave the D-pad nothing to focus; make the column itself focusable as a fallback.
     val nothingFocusable = !showWatch && detail.recordAssetId == null &&
@@ -413,6 +413,11 @@ fun TvProgramDetailScreen(
             if (sub.isNotBlank()) Text(sub, style = MaterialTheme.typography.titleMedium, color = Color.White)
             if (detail.tags.isNotEmpty()) {
                 Text(detail.tags.joinToString("   "), style = MaterialTheme.typography.titleSmall, color = BrandYellow)
+            }
+            // An upcoming (not-yet-aired) programme is not playable: show the backend's reason instead of
+            // a "Regarder" that 5xx's.
+            detail.upcomingMessage?.let {
+                Text(it, style = MaterialTheme.typography.titleMedium, color = BrandYellow)
             }
             // A multi-episode series has no directly playable asset (its id is not a VOD), so it has
             // no "Regarder"; the user picks an episode. A recorded series keeps it (plays the recording).
