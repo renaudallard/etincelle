@@ -521,7 +521,13 @@ private fun AppRoot(
                 }
             }
             if (showCastBar) {
-                CastStatusBar(castState, onClick = { castControlsOpen = true })
+                // Offer the tap-to-open affordance only when a tap will actually open functional
+                // controls (the app holds the playing source). A cast resumed after an app kill has
+                // none, so the bar stays plain status there (the system cast notification controls it).
+                CastStatusBar(
+                    castState,
+                    onClick = if (playing != null) ({ castControlsOpen = true }) else null,
+                )
             }
         }
         if (castState.isCasting && showVolume) {

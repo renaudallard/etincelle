@@ -8,6 +8,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -85,34 +86,40 @@ fun CastButton(state: CastUiState, onConnect: (String) -> Unit, onDisconnect: ()
  * receiver actually plays, next to a "Connexion à …" / "Lecture sur …" label.
  */
 @Composable
-fun CastStatusBar(state: CastUiState, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun CastStatusBar(state: CastUiState, onClick: (() -> Unit)?, modifier: Modifier = Modifier) {
     val name = state.statusDeviceName ?: return
     // The connecting flag is the authority for "a connect is in flight" (it is cleared the moment the
     // receiver reports playback, and bounded by a watchdog), so the label follows it directly even
     // when the old device of a device-to-device switch is still reporting playback.
     val connecting = state.connecting
     val label = if (connecting) "Connexion à $name…" else "Lecture sur $name"
-    // Tapping the bar opens the full playback controls for the active cast (the expand glyph hints it).
+    // Tapping the bar opens the full playback controls (the expand glyph hints it). When [onClick] is
+    // null those controls cannot open (no playing source, e.g. a cast resumed after an app kill), so
+    // the bar is plain, non-clickable status with no affordance.
     Surface(
-        onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surfaceVariant,
         tonalElevation = 3.dp,
     ) {
         Row(
-            Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp),
+            Modifier.fillMaxWidth()
+                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (connecting) PulsingCastGlyph() else CastFillGlyph(1f)
             Spacer(Modifier.width(12.dp))
             Text(label, style = MaterialTheme.typography.bodyMedium, maxLines = 1, modifier = Modifier.weight(1f))
-            Spacer(Modifier.width(12.dp))
-            Icon(
-                painterResource(DesignR.drawable.ic_pleinecran),
-                contentDescription = "Commandes de lecture",
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (onClick != null) {
+                Spacer(Modifier.width(12.dp))
+                Icon(
+                    painterResource(DesignR.drawable.ic_pleinecran),
+                    contentDescription = "Commandes de lecture",
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
