@@ -301,11 +301,15 @@ class FuboRepository(
         )
     }
 
-    /** The catch-up episodes of a series (its "Regarder maintenant" tab), or empty if it has none. */
-    private suspend fun seriesEpisodes(seriesId: String): List<ContentCard> {
-        val series = runCatching { api.seriesDetail(seriesId) }.getOrNull() ?: return emptyList()
-        return if (series.hasWatchNowTab()) api.seriesDetail(seriesId, "id-tab-watch-now").toEpisodes() else emptyList()
-    }
+    /**
+     * The catch-up episodes of a series (its "Regarder maintenant" tab), or empty if it has none. The
+     * whole lookup is best-effort: it must never fail the detail open, since the episode list is only a
+     * supplement to the show's own page.
+     */
+    private suspend fun seriesEpisodes(seriesId: String): List<ContentCard> = runCatching {
+        val series = api.seriesDetail(seriesId)
+        if (series.hasWatchNowTab()) api.seriesDetail(seriesId, "id-tab-watch-now").toEpisodes() else emptyList()
+    }.getOrDefault(emptyList())
 
     override suspend fun recordEpisode(assetId: String) = withRefresh {
         // The response body is unused, but a raw ResponseBody must be closed or the connection leaks.
