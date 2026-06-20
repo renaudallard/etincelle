@@ -426,8 +426,10 @@ class FuboRepository(
         }
     }
 
+    // Only a 401 means the refresh token itself is dead -> log out. A 403 is forbidden/geo on a token the
+    // server still recognizes, so it must NOT wipe the session (it surfaces like the retry-path 403).
     private fun Throwable.isAuthFailure(): Boolean =
-        this is AppError.Unauthorized || (this is HttpException && (code() == 401 || code() == 403))
+        this is AppError.Unauthorized || (this is HttpException && code() == 401)
 
     /** Turns raw transport failures into friendly domain errors; passes [AppError]s through. */
     private suspend fun <T> translateErrors(block: suspend () -> T): T = try {
