@@ -130,9 +130,13 @@ class CastPlayerController(
     // loaded onto it; the same id is just the session resuming, so nothing is reloaded.
     private var castSessionId: String? = null
 
-    private val errorListener = object : Player.Listener {
-        override fun onPlayerError(error: PlaybackException) = onPlaybackError()
+    // Per-player so onPlaybackError knows WHICH player failed: a local-player error during a cast-out
+    // hand-off (while the cast player is already current) must not be misread as a cast failure.
+    private fun errorListenerFor(player: Player) = object : Player.Listener {
+        override fun onPlayerError(error: PlaybackException) = onPlaybackError(player)
     }
+    private val localErrorListener = errorListenerFor(localPlayer)
+    private val castErrorListener = errorListenerFor(castPlayer)
 
     // Drives the connect animation: the bar fills while connecting and snaps full once the receiver
     // actually plays. Only meaningful while the cast player is current.
@@ -151,8 +155,8 @@ class CastPlayerController(
     }
 
     init {
-        localPlayer.addListener(errorListener)
-        castPlayer.addListener(errorListener)
+        localPlayer.addListener(localErrorListener)
+        castPlayer.addListener(castErrorListener)
         castPlayer.addListener(castPlaybackListener)
     }
 
@@ -316,8 +320,8 @@ class CastPlayerController(
     fun release() {
         clearDeferredStop()
         connectWatchdogJob?.cancel()
-        localPlayer.removeListener(errorListener)
-        castPlayer.removeListener(errorListener)
+        localPlayer.removeListener(localErrorListener)
+        castPlayer.removeListener(castErrorListener)
         castPlayer.removeListener(castPlaybackListener)
         scope.cancel()
         castPlayer.release()
@@ -531,7 +535,10 @@ class CastPlayerController(
         player.playWhenReady = true
     }
 
-    private fun onPlaybackError() {
+    private fun onPlaybackError(failedPlayer: Player) {
+        // Ignore an error from a player that is no longer current (e.g. the local player being torn
+        // down during a cast-out hand-off): recovering would reload the wrong, now-current player.
+        if (failedPlayer !== _currentPlayer.value) return
         val source = currentItem?.localConfiguration?.tag as? PlaybackSource
         val resolver = reResolve
         // A failure long after the previous one is a fresh incident, not part of a burst: restore the
