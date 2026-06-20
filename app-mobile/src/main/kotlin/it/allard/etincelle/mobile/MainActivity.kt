@@ -259,7 +259,9 @@ class MainActivity : ComponentActivity() {
         castController?.start()
         if (pausedForBackground) {
             pausedForBackground = false
-            player?.playWhenReady = true
+            // Do not resume the local player if a cast session is now active (e.g. casting began while
+            // backgrounded): the Chromecast is playing, so resuming locally too would double the audio.
+            if (castController?.isCastSessionActive != true) player?.playWhenReady = true
         }
     }
 
