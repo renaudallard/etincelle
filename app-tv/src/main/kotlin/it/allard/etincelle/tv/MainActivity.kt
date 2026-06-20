@@ -233,9 +233,13 @@ private fun TvPlayerSurface(
     val liveWindow = remember { Timeline.Window() }
     var behindLive by remember { mutableStateOf(false) }
     LaunchedEffect(source.isLive) {
+        // VOD and recordings have no live edge, so do not poll: stay at "not behind" without a 1s loop.
+        if (!source.isLive) {
+            behindLive = false
+            return@LaunchedEffect
+        }
         while (true) {
-            behindLive = source.isLive &&
-                LivePlayback.behindLiveEdgeMs(player, liveWindow) > LivePlayback.LIVE_REWIND_THRESHOLD_MS
+            behindLive = LivePlayback.behindLiveEdgeMs(player, liveWindow) > LivePlayback.LIVE_REWIND_THRESHOLD_MS
             delay(1000)
         }
     }
