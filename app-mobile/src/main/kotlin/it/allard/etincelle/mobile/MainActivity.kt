@@ -326,7 +326,12 @@ private fun AppRoot(
     // app is the caster. After an app kill the cast session resumes but the cast player carries no
     // loaded media (its transport stays inert), so leave that case to the system cast notification.
     var castControlsOpen by remember { mutableStateOf(false) }
-    LaunchedEffect(castState.isCasting) { if (!castState.isCasting) castControlsOpen = false }
+    // Close the controller only when casting truly ends, not during a device-to-device switch: there
+    // isCasting briefly dips to false while connecting stays true, and closing then would eject the
+    // controller mid-switch with no path to reopen it on the new device.
+    LaunchedEffect(castState.isCasting, castState.connecting) {
+        if (!castState.isCasting && !castState.connecting) castControlsOpen = false
+    }
     val castControls = playing != null && castState.isCasting && castControlsOpen
     // The cast bar is shown (and the nav bar then drops its bottom inset) when there is a device to
     // name and the full-screen player is not up - except while a connect is in flight, so casting
