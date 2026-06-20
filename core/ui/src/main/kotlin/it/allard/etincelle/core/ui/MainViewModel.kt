@@ -150,7 +150,9 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
                 rounds++
                 val pairing = orNull { repo.startCodeLogin() }
                 if (pairing == null) {
-                    _state.update { it.copy(busy = false, pairingCode = null, error = "Connexion impossible, nouvel essai…") }
+                    // Still busy: the loop retries on its own after the delay, so the screen shows the
+                    // notice without offering a manual retry button that would just restart this loop.
+                    _state.update { it.copy(busy = true, pairingCode = null, error = "Connexion impossible, nouvel essai…") }
                     delay(PAIRING_RETRY_MS)
                     continue
                 }

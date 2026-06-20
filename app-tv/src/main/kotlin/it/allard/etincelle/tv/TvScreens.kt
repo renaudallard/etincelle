@@ -102,7 +102,7 @@ fun TvLoginScreen(
     if (emailMode) {
         TvEmailLoginScreen(busy, error, onEmailLogin, onUseCode = { emailMode = false })
     } else {
-        TvCodeLoginScreen(pairingCode, error, onStartPairing, onStopPairing, onUseEmail = {
+        TvCodeLoginScreen(pairingCode, busy, error, onStartPairing, onStopPairing, onUseEmail = {
             onCancelPairing()
             emailMode = true
         })
@@ -110,7 +110,7 @@ fun TvLoginScreen(
 }
 
 @Composable
-private fun TvCodeLoginScreen(code: String?, error: String?, onStart: () -> Unit, onStop: () -> Unit, onUseEmail: () -> Unit) {
+private fun TvCodeLoginScreen(code: String?, busy: Boolean, error: String?, onStart: () -> Unit, onStop: () -> Unit, onUseEmail: () -> Unit) {
     LaunchedEffect(Unit) { onStart() }
     // Stop polling when the code screen leaves (email toggle / sign-in), so the loop does not linger.
     DisposableEffect(Unit) { onDispose { onStop() } }
@@ -153,10 +153,13 @@ private fun TvCodeLoginScreen(code: String?, error: String?, onStart: () -> Unit
             if (error != null) {
                 Spacer(Modifier.height(12.dp))
                 Text(error, color = MaterialTheme.colorScheme.error)
-                Spacer(Modifier.height(12.dp))
-                // The code loop stops after a while so it does not poll an idle TV forever; let the user
-                // restart it instead of dead-ending with no code and no way back.
-                Button(onClick = onStart) { Text("Réessayer") }
+                // The code loop stops after a while so it does not poll an idle TV forever; once it has
+                // stopped (not busy) let the user restart it instead of dead-ending with no code and no
+                // way back. While it is still auto-retrying (busy) no button is needed.
+                if (!busy) {
+                    Spacer(Modifier.height(12.dp))
+                    Button(onClick = onStart) { Text("Réessayer") }
+                }
             }
         }
     }
