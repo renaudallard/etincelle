@@ -55,20 +55,33 @@ class FuboRepository(
         progress,
     )
 
+    /**
+     * Finishes a sign-in once tokens are in hand: sets the access token so api.user() authenticates,
+     * loads the user/profile id, and persists the full session. If the user load fails it clears that
+     * half-initialized session (empty ids) again, so a failed login leaves no bad session behind.
+     */
+    private suspend fun finishLogin(accessToken: String, refreshToken: String?): UserSession {
+        val previous = session.session
+        session.session = UserSession(accessToken, refreshToken, userId = "", profileId = "")
+        try {
+            val user = api.user().data ?: throw AppError.Unknown("Empty user response")
+            val userId = user.id ?: throw AppError.Unknown("Missing user id")
+            val profileId = user.profiles?.firstOrNull()?.id ?: throw AppError.Unknown("Missing profile")
+            return UserSession(accessToken, refreshToken, userId, profileId).also {
+                session.session = it
+                store.save(it)
+            }
+        } catch (e: Exception) {
+            session.session = previous
+            throw e
+        }
+    }
+
     /** Signs in, loads the user/profile id, and persists the session. */
     override suspend fun login(email: String, password: String): UserSession {
         val tokens = api.signin(SigninRequest(email, password))
         val accessToken = tokens.accessToken ?: throw AppError.Unauthorized
-        session.session = UserSession(accessToken, tokens.refreshToken, userId = "", profileId = "")
-
-        val user = api.user().data ?: throw AppError.Unknown("Empty user response")
-        val userId = user.id ?: throw AppError.Unknown("Missing user id")
-        val profileId = user.profiles?.firstOrNull()?.id ?: throw AppError.Unknown("Missing profile")
-
-        return UserSession(accessToken, tokens.refreshToken, userId, profileId).also {
-            session.session = it
-            store.save(it)
-        }
+        return finishLogin(accessToken, tokens.refreshToken)
     }
 
     /** TV pairing: fetch a fresh code and its lifetime for the user to confirm on their phone. A fresh
@@ -89,17 +102,7 @@ class FuboRepository(
     override suspend fun pollCodeLogin(code: String, deviceId: String): UserSession? {
         val tokens = api.pollSignInCode(deviceId, SignInCodePollRequest(code)).data ?: return null
         val accessToken = tokens.accessToken ?: return null
-        val refreshToken = tokens.refreshToken
-        session.session = UserSession(accessToken, refreshToken, userId = "", profileId = "")
-
-        val user = api.user().data ?: throw AppError.Unknown("Empty user response")
-        val userId = user.id ?: throw AppError.Unknown("Missing user id")
-        val profileId = user.profiles?.firstOrNull()?.id ?: throw AppError.Unknown("Missing profile")
-
-        return UserSession(accessToken, refreshToken, userId, profileId).also {
-            session.session = it
-            store.save(it)
-        }
+        return finishLogin(accessToken, tokens.refreshToken)
     }
 
     /** Confirms a TV's pairing code from this signed-in account (authenticated PUT). */
