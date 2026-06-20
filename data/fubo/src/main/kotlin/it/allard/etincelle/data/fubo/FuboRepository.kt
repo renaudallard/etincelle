@@ -295,7 +295,10 @@ class FuboRepository(
         // When the show has no real poster, fall back to a recording's own image (a real thumbnail).
         detail.copy(
             recordings = matches,
-            episodes = episodes,
+            // Drop episodes the user has already recorded: a recorded episode's card carries the
+            // recording's LIVE_ asset id as its vodId, and its catch-up VOD returns a 5xx for recorded
+            // content. They stay in "Vos enregistrements" below, which plays them from the DVR.
+            episodes = episodes.filterNot { ep -> ep.vodId != null && matches.any { it.assetId == ep.vodId } },
             posterUrl = detail.posterUrl ?: matches.firstOrNull()?.imageUrl,
             isSeries = kind == DetailKind.SERIES,
         )
