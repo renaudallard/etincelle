@@ -90,8 +90,11 @@ class RetryInterceptor(
     // Sleep in short slices so a cancelled call aborts the backoff promptly instead of blocking the
     // OkHttp thread for the full delay.
     private fun backoff(chain: Interceptor.Chain, attempt: Int) {
-        val deadline = System.nanoTime() + 400L * attempt * 1_000_000
-        while (System.nanoTime() < deadline) {
+        val start = System.nanoTime()
+        val delayNanos = 400L * attempt * 1_000_000
+        // Compare elapsed time, not an absolute deadline: nanoTime is only meaningful as a difference,
+        // and (now - start) stays correct across the counter's wraparound where (now < deadline) can not.
+        while (System.nanoTime() - start < delayNanos) {
             if (chain.call().isCanceled()) throw IOException("Cancelled during retry backoff")
             try {
                 Thread.sleep(50)
