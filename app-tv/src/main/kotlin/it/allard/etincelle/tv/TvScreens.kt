@@ -424,10 +424,10 @@ fun TvProgramDetailScreen(
                         }
                     }
                     if (detail.recordAssetId != null) {
-                        // When there is no Regarder and no episode/recording to take initial focus,
+                        // When there is no Regarder and no recording/episode to take initial focus,
                         // the record button is the only focusable widget, so hand it watchFocus.
                         val recordButtonFocus = !showWatch &&
-                            !(detail.episodes.isNotEmpty() && !isRecording) && detail.recordings.isEmpty()
+                            detail.recordings.isEmpty() && detail.episodes.isEmpty()
                         Button(
                             onClick = onRecord, enabled = !busy,
                             modifier = if (recordButtonFocus) Modifier.focusRequester(watchFocus) else Modifier,
@@ -444,20 +444,13 @@ fun TvProgramDetailScreen(
                 detail.year?.let { "Année de sortie : $it" },
                 detail.classification?.let { "Classification : $it" },
             ).forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Color.White) }
-            // For a recording, hide the catch-up episodes (their VOD can 5xx for recorded content);
-            // the user's recordings below are what plays.
-            if (detail.episodes.isNotEmpty() && !isRecording) {
-                // With no "Regarder" to focus on a series, hand initial focus to the first episode.
-                TvEpisodesSection(detail.episodes, busy, onEpisode, firstFocus = if (showWatch) null else watchFocus)
-            }
+            // Your own recordings first (what you came for); the available episodes follow.
             if (detail.recordings.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 Text("Vos enregistrements", style = MaterialTheme.typography.titleMedium, color = Color.White)
-                // When nothing above claimed initial focus (no Regarder, no episodes), give it to the
-                // first recording so the page is not a D-pad dead-end. This holds whether or not the
-                // page also has a record CTA (the record button only takes focus when there are no
-                // recordings either).
-                val recordingsOwnFocus = !showWatch && !(detail.episodes.isNotEmpty() && !isRecording)
+                // With no "Regarder" button the first recording takes initial focus, so the page is not
+                // a D-pad dead-end.
+                val recordingsOwnFocus = !showWatch
                 detail.recordings.forEachIndexed { i, recording ->
                     TvRecordingRow(
                         recording,
@@ -466,6 +459,13 @@ fun TvProgramDetailScreen(
                         focus = watchFocus.takeIf { recordingsOwnFocus && i == 0 },
                     )
                 }
+            }
+            if (detail.episodes.isNotEmpty()) {
+                // With no "Regarder" and no recordings above, hand initial focus to the first episode.
+                TvEpisodesSection(
+                    detail.episodes, busy, onEpisode,
+                    firstFocus = if (showWatch || detail.recordings.isNotEmpty()) null else watchFocus,
+                )
             }
         }
     }

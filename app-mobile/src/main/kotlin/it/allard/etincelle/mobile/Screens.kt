@@ -615,17 +615,16 @@ fun ProgramDetailScreen(
             ).forEach {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            // For a recording, hide the catch-up episodes (their VOD can 5xx for recorded content);
-            // the user's recordings below are what plays.
-            if (detail.episodes.isNotEmpty() && !isRecording) {
-                EpisodesSection(detail.episodes, busy, onEpisode)
-            }
+            // Your own recordings first (what you came for); the full list of available episodes follows.
             if (detail.recordings.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 Text("Vos enregistrements", style = MaterialTheme.typography.titleMedium)
                 detail.recordings.forEach { recording ->
                     RecordingRow(recording, enabled = !busy, onWatch = { onWatchRecording(recording.assetId) })
                 }
+            }
+            if (detail.episodes.isNotEmpty()) {
+                EpisodesSection(detail.episodes, busy, onEpisode)
             }
         }
     }

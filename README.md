@@ -24,7 +24,8 @@ apparaît dès que l'on s'éloigne du bord pour y ramener d'un appui. Cliquer su
 (synopsis, casting, année, classification) plutôt que de le lire aussitôt, et la fiche regroupe ses
 autres diffusions disponibles. Quand un programme fait partie d'une série en rattrapage, sa fiche
 liste en dessous les **épisodes disponibles** (avec leur vignette) pour en choisir un autre ; pour une
-série **enregistrée**, elle propose directement vos épisodes enregistrés, lus depuis le DVR. Vous pouvez aussi **programmer un enregistrement** et retrouver vos
+série **enregistrée**, elle affiche d'abord vos épisodes enregistrés (lus depuis le DVR), puis la même
+liste des **épisodes disponibles** en rattrapage. Vous pouvez aussi **programmer un enregistrement** et retrouver vos
 **enregistrements** (DVR) dans une rangée dédiée sur l'accueil. L'accueil réunit aussi les
 **applications des diffuseurs** (france.tv, MyTF1, M6+…) : ouvrez l'une d'elles pour parcourir son
 catalogue (un abonnement peut être requis). Cliquer sur l'en-tête d'une rangée (par ex. *En direct à
