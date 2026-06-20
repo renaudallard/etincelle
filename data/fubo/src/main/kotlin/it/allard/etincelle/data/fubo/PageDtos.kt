@@ -111,14 +111,18 @@ fun PageResponse.toProgramDetail(channelId: String?, vodId: String?, isLive: Boo
         val value = f.value?.text ?: return@mapNotNull null
         key to value
     }.toMap()
-    // Blank -> null, so an empty credits string neither wipes the synopsis (contains("") is true) nor
+    // Blank -> null, so an empty credits string neither wipes the synopsis (endsWith("") is true) nor
     // surfaces an empty credits line.
     val credits = about?.description?.text?.takeIf { it.isNotBlank() }
-    // Some descriptions already end with the "Réalisé par … avec …" credits; drop that tail so the
-    // cast is not shown twice (once in the synopsis, once as the credits line).
+    // Some descriptions already end with the "Réalisé par … avec …" credits; drop that trailing tail so
+    // the cast is not shown twice. Match the suffix only, so a credits phrase that happens to appear
+    // mid-synopsis does not truncate the real body.
     val rawSynopsis = meta?.description?.text
-    val synopsis = if (credits != null && rawSynopsis != null && rawSynopsis.contains(credits)) {
-        rawSynopsis.substringBefore(credits).trim().ifEmpty { null }
+    // Match the suffix ignoring trailing whitespace, so a stray newline or space after the credits
+    // block does not defeat the match and leave the cast shown twice.
+    val trimmedSynopsis = rawSynopsis?.trimEnd()
+    val synopsis = if (credits != null && trimmedSynopsis != null && trimmedSynopsis.endsWith(credits)) {
+        trimmedSynopsis.removeSuffix(credits).trim().ifEmpty { null }
     } else {
         rawSynopsis
     }
