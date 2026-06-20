@@ -152,6 +152,23 @@ fun PageResponse.toEpisodes(): List<ContentCard> = content?.sections.orEmpty()
     .flatMap { it.components.orEmpty() }
     .mapNotNull { it.toCard() }
 
+/**
+ * The series this program/airing belongs to, taken from its "Détails du programme" navigation (a
+ * `program-details/series/{id}` link in the CTAs or body), or null for a standalone title. A show
+ * opens on a single episode/airing, so this is how its full episode list is reached.
+ */
+fun PageResponse.seriesLink(): String? {
+    val ctaUrls = content?.metadata?.ctas.orEmpty()
+        .flatMap { it.actionItems.orEmpty() }
+        .flatMap { it.actions?.onClick.orEmpty() }
+        .mapNotNull { it.endpoint?.url }
+    val sectionUrls = content?.sections.orEmpty()
+        .flatMap { it.components.orEmpty() }
+        .flatMap { it.actions?.onClick.orEmpty() }
+        .mapNotNull { it.endpoint?.url }
+    return (ctaUrls + sectionUrls).firstNotNullOfOrNull { SERIES_REGEX.find(it)?.groupValues?.get(1) }
+}
+
 fun PageResponse.toRails(): List<ContentRail> {
     val sections = content?.sections ?: return emptyList()
     return sections.mapIndexedNotNull { index, section ->

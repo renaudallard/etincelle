@@ -267,9 +267,11 @@ class FuboRepository(
         var episodes = emptyList<ContentCard>()
         val detail = when (kind) {
             DetailKind.PROGRAM -> {
-                // An episode page stays focused on the episode (title, synopsis, Regarder); it does not
-                // re-list the whole series, which is redundant with the series page you came from.
-                api.programDetail(id).toProgramDetail(channelId = null, vodId = id, isLive = false)
+                // A show opens on one episode/airing; follow its "Détails du programme" series link to
+                // list the series' available episodes so the viewer can pick another.
+                val resp = api.programDetail(id)
+                episodes = resp.seriesLink()?.let { seriesEpisodes(it) }.orEmpty()
+                resp.toProgramDetail(channelId = null, vodId = id, isLive = false)
             }
             DetailKind.SERIES -> {
                 val resp = api.seriesDetail(id)
@@ -277,7 +279,11 @@ class FuboRepository(
                 if (resp.hasWatchNowTab()) episodes = api.seriesDetail(id, "id-tab-watch-now").toEpisodes()
                 resp.toProgramDetail(channelId = null, vodId = id, isLive = false)
             }
-            DetailKind.CHANNEL -> api.channelDetail(id).toProgramDetail(channelId = id, vodId = null, isLive = true)
+            DetailKind.CHANNEL -> {
+                val resp = api.channelDetail(id)
+                episodes = resp.seriesLink()?.let { seriesEpisodes(it) }.orEmpty()
+                resp.toProgramDetail(channelId = id, vodId = null, isLive = true)
+            }
         }
         val detailProgramId = detail.programId
         val matches = when (kind) {
@@ -293,6 +299,12 @@ class FuboRepository(
             posterUrl = detail.posterUrl ?: matches.firstOrNull()?.imageUrl,
             isSeries = kind == DetailKind.SERIES,
         )
+    }
+
+    /** The catch-up episodes of a series (its "Regarder maintenant" tab), or empty if it has none. */
+    private suspend fun seriesEpisodes(seriesId: String): List<ContentCard> {
+        val series = runCatching { api.seriesDetail(seriesId) }.getOrNull() ?: return emptyList()
+        return if (series.hasWatchNowTab()) api.seriesDetail(seriesId, "id-tab-watch-now").toEpisodes() else emptyList()
     }
 
     override suspend fun recordEpisode(assetId: String) = withRefresh {
