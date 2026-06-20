@@ -166,7 +166,13 @@ fun PageResponse.seriesLink(): String? {
         .flatMap { it.components.orEmpty() }
         .flatMap { it.actions?.onClick.orEmpty() }
         .mapNotNull { it.endpoint?.url }
-    return (ctaUrls + sectionUrls).firstNotNullOfOrNull { SERIES_REGEX.find(it)?.groupValues?.get(1) }
+    // A show's own "Détails du programme" link is a primary CTA (trkOriginElement=view_program_details_cta);
+    // the recommendation carousels on the page ("see also", "most watched", …) also carry
+    // program-details/series/ links, so skip those section cards (tagged trkOriginComponent=section-…) to
+    // avoid listing a different show's episodes.
+    return (ctaUrls + sectionUrls)
+        .filterNot { it.contains("trkOriginComponent=section-") }
+        .firstNotNullOfOrNull { SERIES_REGEX.find(it)?.groupValues?.get(1) }
 }
 
 fun PageResponse.toRails(): List<ContentRail> {
