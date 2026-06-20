@@ -26,6 +26,9 @@ data class CastDevice(val routeId: String, val name: String)
 data class CastUiState(
     val devices: List<CastDevice> = emptyList(),
     val connectedDeviceName: String? = null,
+    // The route id of the connected device, so the picker marks the right row even when two devices
+    // share a friendly name (a name match alone would select both).
+    val connectedRouteId: String? = null,
     // True from the moment a device is tapped until the receiver actually starts playing; with
     // connectingDeviceName it drives the "filling" connect animation before the session is up.
     val connecting: Boolean = false,
@@ -133,12 +136,20 @@ open class CastController(
 
     /** Subclass hooks for the player swap (overridden by the M2 cast-player controller). */
     protected open fun onSessionConnected(session: CastSession) {
-        _state.value = _state.value.copy(connectedDeviceName = session.castDevice?.friendlyName)
+        // Record the route id only when selectedRoute is a real cast route (the same filter the device
+        // list uses). On an externally resumed session the framework may not have re-selected the cast
+        // route yet, leaving the system default here; null then, so the picker falls back to the name.
+        val route = mediaRouter.selectedRoute
+        _state.value = _state.value.copy(
+            connectedDeviceName = session.castDevice?.friendlyName,
+            connectedRouteId = route.takeIf { !it.isDefault && !it.isBluetooth }?.id,
+        )
     }
 
     protected open fun onSessionDisconnected() {
         _state.value = _state.value.copy(
             connectedDeviceName = null,
+            connectedRouteId = null,
             connecting = false,
             connectingDeviceName = null,
             playing = false,
