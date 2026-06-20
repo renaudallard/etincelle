@@ -50,8 +50,12 @@ object LivePlayback {
      * receiver land where the phone was rather than the edge-delay closer to live.
      */
     fun castRewindOffsetMs(player: Player, window: Timeline.Window): Long {
-        if (behindLiveEdgeMs(player, window) <= LIVE_REWIND_THRESHOLD_MS) return 0L
+        val behind = behindLiveEdgeMs(player, window)
+        if (behind <= LIVE_REWIND_THRESHOLD_MS) return 0L
         val offset = player.currentLiveOffset
-        return if (offset != C.TIME_UNSET && offset > 0) offset else 0L
+        // A CastPlayer commonly reports no live offset (C.TIME_UNSET), so a cast-to-cast transfer (or a
+        // cast recovery) would otherwise drop the rewind and snap to the live edge. Fall back to the
+        // behind-edge measure, which keeps the viewer's position (to within the stream's edge delay).
+        return if (offset != C.TIME_UNSET && offset > 0) offset else behind
     }
 }
