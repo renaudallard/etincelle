@@ -465,7 +465,13 @@ fun SettingsScreen(
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = tvCode,
-                        onValueChange = { tvCode = it.filter(Char::isDigit).take(8) },
+                        onValueChange = {
+                            tvCode = it.filter(Char::isDigit).take(8)
+                            // Editing the code clears a previous result, so a follow-up pairing (e.g. a
+                            // second TV) can be submitted in the same dialog instead of staying locked
+                            // out by the success message.
+                            if (connectInfo != null || connectError != null) onClearTvConnect()
+                        },
                         label = { Text("Code") },
                         singleLine = true,
                         enabled = !connecting,
@@ -480,7 +486,12 @@ fun SettingsScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { onConnectTv(tvCode) }, enabled = tvCode.length >= 4 && !connecting) { Text("Connecter") }
+                // Disabled once a connect succeeded so a second tap cannot re-submit the now consumed
+                // code and replace the success message with a spurious error.
+                TextButton(
+                    onClick = { onConnectTv(tvCode) },
+                    enabled = tvCode.length >= 4 && !connecting && connectInfo == null,
+                ) { Text("Connecter") }
             },
             dismissButton = { TextButton(onClick = { connectTv = false; tvCode = ""; onClearTvConnect() }) { Text("Fermer") } },
         )
