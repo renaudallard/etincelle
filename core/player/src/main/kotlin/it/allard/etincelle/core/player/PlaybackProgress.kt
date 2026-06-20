@@ -14,5 +14,5 @@ object PlaybackProgress {
      * (durationMs <= 0). Live playback is filtered out upstream by a null resume key, not here.
      */
     fun positionToSave(positionMs: Long, durationMs: Long): Long =
-        if (positionMs > MIN_MS && durationMs > 0 && positionMs < durationMs - END_MS) positionMs else 0L
+        if (positionMs >= MIN_MS && durationMs > 0 && positionMs < durationMs - END_MS) positionMs else 0L
 }
