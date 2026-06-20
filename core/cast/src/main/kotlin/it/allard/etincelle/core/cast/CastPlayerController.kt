@@ -304,7 +304,12 @@ class CastPlayerController(
         val next = (base + if (up) VOLUME_STEP else -VOLUME_STEP).coerceIn(0.0, 1.0)
         castVolume = next
         // setVolume throws IOException if the session dropped mid-press; ignore and keep the UI level.
-        runCatching { session.volume = next }
+        // A volume press means the viewer wants sound, so clear any active mute too; otherwise the new
+        // level would sit on a still-muted device and the overlay would show a level while it is silent.
+        runCatching {
+            session.volume = next
+            if (session.isMute) session.isMute = false
+        }
         publishVolume(next.toFloat())
     }
 
