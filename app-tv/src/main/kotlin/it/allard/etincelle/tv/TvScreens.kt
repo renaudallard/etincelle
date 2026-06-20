@@ -153,6 +153,10 @@ private fun TvCodeLoginScreen(code: String?, error: String?, onStart: () -> Unit
             if (error != null) {
                 Spacer(Modifier.height(12.dp))
                 Text(error, color = MaterialTheme.colorScheme.error)
+                Spacer(Modifier.height(12.dp))
+                // The code loop stops after a while so it does not poll an idle TV forever; let the user
+                // restart it instead of dead-ending with no code and no way back.
+                Button(onClick = onStart) { Text("Réessayer") }
             }
         }
     }
