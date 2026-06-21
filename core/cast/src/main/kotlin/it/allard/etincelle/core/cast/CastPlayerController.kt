@@ -356,7 +356,6 @@ class CastPlayerController(
             transferFallbackJob?.cancel()
             return
         }
-        val item = currentItem ?: return
         // A deliberate switch resumes at the captured position; an unexpected reconnect just clamps live
         // to the edge / starts VOD afresh (the old position is unreadable once the session is gone).
         val position = if (transferring) transferPosition else 0L
@@ -371,6 +370,9 @@ class CastPlayerController(
         castRetryCount = 0
         clearDeferredStop()
         castSessionId = session.sessionId
+        // Nothing loaded to move onto the new session: the cleanup above still applies (so a later
+        // disconnect is not misread as a transfer with a stale session id), but there is no item to load.
+        val item = currentItem ?: return
         loadResolved(castPlayer, item, position, playWhenReady, rewind)
     }
 
