@@ -233,6 +233,9 @@ class CastPlayerController(
      * locally at the cast position, re-surfacing the player. Distinct from [disconnect], which stops.
      */
     fun returnToThisDevice() {
+        // No live session to end (it already tore down): do nothing. Arming returnToPhoneOnEnd with no
+        // onSessionEnded coming would leave it set to mis-fire a return-to-phone on a later cast.
+        if (castContext.sessionManager.currentCastSession == null) return
         returnToPhoneOnEnd = true
         transferring = false
         transferFallbackJob?.cancel()
@@ -335,7 +338,9 @@ class CastPlayerController(
     override fun onSessionConnected(session: CastSession) {
         super.onSessionConnected(session)
         if (_currentPlayer.value !== castPlayer) {
-            // Casting out from the phone: swap to the cast player (re-resolves a fresh URL).
+            // Casting out from the phone: swap to the cast player (re-resolves a fresh URL). Clear any
+            // stale return-to-phone request so it cannot fire when this fresh session later ends.
+            returnToPhoneOnEnd = false
             transferring = false
             transferFallbackJob?.cancel()
             castSessionId = session.sessionId
