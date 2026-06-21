@@ -79,9 +79,23 @@ class FuboRepository(
 
     /** Signs in, loads the user/profile id, and persists the session. */
     override suspend fun login(email: String, password: String): UserSession {
-        val tokens = api.signin(SigninRequest(email, password))
-        val accessToken = tokens.accessToken ?: throw AppError.Unauthorized
-        return finishLogin(accessToken, tokens.refreshToken)
+        val tokens = try {
+            api.signin(SigninRequest(email, password))
+        } catch (e: HttpException) {
+            // Only the sign-in call reflects the credentials: a 401 is a wrong email/password and a 403
+            // is a region block (the backend is geo-gated), not an expired session.
+            throw when (e.code()) {
+                400, 401 -> AppError.Unknown("Email ou mot de passe incorrect")
+                403 -> AppError.GeoBlocked
+                else -> e.toAppError()
+            }
+        } catch (e: IOException) {
+            throw AppError.Network("Pas de connexion, vérifiez votre réseau")
+        }
+        val accessToken = tokens.accessToken ?: throw AppError.Unknown("Email ou mot de passe incorrect")
+        // The user/profile load runs after credentials are accepted, so its errors are not credential
+        // failures: map them normally (a 403 here is Forbidden, a 401 an expired token).
+        return translateErrors { finishLogin(accessToken, tokens.refreshToken) }
     }
 
     /** TV pairing: fetch a fresh code and its lifetime for the user to confirm on their phone. A fresh
