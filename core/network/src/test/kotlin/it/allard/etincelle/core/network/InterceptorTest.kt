@@ -26,7 +26,8 @@ class InterceptorTest {
         val device = DeviceInfo(deviceId = "dev-1", brand = "b", model = "m", osVersion = "16")
         client = OkHttpClient.Builder()
             .addInterceptor(FuboHeadersInterceptor(device))
-            .addInterceptor(AuthInterceptor(session))
+            // MockWebServer runs on localhost, so trust it here; host-allowlist behavior is tested below.
+            .addInterceptor(AuthInterceptor(session) { true })
             .build()
     }
 
@@ -57,6 +58,18 @@ class InterceptorTest {
         assertEquals("Bearer AT", req.getHeader("authorization"))
         assertEquals("user1", req.getHeader("x-user-id"))
         assertEquals("profile1", req.getHeader("x-profile-id"))
+    }
+
+    @Test
+    fun `omits the bearer token for an untrusted host`() {
+        session.session = UserSession("AT", "RT", "user1", "profile1")
+        // Default host allowlist: MockWebServer's localhost is not a Fubo host, so no credentials.
+        val guarded = OkHttpClient.Builder().addInterceptor(AuthInterceptor(session)).build()
+        server.enqueue(MockResponse().setBody("{}"))
+        guarded.newCall(Request.Builder().url(server.url("/x")).build()).execute().close()
+        val req = server.takeRequest()
+        assertEquals(null, req.getHeader("authorization"))
+        assertEquals(null, req.getHeader("x-user-id"))
     }
 
     @Test

@@ -38,10 +38,16 @@ class FuboHeadersInterceptor(private val device: DeviceInfo) : Interceptor {
  * Adds the bearer token and user/profile ids once authenticated. Requests that already carry an
  * Authorization header (the `/refresh` call, which sends the refresh token) are left untouched.
  */
-class AuthInterceptor(private val session: SessionManager) : Interceptor {
+class AuthInterceptor(
+    private val session: SessionManager,
+    private val isTrustedHost: (String) -> Boolean = String::isTrustedApiHost,
+) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
         if (request.header("authorization") != null) return chain.proceed(request)
+        // pageByUrl/pingProgress follow backend-supplied absolute URLs, so only attach the account
+        // credentials to Fubo's own hosts; a tampered or hostile URL must never receive the bearer token.
+        if (!isTrustedHost(request.url.host)) return chain.proceed(request)
 
         val builder = request.newBuilder()
         session.accessToken?.let { builder.header("authorization", "Bearer $it") }
@@ -49,6 +55,13 @@ class AuthInterceptor(private val session: SessionManager) : Interceptor {
         session.profileId?.takeIf { it.isNotBlank() }?.let { builder.header("x-profile-id", it) }
         return chain.proceed(builder.build())
     }
+}
+
+// The app's own backend domains (Fubo's api-eu.fubo.tv plus the molotov.tv tenant) and any subdomain
+// the backend hands back in page/playhead/heartbeat URLs. Credentials are attached only to these.
+private fun String.isTrustedApiHost(): Boolean {
+    val h = lowercase()
+    return h == "fubo.tv" || h.endsWith(".fubo.tv") || h == "molotov.tv" || h.endsWith(".molotov.tv")
 }
 
 /**
