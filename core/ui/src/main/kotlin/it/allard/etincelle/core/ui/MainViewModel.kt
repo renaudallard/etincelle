@@ -107,7 +107,19 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
                         _state.update { it.copy(checking = false, loggedIn = true, tab = Tab.HOME, backStack = listOf(page)) }
                         consumeDeepLink()
                     }
-                    .onFailure { _state.update { it.copy(checking = false, loggedIn = false) } }
+                    .onFailure { e ->
+                        // Only a genuinely dead session (the repo cleared it) returns to login; a transient
+                        // blip keeps the restored session signed in with an error, like the pairing path,
+                        // instead of ejecting a still-valid session.
+                        val sessionDead = e is AppError.Unauthorized && repo.currentSession() == null
+                        _state.update {
+                            if (sessionDead) {
+                                it.copy(checking = false, loggedIn = false)
+                            } else {
+                                it.copy(checking = false, loggedIn = true, tab = Tab.HOME, error = "Échec du chargement de l'accueil")
+                            }
+                        }
+                    }
             } else {
                 _state.update { it.copy(checking = false) }
             }
