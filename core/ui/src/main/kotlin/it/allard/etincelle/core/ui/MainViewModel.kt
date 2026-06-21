@@ -16,6 +16,7 @@ import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramDetail
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -540,9 +541,11 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
     }
 
     /** Persists a VOD/replay resume position; a null [key] (live) is ignored. */
+    private var saveJob: Job? = null
+
     fun savePlaybackPosition(key: String?, positionMs: Long) {
         if (key == null) return
-        viewModelScope.launch { runCatching { repo.savePlaybackPosition(key, positionMs) } }
+        saveJob = viewModelScope.launch { runCatching { repo.savePlaybackPosition(key, positionMs) } }
     }
 
     /** Reports progress to the server playhead (continue-watching); best-effort and a no-op for live. */
@@ -605,9 +608,15 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
     }
 
     fun logout() {
-        // Drop any in-flight nav so a stale failure can't stamp a banner onto the reset login screen.
+        // Drop every in-flight job so a stale completion can't stamp a banner onto the reset login
+        // screen (nav, TV pairing, TV-code confirm).
         navJob?.cancel()
+        confirmJob?.cancel()
+        pairingJob?.cancel()
         viewModelScope.launch {
+            // Wait out a pending resume-position save so it cannot land after the progress wipe below
+            // and leak the previous account's continue-watching position to the next one.
+            saveJob?.cancelAndJoin()
             runCatching { repo.logout() }
             _state.value = UiState(checking = false)
         }
