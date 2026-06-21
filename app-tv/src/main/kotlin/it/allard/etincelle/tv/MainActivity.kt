@@ -61,7 +61,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val exo = ExoPlayer.Builder(this)
             // Pause on audio-focus loss (other media) and on a headset disconnect.
             .setAudioAttributes(
@@ -208,11 +207,13 @@ private fun TvPlayerSurface(
 ) {
     val view = LocalView.current
     DisposableEffect(Unit) {
-        // Mark the window secure while a stream is on screen (parity with mobile); protects the
-        // software/L3 decode path on top of Widevine L1 + HDCP.
+        // Keep the screen on and mark the window secure while a stream is on screen (parity with mobile):
+        // secure protects the software/L3 decode path on top of Widevine L1 + HDCP, and scoping
+        // keep-screen-on here lets the TV sleep when idling on browse/login instead of staying awake.
         val window = (view.context as? Activity)?.window
-        window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
+        val flags = WindowManager.LayoutParams.FLAG_SECURE or WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+        window?.addFlags(flags)
+        onDispose { window?.clearFlags(flags) }
     }
     DisposableEffect(source) {
         val item = MediaItemFactory.create(source)
