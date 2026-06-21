@@ -45,16 +45,20 @@ import it.allard.etincelle.core.designsystem.theme.BrandYellow
 /** Cast control for the top bar: shows a picker of discovered Chromecasts, or the connected one. */
 @Composable
 fun CastButton(state: CastUiState, onConnect: (String) -> Unit, onDisconnect: () -> Unit) {
-    if (!state.available) return
     var open by remember { mutableStateOf(false) }
-    TextButton(onClick = { open = true }) {
-        // A filled glyph signals an active Cast connection; the outline one means "not casting".
-        val icon = if (state.isCasting) DesignR.drawable.ic_cast_connected else DesignR.drawable.ic_cast
-        Icon(painterResource(icon), contentDescription = "Caster", modifier = Modifier.size(30.dp))
-        val device = state.connectedDeviceName
-        if (device != null) {
-            Spacer(Modifier.width(6.dp))
-            Text(device)
+    // Hide the button when there is nothing to cast to, but keep an already-open picker on screen so it
+    // does not vanish mid-interaction if the last discovered device drops off the network.
+    if (!state.available && !open) return
+    if (state.available) {
+        TextButton(onClick = { open = true }) {
+            // A filled glyph signals an active Cast connection; the outline one means "not casting".
+            val icon = if (state.isCasting) DesignR.drawable.ic_cast_connected else DesignR.drawable.ic_cast
+            Icon(painterResource(icon), contentDescription = "Caster", modifier = Modifier.size(30.dp))
+            val device = state.connectedDeviceName
+            if (device != null) {
+                Spacer(Modifier.width(6.dp))
+                Text(device)
+            }
         }
     }
     if (open) {
