@@ -14,6 +14,8 @@ data class UserSession(
 /** Domain-level failures surfaced to the UI, carrying user-facing French messages. */
 sealed class AppError(message: String) : Exception(message) {
     data object Unauthorized : AppError("Session expirée, reconnectez-vous")
+    // A 403 on a still-valid session: forbidden for geo or entitlement reasons, not an expired session.
+    data object Forbidden : AppError("Contenu non disponible avec votre abonnement ou dans votre région")
     data object GeoBlocked : AppError("Non disponible dans votre région")
     data object NotEntitled : AppError("Réservé aux abonnés")
     data class Network(val reason: String) : AppError(reason)

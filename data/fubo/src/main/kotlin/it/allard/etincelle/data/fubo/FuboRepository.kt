@@ -461,7 +461,9 @@ class FuboRepository(
 }
 
 private fun HttpException.toAppError(): AppError = when (code()) {
-    401, 403 -> AppError.Unauthorized
+    401 -> AppError.Unauthorized
+    // Forbidden on a session the server still recognizes (geo/entitlement); not an expired session.
+    403 -> AppError.Forbidden
     404 -> AppError.Unknown("Contenu introuvable")
     in 500..599 -> AppError.Network("Service indisponible, réessayez")
     else -> AppError.Unknown("Chargement impossible, réessayez")

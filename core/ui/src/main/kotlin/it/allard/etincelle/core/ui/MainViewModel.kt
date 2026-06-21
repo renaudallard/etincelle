@@ -241,8 +241,8 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         }
 
     // Surfaces a failure. Only when the session is genuinely gone (the repo cleared it) do we return
-    // to login - a plain 403 (forbidden/not-entitled/geo) also maps to Unauthorized but the session is
-    // still valid, so it must stay an in-place banner. Local prefs survive the reset.
+    // to login - a 403 maps to AppError.Forbidden (not Unauthorized) and the session is still valid, so
+    // it stays an in-place banner. Local prefs survive the reset.
     private fun applyFailure(e: Throwable, fallback: String) {
         if (e is AppError.Unauthorized && repo.currentSession() == null) {
             _state.update { UiState(checking = false, error = e.message, hideLocked = it.hideLocked, update = it.update) }
@@ -549,7 +549,8 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         throw c
     } catch (e: Throwable) {
         // Surface a genuinely dead session so the loggedIn shell is not left zombied; applyFailure is
-        // gated on currentSession()==null, so a recoverable 403 still fails in place rather than ejecting.
+        // gated on currentSession()==null, so it ejects only when the session is really gone. Other
+        // failures (forbidden/geo/network) return null and the cast caller surfaces the playback error.
         if (e is AppError.Unauthorized) applyFailure(e, "")
         null
     }
