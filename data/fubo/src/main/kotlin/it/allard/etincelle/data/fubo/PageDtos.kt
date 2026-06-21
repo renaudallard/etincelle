@@ -225,9 +225,12 @@ private fun ComponentDto.toCard(square: Boolean = false): ContentCard? {
     val label = title?.text ?: heading?.text ?: footer?.title?.text ?: actionUrl?.let { trkTitle(it) }
     if (img == null && label == null) return null
 
-    val channelId = actionUrl?.let { CHANNEL_REGEX.find(it)?.groupValues?.get(1) }
-    val vodId = actionUrl?.let { VOD_REGEX.find(it)?.groupValues?.get(1) }
-    val seriesId = actionUrl?.let { SERIES_REGEX.find(it)?.groupValues?.get(1) }
+    // Match only the path, not the query string: a nav url can carry an unrelated program-details/...
+    // link in its tracking params, which would otherwise set the wrong id (or both vod and series).
+    val path = actionUrl?.substringBefore('?')
+    val channelId = path?.let { CHANNEL_REGEX.find(it)?.groupValues?.get(1) }
+    val vodId = path?.let { VOD_REGEX.find(it)?.groupValues?.get(1) }
+    val seriesId = path?.let { SERIES_REGEX.find(it)?.groupValues?.get(1) }
 
     return ContentCard(
         id = id ?: label ?: img ?: "card",
