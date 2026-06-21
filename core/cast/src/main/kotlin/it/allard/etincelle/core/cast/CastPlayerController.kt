@@ -482,6 +482,9 @@ class CastPlayerController(
                 // the receiver; stop the connect animation and surface the error instead of leaving
                 // the bar stuck on "Connexion à …" with a stream that will never load.
                 if (fresh == null && target === castPlayer) {
+                    // Drop the item so a later re-entry of the same content is not short-circuited by
+                    // play()'s sameContent guard and actually reloads, instead of leaving the cast idle.
+                    currentItem = null
                     clearConnecting()
                     onError?.invoke(PLAYBACK_ERROR_MESSAGE)
                     return@launch
