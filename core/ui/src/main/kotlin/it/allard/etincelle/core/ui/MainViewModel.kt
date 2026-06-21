@@ -497,7 +497,11 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         val assetId = _state.value.detail?.recordAssetId ?: return
         _state.update { it.copy(busy = true, error = null, info = null) }
         viewModelScope.launch {
-            runCatching { repo.recordEpisode(assetId) }
+            val result = runCatching { repo.recordEpisode(assetId) }
+            // Only reflect the outcome if still on the detail that started it; a slow record completing
+            // after the user navigated away must not stamp busy/banner onto an unrelated screen.
+            if (_state.value.detail?.recordAssetId != assetId) return@launch
+            result
                 .onSuccess { _state.update { it.copy(busy = false, info = "Enregistrement programmé") } }
                 .onFailure { e -> applyFailure(e, "Échec de l'enregistrement") }
         }
