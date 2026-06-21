@@ -135,7 +135,9 @@ fun PageResponse.toProgramDetail(channelId: String?, vodId: String?, isLive: Boo
     val programId = meta?.id?.let { PROGRAM_ID_REGEX.find(it)?.groupValues?.get(1) }
     // An upcoming (not-yet-aired) programme is not playable; surface the backend's own localized reason
     // (e.g. "Ce programme sera en direct dans 4 jours.") instead of letting Regarder 5xx.
-    val upcomingMessage = content?.player?.let { p -> p.title?.text?.takeIf { p.isUpcoming == true && it.isNotBlank() } }
+    val upcomingMessage = content?.player?.takeIf { it.isUpcoming == true }?.let { p ->
+        p.title?.text?.takeIf { it.isNotBlank() } ?: p.subtitle?.text?.takeIf { it.isNotBlank() }
+    }
     return ProgramDetail(
         title = meta?.title?.text,
         subtitle = meta?.subtitle?.text,
