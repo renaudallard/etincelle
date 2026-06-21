@@ -176,6 +176,14 @@ class MainActivity : ComponentActivity() {
         // Pause playback in the background (no decoding/audio); resume on return.
         player?.let {
             if (it.isPlaying) {
+                // Persist the resume point now too: the player surface only saves on dispose, which a
+                // kill of the backgrounded process skips, losing the position. Only ever save a real
+                // position here, never clear (positionToSave returns 0 near the start/end), so a
+                // background blip cannot wipe a valid resume point; clearing is the dispose path's job.
+                viewModel.state.value.playing?.let { src ->
+                    val pos = PlaybackProgress.positionToSave(it.currentPosition, it.duration)
+                    if (pos > 0) viewModel.savePlaybackPosition(src.resumeKey, pos)
+                }
                 pausedForBackground = true
                 it.playWhenReady = false
             }

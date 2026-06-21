@@ -271,6 +271,15 @@ class MainActivity : ComponentActivity() {
         // the local player is idle, so this is a no-op and the Chromecast keeps playing.
         player?.let {
             if (it.isPlaying) {
+                // Persist the resume point now too: the player surface only saves on dispose, which a
+                // kill of the backgrounded process skips, losing the position. Only ever save a real
+                // position here, never clear (positionToSave returns 0 near the start/end), so a
+                // background blip cannot wipe a valid resume point; clearing is the dispose path's job.
+                // (No-op while casting: the local player is idle, so isPlaying is false.)
+                viewModel.state.value.playing?.let { src ->
+                    val pos = PlaybackProgress.positionToSave(it.currentPosition, it.duration)
+                    if (pos > 0) viewModel.savePlaybackPosition(src.resumeKey, pos)
+                }
                 pausedForBackground = true
                 it.playWhenReady = false
             }
