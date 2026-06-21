@@ -606,7 +606,12 @@ private fun PlayerSurface(
                 // pinned (controllerShowTimeoutMs=0 / hideOnTouch=false) for the cast controller.
                 if (!secure) it.showController()
             },
-            onRelease = { it.player = null },
+            onRelease = {
+                it.player = null
+                // Clear the listener too: it captures the controlsVisible setter, so leaving it set holds
+                // the recomposition scope on the detached view until it is garbage-collected.
+                it.setControllerVisibilityListener(null as PlayerView.ControllerVisibilityListener?)
+            },
             modifier = Modifier.fillMaxSize(),
         )
         if (controlsVisible) {
