@@ -79,6 +79,12 @@ class FuboCastMediaItemConverter(
             if (source?.isLive == true && source.liveRewindOffsetMs > 0) {
                 put("live_rewind_sec", (source.liveRewindOffsetMs + 500) / 1000)
             }
+            // The on-screen programme's air-window (epoch ms), so the receiver can mark the current
+            // show on its seek bar like the phone does. Live only; absent when no times are known.
+            source?.programWindow?.takeIf { source.isLive }?.let {
+                put("program_start_ms", it.startMs)
+                put("program_end_ms", it.endMs)
+            }
             if (!licenseUrl.isNullOrEmpty() && !token.isNullOrEmpty()) {
                 put("license_url", licenseUrl)
                 put("drm_token", token)
