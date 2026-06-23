@@ -6,6 +6,21 @@ package it.allard.etincelle.core.player
 import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
+import it.allard.etincelle.core.model.ProgramWindow
+
+/**
+ * Where the live seek bar's marks sit, as fractions [0,1] of the seekable window (the ~4h DVR
+ * buffer): [playedFraction] is the playhead, [liveFraction] the live edge. When [hasProgramBand],
+ * the current programme spans [[showStartFraction], [showEndFraction]] and everything before
+ * [showStartFraction] is earlier-buffer to be drawn in a distinct colour.
+ */
+data class LiveBarGeometry(
+    val playedFraction: Float,
+    val liveFraction: Float,
+    val showStartFraction: Float,
+    val showEndFraction: Float,
+    val hasProgramBand: Boolean,
+)
 
 /** Live DVR helpers and tuning shared by the phone player, the TV player, and the cast controller. */
 object LivePlayback {
@@ -57,5 +72,54 @@ object LivePlayback {
         // cast recovery) would otherwise drop the rewind and snap to the live edge. Fall back to the
         // behind-edge measure, which keeps the viewer's position (to within the stream's edge delay).
         return if (offset != C.TIME_UNSET && offset > 0) offset else behind
+    }
+
+    /**
+     * The marks for a programme-scoped live seek bar at true window scale, or null when the stream is
+     * not a live seekable window yet. The window maps to wall-clock via [Timeline.Window.windowStartTimeMs]
+     * (the Fubo live manifest is epoch-normalised); without it (C.TIME_UNSET) the bar still spans the
+     * window but carries no programme band. [window] is a caller-owned scratch instance to fill.
+     */
+    fun liveBarGeometry(player: Player, window: Timeline.Window, programWindow: ProgramWindow?): LiveBarGeometry? {
+        if (!player.isCurrentMediaItemLive) return null
+        val timeline = player.currentTimeline
+        if (timeline.isEmpty) return null
+        timeline.getWindow(player.currentMediaItemIndex, window)
+        if (!window.isLive()) return null
+        val durationMs = window.durationMs
+        if (durationMs <= 0L) return null
+        val played = (player.currentPosition.toFloat() / durationMs).coerceIn(0f, 1f)
+        val live = (window.defaultPositionMs.toFloat() / durationMs).coerceIn(0f, 1f)
+        val windowStart = window.windowStartTimeMs
+        if (programWindow == null || windowStart == C.TIME_UNSET) {
+            return LiveBarGeometry(played, live, 0f, 0f, hasProgramBand = false)
+        }
+        val showStart = ((programWindow.startMs - windowStart).toFloat() / durationMs).coerceIn(0f, 1f)
+        val showEnd = ((programWindow.endMs - windowStart).toFloat() / durationMs).coerceIn(0f, 1f)
+        return LiveBarGeometry(played, live, showStart, showEnd, hasProgramBand = showEnd > showStart)
+    }
+
+    /** Seeks the live window to [fraction] of its seekable range, never past the live edge. */
+    fun seekToFraction(player: Player, window: Timeline.Window, fraction: Float) {
+        val timeline = player.currentTimeline
+        if (timeline.isEmpty) return
+        timeline.getWindow(player.currentMediaItemIndex, window)
+        val durationMs = window.durationMs
+        if (durationMs <= 0L) return
+        val target = (fraction.coerceIn(0f, 1f) * durationMs).toLong().coerceIn(0L, window.defaultPositionMs)
+        player.seekTo(target)
+    }
+
+    /** The live edge as wall-clock epoch ms, or null when the window carries no epoch anchor. Used to
+     * tell when the live edge has crossed the current programme's end and the bar must re-scope. */
+    fun liveEdgeEpochMs(player: Player, window: Timeline.Window): Long? {
+        if (!player.isCurrentMediaItemLive) return null
+        val timeline = player.currentTimeline
+        if (timeline.isEmpty) return null
+        timeline.getWindow(player.currentMediaItemIndex, window)
+        if (!window.isLive()) return null
+        val windowStart = window.windowStartTimeMs
+        if (windowStart == C.TIME_UNSET) return null
+        return windowStart + window.defaultPositionMs
     }
 }

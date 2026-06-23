@@ -14,6 +14,7 @@ import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramDetail
+import it.allard.etincelle.core.model.ProgramWindow
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
@@ -573,6 +574,11 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         if (e is AppError.Unauthorized) applyFailure(e, "")
         null
     }
+
+    /** The on-screen programme's air-window for a live channel, for the player's programme-scoped seek
+     * bar; best-effort, so a failed lookup just leaves the bar spanning the full window. */
+    suspend fun liveProgramWindow(channelId: String): ProgramWindow? =
+        runCatching { repo.liveProgramWindow(channelId) }.getOrNull()
 
     fun openSettings() = _state.update { it.copy(settings = true, updateStatus = null) }
 

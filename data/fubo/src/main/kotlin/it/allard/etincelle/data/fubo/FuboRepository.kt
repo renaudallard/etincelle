@@ -12,6 +12,7 @@ import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.DrmSpec
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramDetail
+import it.allard.etincelle.core.model.ProgramWindow
 import it.allard.etincelle.core.model.Recording
 import it.allard.etincelle.core.model.PairingCode
 import it.allard.etincelle.core.model.UserSession
@@ -355,8 +356,15 @@ class FuboRepository(
     }
 
     override suspend fun resolveLiveChannel(channelId: String): PlaybackSource = withRefresh {
-        api.playbackAsset(channelId = channelId, type = "live").toPlaybackSource()
-            .copy(originChannelId = channelId)
+        val resp = api.playbackAsset(channelId = channelId, type = "live")
+        resp.toPlaybackSource().copy(
+            originChannelId = channelId,
+            programWindow = resp.accessRightsV2?.live?.toProgramWindow(),
+        )
+    }
+
+    override suspend fun liveProgramWindow(channelId: String): ProgramWindow? = withRefresh {
+        api.playbackAsset(channelId = channelId, type = "live").accessRightsV2?.live?.toProgramWindow()
     }
 
     override suspend fun resolveVod(vodId: String): PlaybackSource = withRefresh {
@@ -467,6 +475,13 @@ private fun HttpException.toAppError(): AppError = when (code()) {
     404 -> AppError.Unknown("Contenu introuvable")
     in 500..599 -> AppError.Network("Service indisponible, réessayez")
     else -> AppError.Unknown("Chargement impossible, réessayez")
+}
+
+/** The programme air-window in epoch ms, preferring the ms form; null unless both bounds are sane. */
+internal fun AccessRightsV2WindowDto.toProgramWindow(): ProgramWindow? {
+    val start = startTimeMs ?: rfc3339UtcToEpochMillis(startTime)
+    val end = endTimeMs ?: rfc3339UtcToEpochMillis(endTime)
+    return if (start != null && end != null && end > start) ProgramWindow(start, end) else null
 }
 
 internal fun PlaybackResponse.toPlaybackSource(): PlaybackSource {

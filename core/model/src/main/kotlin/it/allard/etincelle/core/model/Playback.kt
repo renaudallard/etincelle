@@ -17,12 +17,19 @@ sealed interface DrmSpec {
     ) : DrmSpec
 }
 
+/** The air-window (epoch ms, UTC) of a live channel's currently-on-screen programme, used to scope
+ * the live seek bar to the show. [startMs] is its scheduled start, [endMs] its scheduled end. */
+data class ProgramWindow(val startMs: Long, val endMs: Long)
+
 /** Everything the player needs to start a stream, mapped from the backend playback response. */
 data class PlaybackSource(
     val manifestUrl: String,
     val drm: DrmSpec,
     val isLive: Boolean,
     val title: String? = null,
+    /** Live only: the on-screen programme's air-window, so the seek bar can mark the show within the
+     * ~4h DVR window. Null when the backend gives no programme times; the bar then spans the window. */
+    val programWindow: ProgramWindow? = null,
     /** Non-null for VOD/replay: the key under which to remember the resume position. */
     val resumeKey: String? = null,
     /** Where to start playback (ms); 0 starts at the beginning / live edge. */

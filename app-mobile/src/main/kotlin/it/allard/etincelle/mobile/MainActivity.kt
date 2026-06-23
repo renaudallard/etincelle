@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.AlertDialog
@@ -62,11 +63,14 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import it.allard.etincelle.core.cast.CastPlayerController
 import it.allard.etincelle.core.cast.CastUiState
+import it.allard.etincelle.core.designsystem.LiveProgramBar
 import it.allard.etincelle.core.designsystem.R as DesignR
 import it.allard.etincelle.core.designsystem.ReturnToLiveButton
 import it.allard.etincelle.core.designsystem.theme.EtincelleTheme
 import it.allard.etincelle.core.domain.DetailKind
 import it.allard.etincelle.core.model.PlaybackSource
+import it.allard.etincelle.core.model.ProgramWindow
+import it.allard.etincelle.core.player.LiveBarGeometry
 import it.allard.etincelle.core.player.LivePlayback
 import it.allard.etincelle.core.player.MediaItemFactory
 import it.allard.etincelle.core.player.PlaybackProgress
@@ -385,7 +389,10 @@ private fun AppRoot(
                     // over the whole screen with the player when playing locally on the phone.
                     playerFullscreen -> {
                         BackHandler { vm.stopPlaying() }
-                        PlayerSurface(playing!!, currentPlayer, castState, onCastConnect, onCastDisconnect)
+                        PlayerSurface(
+                            playing!!, currentPlayer, castState, onCastConnect, onCastDisconnect,
+                            fetchProgramWindow = vm::liveProgramWindow,
+                        )
                     }
 
                     // The cast controller: the same player surface bound to the cast player, so its
@@ -393,7 +400,8 @@ private fun AppRoot(
                     castControls -> {
                         BackHandler { castControlsOpen = false }
                         PlayerSurface(
-                            playing!!, currentPlayer, castState, onCastConnect, onCastDisconnect, secure = false,
+                            playing!!, currentPlayer, castState, onCastConnect, onCastDisconnect,
+                            fetchProgramWindow = vm::liveProgramWindow, secure = false,
                         )
                     }
 
@@ -558,6 +566,7 @@ private fun PlayerSurface(
     castState: CastUiState,
     onCastConnect: (String) -> Unit,
     onCastDisconnect: () -> Unit,
+    fetchProgramWindow: suspend (String) -> ProgramWindow?,
     secure: Boolean = true,
 ) {
     val view = LocalView.current
@@ -577,14 +586,37 @@ private fun PlayerSurface(
     // has scrubbed into the DVR window of a live show (and disappear again at the edge).
     val liveWindow = remember { Timeline.Window() }
     var behindLive by remember { mutableStateOf(false) }
+    // The on-screen programme's air-window, marked on the live bar. Kept locally (not on the source)
+    // so re-scoping it on a programme rollover does not restart the stream. Only the local player gets
+    // the custom bar: a CastPlayer reports no live window here, so leave its controller untouched.
+    val showBar = secure && source.isLive
+    var programWindow by remember(source) { mutableStateOf(source.programWindow) }
+    var barGeometry by remember { mutableStateOf<LiveBarGeometry?>(null) }
     LaunchedEffect(currentPlayer, source.isLive) {
         // VOD and recordings have no live edge, so do not poll: stay at "not behind" without a 1s loop.
         if (!source.isLive) {
             behindLive = false
+            barGeometry = null
             return@LaunchedEffect
         }
+        var nextRolloverMs = 0L
         while (true) {
             behindLive = LivePlayback.behindLiveEdgeMs(currentPlayer, liveWindow) > LivePlayback.LIVE_REWIND_THRESHOLD_MS
+            if (showBar) {
+                barGeometry = LivePlayback.liveBarGeometry(currentPlayer, liveWindow, programWindow)
+                // Rollover: once the live edge passes the show's end, re-scope to the now-current
+                // programme. Throttled, and only adopted when it actually advances, so a backend that
+                // lags the boundary is not polled every second.
+                val pw = programWindow
+                val edge = LivePlayback.liveEdgeEpochMs(currentPlayer, liveWindow)
+                val now = System.currentTimeMillis()
+                if (pw != null && edge != null && edge >= pw.endMs && now >= nextRolloverMs) {
+                    nextRolloverMs = now + 15_000
+                    source.originChannelId?.let { channelId ->
+                        fetchProgramWindow(channelId)?.takeIf { it.endMs > pw.endMs }?.let { programWindow = it }
+                    }
+                }
+            }
             delay(1000)
         }
     }
@@ -602,6 +634,9 @@ private fun PlayerSurface(
                         controllerShowTimeoutMs = 0
                         setControllerHideOnTouch(false)
                     }
+                    // The live programme bar replaces the default time bar (which spans the bare 4h
+                    // DVR window with no show markers), so hide the built-in one for the local player.
+                    if (showBar) findViewById<View?>(androidx.media3.ui.R.id.exo_progress)?.visibility = View.GONE
                     setControllerVisibilityListener(
                         PlayerView.ControllerVisibilityListener { visibility ->
                             controlsVisible = visibility == View.VISIBLE
@@ -611,6 +646,7 @@ private fun PlayerSurface(
             },
             update = {
                 it.player = currentPlayer
+                if (showBar) it.findViewById<View?>(androidx.media3.ui.R.id.exo_progress)?.visibility = View.GONE
                 // The cast player never auto-shows the controller, so show it explicitly and keep it
                 // pinned (controllerShowTimeoutMs=0 / hideOnTouch=false) for the cast controller.
                 if (!secure) it.showController()
@@ -633,6 +669,18 @@ private fun PlayerSurface(
                 onClick = { currentPlayer.seekToDefaultPosition() },
                 modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 12.dp),
             )
+        }
+        barGeometry?.let { bar ->
+            if (controlsVisible) {
+                LiveProgramBar(
+                    playedFraction = bar.playedFraction,
+                    liveFraction = bar.liveFraction,
+                    showStartFraction = if (bar.hasProgramBand) bar.showStartFraction else 0f,
+                    onSeekToFraction = { LivePlayback.seekToFraction(currentPlayer, liveWindow, it) },
+                    modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
         }
     }
 }

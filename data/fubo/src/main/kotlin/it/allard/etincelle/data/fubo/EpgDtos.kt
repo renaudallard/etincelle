@@ -65,6 +65,10 @@ private fun utcFormatter() =
 /** Formats an epoch instant as an RFC3339 UTC timestamp, the format /epg expects. */
 internal fun rfc3339Utc(epochMillis: Long): String = utcFormatter().format(Date(epochMillis))
 
+/** Parses an RFC3339 UTC timestamp to epoch millis, or null if absent/unparseable. */
+internal fun rfc3339UtcToEpochMillis(rfc3339: String?): Long? =
+    rfc3339?.let { runCatching { utcFormatter().parse(it) }.getOrNull() }?.time
+
 /** Parses an RFC3339 UTC timestamp and renders it as device-local "HH:mm", or null if unparseable. */
 private fun localHourMinute(rfc3339: String?): String? {
     val parsed = rfc3339?.let { runCatching { utcFormatter().parse(it) }.getOrNull() } ?: return null

@@ -7,6 +7,7 @@ import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.PairingCode
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramDetail
+import it.allard.etincelle.core.model.ProgramWindow
 import it.allard.etincelle.core.model.Recording
 import it.allard.etincelle.core.model.UserSession
 
@@ -55,6 +56,10 @@ interface MolotovRepository {
 
     suspend fun resolveLiveChannel(channelId: String): PlaybackSource
     suspend fun resolveVod(vodId: String): PlaybackSource
+
+    /** The current programme's air-window for a live channel, so the live seek bar can mark the show
+     * on screen and re-scope when it rolls over to the next programme; null when no times are given. */
+    suspend fun liveProgramWindow(channelId: String): ProgramWindow?
 
     /** Resolves a DVR recording [assetId] to a playable stream. */
     suspend fun resolveRecording(assetId: String): PlaybackSource

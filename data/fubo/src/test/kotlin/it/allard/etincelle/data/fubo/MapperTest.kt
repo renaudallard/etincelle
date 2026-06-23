@@ -60,6 +60,31 @@ class MapperTest {
     }
 
     @Test
+    fun `program window parses rfc3339 utc bounds`() {
+        val window = AccessRightsV2WindowDto(startTime = "2026-06-23T19:50:00Z", endTime = "2026-06-23T20:15:00Z")
+            .toProgramWindow()!!
+        assertEquals(1_782_244_200_000L, window.startMs)
+        assertEquals(1_782_245_700_000L, window.endMs)
+    }
+
+    @Test
+    fun `program window prefers the epoch-ms bounds over the string form`() {
+        val window = AccessRightsV2WindowDto(
+            startTime = "2026-06-23T19:50:00Z", endTime = "2026-06-23T20:15:00Z",
+            startTimeMs = 1_000L, endTimeMs = 2_000L,
+        ).toProgramWindow()!!
+        assertEquals(1_000L, window.startMs)
+        assertEquals(2_000L, window.endMs)
+    }
+
+    @Test
+    fun `program window is null when bounds are missing or not ordered`() {
+        assertNull(AccessRightsV2WindowDto().toProgramWindow())
+        assertNull(AccessRightsV2WindowDto(startTimeMs = 5_000L, endTimeMs = 5_000L).toProgramWindow())
+        assertNull(AccessRightsV2WindowDto(startTime = "not-a-date", endTime = "2026-06-23T20:15:00Z").toProgramWindow())
+    }
+
+    @Test
     fun `collapsedByShow groups episodes per show and badges only multi-episode shows`() {
         val recs = listOf(
             Recording("a1", "Ep1", null, "img1", "C", "p1", "S1", "Show One"),

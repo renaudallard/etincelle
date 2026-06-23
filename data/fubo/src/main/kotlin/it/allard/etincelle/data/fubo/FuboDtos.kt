@@ -65,6 +65,23 @@ data class PlaybackResponse(
     val playhead: PlayHeadDto?,
     val type: String?,
     val program: ProgramDto?,
+    @Json(name = "accessRightsV2") val accessRightsV2: AccessRightsV2Dto? = null,
+    @Json(name = "nextProgramURL") val nextProgramUrl: String? = null,
+)
+
+/** Per-mode air-windows and scrubbing rights on a live playback response; only [live] is used today. */
+data class AccessRightsV2Dto(val live: AccessRightsV2WindowDto?)
+
+/**
+ * The current live programme's air-window. The backend has been seen to express the bounds either as
+ * RFC3339-UTC strings ([startTime]/[endTime]) or as epoch-ms longs ([startTimeMs]/[endTimeMs]), so
+ * both are parsed and the ms form is preferred.
+ */
+data class AccessRightsV2WindowDto(
+    val startTime: String? = null,
+    val endTime: String? = null,
+    val startTimeMs: Long? = null,
+    val endTimeMs: Long? = null,
 )
 
 /**

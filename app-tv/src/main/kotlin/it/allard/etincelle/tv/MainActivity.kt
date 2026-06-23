@@ -7,6 +7,7 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.View
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -14,6 +15,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
@@ -40,10 +42,13 @@ import androidx.media3.common.C
 import androidx.media3.common.Timeline
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import it.allard.etincelle.core.designsystem.LiveProgramBar
 import it.allard.etincelle.core.designsystem.ReturnToLiveButton
 import it.allard.etincelle.core.designsystem.theme.EtincelleTheme
 import it.allard.etincelle.core.domain.DetailKind
 import it.allard.etincelle.core.model.PlaybackSource
+import it.allard.etincelle.core.model.ProgramWindow
+import it.allard.etincelle.core.player.LiveBarGeometry
 import it.allard.etincelle.core.player.LivePlayback
 import it.allard.etincelle.core.player.MediaItemFactory
 import it.allard.etincelle.core.player.PlaybackProgress
@@ -98,7 +103,10 @@ class MainActivity : ComponentActivity() {
 
                         playing != null -> {
                             BackHandler { viewModel.stopPlaying() }
-                            TvPlayerSurface(playing, exo, viewModel::savePlaybackPosition, viewModel::reportProgress)
+                            TvPlayerSurface(
+                                playing, exo, viewModel::savePlaybackPosition, viewModel::reportProgress,
+                                viewModel::liveProgramWindow,
+                            )
                         }
 
                         detail != null -> {
@@ -212,6 +220,7 @@ private fun TvPlayerSurface(
     player: ExoPlayer,
     onSavePosition: (String?, Long) -> Unit,
     onReportProgress: (PlaybackSource, Long, Long) -> Unit,
+    fetchProgramWindow: suspend (String) -> ProgramWindow?,
 ) {
     val view = LocalView.current
     DisposableEffect(Unit) {
@@ -241,23 +250,70 @@ private fun TvPlayerSurface(
     // viewer has scrubbed into the DVR window of a live show (and disappears again at the edge).
     val liveWindow = remember { Timeline.Window() }
     var behindLive by remember { mutableStateOf(false) }
+    // The on-screen programme's air-window, marked on the live bar; kept locally so a rollover re-scope
+    // does not restart the stream. The TV bar is a position indicator (the remote scrubs with the
+    // rewind/forward buttons), so it carries no seek callback.
+    var programWindow by remember(source) { mutableStateOf(source.programWindow) }
+    var barGeometry by remember { mutableStateOf<LiveBarGeometry?>(null) }
+    var controlsVisible by remember { mutableStateOf(true) }
     LaunchedEffect(source.isLive) {
         // VOD and recordings have no live edge, so do not poll: stay at "not behind" without a 1s loop.
         if (!source.isLive) {
             behindLive = false
+            barGeometry = null
             return@LaunchedEffect
         }
+        var nextRolloverMs = 0L
         while (true) {
             behindLive = LivePlayback.behindLiveEdgeMs(player, liveWindow) > LivePlayback.LIVE_REWIND_THRESHOLD_MS
+            barGeometry = LivePlayback.liveBarGeometry(player, liveWindow, programWindow)
+            val pw = programWindow
+            val edge = LivePlayback.liveEdgeEpochMs(player, liveWindow)
+            val now = System.currentTimeMillis()
+            if (pw != null && edge != null && edge >= pw.endMs && now >= nextRolloverMs) {
+                nextRolloverMs = now + 15_000
+                source.originChannelId?.let { channelId ->
+                    fetchProgramWindow(channelId)?.takeIf { it.endMs > pw.endMs }?.let { programWindow = it }
+                }
+            }
             delay(1000)
         }
     }
     Box(Modifier.fillMaxSize()) {
         AndroidView(
-            factory = { context -> PlayerView(context).apply { this.player = player } },
-            onRelease = { it.player = null },
+            factory = { context ->
+                PlayerView(context).apply {
+                    this.player = player
+                    // The programme bar replaces the default time bar, which spans the bare 4h DVR
+                    // window with no show markers.
+                    if (source.isLive) findViewById<View?>(androidx.media3.ui.R.id.exo_progress)?.visibility = View.GONE
+                    setControllerVisibilityListener(
+                        PlayerView.ControllerVisibilityListener { visibility ->
+                            controlsVisible = visibility == View.VISIBLE
+                        },
+                    )
+                }
+            },
+            update = {
+                if (source.isLive) it.findViewById<View?>(androidx.media3.ui.R.id.exo_progress)?.visibility = View.GONE
+            },
+            onRelease = {
+                it.player = null
+                it.setControllerVisibilityListener(null as PlayerView.ControllerVisibilityListener?)
+            },
             modifier = Modifier.fillMaxSize(),
         )
+        barGeometry?.let { bar ->
+            if (controlsVisible) {
+                LiveProgramBar(
+                    playedFraction = bar.playedFraction,
+                    liveFraction = bar.liveFraction,
+                    showStartFraction = if (bar.hasProgramBand) bar.showStartFraction else 0f,
+                    modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding()
+                        .padding(horizontal = 48.dp, vertical = 24.dp),
+                )
+            }
+        }
         if (behindLive) {
             // The PlayerView controller owns D-pad focus, so claim it for the pill while it is shown
             // (as the rest of the TV UI does) - otherwise the remote could never reach it.
