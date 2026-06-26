@@ -310,6 +310,7 @@ private const val VOLUME_OVERLAY_MS = 1500L
 private fun tabIconRes(tab: Tab): Int? = when (tab) {
     Tab.HOME -> DesignR.drawable.ic_accueil
     Tab.LIVE -> DesignR.drawable.ic_direct
+    Tab.CHANNELS -> DesignR.drawable.ic_chaines
     Tab.GUIDE -> DesignR.drawable.ic_grille
     Tab.MOVIES -> DesignR.drawable.ic_films
     Tab.SERIES -> DesignR.drawable.ic_series

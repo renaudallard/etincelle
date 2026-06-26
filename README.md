@@ -34,7 +34,8 @@ passera (par exemple « Ce programme sera en direct dans 4 jours. ») au lieu d'
 **applications des diffuseurs** (france.tv, MyTF1, M6+…) : ouvrez l'une d'elles pour parcourir son
 catalogue (un abonnement peut être requis). Cliquer sur l'en-tête d'une rangée (par ex. *En direct à
 la TV*) ouvre la **catégorie complète en grille**, avec le nom de la chaîne sous chaque programme.
-Le **guide** se rafraîchit à chaque ouverture et au retour de l'application (son contenu se périme
+L'onglet **Chaînes** ouvre la grille de **toutes les chaînes** (TNT, chaînes thématiques Molotov…)
+pour les parcourir directement. Le **guide** se rafraîchit à chaque ouverture et au retour de l'application (son contenu se périme
 avec l'heure) ; sur téléphone, n'importe quelle page se **rafraîchit** en tirant au-delà du haut ou
 du bas de la liste.
 

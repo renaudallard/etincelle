@@ -37,6 +37,7 @@ private const val PAIRING_MAX_ROUNDS = 12
 enum class Tab(val label: String, val icon: String, val path: String) {
     HOME("Accueil", "🏠", "papi/v1/page/home"),
     LIVE("Direct", "📡", "papi/v1/page/live-tv"),
+    CHANNELS("Chaînes", "📺", "papi/v1/page/channels"),
     GUIDE("Guide", "🗓", ""),
     MOVIES("Films", "🎬", "papi/v1/page/films"),
     SERIES("Séries", "📺", "papi/v1/page/series"),
@@ -305,9 +306,9 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         }
         if (tab == _state.value.tab && _state.value.backStack.size == 1) return
         _state.update { it.copy(busy = true, error = null, tab = tab) }
-        // The Direct tab loads the same /live-tv page as the "En direct à la TV" rail header, so
-        // render it as the same full-screen grid for a coherent experience.
-        loadPageInto(tab.path, replace = true, fallbackTitle = tab.label, grid = tab == Tab.LIVE)
+        // The Direct and Chaînes tabs load a page (/live-tv, /channels) that is also reachable from a
+        // rail header, so render them as the same full-screen grid for a coherent experience.
+        loadPageInto(tab.path, replace = true, fallbackTitle = tab.label, grid = tab == Tab.LIVE || tab == Tab.CHANNELS)
     }
 
     private fun reloadGuide(silent: Boolean) {
