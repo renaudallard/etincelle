@@ -3,6 +3,7 @@
 
 package it.allard.etincelle.core.player
 
+import androidx.media3.common.C
 import it.allard.etincelle.core.model.ProgramWindow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -118,5 +119,62 @@ class LivePlaybackTest {
             programWindow = oneHourShow,
         )
         assertEquals(programStart, target)
+    }
+
+    @Test
+    fun `stays precise at real epoch scale`() {
+        // Real Fubo windows carry ~1.7e12 epoch ms; the fraction must subtract in Long before going to
+        // Float, or ~1e5 ms of precision is lost. A 1h show, 20 min in, playhead at the live edge.
+        val windowStart = 1_700_000_000_000L
+        val liveEdgeWall = windowStart + window4h
+        val program = ProgramWindow(liveEdgeWall - 20 * 60_000L, liveEdgeWall - 20 * 60_000L + hour)
+        val g = LivePlayback.liveBarGeometry(
+            currentPositionMs = window4h,
+            liveEdgeMs = window4h,
+            windowDurationMs = window4h,
+            windowStartTimeMs = windowStart,
+            programWindow = program,
+        )!!
+        assertEquals(20f / 60f, g.playedFraction, 1e-4f)
+        assertEquals(20f / 60f, g.liveFraction, 1e-4f)
+        assertEquals(0f, g.seekFloorFraction, 1e-4f)
+    }
+
+    @Test
+    fun `seeking before the window start clamps to the rewind floor`() {
+        // Show older than the buffer: the window opens 1h in, so fraction 0 is before what can be reached.
+        val sixHourShow = ProgramWindow(0L, 6 * hour)
+        val target = LivePlayback.seekTargetMs(
+            fraction = 0f,
+            windowDurationMs = window4h,
+            windowStartTimeMs = hour,
+            liveEdgeMs = window4h,
+            programWindow = sixHourShow,
+        )
+        assertEquals(0L, target) // clamped up to the window start
+    }
+
+    @Test
+    fun `falls back to the bare window when the wall-clock anchor is unknown`() {
+        // A known programme but an epoch-less window (C.TIME_UNSET) cannot be anchored, so both the
+        // geometry and the seek use the bare-window scale.
+        val g = LivePlayback.liveBarGeometry(
+            currentPositionMs = 2 * hour,
+            liveEdgeMs = window4h,
+            windowDurationMs = window4h,
+            windowStartTimeMs = C.TIME_UNSET,
+            programWindow = oneHourShow,
+        )!!
+        assertFalse(g.hasProgramBand)
+        assertEquals(0.5f, g.playedFraction, 1e-4f)
+
+        val target = LivePlayback.seekTargetMs(
+            fraction = 0.5f,
+            windowDurationMs = window4h,
+            windowStartTimeMs = C.TIME_UNSET,
+            liveEdgeMs = window4h,
+            programWindow = oneHourShow,
+        )
+        assertEquals(2 * hour, target)
     }
 }
