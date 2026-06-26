@@ -43,6 +43,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -377,6 +378,10 @@ private fun AppRoot(
         }
     }
 
+    // Retains each page's saveable UI state (e.g. list/grid scroll) while a detail or the player covers
+    // the logged-in content, so backing out restores it. Lives above the screen `when` so it survives
+    // that swap (the logged-in branch leaves composition while a detail is shown).
+    val contentStateHolder = rememberSaveableStateHolder()
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f)) {
@@ -497,41 +502,55 @@ private fun AppRoot(
                             },
                         ) { padding ->
                             val modifier = Modifier.padding(padding)
-                            if (state.tab == Tab.SEARCH) {
-                                SearchScreen(
-                                    rails = state.visibleRails,
-                                    busy = state.busy,
-                                    error = state.error,
-                                    onSubmit = vm::search,
-                                    onCardClick = vm::onCardClick,
-                                    onSeeAll = vm::onRailSeeAll,
-                                    refreshing = state.refreshing,
-                                    onRefresh = vm::refreshCurrent,
-                                    modifier = modifier,
-                                )
-                            } else if (state.current?.isGrid == true) {
-                                GridContent(
-                                    rails = state.visibleRails,
-                                    busy = state.busy,
-                                    error = state.error,
-                                    onCardClick = vm::onCardClick,
-                                    refreshing = state.refreshing,
-                                    onRefresh = vm::refreshCurrent,
-                                    columns = gridColumns,
-                                    pageTitle = state.current?.title,
-                                    modifier = modifier,
-                                )
+                            // Key the saveable state by the back-stack entry so each page keeps its own
+                            // scroll: the key is unchanged while a detail covers the page (the back stack
+                            // does not move), so the scroll offset is restored when the detail closes.
+                            // Search keeps a constant key: it always shows SearchScreen, and its back-stack
+                            // depth flips 0->1 when results arrive, which would otherwise tear down the
+                            // search field and blank the typed query.
+                            val pageKey = if (state.tab == Tab.SEARCH) {
+                                "SEARCH"
                             } else {
-                                PageContent(
-                                    rails = state.visibleRails,
-                                    busy = state.busy,
-                                    error = state.error,
-                                    onCardClick = vm::onCardClick,
-                                    onSeeAll = vm::onRailSeeAll,
-                                    refreshing = state.refreshing,
-                                    onRefresh = vm::refreshCurrent,
-                                    modifier = modifier,
-                                )
+                                "${state.tab.name}#${state.backStack.size}#" +
+                                    (state.current?.reloadUrl ?: state.current?.title.orEmpty())
+                            }
+                            contentStateHolder.SaveableStateProvider(pageKey) {
+                                if (state.tab == Tab.SEARCH) {
+                                    SearchScreen(
+                                        rails = state.visibleRails,
+                                        busy = state.busy,
+                                        error = state.error,
+                                        onSubmit = vm::search,
+                                        onCardClick = vm::onCardClick,
+                                        onSeeAll = vm::onRailSeeAll,
+                                        refreshing = state.refreshing,
+                                        onRefresh = vm::refreshCurrent,
+                                        modifier = modifier,
+                                    )
+                                } else if (state.current?.isGrid == true) {
+                                    GridContent(
+                                        rails = state.visibleRails,
+                                        busy = state.busy,
+                                        error = state.error,
+                                        onCardClick = vm::onCardClick,
+                                        refreshing = state.refreshing,
+                                        onRefresh = vm::refreshCurrent,
+                                        columns = gridColumns,
+                                        pageTitle = state.current?.title,
+                                        modifier = modifier,
+                                    )
+                                } else {
+                                    PageContent(
+                                        rails = state.visibleRails,
+                                        busy = state.busy,
+                                        error = state.error,
+                                        onCardClick = vm::onCardClick,
+                                        onSeeAll = vm::onRailSeeAll,
+                                        refreshing = state.refreshing,
+                                        onRefresh = vm::refreshCurrent,
+                                        modifier = modifier,
+                                    )
+                                }
                             }
                         }
                     }
