@@ -675,8 +675,8 @@ private fun PlayerSurface(
                 LiveProgramBar(
                     playedFraction = bar.playedFraction,
                     liveFraction = bar.liveFraction,
-                    showStartFraction = if (bar.hasProgramBand) bar.showStartFraction else 0f,
-                    onSeekToFraction = { LivePlayback.seekToFraction(currentPlayer, liveWindow, it) },
+                    seekFloorFraction = if (bar.hasProgramBand) bar.seekFloorFraction else 0f,
+                    onSeekToFraction = { LivePlayback.seekToFraction(currentPlayer, liveWindow, it, programWindow) },
                     modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding()
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                 )

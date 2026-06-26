@@ -24,15 +24,16 @@ import androidx.compose.ui.unit.dp
 // Dark-theme palette, in step with the rest of designsystem (see ReturnToLiveButton).
 private val Played = Color(0xFFFFC107) // brand yellow: the show watched so far
 private val ShowTrack = Color(0x4DFFFFFF) // the show, not yet reached
-private val Earlier = Color(0xFF5B6478) // the DVR buffer before the show starts: a distinct colour
+private val Earlier = Color(0xFF5B6478) // the stretch of the show older than the rewind buffer: a distinct colour
 private val LiveTick = Color(0xFFE53935) // the live edge, echoing the back-to-live dot
 private val Thumb = Color(0xFFFFFFFF)
 
 /**
- * A live seek bar at true window scale: the whole bar is the ~4h seekable DVR window, the watched
- * part of the on-screen show is [Played] yellow, the buffer before the show starts is the distinct
- * [Earlier] colour, and a [LiveTick] marks the live edge. [playedFraction]/[liveFraction] and
- * [showStartFraction] are fractions [0,1] of the window (see LivePlayback.liveBarGeometry).
+ * A live seek bar scaled to the current programme: the whole bar is the on-screen show, the watched
+ * part is [Played] yellow, the stretch older than the rewind buffer is the distinct [Earlier] colour,
+ * and a [LiveTick] marks the live edge part-way along (the not-yet-aired remainder is the tail past
+ * it). [playedFraction]/[liveFraction]/[seekFloorFraction] are fractions [0,1] of the programme (see
+ * LivePlayback.liveBarGeometry).
  *
  * [onSeekToFraction] makes the bar draggable (phone, touch); pass null for a position-only indicator
  * (TV, where the remote scrubs with the rewind/forward buttons).
@@ -41,7 +42,7 @@ private val Thumb = Color(0xFFFFFFFF)
 fun LiveProgramBar(
     playedFraction: Float,
     liveFraction: Float,
-    showStartFraction: Float,
+    seekFloorFraction: Float,
     modifier: Modifier = Modifier,
     onSeekToFraction: ((Float) -> Unit)? = null,
 ) {
@@ -71,11 +72,11 @@ fun LiveProgramBar(
     }
 
     Canvas(modifier.fillMaxWidth().height(28.dp).then(gestures)) {
-        drawLiveBar(played, liveFraction, showStartFraction)
+        drawLiveBar(played, liveFraction, seekFloorFraction)
     }
 }
 
-private fun DrawScope.drawLiveBar(played: Float, live: Float, showStart: Float) {
+private fun DrawScope.drawLiveBar(played: Float, live: Float, seekFloor: Float) {
     val trackH = 4.dp.toPx()
     val thumbR = 7.dp.toPx()
     val tickH = 12.dp.toPx()
@@ -90,11 +91,11 @@ private fun DrawScope.drawLiveBar(played: Float, live: Float, showStart: Float) 
         drawLine(color, Offset(x(from), y), Offset(x(to), y), trackH, StrokeCap.Round)
     }
 
-    // The show, not yet reached, runs as the base track; the buffer before it gets its own colour;
+    // The show runs as the base track; the stretch older than the rewind buffer gets its own colour;
     // the watched part of the show is painted over in yellow.
-    segment(showStart, 1f, ShowTrack)
-    segment(0f, showStart, Earlier)
-    segment(showStart.coerceAtMost(played), played, Played)
+    segment(seekFloor, 1f, ShowTrack)
+    segment(0f, seekFloor, Earlier)
+    segment(seekFloor.coerceAtMost(played), played, Played)
 
     // Live edge marker, then the thumb on top.
     drawLine(LiveTick, Offset(x(live), y - tickH / 2f), Offset(x(live), y + tickH / 2f), 2.dp.toPx())
