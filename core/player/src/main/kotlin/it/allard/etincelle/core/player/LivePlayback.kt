@@ -89,28 +89,37 @@ object LivePlayback {
         if (timeline.isEmpty) return null
         timeline.getWindow(player.currentMediaItemIndex, window)
         if (!window.isLive()) return null
-        val durationMs = window.durationMs
-        if (durationMs <= 0L) return null
-        val windowStart = window.windowStartTimeMs
-        if (programWindow == null || windowStart == C.TIME_UNSET) {
+        return liveBarGeometry(
+            player.currentPosition, window.defaultPositionMs, window.durationMs, window.windowStartTimeMs, programWindow,
+        )
+    }
+
+    /** The pure geometry behind [liveBarGeometry], split out so it can be unit-tested without a player. */
+    internal fun liveBarGeometry(
+        currentPositionMs: Long,
+        liveEdgeMs: Long,
+        windowDurationMs: Long,
+        windowStartTimeMs: Long,
+        programWindow: ProgramWindow?,
+    ): LiveBarGeometry? {
+        if (windowDurationMs <= 0L) return null
+        if (programWindow == null || windowStartTimeMs == C.TIME_UNSET) {
             // No programme to scale to: span the bare seekable window instead.
-            val played = (player.currentPosition.toFloat() / durationMs).coerceIn(0f, 1f)
-            val live = (window.defaultPositionMs.toFloat() / durationMs).coerceIn(0f, 1f)
+            val played = (currentPositionMs.toFloat() / windowDurationMs).coerceIn(0f, 1f)
+            val live = (liveEdgeMs.toFloat() / windowDurationMs).coerceIn(0f, 1f)
             return LiveBarGeometry(played, live, 0f, hasProgramBand = false)
         }
         val programStart = programWindow.startMs
         val programDurationMs = (programWindow.endMs - programStart).toFloat()
         if (programDurationMs <= 0f) return null
-        // Anchor the player's window positions to wall-clock, then express each as a fraction of the
-        // programme's air-window so the show fills the whole bar.
+        // Anchor each window position to wall-clock, then express it as a fraction of the programme's
+        // air-window so the show fills the whole bar.
         fun fraction(positionMs: Long): Float =
-            ((windowStart + positionMs - programStart).toFloat() / programDurationMs).coerceIn(0f, 1f)
-        val played = fraction(player.currentPosition)
-        val live = fraction(window.defaultPositionMs)
+            ((windowStartTimeMs + positionMs - programStart).toFloat() / programDurationMs).coerceIn(0f, 1f)
         // The DVR buffer only reaches back to the window start, so earlier parts of the show can no
         // longer be rewound to; mark that floor (0 when the show began inside the buffer).
-        val seekFloor = ((maxOf(programStart, windowStart) - programStart).toFloat() / programDurationMs).coerceIn(0f, 1f)
-        return LiveBarGeometry(played, live, seekFloor, hasProgramBand = true)
+        val seekFloor = ((maxOf(programStart, windowStartTimeMs) - programStart).toFloat() / programDurationMs).coerceIn(0f, 1f)
+        return LiveBarGeometry(fraction(currentPositionMs), fraction(liveEdgeMs), seekFloor, hasProgramBand = true)
     }
 
     /**
@@ -121,18 +130,27 @@ object LivePlayback {
         val timeline = player.currentTimeline
         if (timeline.isEmpty) return
         timeline.getWindow(player.currentMediaItemIndex, window)
-        val durationMs = window.durationMs
-        if (durationMs <= 0L) return
+        if (window.durationMs <= 0L) return
+        player.seekTo(seekTargetMs(fraction, window.durationMs, window.windowStartTimeMs, window.defaultPositionMs, programWindow))
+    }
+
+    /** The pure seek-target math behind [seekToFraction], split out for unit testing. */
+    internal fun seekTargetMs(
+        fraction: Float,
+        windowDurationMs: Long,
+        windowStartTimeMs: Long,
+        liveEdgeMs: Long,
+        programWindow: ProgramWindow?,
+    ): Long {
         val f = fraction.coerceIn(0f, 1f)
-        val windowStart = window.windowStartTimeMs
-        val target = if (programWindow != null && windowStart != C.TIME_UNSET) {
+        val target = if (programWindow != null && windowStartTimeMs != C.TIME_UNSET) {
             // Map the programme fraction back to wall-clock, then to a position in the seekable window.
             val wallClockMs = programWindow.startMs + (f * (programWindow.endMs - programWindow.startMs)).toLong()
-            wallClockMs - windowStart
+            wallClockMs - windowStartTimeMs
         } else {
-            (f * durationMs).toLong()
+            (f * windowDurationMs).toLong()
         }
-        player.seekTo(target.coerceIn(0L, window.defaultPositionMs))
+        return target.coerceIn(0L, liveEdgeMs)
     }
 
     /** The live edge as wall-clock epoch ms, or null when the window carries no epoch anchor. Used to
