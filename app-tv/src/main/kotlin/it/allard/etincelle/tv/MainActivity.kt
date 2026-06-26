@@ -308,7 +308,7 @@ private fun TvPlayerSurface(
                 LiveProgramBar(
                     playedFraction = bar.playedFraction,
                     liveFraction = bar.liveFraction,
-                    seekFloorFraction = if (bar.hasProgramBand) bar.seekFloorFraction else 0f,
+                    seekFloorFraction = bar.seekFloorFraction,
                     modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding()
                         .padding(horizontal = 48.dp, vertical = 24.dp),
                 )
