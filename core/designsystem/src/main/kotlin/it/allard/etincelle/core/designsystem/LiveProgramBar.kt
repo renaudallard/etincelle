@@ -23,7 +23,8 @@ import androidx.compose.ui.unit.dp
 
 // Dark-theme palette, in step with the rest of designsystem (see ReturnToLiveButton).
 private val Played = Color(0xFFFFC107) // brand yellow: the show watched so far
-private val ShowTrack = Color(0x4DFFFFFF) // the show, not yet reached
+private val ShowTrack = Color(0x4DFFFFFF) // the aired show, seekable but not yet watched
+private val Upcoming = Color(0x26FFFFFF) // the show not yet aired (past the live edge): dimmer
 private val Earlier = Color(0xFF5B6478) // the stretch of the show older than the rewind buffer: a distinct colour
 private val LiveTick = Color(0xFFE53935) // the live edge, echoing the back-to-live dot
 private val Thumb = Color(0xFFFFFFFF)
@@ -91,9 +92,10 @@ private fun DrawScope.drawLiveBar(played: Float, live: Float, seekFloor: Float) 
         drawLine(color, Offset(x(from), y), Offset(x(to), y), trackH, StrokeCap.Round)
     }
 
-    // The show runs as the base track; the stretch older than the rewind buffer gets its own colour;
-    // the watched part of the show is painted over in yellow.
-    segment(seekFloor, 1f, ShowTrack)
+    // The aired part of the show is the base track up to the live edge; the not-yet-aired tail past it
+    // is dimmer; the stretch too old to rewind to gets its own colour; the watched part is yellow.
+    segment(seekFloor, live, ShowTrack)
+    segment(live, 1f, Upcoming)
     segment(0f, seekFloor, Earlier)
     segment(seekFloor.coerceAtMost(played), played, Played)
 
