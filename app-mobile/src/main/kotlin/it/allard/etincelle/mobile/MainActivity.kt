@@ -508,10 +508,12 @@ private fun AppRoot(
                             // Search keeps a constant key: it always shows SearchScreen, and its back-stack
                             // depth flips 0->1 when results arrive, which would otherwise tear down the
                             // search field and blank the typed query.
+                            // hideLocked is folded in so toggling "hide locked" (which shrinks the lists)
+                            // starts the page fresh at the top instead of restoring a now-out-of-range index.
                             val pageKey = if (state.tab == Tab.SEARCH) {
                                 "SEARCH"
                             } else {
-                                "${state.tab.name}#${state.backStack.size}#" +
+                                "${state.tab.name}#${state.backStack.size}#${state.hideLocked}#" +
                                     (state.current?.reloadUrl ?: state.current?.title.orEmpty())
                             }
                             contentStateHolder.SaveableStateProvider(pageKey) {
