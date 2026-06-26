@@ -25,6 +25,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,6 +55,7 @@ import it.allard.etincelle.core.player.MediaItemFactory
 import it.allard.etincelle.core.player.PlaybackProgress
 import it.allard.etincelle.core.ui.MainViewModel
 import it.allard.etincelle.core.ui.MainViewModelFactory
+import it.allard.etincelle.core.ui.Tab
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
@@ -95,6 +97,10 @@ class MainActivity : ComponentActivity() {
                     val context = LocalContext.current
                     // Grid density (cards per row on the "tout voir" pages); persisted, set live from settings.
                     var gridColumns by remember { mutableStateOf(TvPrefs.gridColumns(context)) }
+                    // Preserve the browse list's scroll position while a detail/settings/player covers it,
+                    // so backing out keeps the grid where it was instead of jumping to the top. Lives above
+                    // the screen `when` so it survives that swap (the browse branch leaves composition).
+                    val contentStateHolder = rememberSaveableStateHolder()
                     Box(Modifier.fillMaxSize()) {
                     when {
                         state.checking -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -131,10 +137,22 @@ class MainActivity : ComponentActivity() {
 
                         state.loggedIn -> {
                             BackHandler(enabled = state.canGoBack) { viewModel.back() }
-                            TvBrowseScreen(
-                                state, viewModel::selectTab, viewModel::onCardClick, viewModel::search,
-                                viewModel::openSettings, viewModel::onRailSeeAll, gridColumns,
-                            )
+                            // Search keeps a constant key (its back-stack depth flips 0->1 when results
+                            // arrive, which would otherwise reset the typed query); other pages key by the
+                            // back-stack entry so each keeps its own scroll, plus hideLocked so toggling it
+                            // starts fresh at the top.
+                            val pageKey = if (state.tab == Tab.SEARCH) {
+                                "SEARCH"
+                            } else {
+                                "${state.tab.name}#${state.backStack.size}#${state.hideLocked}#" +
+                                    (state.current?.reloadUrl ?: state.current?.title.orEmpty())
+                            }
+                            contentStateHolder.SaveableStateProvider(pageKey) {
+                                TvBrowseScreen(
+                                    state, viewModel::selectTab, viewModel::onCardClick, viewModel::search,
+                                    viewModel::openSettings, viewModel::onRailSeeAll, gridColumns,
+                                )
+                            }
                         }
 
                         else -> TvLoginScreen(
