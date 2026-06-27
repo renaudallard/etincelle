@@ -409,6 +409,20 @@ fun TvProgramDetailScreen(
                 contentScale = ContentScale.Crop,
             )
             Spacer(Modifier.width(32.dp))
+        } else if (detail.channelLogoUrl != null) {
+            // No programme poster (e.g. a FAST channel): show the channel logo centred instead of nothing.
+            Box(
+                Modifier.width(300.dp).height(440.dp).clip(RoundedCornerShape(12.dp)).background(BackgroundLevel1),
+                contentAlignment = Alignment.Center,
+            ) {
+                AsyncImage(
+                    model = detail.channelLogoUrl,
+                    contentDescription = detail.title,
+                    modifier = Modifier.fillMaxSize().padding(40.dp),
+                    contentScale = ContentScale.Fit,
+                )
+            }
+            Spacer(Modifier.width(32.dp))
         }
         Column(
             Modifier.weight(1f).verticalScroll(rememberScrollState())

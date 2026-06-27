@@ -588,6 +588,20 @@ fun ProgramDetailScreen(
                     contentScale = ContentScale.Crop,
                 )
             }
+        } else if (detail.channelLogoUrl != null) {
+            // No programme poster (e.g. a FAST channel with no "now playing"): show the channel logo
+            // centred so the page has a header instead of opening bare.
+            Box(
+                Modifier.fillMaxWidth().height(160.dp).background(BackgroundLevel1),
+                contentAlignment = Alignment.Center,
+            ) {
+                AsyncImage(
+                    model = detail.channelLogoUrl,
+                    contentDescription = detail.title,
+                    modifier = Modifier.fillMaxSize().padding(24.dp),
+                    contentScale = ContentScale.Fit,
+                )
+            }
         }
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(detail.title ?: "", style = MaterialTheme.typography.headlineSmall)

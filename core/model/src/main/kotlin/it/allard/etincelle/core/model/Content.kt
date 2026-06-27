@@ -116,4 +116,7 @@ data class ProgramDetail(
     /** Set when the programme is not yet aired: the backend's own localized reason (e.g. "… en direct
      * dans 4 jours."). Non-null means it is not playable, so no "Regarder" is offered. */
     val upcomingMessage: String? = null,
+    /** The channel's own logo, shown as the header when a channel detail has no programme poster (a FAST
+     * channel with no "now playing" metadata would otherwise render bare). */
+    val channelLogoUrl: String? = null,
 )

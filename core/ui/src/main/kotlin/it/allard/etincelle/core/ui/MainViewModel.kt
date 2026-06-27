@@ -452,7 +452,12 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         _state.update { it.copy(busy = true, error = null, info = null) }
         navLaunch {
             runCatchingNav { repo.fetchProgramDetail(id, kind) }
-                .onSuccess { d -> _state.update { it.copy(busy = false, detailStack = it.detailStack + DetailEntry(d, null)) } }
+                .onSuccess { d ->
+                    // A FAST channel's detail has no programme poster, so fall back to the channel's own
+                    // logo (the card the user tapped) to give the page a header instead of leaving it bare.
+                    val detail = if (kind == DetailKind.CHANNEL) d.copy(channelLogoUrl = card.imageUrl) else d
+                    _state.update { it.copy(busy = false, detailStack = it.detailStack + DetailEntry(detail, null)) }
+                }
                 .onFailure { e -> applyFailure(e, "Détail indisponible") }
         }
     }
