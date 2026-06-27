@@ -135,6 +135,17 @@ class MapperTest {
     }
 
     @Test
+    fun `a channels-grid card parses its channel-details id`() {
+        val card = page(
+            componentType = "square",
+            title = "KITCHEN MANIA",
+            locked = false,
+            actionUrl = "https://api-eu.fubo.tv/papi/v1/channel-details/700123",
+        ).toRails()[0].cards[0]
+        assertEquals("700123", card.channelId)
+    }
+
+    @Test
     fun `a program card parses its vod id and lock`() {
         val card = page(
             componentType = "card",

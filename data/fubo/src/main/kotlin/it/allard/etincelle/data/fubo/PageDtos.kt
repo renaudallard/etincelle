@@ -228,7 +228,12 @@ private fun ComponentDto.toCard(square: Boolean = false): ContentCard? {
     // Match only the path, not the query string: a nav url can carry an unrelated program-details/...
     // link in its tracking params, which would otherwise set the wrong id (or both vod and series).
     val path = actionUrl?.substringBefore('?')
-    val channelId = path?.let { CHANNEL_REGEX.find(it)?.groupValues?.get(1) }
+    // A live card links to its channel via `program-details/channel/{id}`; a card on the /channels grid
+    // uses `channel-details/{id}` (same channel id). Accept either so both open the channel detail
+    // (with "Regarder en direct") rather than loading the link as a generic page.
+    val channelId = path?.let {
+        CHANNEL_REGEX.find(it)?.groupValues?.get(1) ?: CHANNEL_DETAILS_REGEX.find(it)?.groupValues?.get(1)
+    }
     val vodId = path?.let { VOD_REGEX.find(it)?.groupValues?.get(1) }
     val seriesId = path?.let { SERIES_REGEX.find(it)?.groupValues?.get(1) }
 
