@@ -119,4 +119,7 @@ data class ProgramDetail(
     /** The channel's own logo, shown as the header when a channel detail has no programme poster (a FAST
      * channel with no "now playing" metadata would otherwise render bare). */
     val channelLogoUrl: String? = null,
+    /** A channel's catalogue carousels (replays, most-viewed, live & upcoming), shown below the live
+     * header so a channel detail offers more than just "Regarder en direct". Empty for non-channels. */
+    val sections: List<ContentRail> = emptyList(),
 )

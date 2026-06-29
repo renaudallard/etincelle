@@ -493,6 +493,12 @@ fun TvProgramDetailScreen(
                     firstFocus = if (showWatch || detail.recordings.isNotEmpty()) null else watchFocus,
                 )
             }
+            // A channel's catalogue carousels (replays, most-viewed, live & upcoming) below the header.
+            // No "Tout voir" (it would navigate out of the open detail); each card opens via onEpisode.
+            detail.sections.forEach { rail ->
+                Spacer(Modifier.height(20.dp))
+                TvRail(rail, onCardClick = onEpisode, onSeeAll = {}, showSeeAll = false)
+            }
         }
     }
 }
@@ -574,10 +580,15 @@ private fun TvRecordingRow(recording: Recording, enabled: Boolean, onWatch: () -
 }
 
 @Composable
-private fun TvRail(rail: ContentRail, onCardClick: (ContentCard) -> Unit, onSeeAll: (ContentRail) -> Unit) {
+private fun TvRail(
+    rail: ContentRail,
+    onCardClick: (ContentCard) -> Unit,
+    onSeeAll: (ContentRail) -> Unit,
+    showSeeAll: Boolean = true,
+) {
     Column {
         rail.title?.takeIf { it.isNotBlank() }?.let { title ->
-            if (rail.expandable()) {
+            if (showSeeAll && rail.expandable()) {
                 var focused by remember { mutableStateOf(false) }
                 Text(
                     "$title   ›  Tout voir",
@@ -593,7 +604,8 @@ private fun TvRail(rail: ContentRail, onCardClick: (ContentCard) -> Unit, onSeeA
             }
         }
         LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(rail.cards, key = { it.id }) { card -> TvCard(card, onCardClick) }
+            // Index in the key: a card id can repeat within a rail, and a duplicate lazy key crashes.
+            itemsIndexed(rail.cards, key = { i, c -> "${c.id}#$i" }) { _, card -> TvCard(card, onCardClick) }
         }
     }
 }

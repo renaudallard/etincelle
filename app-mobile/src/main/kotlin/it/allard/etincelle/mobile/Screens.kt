@@ -656,6 +656,15 @@ fun ProgramDetailScreen(
                 EpisodesSection(detail.episodes, busy, onEpisode)
             }
         }
+        // A channel's catalogue carousels (replays, most-viewed, live & upcoming) full width below the
+        // live header. onEpisode is the shared card click (vm.onCardClick), so a card opens normally.
+        detail.sections.forEach { rail ->
+            Spacer(Modifier.height(20.dp))
+            // No "Tout voir" here: a see-all would navigate out of the open detail. The carousels carry
+            // plenty of cards, and each card opens normally via onEpisode (vm.onCardClick).
+            Rail(rail, onCardClick = onEpisode, onSeeAll = {}, showSeeAll = false)
+        }
+        if (detail.sections.isNotEmpty()) Spacer(Modifier.height(16.dp))
     }
 }
 
@@ -732,10 +741,15 @@ private fun RecordingRow(recording: Recording, enabled: Boolean, onWatch: () -> 
 }
 
 @Composable
-private fun Rail(rail: ContentRail, onCardClick: (ContentCard) -> Unit, onSeeAll: (ContentRail) -> Unit) {
+private fun Rail(
+    rail: ContentRail,
+    onCardClick: (ContentCard) -> Unit,
+    onSeeAll: (ContentRail) -> Unit,
+    showSeeAll: Boolean = true,
+) {
     Column(Modifier.fillMaxWidth()) {
         rail.title?.takeIf { it.isNotBlank() }?.let { title ->
-            if (rail.expandable()) {
+            if (showSeeAll && rail.expandable()) {
                 Row(
                     modifier = Modifier.fillMaxWidth().clickable { onSeeAll(rail) }
                         .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),

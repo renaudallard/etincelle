@@ -300,7 +300,16 @@ class FuboRepository(
             DetailKind.CHANNEL -> {
                 val resp = api.channelDetail(id)
                 episodes = resp.seriesLink()?.let { seriesEpisodes(it) }.orEmpty()
-                resp.toProgramDetail(channelId = id, vodId = null, isLive = true)
+                // The default (about) tab carries the live header; the "see also" tab carries the channel's
+                // replay / most-viewed / live-and-upcoming carousels. Best-effort and title-filtered (the
+                // tab bar is a title-less section), with the see-all dropped (it would navigate out of the
+                // open detail). Empty on failure, leaving the plain live detail.
+                val sections = runCatching {
+                    api.channelDetail(id, "id-tab-see-also").toRails()
+                        .filter { it.title != null }
+                        .map { it.copy(seeAllUrl = null) }
+                }.getOrDefault(emptyList())
+                resp.toProgramDetail(channelId = id, vodId = null, isLive = true).copy(sections = sections)
             }
         }
         val detailProgramId = detail.programId
