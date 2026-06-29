@@ -186,6 +186,8 @@ class MainActivity : ComponentActivity() {
                         },
                         // "Cet appareil" in the picker: bring playback back to this phone (not a stop).
                         onCastDisconnect = { controller?.returnToThisDevice() },
+                        // Active-scan while the cast picker is open so the device list stays fresh.
+                        onCastActiveScan = { controller?.setActiveScan(it) },
                     )
                 }
                 state.update?.let { up ->
@@ -329,6 +331,7 @@ private fun AppRoot(
     onStop: (PlaybackSource) -> Unit,
     onCastConnect: (String) -> Unit,
     onCastDisconnect: () -> Unit,
+    onCastActiveScan: (Boolean) -> Unit = {},
 ) {
     val playing = state.playing
     val detail = state.detail
@@ -424,7 +427,7 @@ private fun AppRoot(
                             onBack = { vm.closeDetail() },
                             onEpisode = { vm.onCardClick(it) },
                             isRecording = state.detailRecordingAssetId != null,
-                            castButton = { CastButton(castState, onCastConnect, onCastDisconnect) },
+                            castButton = { CastButton(castState, onCastConnect, onCastDisconnect, onCastActiveScan) },
                         )
                     }
 
@@ -461,7 +464,7 @@ private fun AppRoot(
                                         }
                                     },
                                     actions = {
-                                        CastButton(castState, onCastConnect, onCastDisconnect)
+                                        CastButton(castState, onCastConnect, onCastDisconnect, onCastActiveScan)
                                         TextButton(onClick = { vm.openSettings() }) { Text("Paramètres") }
                                     },
                                 )

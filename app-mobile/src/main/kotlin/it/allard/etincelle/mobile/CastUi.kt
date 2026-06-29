@@ -28,6 +28,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,8 +45,16 @@ import it.allard.etincelle.core.designsystem.theme.BrandYellow
 
 /** Cast control for the top bar: shows a picker of discovered Chromecasts, or the connected one. */
 @Composable
-fun CastButton(state: CastUiState, onConnect: (String) -> Unit, onDisconnect: () -> Unit) {
+fun CastButton(
+    state: CastUiState,
+    onConnect: (String) -> Unit,
+    onDisconnect: () -> Unit,
+    onActiveScan: (Boolean) -> Unit = {},
+) {
     var open by remember { mutableStateOf(false) }
+    // Scan aggressively while the picker is open (and stop when it closes), so a device that just
+    // flapped reappears in the list within ~1s instead of waiting for the idle re-discovery tick.
+    LaunchedEffect(open) { onActiveScan(open) }
     // Hide the button when there is nothing to cast to, but keep an already-open picker on screen so it
     // does not vanish mid-interaction if the last discovered device drops off the network.
     if (!state.available && !open) return

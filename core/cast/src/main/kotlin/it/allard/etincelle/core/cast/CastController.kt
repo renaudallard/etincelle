@@ -79,6 +79,15 @@ open class CastController(
         override fun onRouteChanged(router: MediaRouter, route: MediaRouter.RouteInfo) = refreshDevices()
     }
 
+    // A separate callback record carrying an active-scan request, toggled while the cast picker is open
+    // (see [setActiveScan]). Kept distinct from [routerCallback] so toggling the active scan does not
+    // disturb the passive/idle discovery flags on the shared record.
+    private val activeScanCallback = object : MediaRouter.Callback() {
+        override fun onRouteAdded(router: MediaRouter, route: MediaRouter.RouteInfo) = refreshDevices()
+        override fun onRouteChanged(router: MediaRouter, route: MediaRouter.RouteInfo) = refreshDevices()
+    }
+    private var activeScanning = false
+
     private val sessionListener = object : SessionManagerListener<CastSession> {
         override fun onSessionStarted(session: CastSession, sessionId: String) = onSessionConnected(session)
         override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) = onSessionConnected(session)
@@ -107,6 +116,7 @@ open class CastController(
     open fun stop() {
         discoveryScope?.cancel()
         discoveryScope = null
+        setActiveScan(false)
         mediaRouter.removeCallback(routerCallback)
         castContext.sessionManager.removeSessionManagerListener(sessionListener, CastSession::class.java)
     }
@@ -133,6 +143,23 @@ open class CastController(
 
     /** End the Cast session and stop the receiver (returns playback to the phone). */
     open fun disconnect() = castContext.sessionManager.endCurrentSession(true)
+
+    /**
+     * Request an aggressive active scan while [enabled] (e.g. the cast picker is open). Mirrors what the
+     * platform's own chooser does: the moment the user signals intent to cast, scan hard so a device
+     * that briefly dropped off (or a second device for a device-to-device switch) reappears in ~1s
+     * instead of waiting for the idle re-discovery tick. Cleared (back to passive discovery) when closed.
+     */
+    fun setActiveScan(enabled: Boolean) {
+        if (enabled == activeScanning) return
+        activeScanning = enabled
+        if (enabled) {
+            mediaRouter.addCallback(selector, activeScanCallback, MediaRouter.CALLBACK_FLAG_PERFORM_ACTIVE_SCAN)
+        } else {
+            mediaRouter.removeCallback(activeScanCallback)
+        }
+        refreshDevices()
+    }
 
     /** Subclass hooks for the player swap (overridden by the M2 cast-player controller). */
     protected open fun onSessionConnected(session: CastSession) {
@@ -184,13 +211,19 @@ open class CastController(
     // that reappears is rediscovered on its own, without the battery cost of scanning continuously.
     private suspend fun rediscoverWhileIdle() {
         while (true) {
+            // Scan first, then wait, so the cast button appears as fast as the platform chooser would on
+            // app open / return-to-foreground, instead of only after the first idle interval elapses.
+            if (state.value.connectedDeviceName == null) activeScanPulse()
             delay(REDISCOVERY_INTERVAL_MS)
-            if (state.value.connectedDeviceName != null) continue
-            mediaRouter.addCallback(selector, routerCallback, MediaRouter.CALLBACK_FLAG_PERFORM_ACTIVE_SCAN)
-            delay(ACTIVE_SCAN_MS)
-            mediaRouter.addCallback(selector, routerCallback, MediaRouter.CALLBACK_FLAG_REQUEST_DISCOVERY)
-            refreshDevices()
         }
+    }
+
+    // One short active scan, then back to passive discovery, refreshing the device list afterwards.
+    private suspend fun activeScanPulse() {
+        mediaRouter.addCallback(selector, routerCallback, MediaRouter.CALLBACK_FLAG_PERFORM_ACTIVE_SCAN)
+        delay(ACTIVE_SCAN_MS)
+        mediaRouter.addCallback(selector, routerCallback, MediaRouter.CALLBACK_FLAG_REQUEST_DISCOVERY)
+        refreshDevices()
     }
 
     private companion object {
