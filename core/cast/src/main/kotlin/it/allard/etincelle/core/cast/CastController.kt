@@ -94,7 +94,7 @@ open class CastController(
         override fun onSessionEnded(session: CastSession, error: Int) = onSessionDisconnected()
         // A suspend is transient (brief network drop); keep the cast player current and wait for
         // onSessionResumed/onSessionEnded, rather than bouncing playback to the phone and back.
-        override fun onSessionSuspended(session: CastSession, reason: Int) = Unit
+        override fun onSessionSuspended(session: CastSession, reason: Int) = onSessionSuspendedInternal(session)
         override fun onSessionStartFailed(session: CastSession, error: Int) = onSessionDisconnected()
         override fun onSessionResumeFailed(session: CastSession, error: Int) = onSessionDisconnected()
         override fun onSessionStarting(session: CastSession) = Unit
@@ -184,6 +184,10 @@ open class CastController(
     }
 
     protected open fun onSessionEndingInternal(session: CastSession) = Unit
+
+    /** The session dropped transiently (kept current, riding out the network blip). Subclasses use this
+     *  to suppress stall recovery while suspended, since the receiver state freezes across a suspend. */
+    protected open fun onSessionSuspendedInternal(session: CastSession) = Unit
 
     /** Set by the cast player once the receiver actually plays (clears the connecting animation). */
     protected fun setReceiverPlaying(playing: Boolean) {

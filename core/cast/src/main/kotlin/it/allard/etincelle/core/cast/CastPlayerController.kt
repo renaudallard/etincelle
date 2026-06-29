@@ -57,6 +57,14 @@ private const val CAST_RETRY_MAX_BACKOFF_MS = 2000L
 // a long cast that self-heals occasionally is never eventually refused recovery.
 private const val CAST_RETRY_RESET_MS = 60_000L
 
+// media3's CastPlayer never reports a receiver-side failure as a player error, so the only way the
+// phone can notice a wedged cast (a stalled load, or a mid-cast token expiry the receiver cannot
+// refresh) is to watch it. Sample this often, and treat the receiver as stuck after this much
+// continuous buffering while it should be playing, then re-resolve a fresh stream and reload. The
+// threshold is generously past any normal rebuffer so a healthy cast is never disturbed.
+private const val LIVENESS_INTERVAL_MS = 5_000L
+private const val LIVENESS_STALL_MS = 30_000L
+
 // One volume-key press steps the cast device volume by this fraction (the Cast SDK default).
 private const val VOLUME_STEP = 0.05
 
@@ -112,6 +120,17 @@ class CastPlayerController(
     // but never reports playback (e.g. a stalled load that neither errors nor drops the session).
     private var connectWatchdogJob: Job? = null
 
+    // The session is transiently suspended (a network blip the design rides out). media3's CastPlayer
+    // FREEZES its playback state across a suspend, so the liveness/connect recovery must stand down
+    // while suspended or it would mistake the frozen "buffering" state for a wedge and tear down a cast
+    // that is about to resume. Set on suspend, cleared on (re)connect / end.
+    private var suspended = false
+
+    // Whether the receiver has reported ready/playing since the current connect was armed. The connect
+    // watchdog only recovers a receiver that NEVER became ready; a healthy cast that played then paused
+    // must be left alone (recovering it would re-resolve and force play, un-pausing it).
+    private var receiverEverReady = false
+
     // A transfer keeps the old player running until the new one starts; these track that pending stop.
     private var deferStopSource: Player? = null
     private var deferStopTarget: Player? = null
@@ -142,13 +161,17 @@ class CastPlayerController(
     // actually plays. Only meaningful while the cast player is current.
     private val castPlaybackListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            if (_currentPlayer.value === castPlayer) setReceiverPlaying(isPlaying)
+            if (_currentPlayer.value === castPlayer) {
+                if (isPlaying) receiverEverReady = true
+                setReceiverPlaying(isPlaying)
+            }
         }
 
         // Once the receiver has the media ready the connect handshake is done, even if it has not
         // flipped to actively playing yet (still buffering): stop the connecting animation either way.
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (_currentPlayer.value === castPlayer && playbackState == Player.STATE_READY) {
+                receiverEverReady = true
                 setReceiverPlaying(true)
             }
         }
@@ -158,6 +181,7 @@ class CastPlayerController(
         localPlayer.addListener(localErrorListener)
         castPlayer.addListener(castErrorListener)
         castPlayer.addListener(castPlaybackListener)
+        scope.launch { monitorCastLiveness() }
     }
 
     /** Load + play [item] on whichever player is current (phone or cast). */
@@ -199,7 +223,10 @@ class CastPlayerController(
         // rewound live stream keeps its position across the device switch.
         val rewind = if (willTransfer) LivePlayback.castRewindOffsetMs(castPlayer, liveWindow) else 0L
         val selected = super.connectTo(routeId)
-        if (selected) startConnectWatchdog()
+        if (selected) {
+            receiverEverReady = false
+            startConnectWatchdog()
+        }
         // Arm the transfer only once a route was actually selected; it just records the position the
         // new device should resume at (the actual load happens in onSessionConnected by session id).
         if (willTransfer && selected) {
@@ -215,8 +242,50 @@ class CastPlayerController(
         connectWatchdogJob?.cancel()
         connectWatchdogJob = scope.launch {
             delay(CONNECT_TIMEOUT_MS)
-            // No-op if the receiver already started (clearConnecting only acts while still connecting).
+            // Receiver already playing: nothing to do.
+            if (state.value.playing) return@launch
+            // The receiver NEVER became ready in the connect window (a wedged DRM handshake / a load it
+            // silently never started): the CastPlayer will not raise this as an error, so recover it -
+            // re-resolve a fresh stream and reload (and give up cleanly, ending the session, if recovery
+            // is exhausted). A receiver that DID become ready and is merely paused/buffering, or a
+            // suspend riding out a blip, is left alone (recovering would un-pause it). Either way, cap
+            // the connect spinner so it can never outlive the deadline.
+            if (!receiverEverReady && !suspended && _currentPlayer.value === castPlayer &&
+                currentItem != null && castContext.sessionManager.currentCastSession != null
+            ) {
+                onPlaybackError(castPlayer)
+            }
             clearConnecting()
+        }
+    }
+
+    // While casting, a receiver that should be playing but sits buffering for a long stretch is wedged
+    // (typically its short-lived stream/DRM token expired and it cannot refresh it): re-resolve a fresh
+    // stream and reload so a stalled cast self-heals instead of sitting black indefinitely. Runs for the
+    // controller's lifetime, idle unless the cast player is current with a live session.
+    private suspend fun monitorCastLiveness() {
+        var bufferingForMs = 0L
+        while (true) {
+            delay(LIVENESS_INTERVAL_MS)
+            // Stand down while suspended: the CastPlayer freezes its state across a suspend, so a frozen
+            // "buffering" would otherwise be mistaken for a wedge and tear down a cast about to resume.
+            if (suspended || _currentPlayer.value !== castPlayer ||
+                castContext.sessionManager.currentCastSession == null
+            ) {
+                bufferingForMs = 0L
+                continue
+            }
+            // A healthy cast is STATE_READY; a user-paused one has playWhenReady=false. Only a session
+            // that should be playing yet stays buffering counts toward a stall.
+            if (castPlayer.playWhenReady && castPlayer.playbackState == Player.STATE_BUFFERING) {
+                bufferingForMs += LIVENESS_INTERVAL_MS
+                if (bufferingForMs >= LIVENESS_STALL_MS) {
+                    bufferingForMs = 0L
+                    onPlaybackError(castPlayer)
+                }
+            } else {
+                bufferingForMs = 0L
+            }
         }
     }
 
@@ -335,8 +404,14 @@ class CastPlayerController(
         castPlayer.release()
     }
 
+    // A transient suspend (network blip): note it so the stall recovery stands down until it resumes.
+    override fun onSessionSuspendedInternal(session: CastSession) {
+        suspended = true
+    }
+
     override fun onSessionConnected(session: CastSession) {
         super.onSessionConnected(session)
+        suspended = false
         if (_currentPlayer.value !== castPlayer) {
             // Casting out from the phone: swap to the cast player (re-resolves a fresh URL). Clear any
             // stale return-to-phone request so it cannot fire when this fresh session later ends.
@@ -388,6 +463,7 @@ class CastPlayerController(
         // animating the connect toward the incoming device across the hand-off gap.
         val transferTargetName = state.value.connectingDeviceName
         super.onSessionDisconnected()
+        suspended = false
         castSessionId = null
         castVolume = null
         // The connect watchdog is left to self-expire (it is a no-op once connecting is cleared); it
@@ -583,6 +659,9 @@ class CastPlayerController(
             clearDeferredStop()
             clearConnecting()
             onError?.invoke(PLAYBACK_ERROR_MESSAGE)
+            // If the dead stream was on the cast player, end the session so the bar stops claiming an
+            // active cast over playback that never recovered.
+            if (_currentPlayer.value === castPlayer && castContext.sessionManager.currentCastSession != null) disconnect()
             return
         }
         castRetryCount++
@@ -612,6 +691,7 @@ class CastPlayerController(
                 clearDeferredStop()
                 clearConnecting()
                 onError?.invoke(PLAYBACK_ERROR_MESSAGE)
+                if (_currentPlayer.value === castPlayer && castContext.sessionManager.currentCastSession != null) disconnect()
                 return@launch
             }
             loadOn(target, MediaItemFactory.create(fresh.copy(liveRewindOffsetMs = rewind)), if (fresh.isLive) 0 else position)
