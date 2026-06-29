@@ -30,7 +30,9 @@ série **enregistrée**, elle affiche d'abord vos épisodes enregistrés (lus de
 liste des **épisodes disponibles** en rattrapage. Un programme **pas encore diffusé** indique quand il
 passera (par exemple « Ce programme sera en direct dans 4 jours. ») au lieu d'un « Regarder » qui
 échouerait. Vous pouvez aussi **programmer un enregistrement** et retrouver vos
-**enregistrements** (DVR) dans une rangée dédiée sur l'accueil. L'accueil réunit aussi les
+**enregistrements** (DVR) dans une rangée dédiée sur l'accueil. Les contenus à la demande
+(rattrapage, VOD, enregistrements) sont mis en **mémoire tampon** plus loin à l'avance, selon la
+mémoire de l'appareil, pour qu'une brève coupure réseau n'interrompe pas la lecture. L'accueil réunit aussi les
 **applications des diffuseurs** (france.tv, MyTF1, M6+…) : ouvrez l'une d'elles pour parcourir son
 catalogue (un abonnement peut être requis). Cliquer sur l'en-tête d'une rangée (par ex. *En direct à
 la TV*) ouvre la **catégorie complète en grille**, avec le nom de la chaîne sous chaque programme.
@@ -60,7 +62,8 @@ se remplit jusqu'à ce que la lecture démarre réellement sur la TV. **Touchez 
 ouvrir les **commandes de lecture** (lecture/pause, retour et avance, barre de progression) qui
 pilotent la diffusion ; le retour arrière revient à la navigation sans interrompre la diffusion. Les
 **boutons de volume** du téléphone règlent alors le volume du Chromecast (un indicateur s'affiche
-brièvement). La diffusion
+brièvement). Côté Chromecast, les contenus à la demande sont eux aussi mis en mémoire tampon plus
+loin à l'avance pour absorber les coupures réseau. La diffusion
 s'appuie sur un récepteur Cast Widevine personnalisé, hébergé séparément :
 [etincelle_receiver](https://github.com/renaudallard/etincelle_receiver).
 À chaque démarrage, etincelle **vérifie les mises à jour** sur GitHub et propose de télécharger la

@@ -71,6 +71,7 @@ import it.allard.etincelle.core.designsystem.theme.EtincelleTheme
 import it.allard.etincelle.core.domain.DetailKind
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramWindow
+import it.allard.etincelle.core.player.AdaptiveLoadControl
 import it.allard.etincelle.core.player.LiveBarGeometry
 import it.allard.etincelle.core.player.LivePlayback
 import it.allard.etincelle.core.player.MediaItemFactory
@@ -92,11 +93,17 @@ class MainActivity : ComponentActivity() {
     }
     private var player: ExoPlayer? = null
     private var castController: CastPlayerController? = null
+    private var loadControl: AdaptiveLoadControl? = null
     private var pausedForBackground = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val control = AdaptiveLoadControl.create(this)
+        loadControl = control
         val exo = ExoPlayer.Builder(this)
+            // Buffer further ahead for replays/recordings/VOD so a brief drop drains the buffer
+            // instead of stalling; sized to the device heap and trimmed under memory pressure.
+            .setLoadControl(control)
             // Pause on audio-focus loss (calls, other media) and on headphones unplugged.
             .setAudioAttributes(
                 AudioAttributes.Builder()
@@ -263,6 +270,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        // Back in the foreground: any memory pressure that shrank the buffer has passed.
+        loadControl?.restoreFullBuffer()
         castController?.start()
         if (pausedForBackground) {
             pausedForBackground = false
@@ -294,10 +303,17 @@ class MainActivity : ComponentActivity() {
         super.onStop()
     }
 
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        // Shrink the forward buffer under memory pressure so it stops growing and frees its slack.
+        loadControl?.onTrimMemory(level)
+    }
+
     override fun onDestroy() {
         castController?.release()
         player?.release()
         player = null
+        loadControl = null
         super.onDestroy()
     }
 }
