@@ -482,11 +482,27 @@ class CastPlayerController(
                 // the receiver; stop the connect animation and surface the error instead of leaving
                 // the bar stuck on "Connexion à …" with a stream that will never load.
                 if (fresh == null && target === castPlayer) {
-                    // Drop the item so a later re-entry of the same content is not short-circuited by
-                    // play()'s sameContent guard and actually reloads, instead of leaving the cast idle.
+                    // A transient re-resolve failure (a Wi-Fi blip, a backend 5xx / the documented 528)
+                    // should not abort the whole cast on the first miss: consume one recovery attempt and
+                    // retry after a backoff, mirroring the receiver-error path, before giving up.
+                    if (castRetryCount < MAX_CAST_RECOVERIES) {
+                        castRetryCount++
+                        val backoff = ((castRetryCount - 1) * CAST_RETRY_BACKOFF_MS).coerceAtMost(CAST_RETRY_MAX_BACKOFF_MS)
+                        if (backoff > 0) delay(backoff)
+                        ensureActive()
+                        if (target !== _currentPlayer.value || currentItem == null) return@launch
+                        loadResolved(target, item, fromPosition, fromPlayWhenReady, castRewindMs)
+                        return@launch
+                    }
+                    // Out of attempts: cut the source kept alive for the hand-off so it stops decoding
+                    // behind a dead cast and its listener is not leaked, drop the item so a re-tap
+                    // reloads, surface the error, and END the session so the cast bar stops claiming an
+                    // active cast over a stream that never loaded (onSessionDisconnected clears the UI).
+                    clearDeferredStop()
                     currentItem = null
                     clearConnecting()
                     onError?.invoke(PLAYBACK_ERROR_MESSAGE)
+                    disconnect()
                     return@launch
                 }
                 // Carry the live rewind (if any) onto the fresh source so the receiver's customData
