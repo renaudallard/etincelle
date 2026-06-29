@@ -686,12 +686,12 @@ class CastPlayerController(
             // Bail if a swap/stop superseded this stream while we were resolving.
             if (target !== _currentPlayer.value || currentItem == null) return@launch
             if (fresh == null) {
-                // Re-resolve itself failed: tear down the kept-alive source and connect animation too,
-                // not just the toast, like the give-up branch above.
-                clearDeferredStop()
-                clearConnecting()
-                onError?.invoke(PLAYBACK_ERROR_MESSAGE)
-                if (_currentPlayer.value === castPlayer && castContext.sessionManager.currentCastSession != null) disconnect()
+                // The re-resolve itself failed - usually a transient blip (a Wi-Fi hiccup, a 5xx, the
+                // documented 528), not a permanently dead stream. Retry within the budget rather than
+                // tearing the cast down on a single miss: onPlaybackError re-arms with backoff and only
+                // gives up (ending the session) once the budget is exhausted. target===currentPlayer is
+                // already guaranteed here, so this consumes one more attempt and re-resolves.
+                onPlaybackError(target)
                 return@launch
             }
             loadOn(target, MediaItemFactory.create(fresh.copy(liveRewindOffsetMs = rewind)), if (fresh.isLive) 0 else position)
