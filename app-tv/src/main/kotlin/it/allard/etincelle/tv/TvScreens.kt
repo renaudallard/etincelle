@@ -386,6 +386,7 @@ fun TvProgramDetailScreen(
     error: String?,
     info: String?,
     onWatch: () -> Unit,
+    onStartOver: () -> Unit,
     onRecord: () -> Unit,
     onWatchRecording: (String) -> Unit,
     onEpisode: (ContentCard) -> Unit,
@@ -448,6 +449,9 @@ fun TvProgramDetailScreen(
                         Button(onClick = onWatch, enabled = !busy, modifier = Modifier.focusRequester(watchFocus)) {
                             Text(if (detail.isLive) "Regarder en direct" else "Regarder")
                         }
+                    }
+                    if (showWatch && detail.isLive) {
+                        Button(onClick = onStartOver, enabled = !busy) { Text("Regarder depuis le début") }
                     }
                     if (detail.recordAssetId != null) {
                         // When there is no Regarder and no recording/episode to take initial focus,

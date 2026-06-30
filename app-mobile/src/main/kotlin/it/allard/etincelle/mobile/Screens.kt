@@ -558,6 +558,7 @@ fun ProgramDetailScreen(
     error: String?,
     info: String?,
     onWatch: () -> Unit,
+    onStartOver: () -> Unit,
     onRecord: () -> Unit,
     onWatchRecording: (String) -> Unit,
     onBack: () -> Unit,
@@ -625,6 +626,9 @@ fun ProgramDetailScreen(
                         Button(onClick = onWatch, enabled = !busy) {
                             Text(if (detail.isLive) "Regarder en direct" else "Regarder")
                         }
+                    }
+                    if (showWatch && detail.isLive) {
+                        Button(onClick = onStartOver, enabled = !busy) { Text("Regarder depuis le début") }
                     }
                     if (detail.recordAssetId != null) {
                         Button(onClick = onRecord, enabled = !busy) { Text("Enregistrer") }

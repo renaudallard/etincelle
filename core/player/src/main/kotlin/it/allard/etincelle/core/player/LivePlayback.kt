@@ -134,6 +134,23 @@ object LivePlayback {
         player.seekTo(seekTargetMs(fraction, window.durationMs, window.windowStartTimeMs, window.defaultPositionMs, programWindow))
     }
 
+    /**
+     * Seeks live playback to the start of [programWindow] (the current show's beginning) once the live
+     * window carries a usable epoch anchor, returning true when it has seeked. Returns false while the
+     * timeline is not a ready live window yet (so a poller can retry) or when there is no [programWindow].
+     * Used to start a show "depuis le début" on the local player, which joins at the live edge first.
+     * [window] is a caller-owned scratch instance to fill.
+     */
+    fun seekToProgramStartIfReady(player: Player, window: Timeline.Window, programWindow: ProgramWindow?): Boolean {
+        if (programWindow == null || !player.isCurrentMediaItemLive) return false
+        val timeline = player.currentTimeline
+        if (timeline.isEmpty) return false
+        timeline.getWindow(player.currentMediaItemIndex, window)
+        if (!window.isLive() || window.windowStartTimeMs == C.TIME_UNSET || window.durationMs <= 0L) return false
+        seekToFraction(player, window, 0f, programWindow)
+        return true
+    }
+
     /** The pure seek-target math behind [seekToFraction], split out for unit testing. */
     internal fun seekTargetMs(
         fraction: Float,

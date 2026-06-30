@@ -24,7 +24,9 @@ cours de route et la portion pas encore diffusée formant la fin de la barre ; l
 pour être rembobinée y est tracée dans une couleur distincte, et un bouton **Revenir au direct**
 apparaît dès que l'on s'éloigne du bord pour y ramener d'un appui. Cliquer sur un programme ouvre d'abord sa **fiche détaillée**
 (synopsis, casting, année, classification) plutôt que de le lire aussitôt, et la fiche regroupe ses
-autres diffusions disponibles. Quand un programme fait partie d'une série en rattrapage, sa fiche
+autres diffusions disponibles. Pour une chaîne en **direct**, la fiche propose, à côté de **Regarder
+en direct** et **Enregistrer**, un bouton **Regarder depuis le début** qui reprend le programme en
+cours à son commencement (dans la limite de la fenêtre de rembobinage). Quand un programme fait partie d'une série en rattrapage, sa fiche
 liste en dessous les **épisodes disponibles** (avec leur vignette) pour en choisir un autre ; pour une
 série **enregistrée**, elle affiche d'abord vos épisodes enregistrés (lus depuis le DVR), puis la même
 liste des **épisodes disponibles** en rattrapage. Un programme **pas encore diffusé** indique quand il

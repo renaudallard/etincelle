@@ -438,6 +438,7 @@ private fun AppRoot(
                             error = state.error,
                             info = state.info,
                             onWatch = { vm.watchDetail() },
+                            onStartOver = { vm.startOverDetail() },
                             onRecord = { vm.recordDetail() },
                             onWatchRecording = { vm.watchRecording(it) },
                             onBack = { vm.closeDetail() },
@@ -633,6 +634,9 @@ private fun PlayerSurface(
     val showBar = secure && source.isLive
     var programWindow by remember(source) { mutableStateOf(source.programWindow) }
     var barGeometry by remember { mutableStateOf<LiveBarGeometry?>(null) }
+    // A "depuis le début" start asks playback to begin at the current show's start; the local player
+    // joins at the live edge first, so seek back once the live window has loaded, then stop retrying.
+    var pendingStartOver by remember(source) { mutableStateOf(source.isLive && source.liveRewindOffsetMs > 0L) }
     LaunchedEffect(currentPlayer, source.isLive) {
         // VOD and recordings have no live edge, so do not poll: stay at "not behind" without a 1s loop.
         if (!source.isLive) {
@@ -645,6 +649,9 @@ private fun PlayerSurface(
             behindLive = LivePlayback.behindLiveEdgeMs(currentPlayer, liveWindow) > LivePlayback.LIVE_REWIND_THRESHOLD_MS
             if (showBar) {
                 barGeometry = LivePlayback.liveBarGeometry(currentPlayer, liveWindow, programWindow)
+                if (pendingStartOver && LivePlayback.seekToProgramStartIfReady(currentPlayer, liveWindow, programWindow)) {
+                    pendingStartOver = false
+                }
                 // Rollover: once the live edge passes the show's end, re-scope to the now-current
                 // programme. Throttled, and only adopted when it actually advances, so a backend that
                 // lags the boundary is not polled every second.

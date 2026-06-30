@@ -196,10 +196,13 @@ class CastPlayerController(
             _currentPlayer.value = localPlayer
         }
         // Re-entering the player while this exact stream is already running on a Chromecast: leave it
-        // alone instead of reloading and restarting it from the original position.
+        // alone instead of reloading and restarting it from the original position. A "depuis le début"
+        // restart carries an explicit rewind, so it must reload even on the same channel.
+        val newSource = item.localConfiguration?.tag as? PlaybackSource
         if (_currentPlayer.value === castPlayer &&
             castContext.sessionManager.currentCastSession != null &&
-            sameContent(currentItem, item)
+            sameContent(currentItem, item) &&
+            (newSource?.liveRewindOffsetMs ?: 0L) <= 0L
         ) {
             return
         }

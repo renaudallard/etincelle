@@ -34,8 +34,10 @@ data class PlaybackSource(
     val resumeKey: String? = null,
     /** Where to start playback (ms); 0 starts at the beginning / live edge. */
     val startPositionMs: Long = 0L,
-    /** Cast hand-off hint for a rewound live stream: how far behind the live edge (ms) the receiver
-     * should start, so casting keeps the viewer's rewind instead of jumping to the edge. 0 = live edge. */
+    /** Live only: how far behind the live edge (ms) playback should begin instead of at the edge.
+     * Carries a manual rewind across a cast hand-off, and starts the current show from its beginning
+     * ("depuis le début"). The cast receiver gets it as live_rewind_sec; the local player seeks to the
+     * programme start once the live window is known. 0 = live edge. */
     val liveRewindOffsetMs: Long = 0L,
     /** The originating ids, so a stream can be re-resolved (e.g. when a Cast transfer hits an
      * expired token). At most one is set: [originChannelId] for live, [originVodId] for VOD/replay,

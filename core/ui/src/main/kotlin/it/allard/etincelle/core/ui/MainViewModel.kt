@@ -500,6 +500,26 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         }
     }
 
+    /** Plays the live show on the detail page from the beginning of the current programme: resolves
+     * the channel, then asks playback to start that far behind the live edge (within the DVR window)
+     * instead of at the edge. Falls back to a normal live start when the programme times are unknown. */
+    fun startOverDetail() {
+        val d = _state.value.detail ?: return
+        if (!d.isLive) return
+        val channelId = d.channelId ?: return
+        _state.update { it.copy(busy = true, error = null) }
+        navLaunch {
+            runCatchingNav { repo.resolveLiveChannel(channelId) }
+                .onSuccess { src ->
+                    val fromStart = src.programWindow?.let { pw ->
+                        src.copy(liveRewindOffsetMs = (System.currentTimeMillis() - pw.startMs).coerceAtLeast(0L))
+                    } ?: src
+                    _state.update { it.copy(busy = false, playing = fromStart) }
+                }
+                .onFailure { e -> applyFailure(e, "Échec de lecture") }
+        }
+    }
+
     /** Records the live airing shown on the detail page. */
     fun recordDetail() {
         val assetId = _state.value.detail?.recordAssetId ?: return

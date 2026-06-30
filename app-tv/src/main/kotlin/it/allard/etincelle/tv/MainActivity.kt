@@ -126,7 +126,7 @@ class MainActivity : ComponentActivity() {
                             BackHandler { viewModel.closeDetail() }
                             TvProgramDetailScreen(
                                 detail, state.busy, state.error, state.info,
-                                viewModel::watchDetail, viewModel::recordDetail, viewModel::watchRecording,
+                                viewModel::watchDetail, viewModel::startOverDetail, viewModel::recordDetail, viewModel::watchRecording,
                                 viewModel::onCardClick,
                                 isRecording = state.detailRecordingAssetId != null,
                             )
@@ -289,6 +289,9 @@ private fun TvPlayerSurface(
     // rewind/forward buttons), so it carries no seek callback.
     var programWindow by remember(source) { mutableStateOf(source.programWindow) }
     var barGeometry by remember { mutableStateOf<LiveBarGeometry?>(null) }
+    // A "depuis le début" start asks playback to begin at the current show's start; the player joins at
+    // the live edge first, so seek back once the live window has loaded, then stop retrying.
+    var pendingStartOver by remember(source) { mutableStateOf(source.isLive && source.liveRewindOffsetMs > 0L) }
     var controlsVisible by remember { mutableStateOf(true) }
     LaunchedEffect(source.isLive) {
         // VOD and recordings have no live edge, so do not poll: stay at "not behind" without a 1s loop.
@@ -301,6 +304,9 @@ private fun TvPlayerSurface(
         while (true) {
             behindLive = LivePlayback.behindLiveEdgeMs(player, liveWindow) > LivePlayback.LIVE_REWIND_THRESHOLD_MS
             barGeometry = LivePlayback.liveBarGeometry(player, liveWindow, programWindow)
+            if (pendingStartOver && LivePlayback.seekToProgramStartIfReady(player, liveWindow, programWindow)) {
+                pendingStartOver = false
+            }
             val pw = programWindow
             val edge = LivePlayback.liveEdgeEpochMs(player, liveWindow)
             val now = System.currentTimeMillis()
