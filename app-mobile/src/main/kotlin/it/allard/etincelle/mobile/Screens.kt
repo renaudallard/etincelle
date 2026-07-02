@@ -11,6 +11,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
@@ -86,6 +87,7 @@ import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.expandable
 import it.allard.etincelle.core.model.groupBySeason
 import it.allard.etincelle.core.model.ProgramDetail
+import it.allard.etincelle.core.model.RecordAction
 import it.allard.etincelle.core.model.Recording
 import kotlin.math.roundToInt
 
@@ -559,7 +561,7 @@ fun ProgramDetailScreen(
     info: String?,
     onWatch: () -> Unit,
     onStartOver: () -> Unit,
-    onRecord: () -> Unit,
+    onRecord: (RecordAction) -> Unit,
     onWatchRecording: (String) -> Unit,
     onBack: () -> Unit,
     onEpisode: (ContentCard) -> Unit = {},
@@ -620,8 +622,13 @@ fun ProgramDetailScreen(
             detail.upcomingMessage?.let {
                 Text(it, style = MaterialTheme.typography.titleSmall, color = BrandYellow)
             }
-            if (showWatch || detail.recordAssetId != null) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (showWatch || detail.recordActions.isNotEmpty()) {
+                // Wrap so the record button stays reachable when a live channel shows several actions
+                // (Regarder en direct + depuis le début + Enregistrer) that overflow one row.
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     if (showWatch) {
                         Button(onClick = onWatch, enabled = !busy) {
                             Text(if (detail.isLive) "Regarder en direct" else "Regarder")
@@ -630,8 +637,8 @@ fun ProgramDetailScreen(
                     if (showWatch && detail.isLive) {
                         Button(onClick = onStartOver, enabled = !busy) { Text("Regarder depuis le début") }
                     }
-                    if (detail.recordAssetId != null) {
-                        Button(onClick = onRecord, enabled = !busy) { Text("Enregistrer") }
+                    if (detail.recordActions.isNotEmpty()) {
+                        RecordButton(detail.recordActions, enabled = !busy, onRecord = onRecord)
                     }
                 }
             }
@@ -720,6 +727,25 @@ private fun EpisodeRow(card: ContentCard, enabled: Boolean, onClick: () -> Unit)
         )
         Spacer(Modifier.width(8.dp))
         Text("›", style = MaterialTheme.typography.titleLarge, color = BrandYellow)
+    }
+}
+
+/** The record CTA: a single button carrying the backend's own label when there is one option, or a
+ * button that opens a menu when there are several (e.g. "Enregistrer l'épisode" / "Enregistrer la série"). */
+@Composable
+private fun RecordButton(actions: List<RecordAction>, enabled: Boolean, onRecord: (RecordAction) -> Unit) {
+    if (actions.size == 1) {
+        Button(onClick = { onRecord(actions[0]) }, enabled = enabled) { Text(actions[0].label) }
+        return
+    }
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        Button(onClick = { expanded = true }, enabled = enabled) { Text("Enregistrer") }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            actions.forEach { action ->
+                DropdownMenuItem(text = { Text(action.label) }, onClick = { expanded = false; onRecord(action) })
+            }
+        }
     }
 }
 

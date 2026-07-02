@@ -13,6 +13,7 @@ import it.allard.etincelle.core.model.DrmSpec
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.ProgramWindow
+import it.allard.etincelle.core.model.RecordAction
 import it.allard.etincelle.core.model.Recording
 import it.allard.etincelle.core.model.PairingCode
 import it.allard.etincelle.core.model.UserSession
@@ -341,14 +342,13 @@ class FuboRepository(
         if (series.hasWatchNowTab()) api.seriesDetail(seriesId, "id-tab-watch-now").toEpisodes() else emptyList()
     }.getOrDefault(emptyList())
 
-    override suspend fun recordEpisode(assetId: String) = withRefresh {
-        // The response body is unused, but a raw ResponseBody must be closed or the connection leaks.
-        api.addRecording(
-            AddRecordingRequest(
-                params = AddRecordingParams(assetId = assetId),
-                metadatas = mapOf("asset.asset_id" to assetId),
-            ),
-        ).close()
+    override suspend fun record(action: RecordAction) = withRefresh {
+        // Replay the backend's own record api_call (url + payload) verbatim; coerce the JSON numbers
+        // Moshi decoded to Double back to whole numbers so the body matches what the backend sent. The
+        // response body is unused, but a raw ResponseBody must be closed or the connection leaks.
+        @Suppress("UNCHECKED_CAST")
+        val body = coerceWholeNumbers(action.payload) as Map<String, Any?>
+        api.postAction(action.url, body).close()
     }
 
     override suspend fun loadRecordings(): List<Recording> = withRefresh {

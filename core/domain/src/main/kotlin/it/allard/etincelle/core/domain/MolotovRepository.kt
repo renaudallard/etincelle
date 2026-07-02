@@ -8,6 +8,7 @@ import it.allard.etincelle.core.model.PairingCode
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.ProgramWindow
+import it.allard.etincelle.core.model.RecordAction
 import it.allard.etincelle.core.model.Recording
 import it.allard.etincelle.core.model.UserSession
 
@@ -48,8 +49,8 @@ interface MolotovRepository {
      */
     suspend fun fetchProgramDetail(id: String, kind: DetailKind): ProgramDetail
 
-    /** Records the live airing identified by [assetId]. */
-    suspend fun recordEpisode(assetId: String)
+    /** Schedules a recording by replaying the backend's own record [action] (episode or whole series). */
+    suspend fun record(action: RecordAction)
 
     /** The user's DVR recordings (recorded and scheduled), each with a playable dvr asset. */
     suspend fun loadRecordings(): List<Recording>

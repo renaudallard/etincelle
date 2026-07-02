@@ -9,19 +9,6 @@ import com.squareup.moshi.Json
 
 data class SigninRequest(val email: String, val password: String)
 
-// --- Recording ---
-
-data class AddRecordingRequest(
-    @Json(name = "action_name") val actionName: String = "add-recording",
-    @Json(name = "params") val params: AddRecordingParams,
-    @Json(name = "metadatas") val metadatas: Map<String, String>,
-)
-
-data class AddRecordingParams(
-    @Json(name = "asset_id") val assetId: String,
-    @Json(name = "is_upcoming") val isUpcoming: String = "false",
-)
-
 data class SigninResponse(
     @Json(name = "access_token") val accessToken: String?,
     @Json(name = "refresh_token") val refreshToken: String?,

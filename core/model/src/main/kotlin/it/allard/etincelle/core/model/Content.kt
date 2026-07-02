@@ -83,13 +83,25 @@ data class Recording(
 )
 
 /**
+ * A record action the backend offers on a detail page (e.g. "Enregistrer l'épisode" or "Enregistrer
+ * la série"). Server-driven: [label] is the backend's own localized button text and [url]/[payload]
+ * are the api_call it attached to the action, replayed verbatim to schedule the recording. The backend
+ * delivers these as either a direct action-item or the items of a "record options" dropdown.
+ */
+data class RecordAction(
+    val label: String,
+    val url: String,
+    val payload: Map<String, Any?>,
+)
+
+/**
  * A show's detail page (Molotov-4.x style): the program metadata plus how to watch it. Shown when a
  * show card is tapped, instead of playing immediately. The play target is carried in
  * [channelId]/[vodId] (whichever the tapped card had), so watching reuses the normal resolve path.
  *
  * [isLive] marks a live-channel detail: the watch button reads "Regarder en direct" and plays via
- * [channelId] rather than [vodId]. [recordAssetId] is the live airing asset id to record, present
- * only when the airing is recordable; null hides the "Enregistrer" button.
+ * [channelId] rather than [vodId]. [recordActions] are the record options the backend exposes (record
+ * the episode and/or the whole series); empty hides the record button.
  */
 data class ProgramDetail(
     val title: String?,
@@ -104,7 +116,7 @@ data class ProgramDetail(
     val channelId: String?,
     val vodId: String?,
     val isLive: Boolean,
-    val recordAssetId: String?,
+    val recordActions: List<RecordAction> = emptyList(),
     /** This program's id ("{digits}_{digits}"), used to match its DVR recordings; null on series/channel. */
     val programId: String? = null,
     /** DVR recordings of this very show, shown as a "Vos enregistrements" section. */

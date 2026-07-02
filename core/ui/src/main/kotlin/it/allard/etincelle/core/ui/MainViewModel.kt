@@ -15,6 +15,7 @@ import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.ProgramWindow
+import it.allard.etincelle.core.model.RecordAction
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
@@ -44,8 +45,14 @@ enum class Tab(val label: String, val icon: String, val path: String) {
     SEARCH("Recherche", "🔍", ""),
 }
 
-/** One open detail page plus the DVR recording (if any) that its "Regarder" should play. */
-data class DetailEntry(val detail: ProgramDetail, val recordingAssetId: String?)
+/** One open detail page plus the DVR recording (if any) that its "Regarder" should play. [id]/[kind]
+ * are how it was fetched, so it can be refetched in place (e.g. after a record action toggles its CTA). */
+data class DetailEntry(
+    val detail: ProgramDetail,
+    val recordingAssetId: String?,
+    val id: String,
+    val kind: DetailKind,
+)
 
 data class UiState(
     val checking: Boolean = true,
@@ -282,7 +289,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         }
         navLaunch {
             runCatchingNav { repo.fetchProgramDetail(id, kind) }
-                .onSuccess { d -> _state.update { it.copy(busy = false, detailStack = listOf(DetailEntry(d, null))) } }
+                .onSuccess { d -> _state.update { it.copy(busy = false, detailStack = listOf(DetailEntry(d, null, id, kind))) } }
                 .onFailure { e -> applyFailure(e, "Contenu introuvable") }
         }
     }
@@ -456,7 +463,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
                     // A FAST channel's detail has no programme poster, so fall back to the channel's own
                     // logo (the card the user tapped) to give the page a header instead of leaving it bare.
                     val detail = if (kind == DetailKind.CHANNEL) d.copy(channelLogoUrl = card.imageUrl) else d
-                    _state.update { it.copy(busy = false, detailStack = it.detailStack + DetailEntry(detail, null)) }
+                    _state.update { it.copy(busy = false, detailStack = it.detailStack + DetailEntry(detail, null, id, kind)) }
                 }
                 .onFailure { e -> applyFailure(e, "Détail indisponible") }
         }
@@ -470,7 +477,7 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         _state.update { it.copy(busy = true, error = null, info = null) }
         navLaunch {
             runCatchingNav { repo.fetchProgramDetail(id, kind) }
-                .onSuccess { d -> _state.update { it.copy(busy = false, detailStack = it.detailStack + DetailEntry(d, assetId)) } }
+                .onSuccess { d -> _state.update { it.copy(busy = false, detailStack = it.detailStack + DetailEntry(d, assetId, id, kind)) } }
                 .onFailure { watchRecording(assetId) }
         }
     }
@@ -520,17 +527,38 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
         }
     }
 
-    /** Records the live airing shown on the detail page. */
-    fun recordDetail() {
-        val assetId = _state.value.detail?.recordAssetId ?: return
+    /** Runs the given record [action] (schedule the episode/series, or stop an existing series recording)
+     * from the detail page, then refetches so the CTA toggles to reflect the new state. */
+    fun recordDetail(action: RecordAction) {
+        val entry = _state.value.detailStack.lastOrNull() ?: return
+        val stopping = (action.payload["action_name"] as? String)?.contains("stop", ignoreCase = true) == true
         _state.update { it.copy(busy = true, error = null, info = null) }
         viewModelScope.launch {
-            val result = runCatching { repo.recordEpisode(assetId) }
-            // Only reflect the outcome if still on the detail that started it; a slow record completing
+            val result = runCatching { repo.record(action) }
+            // Only reflect the outcome if still on the detail that started it; a slow action completing
             // after the user navigated away must not stamp busy/banner onto an unrelated screen.
-            if (_state.value.detail?.recordAssetId != assetId) return@launch
+            if (_state.value.detailStack.lastOrNull() !== entry) return@launch
             result
-                .onSuccess { _state.update { it.copy(busy = false, info = "Enregistrement programmé") } }
+                .onSuccess {
+                    // Refetch so the record CTA flips (Enregistrer <-> Arrêter d'enregistrer); best-effort,
+                    // as the banner already confirms the action succeeded.
+                    val refreshed = runCatching { repo.fetchProgramDetail(entry.id, entry.kind) }.getOrNull()
+                    _state.update { st ->
+                        if (st.detailStack.lastOrNull() !== entry) return@update st
+                        val stack = if (refreshed == null) st.detailStack else {
+                            // fetchProgramDetail does not re-inject the channel logo showDetail added for a
+                            // CHANNEL detail, so carry it over or a poster-less channel loses its header image.
+                            val merged = if (entry.kind == DetailKind.CHANNEL)
+                                refreshed.copy(channelLogoUrl = entry.detail.channelLogoUrl) else refreshed
+                            st.detailStack.dropLast(1) + entry.copy(detail = merged)
+                        }
+                        st.copy(
+                            busy = false,
+                            info = if (stopping) "Enregistrement annulé" else "Enregistrement programmé",
+                            detailStack = stack,
+                        )
+                    }
+                }
                 .onFailure { e -> applyFailure(e, "Échec de l'enregistrement") }
         }
     }

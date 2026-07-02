@@ -9,6 +9,7 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -77,6 +78,7 @@ import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.expandable
 import it.allard.etincelle.core.model.groupBySeason
 import it.allard.etincelle.core.model.ProgramDetail
+import it.allard.etincelle.core.model.RecordAction
 import it.allard.etincelle.core.model.Recording
 import it.allard.etincelle.core.ui.Tab
 import it.allard.etincelle.core.ui.UiState
@@ -387,7 +389,7 @@ fun TvProgramDetailScreen(
     info: String?,
     onWatch: () -> Unit,
     onStartOver: () -> Unit,
-    onRecord: () -> Unit,
+    onRecord: (RecordAction) -> Unit,
     onWatchRecording: (String) -> Unit,
     onEpisode: (ContentCard) -> Unit,
     isRecording: Boolean = false,
@@ -396,7 +398,7 @@ fun TvProgramDetailScreen(
     val showWatch = !(detail.isSeries && !isRecording) && detail.upcomingMessage == null
     // A page with no playable element at all (a series with no catch-up episodes and no recordings)
     // would otherwise leave the D-pad nothing to focus; make the column itself focusable as a fallback.
-    val nothingFocusable = !showWatch && detail.recordAssetId == null &&
+    val nothingFocusable = !showWatch && detail.recordActions.isEmpty() &&
         detail.episodes.isEmpty() && detail.recordings.isEmpty()
     // Re-key on the shown detail so focus is re-established when navigating detail -> detail, not only
     // for the first detail page.
@@ -443,8 +445,13 @@ fun TvProgramDetailScreen(
             }
             // A multi-episode series has no directly playable asset (its id is not a VOD), so it has
             // no "Regarder"; the user picks an episode. A recorded series keeps it (plays the recording).
-            if (showWatch || detail.recordAssetId != null) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (showWatch || detail.recordActions.isNotEmpty()) {
+                // Wrap so every action stays reachable when a live channel shows several buttons
+                // (Regarder en direct + depuis le début + Enregistrer l'épisode + la série).
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
                     if (showWatch) {
                         Button(onClick = onWatch, enabled = !busy, modifier = Modifier.focusRequester(watchFocus)) {
                             Text(if (detail.isLive) "Regarder en direct" else "Regarder")
@@ -453,15 +460,16 @@ fun TvProgramDetailScreen(
                     if (showWatch && detail.isLive) {
                         Button(onClick = onStartOver, enabled = !busy) { Text("Regarder depuis le début") }
                     }
-                    if (detail.recordAssetId != null) {
-                        // When there is no Regarder and no recording/episode to take initial focus,
-                        // the record button is the only focusable widget, so hand it watchFocus.
-                        val recordButtonFocus = !showWatch &&
-                            detail.recordings.isEmpty() && detail.episodes.isEmpty()
+                    // Each record option (the episode and/or the whole series) is its own D-pad button,
+                    // using the backend's own label. When there is no Regarder and no recording/episode to
+                    // take initial focus, the first record button is the only focusable widget, so it gets
+                    // watchFocus.
+                    val recordTakesFocus = !showWatch && detail.recordings.isEmpty() && detail.episodes.isEmpty()
+                    detail.recordActions.forEachIndexed { i, action ->
                         Button(
-                            onClick = onRecord, enabled = !busy,
-                            modifier = if (recordButtonFocus) Modifier.focusRequester(watchFocus) else Modifier,
-                        ) { Text("Enregistrer") }
+                            onClick = { onRecord(action) }, enabled = !busy,
+                            modifier = if (recordTakesFocus && i == 0) Modifier.focusRequester(watchFocus) else Modifier,
+                        ) { Text(action.label) }
                     }
                 }
             }

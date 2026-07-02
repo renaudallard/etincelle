@@ -439,7 +439,7 @@ private fun AppRoot(
                             info = state.info,
                             onWatch = { vm.watchDetail() },
                             onStartOver = { vm.startOverDetail() },
-                            onRecord = { vm.recordDetail() },
+                            onRecord = { vm.recordDetail(it) },
                             onWatchRecording = { vm.watchRecording(it) },
                             onBack = { vm.closeDetail() },
                             onEpisode = { vm.onCardClick(it) },

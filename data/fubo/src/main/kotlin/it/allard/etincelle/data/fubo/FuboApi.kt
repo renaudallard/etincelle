@@ -79,9 +79,13 @@ interface FuboApi {
         @Query("tabID") tab: String = "id-tab-about",
     ): PageResponse
 
-    /** Records a live airing; the response body is unused. */
-    @POST("action/v1/add-recording")
-    suspend fun addRecording(@Body body: AddRecordingRequest): okhttp3.ResponseBody
+    /** Replays a server-driven record action (its api_call url + payload); the response body is unused.
+     * The url is absolute, so it also carries the endpoint (add-recording, record-new-episodes, …). */
+    @POST
+    suspend fun postAction(
+        @Url url: String,
+        @Body payload: Map<String, @JvmSuppressWildcards Any?>,
+    ): okhttp3.ResponseBody
 
     /** Posts a server playhead (continue-watching) progress update to the response-supplied url. */
     @POST

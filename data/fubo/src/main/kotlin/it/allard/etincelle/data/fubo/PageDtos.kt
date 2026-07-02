@@ -8,6 +8,7 @@ import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.ProgramDetail
+import it.allard.etincelle.core.model.RecordAction
 
 // --- /papi/v1/page/* server-driven UI ---
 
@@ -38,13 +39,16 @@ data class MetadataDto(
     val ctas: List<CtaDto>?,
 )
 
-// The record action hides inside the metadata CTAs: a menu-item whose id is "id-record-{LIVE_xxxxx}".
+// The record actions live in the metadata CTAs. The backend delivers them two ways: as a direct
+// action-item (id "id-record-LIVE_…" or "id-record-series-…") on a programme/series page, or as the
+// items of a "record options" dropdown (id "id-record-options-…") on a live-channel page. Either way,
+// each carries the api_call (endpoint url + payload) that schedules the recording.
 data class CtaDto(@Json(name = "action_items") val actionItems: List<CtaActionItemDto>?)
-data class CtaActionItemDto(val actions: CtaActionsDto?)
+data class CtaActionItemDto(val text: TextDto?, val actions: CtaActionsDto?)
 data class CtaActionsDto(@Json(name = "on_click") val onClick: List<CtaOnClickDto>?)
-data class CtaOnClickDto(val content: CtaContentDto?, val endpoint: EndpointDto? = null)
+data class CtaOnClickDto(val type: String? = null, val content: CtaContentDto? = null, val endpoint: EndpointDto? = null)
 data class CtaContentDto(@Json(name = "menu_items") val menuItems: List<MenuItemDto>?)
-data class MenuItemDto(val id: String?)
+data class MenuItemDto(val text: TextDto? = null, val actions: CtaActionsDto? = null)
 
 data class TagDto(val label: String?)
 data class AboutFieldDto(val label: TextDto?, val value: TextDto?)
@@ -85,7 +89,13 @@ data class BodyDto(val picture: PictureDto?)
 data class StateDto(@Json(name = "is_locked") val isLocked: Boolean?)
 data class ActionsDto(@Json(name = "on_click") val onClick: List<ActionItemDto>?)
 data class ActionItemDto(val endpoint: EndpointDto?, val type: String? = null)
-data class EndpointDto(val url: String?, val method: String?)
+data class EndpointDto(
+    val url: String?,
+    val method: String?,
+    // The request body for an api_call endpoint (e.g. a record action), replayed verbatim. Null for
+    // plain navigation endpoints.
+    val payload: Map<String, @JvmSuppressWildcards Any?>? = null,
+)
 data class PictureDto(val url: String?)
 data class TextDto(val text: String?)
 
@@ -95,10 +105,22 @@ private val CHANNEL_REGEX = Regex("""program-details/channel/(\d+)""")
 private val CHANNEL_DETAILS_REGEX = Regex("""channel-details/(\d+)""")
 private val VOD_REGEX = Regex("""program-details/program/([\w-]+)""")
 private val SERIES_REGEX = Regex("""program-details/series/([\w-]+)""")
-private val RECORD_REGEX = Regex("""id-record-(LIVE_[0-9]+)""")
 // metadata.id looks like "id-metadata-program-details-2768066_48"; the trailing "{digits}_{digits}"
 // is the program id used to match this show's DVR recordings.
 private val PROGRAM_ID_REGEX = Regex("""(\d+_\d+)$""")
+
+// A record action-item/menu-item, identified by its api_call's action_name (add-recording,
+// record-new-episodes, stop-recording-series, …) rather than a fragile element-id convention, so the
+// button toggles correctly once a recording exists. The "record options" dropdown container carries no
+// api_call of its own (only its nested items do), so it maps to null.
+private fun recordActionFrom(text: TextDto?, actions: CtaActionsDto?): RecordAction? {
+    val endpoint = actions?.onClick.orEmpty().firstOrNull { it.type == "api_call" }?.endpoint ?: return null
+    val payload = endpoint.payload ?: return null
+    if ((payload["action_name"] as? String)?.contains("record", ignoreCase = true) != true) return null
+    val url = endpoint.url ?: return null
+    val label = text?.text?.takeIf { it.isNotBlank() } ?: return null
+    return RecordAction(label = label, url = url, payload = payload)
+}
 
 fun PageResponse.toPage(): ContentPage = ContentPage(title?.text, toRails())
 
@@ -126,12 +148,14 @@ fun PageResponse.toProgramDetail(channelId: String?, vodId: String?, isLive: Boo
     } else {
         rawSynopsis
     }
-    // The live airing to record sits in a CTA menu-item id like "id-record-LIVE_3479644".
-    val recordAssetId = meta?.ctas.orEmpty()
-        .flatMap { it.actionItems.orEmpty() }
-        .flatMap { it.actions?.onClick.orEmpty() }
-        .flatMap { it.content?.menuItems.orEmpty() }
-        .firstNotNullOfOrNull { item -> item.id?.let { RECORD_REGEX.find(it)?.groupValues?.get(1) } }
+    // Record actions ("Enregistrer l'épisode" / "Enregistrer la série") are server-driven and appear
+    // as a direct action-item or as the items of a "record options" dropdown, so gather from both.
+    val recordActions = meta?.ctas.orEmpty().flatMap { it.actionItems.orEmpty() }.flatMap { ai ->
+        val nested = ai.actions?.onClick.orEmpty()
+            .flatMap { it.content?.menuItems.orEmpty() }
+            .mapNotNull { recordActionFrom(it.text, it.actions) }
+        listOfNotNull(recordActionFrom(ai.text, ai.actions)) + nested
+    }
     val programId = meta?.id?.let { PROGRAM_ID_REGEX.find(it)?.groupValues?.get(1) }
     // An upcoming (not-yet-aired) programme is not playable; surface the backend's own localized reason
     // (e.g. "Ce programme sera en direct dans 4 jours.") instead of letting Regarder 5xx.
@@ -153,7 +177,7 @@ fun PageResponse.toProgramDetail(channelId: String?, vodId: String?, isLive: Boo
         channelId = channelId,
         vodId = vodId,
         isLive = isLive,
-        recordAssetId = recordAssetId,
+        recordActions = recordActions,
         programId = programId,
         upcomingMessage = upcomingMessage,
     )
