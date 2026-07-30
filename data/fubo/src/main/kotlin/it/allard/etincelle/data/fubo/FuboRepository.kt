@@ -86,10 +86,11 @@ class FuboRepository(
         val response = try {
             api.signin(SigninRequest(email, password))
         } catch (e: HttpException) {
-            // Only the sign-in call reflects the credentials, so a 401 is a wrong email/password
-            // rather than an expired session. The backend's own error table pairs a blocked account
-            // with 403 (BLOCKED_USER) and a region or VPN block with 451 (NO_SERVICE_IN_COUNTRY,
-            // VPN_NETWORK), so the two are distinct answers and not interchangeable.
+            // Only the sign-in call reflects the credentials, so a 4xx here is a rejected sign-in
+            // rather than an expired session; signinMessage() sorts out which of the several states
+            // a 401 actually is. The backend's own error table pairs a blocked account with 403
+            // (BLOCKED_USER) and a region, VPN or subscription-market block with 451, so the two are
+            // distinct answers and not interchangeable.
             throw when (e.code()) {
                 400, 401 -> AppError.Unknown(signinMessage(e.backendError()))
                 403 -> AppError.Unknown("Ce compte est bloqué")
