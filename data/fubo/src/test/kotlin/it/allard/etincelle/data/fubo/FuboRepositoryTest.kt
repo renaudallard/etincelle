@@ -210,6 +210,17 @@ class FuboRepositoryTest {
         assertEquals("Service indisponible, réessayez", error?.message)
     }
 
+    @Test
+    fun `a 451 sign-in is a region block and a 403 is a blocked account`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(451))
+        val geo = runCatching { repo.login("e@x", "pw") }.exceptionOrNull()
+        assertTrue(geo is AppError.GeoBlocked)
+
+        server.enqueue(MockResponse().setResponseCode(403))
+        val blocked = runCatching { repo.login("e@x", "pw") }.exceptionOrNull()
+        assertEquals("Ce compte est bloqué", blocked?.message)
+    }
+
     private class FakeSessionStore : SessionStore {
         var saved: UserSession? = null
         override suspend fun read() = saved

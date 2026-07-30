@@ -84,11 +84,14 @@ class FuboRepository(
         val response = try {
             api.signin(SigninRequest(email, password))
         } catch (e: HttpException) {
-            // Only the sign-in call reflects the credentials: a 401 is a wrong email/password and a 403
-            // is a region block (the backend is geo-gated), not an expired session.
+            // Only the sign-in call reflects the credentials, so a 401 is a wrong email/password
+            // rather than an expired session. The backend's own error table pairs a blocked account
+            // with 403 (BLOCKED_USER) and a region or VPN block with 451 (NO_SERVICE_IN_COUNTRY,
+            // VPN_NETWORK), so the two are distinct answers and not interchangeable.
             throw when (e.code()) {
                 400, 401 -> AppError.Unknown("Email ou mot de passe incorrect")
-                403 -> AppError.GeoBlocked
+                403 -> AppError.Unknown("Ce compte est bloqué")
+                451 -> AppError.GeoBlocked
                 else -> e.toAppError()
             }
         } catch (e: IOException) {
@@ -481,9 +484,11 @@ class FuboRepository(
 
 private fun HttpException.toAppError(): AppError = when (code()) {
     401 -> AppError.Unauthorized
-    // Forbidden on a session the server still recognizes (geo/entitlement); not an expired session.
+    // Forbidden on a session the server still recognizes (entitlement); not an expired session.
     403 -> AppError.Forbidden
     404 -> AppError.Unknown("Contenu introuvable")
+    // The backend answers 451 for a region, VPN or subscription-market block.
+    451 -> AppError.GeoBlocked
     in 500..599 -> AppError.Network("Service indisponible, réessayez")
     else -> AppError.Unknown("Chargement impossible, réessayez")
 }
