@@ -3,6 +3,8 @@
 
 package it.allard.etincelle.data.fubo
 
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.Types
 import it.allard.etincelle.core.domain.DetailKind
 import it.allard.etincelle.core.domain.MolotovRepository
 import it.allard.etincelle.core.model.AppError
@@ -89,7 +91,7 @@ class FuboRepository(
             // with 403 (BLOCKED_USER) and a region or VPN block with 451 (NO_SERVICE_IN_COUNTRY,
             // VPN_NETWORK), so the two are distinct answers and not interchangeable.
             throw when (e.code()) {
-                400, 401 -> AppError.Unknown("Email ou mot de passe incorrect")
+                400, 401 -> AppError.Unknown(signinMessage(e.backendError()))
                 403 -> AppError.Unknown("Ce compte est bloqué")
                 451 -> AppError.GeoBlocked
                 else -> e.toAppError()
@@ -480,6 +482,41 @@ class FuboRepository(
     } catch (e: IOException) {
         throw AppError.Network("Pas de connexion, vérifiez votre réseau")
     }
+}
+
+/** A backend error code with its human message, e.g. INVALID_USERNAME_PASSWORD. */
+private data class BackendError(val code: String?, val message: String?)
+
+/** Decodes `{"error":{...}}` as a plain map, so no Kotlin reflection adapter is needed here. */
+private val errorBodyAdapter by lazy {
+    Moshi.Builder().build().adapter<Map<String, Any?>>(
+        Types.newParameterizedType(Map::class.java, String::class.java, Any::class.java),
+    )
+}
+
+/**
+ * The backend error carried by a failed response, or null when it sent none. `lc_message` is the
+ * message localised to x-preferred-language and is preferred over the English `message`.
+ */
+private fun HttpException.backendError(): BackendError? = runCatching {
+    val body = response()?.errorBody()?.string().orEmpty()
+    val error = if (body.isBlank()) null else errorBodyAdapter.fromJson(body)?.get("error") as? Map<*, *>
+    error?.let {
+        BackendError(it["code"] as? String, it["lc_message"] as? String ?: it["message"] as? String)
+    }
+}.getOrNull()
+
+/**
+ * The message for a rejected sign-in. The backend answers 401 for several unrelated states and only
+ * INVALID_USERNAME_PASSWORD means a wrong password, so the states it is worth naming get their own
+ * text and anything unrecognised falls back to the backend's own message rather than blaming the
+ * password.
+ */
+private fun signinMessage(error: BackendError?): String = when (error?.code) {
+    "MFA_TOKEN_EXPIRED" -> "Validation en deux étapes requise, non prise en charge par l'application"
+    "FORGOT_CREDENTIALS" -> "Réinitialisation de mot de passe en cours, terminez-la puis réessayez"
+    "INVALID_USERNAME_PASSWORD", null -> "Email ou mot de passe incorrect"
+    else -> error?.message ?: "Email ou mot de passe incorrect"
 }
 
 private fun HttpException.toAppError(): AppError = when (code()) {

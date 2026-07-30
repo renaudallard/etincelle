@@ -50,6 +50,12 @@ Geo/market is derived server-side from the egress IP (no `x-client-country` need
 - `GET /v3/location`→ `{network_allowed(bool), country_code, region_code, dma, postal, as_name, ...}`.
 - `POST /logout`.
 - Retrofit verbs (from smali, validated): `/signin`,`/logout` = **PUT**; `/refresh` = POST; `/user` = GET.
+- Errors come back as `{"error":{"code","message","lc_message"}}` (`lc_message` follows `x-preferred-language`).
+  From the app's own error enum (`u00/b.smali`), **401** covers `INVALID_USERNAME_PASSWORD`,
+  `REFRESH_TOKEN_EXPIRED`, `MFA_TOKEN_EXPIRED`, `FORGOT_CREDENTIALS` and `UNAUTHORIZED`, so a 401 is
+  NOT proof of a wrong password. Neighbouring statuses: **451** = `NO_SERVICE_IN_COUNTRY`,
+  `NO_SERVICE_FOR_SUBSCRIPTION`, `VPN_NETWORK`; **403** = `BLOCKED`, `BLOCKED_USER`; **429** =
+  `TOO_MANY_REQUESTS`; **400** = `INVALID_BEARER_TOKEN`, `INVALID_REQUEST`.
 
 ## Content — server-driven "page API" (papi)
 

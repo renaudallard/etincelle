@@ -221,6 +221,40 @@ class FuboRepositoryTest {
         assertEquals("Ce compte est bloqué", blocked?.message)
     }
 
+    @Test
+    fun `a 401 that is not a wrong password says what it actually is`() = runTest {
+        server.enqueue(
+            MockResponse().setResponseCode(401)
+                .setBody("""{"error":{"code":"MFA_TOKEN_EXPIRED","message":"mfa"}}""")
+        )
+        val mfa = runCatching { repo.login("e@x", "pw") }.exceptionOrNull()
+        assertEquals(
+            "Validation en deux étapes requise, non prise en charge par l'application",
+            mfa?.message,
+        )
+
+        // A wrong password keeps the curated message.
+        server.enqueue(
+            MockResponse().setResponseCode(401)
+                .setBody("""{"error":{"code":"INVALID_USERNAME_PASSWORD","message":"nope"}}""")
+        )
+        val wrong = runCatching { repo.login("e@x", "pw") }.exceptionOrNull()
+        assertEquals("Email ou mot de passe incorrect", wrong?.message)
+
+        // An unrecognised code surfaces the backend's localised message instead of blaming the password.
+        server.enqueue(
+            MockResponse().setResponseCode(401)
+                .setBody("""{"error":{"code":"SOMETHING_NEW","message":"en","lc_message":"message localisé"}}""")
+        )
+        val unknown = runCatching { repo.login("e@x", "pw") }.exceptionOrNull()
+        assertEquals("message localisé", unknown?.message)
+
+        // No body at all still falls back cleanly.
+        server.enqueue(MockResponse().setResponseCode(401))
+        val empty = runCatching { repo.login("e@x", "pw") }.exceptionOrNull()
+        assertEquals("Email ou mot de passe incorrect", empty?.message)
+    }
+
     private class FakeSessionStore : SessionStore {
         var saved: UserSession? = null
         override suspend fun read() = saved
