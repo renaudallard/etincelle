@@ -60,6 +60,25 @@ class FuboRepositoryTest {
     }
 
     @Test
+    fun `login unwraps the v2 signin envelope and sends the email as username`() = runTest {
+        server.enqueue(
+            MockResponse().setBody(
+                """{"type":"signin","payload":{"access_token":"AT","refresh_token":"RT","id_token":"IT"}}"""
+            )
+        )
+        server.enqueue(MockResponse().setBody("""{"data":{"id":"u1","profiles":[{"id":"p1"}]}}"""))
+
+        val result = repo.login("e@x", "pw")
+
+        val request = server.takeRequest()
+        assertEquals("/v2/signin", request.path)
+        assertEquals("""{"username":"e@x","password":"pw"}""", request.body.readUtf8())
+        assertEquals("u1", result.userId)
+        assertEquals("AT", session.accessToken)
+        assertEquals("RT", store.saved?.refreshToken)
+    }
+
+    @Test
     fun `restoreSession reloads a saved session`() = runTest {
         store.saved = UserSession("AT", "RT", "u1", "p1")
         assertTrue(repo.restoreSession())

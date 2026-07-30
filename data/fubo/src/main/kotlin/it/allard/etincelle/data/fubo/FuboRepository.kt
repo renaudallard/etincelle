@@ -81,7 +81,7 @@ class FuboRepository(
 
     /** Signs in, loads the user/profile id, and persists the session. */
     override suspend fun login(email: String, password: String): UserSession {
-        val tokens = try {
+        val response = try {
             api.signin(SigninRequest(email, password))
         } catch (e: HttpException) {
             // Only the sign-in call reflects the credentials: a 401 is a wrong email/password and a 403
@@ -94,6 +94,7 @@ class FuboRepository(
         } catch (e: IOException) {
             throw AppError.Network("Pas de connexion, vérifiez votre réseau")
         }
+        val tokens = response.tokens
         val accessToken = tokens.accessToken ?: throw AppError.Unknown("Email ou mot de passe incorrect")
         // The user/profile load runs after credentials are accepted, so its errors are not credential
         // failures: map them normally (a 403 here is Forbidden, a 401 an expired token).
@@ -116,7 +117,8 @@ class FuboRepository(
      * same way as a password sign-in.
      */
     override suspend fun pollCodeLogin(code: String, deviceId: String): UserSession? {
-        val tokens = api.pollSignInCode(deviceId, SignInCodePollRequest(code)).data ?: return null
+        val tokens =
+            api.pollSignInCode(deviceId, SignInCodePollRequest(code)).data?.tokens ?: return null
         val accessToken = tokens.accessToken ?: return null
         return finishLogin(accessToken, tokens.refreshToken)
     }
@@ -416,7 +418,7 @@ class FuboRepository(
         val current = session.session ?: throw AppError.Unauthorized
         if (usedAccessToken != null && current.accessToken != usedAccessToken) return@withLock
         val refreshToken = current.refreshToken ?: throw AppError.Unauthorized
-        val tokens = api.refresh("Bearer $refreshToken")
+        val tokens = api.refresh("Bearer $refreshToken").tokens
         val newAccess = tokens.accessToken ?: throw AppError.Unauthorized
         val updated = current.copy(accessToken = newAccess, refreshToken = tokens.refreshToken ?: refreshToken)
         session.session = updated

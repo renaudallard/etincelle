@@ -15,7 +15,8 @@ import retrofit2.http.Url
 /** Subset of the Fubo (Molotov) REST API used by the app. */
 interface FuboApi {
 
-    @PUT("signin")
+    /** The flat `PUT signin` is refused for migrated accounts, so use the v2 endpoint. */
+    @PUT("v2/signin")
     suspend fun signin(@Body body: SigninRequest): SigninResponse
 
     /** TV pairing: generates a short pairing code (no auth) tied to [deviceId] (a fresh id per attempt

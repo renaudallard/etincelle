@@ -43,7 +43,7 @@ Geo/market is derived server-side from the egress IP (no `x-client-country` need
 ## Auth (host `api-eu.fubo.tv`)
 
 - `PUT /v2/signin`  body `{"username","password"}` → `{type, payload:{...tokens}}` (envelope). The app uses this.
-- `PUT /signin`     body `{"email","password"}`   → flat `{access_token,id_token,refresh_token,token_type,expires_in}` (also works; `expires_in`=36000s).
+- `PUT /signin`     body `{"email","password"}`   → flat `{access_token,id_token,refresh_token,token_type,expires_in}`. **Dead as of 2026-07: answers `401 INVALID_USERNAME_PASSWORD` for migrated accounts. Use `/v2/signin`.** The field name matters too: `/v2/signin` with `email` instead of `username` is also refused. `expires_in`=36000s.
 - `POST /refresh`   (Bearer refresh token) → new tokens.
 - `GET /user`       → `{data:{id, countryCode, language, email, profiles:[{id,name,avatar,dob}], type, ...}}`.
 - `GET /profile`    → profile detail.

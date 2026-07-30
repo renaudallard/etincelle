@@ -7,13 +7,25 @@ import com.squareup.moshi.Json
 
 // --- Auth ---
 
-data class SigninRequest(val email: String, val password: String)
+/** The backend takes the account email in a `username` field. */
+data class SigninRequest(
+    @Json(name = "username") val email: String,
+    val password: String,
+)
 
+/**
+ * Tokens from a sign-in or a refresh. `v2/signin` wraps them in a `{type, payload}` envelope while
+ * `refresh` and the pairing flow return them flat, so both shapes parse and [tokens] returns
+ * whichever of the two actually carries them.
+ */
 data class SigninResponse(
     @Json(name = "access_token") val accessToken: String?,
     @Json(name = "refresh_token") val refreshToken: String?,
     @Json(name = "id_token") val idToken: String?,
-)
+    val payload: SigninResponse? = null,
+) {
+    val tokens: SigninResponse get() = payload ?: this
+}
 
 // --- TV code/QR pairing (signin/code) ---
 
