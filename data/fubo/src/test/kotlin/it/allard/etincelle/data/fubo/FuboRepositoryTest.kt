@@ -255,6 +255,21 @@ class FuboRepositoryTest {
         assertEquals("Email ou mot de passe incorrect", empty?.message)
     }
 
+    @Test
+    fun `a sign-in error with a message but no code keeps the message`() = runTest {
+        server.enqueue(
+            MockResponse().setResponseCode(401)
+                .setBody("""{"error":{"lc_message":"Votre compte doit être réactivé"}}""")
+        )
+        val codeless = runCatching { repo.login("e@x", "pw") }.exceptionOrNull()
+        assertEquals("Votre compte doit être réactivé", codeless?.message)
+
+        // An error object carrying neither a code nor a message still blames nothing but the password.
+        server.enqueue(MockResponse().setResponseCode(401).setBody("""{"error":{}}"""))
+        val bare = runCatching { repo.login("e@x", "pw") }.exceptionOrNull()
+        assertEquals("Email ou mot de passe incorrect", bare?.message)
+    }
+
     private class FakeSessionStore : SessionStore {
         var saved: UserSession? = null
         override suspend fun read() = saved

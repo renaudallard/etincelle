@@ -100,7 +100,7 @@ class FuboRepository(
             throw AppError.Network("Pas de connexion, vérifiez votre réseau")
         }
         val tokens = response.tokens
-        val accessToken = tokens.accessToken ?: throw AppError.Unknown("Email ou mot de passe incorrect")
+        val accessToken = tokens.accessToken ?: throw AppError.Unknown(WRONG_CREDENTIALS)
         // The user/profile load runs after credentials are accepted, so its errors are not credential
         // failures: map them normally (a 403 here is Forbidden, a 401 an expired token).
         return translateErrors { finishLogin(accessToken, tokens.refreshToken) }
@@ -506,6 +506,9 @@ private fun HttpException.backendError(): BackendError? = runCatching {
     }
 }.getOrNull()
 
+/** Shown when the backend names a wrong password, and whenever it offers no message of its own. */
+private const val WRONG_CREDENTIALS = "Email ou mot de passe incorrect"
+
 /**
  * The message for a rejected sign-in. The backend answers 401 for several unrelated states and only
  * INVALID_USERNAME_PASSWORD means a wrong password, so the states it is worth naming get their own
@@ -515,8 +518,8 @@ private fun HttpException.backendError(): BackendError? = runCatching {
 private fun signinMessage(error: BackendError?): String = when (error?.code) {
     "MFA_TOKEN_EXPIRED" -> "Validation en deux étapes requise, non prise en charge par l'application"
     "FORGOT_CREDENTIALS" -> "Réinitialisation de mot de passe en cours, terminez-la puis réessayez"
-    "INVALID_USERNAME_PASSWORD", null -> "Email ou mot de passe incorrect"
-    else -> error?.message ?: "Email ou mot de passe incorrect"
+    "INVALID_USERNAME_PASSWORD" -> WRONG_CREDENTIALS
+    else -> error?.message ?: WRONG_CREDENTIALS
 }
 
 private fun HttpException.toAppError(): AppError = when (code()) {
