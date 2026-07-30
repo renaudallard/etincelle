@@ -94,7 +94,7 @@ class FuboRepository(
             throw when (e.code()) {
                 400, 401 -> AppError.Unknown(signinMessage(e.backendError()))
                 403 -> AppError.Unknown("Ce compte est bloqué")
-                451 -> AppError.GeoBlocked
+                451 -> blockedError(e.backendError())
                 else -> e.toAppError()
             }
         } catch (e: IOException) {
@@ -523,13 +523,22 @@ private fun signinMessage(error: BackendError?): String = when (error?.code) {
     else -> error?.message ?: WRONG_CREDENTIALS
 }
 
+/**
+ * The error for a 451. The backend uses the one status for three different blocks, so only its code
+ * says which: the country, a VPN in the way, or a market the subscription does not cover.
+ */
+private fun blockedError(error: BackendError?): AppError = when (error?.code) {
+    "VPN_NETWORK" -> AppError.Unknown("Désactivez votre VPN pour accéder au service")
+    "NO_SERVICE_FOR_SUBSCRIPTION" -> AppError.NotEntitled
+    else -> AppError.GeoBlocked
+}
+
 private fun HttpException.toAppError(): AppError = when (code()) {
     401 -> AppError.Unauthorized
     // Forbidden on a session the server still recognizes (entitlement); not an expired session.
     403 -> AppError.Forbidden
     404 -> AppError.Unknown("Contenu introuvable")
-    // The backend answers 451 for a region, VPN or subscription-market block.
-    451 -> AppError.GeoBlocked
+    451 -> blockedError(backendError())
     in 500..599 -> AppError.Network("Service indisponible, réessayez")
     else -> AppError.Unknown("Chargement impossible, réessayez")
 }

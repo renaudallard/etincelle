@@ -222,6 +222,43 @@ class FuboRepositoryTest {
     }
 
     @Test
+    fun `a 451 names which of the three blocks it is`() = runTest {
+        server.enqueue(
+            MockResponse().setResponseCode(451)
+                .setBody("""{"error":{"code":"VPN_NETWORK","message":"vpn"}}""")
+        )
+        val vpn = runCatching { repo.login("e@x", "pw") }.exceptionOrNull()
+        assertEquals("Désactivez votre VPN pour accéder au service", vpn?.message)
+
+        server.enqueue(
+            MockResponse().setResponseCode(451)
+                .setBody("""{"error":{"code":"NO_SERVICE_FOR_SUBSCRIPTION","message":"sub"}}""")
+        )
+        val subscription = runCatching { repo.login("e@x", "pw") }.exceptionOrNull()
+        assertTrue(subscription is AppError.NotEntitled)
+
+        server.enqueue(
+            MockResponse().setResponseCode(451)
+                .setBody("""{"error":{"code":"NO_SERVICE_IN_COUNTRY","message":"country"}}""")
+        )
+        val country = runCatching { repo.login("e@x", "pw") }.exceptionOrNull()
+        assertTrue(country is AppError.GeoBlocked)
+    }
+
+    @Test
+    fun `a 451 outside sign-in is mapped the same way`() = runTest {
+        session.session = UserSession("AT", "RT", "u1", "p1")
+        server.enqueue(
+            MockResponse().setResponseCode(451)
+                .setBody("""{"error":{"code":"VPN_NETWORK","message":"vpn"}}""")
+        )
+
+        val vpn = runCatching { repo.loadHome() }.exceptionOrNull()
+
+        assertEquals("Désactivez votre VPN pour accéder au service", vpn?.message)
+    }
+
+    @Test
     fun `a 401 that is not a wrong password says what it actually is`() = runTest {
         server.enqueue(
             MockResponse().setResponseCode(401)
