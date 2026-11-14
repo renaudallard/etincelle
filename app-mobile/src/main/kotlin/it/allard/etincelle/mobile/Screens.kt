@@ -63,6 +63,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -694,8 +695,13 @@ private fun EpisodesSection(episodes: List<ContentCard>, busy: Boolean, onEpisod
             Box {
                 TextButton(onClick = { expanded = true }) { Text("${seasons[idx].first} ▾", color = BrandYellow) }
                 DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    // Mark the season on screen, so the menu shows which one is current.
                     seasons.forEachIndexed { i, (label, _) ->
-                        DropdownMenuItem(text = { Text(label) }, onClick = { selected = i; expanded = false })
+                        DropdownMenuItem(
+                            text = { Text(label, color = if (i == idx) BrandYellow else Color.Unspecified) },
+                            onClick = { selected = i; expanded = false },
+                            trailingIcon = if (i == idx) ({ Text("✓", color = BrandYellow) }) else null,
+                        )
                     }
                 }
             }
