@@ -7,6 +7,7 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -299,8 +300,26 @@ private fun TvPlayerSurface(
     // the view itself: on start, when the back-to-live pill (which takes the focus) goes away, and each
     // time the controls hide, since the focused control button then vanishes and Android hands the
     // focus to the Compose host.
-    var playerView by remember { mutableStateOf<View?>(null) }
+    var playerView by remember { mutableStateOf<PlayerView?>(null) }
     LaunchedEffect(behindLive, playerView) { if (!behindLive) playerView?.requestFocus() }
+    // Up from the controls makes the view's own focus search leave the view for the Compose host,
+    // where the remote then does nothing until the controls hide. So Up is handled here: from the
+    // bottom bar it goes to play/pause, and from the main row it stays put (behind the live edge the
+    // back-to-live pill takes the focus itself).
+    fun remoteKeyUsed(event: KeyEvent): Boolean {
+        val down = event.action == KeyEvent.ACTION_DOWN
+        val up = event.keyCode == KeyEvent.KEYCODE_DPAD_UP
+        val bottomBar = playerView?.findViewById<View>(androidx.media3.ui.R.id.exo_bottom_bar)
+        return when {
+            down && up && bottomBar?.hasFocus() == true ->
+                playerView?.findViewById<View>(androidx.media3.ui.R.id.exo_play_pause)?.requestFocus() == true
+            controlsVisible && down && up && !behindLive -> true
+            else -> false
+        }
+    }
+    // Called by the player view before its own key handling; true when the key was used here. Such a
+    // key never reaches the controls, so restart their hide timer by hand.
+    fun remoteKey(event: KeyEvent): Boolean = remoteKeyUsed(event).also { if (it) playerView?.showController() }
     LaunchedEffect(source.isLive) {
         // VOD and recordings have no live edge, so do not poll: stay at "not behind" without a 1s loop.
         if (!source.isLive) {
@@ -330,7 +349,10 @@ private fun TvPlayerSurface(
     Box(Modifier.fillMaxSize()) {
         AndroidView(
             factory = { context ->
-                PlayerView(context).apply {
+                object : PlayerView(context) {
+                    override fun dispatchKeyEvent(event: KeyEvent): Boolean =
+                        remoteKey(event) || super.dispatchKeyEvent(event)
+                }.apply {
                     this.player = player
                     playerView = this
                     // The programme bar replaces the default time bar, which spans the bare 4h DVR
