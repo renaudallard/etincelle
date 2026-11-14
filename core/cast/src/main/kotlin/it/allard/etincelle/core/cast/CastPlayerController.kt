@@ -505,8 +505,13 @@ class CastPlayerController(
      * locally at the cast position, re-surfacing the player. Distinct from [disconnect], which stops.
      */
     fun returnToThisDevice() {
-        // Direct session: stop the TV and play on the phone again, where the TV was.
+        // Direct session: stop the TV and play on the phone again, where the TV was (or where the phone
+        // still is, when the TV has not taken over yet).
         if (directSession != null) {
+            if (phoneStillPlays) {
+                stopDirect()
+                return
+            }
             val position = directPlayer.currentPosition
             val playWhenReady = directPlayer.playWhenReady
             stopDirect()
