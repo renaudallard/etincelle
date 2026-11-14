@@ -28,6 +28,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 // A live DASH DVR window spans at most a few hours; this is comfortably past any of them, so a load
@@ -69,6 +70,9 @@ private const val LIVENESS_STALL_MS = 30_000L
 // One volume-key press steps the cast device volume by this fraction (the Cast SDK default).
 private const val VOLUME_STEP = 0.05
 
+// When a direct cast's connection drops, wait this long before each reconnection attempt.
+private val REJOIN_DELAYS_MS = longArrayOf(1_000, 3_000, 6_000)
+
 /**
  * Plays a stream on the phone ([ExoPlayer]) or a Chromecast ([CastPlayer]), swapping between them
  * when a Cast session connects/disconnects and carrying the item + position across the swap. The UI
@@ -100,6 +104,8 @@ class CastPlayerController(
     private var directSession: DirectCastSession? = null
     // The player the UI binds to while such a session plays (the counterpart of castPlayer).
     private val directPlayer = DirectCastPlayer()
+    // Reconnecting a direct cast whose connection dropped (see rejoinDirect).
+    private var rejoinJob: Job? = null
 
     // The direct session is connected (not just starting).
     private val directConnected: Boolean
@@ -281,12 +287,8 @@ class CastPlayerController(
         val device = scannedDevice(routeId) ?: return false
         directSession?.stop()
         markConnecting(device.name)
-        lateinit var session: DirectCastSession
-        session = DirectCastSession(
-            device, receiverAppId, wifiNetwork(),
-            onMediaStatus = { status -> if (directSession === session) onDirectMediaStatus(status) },
-            onEnded = { if (directSession === session) onDirectEnded() },
-        )
+        rejoinJob?.cancel()
+        val session = newDirectSession(device)
         directSession = session
         scope.launch {
             val started = runCatching { session.start() }
@@ -354,9 +356,56 @@ class CastPlayerController(
         }
     }
 
-    // The direct session ended on its own (stopped on the TV, connection lost): like any other end of a
-    // cast the user did not ask to continue here, stop, and let the UI drop its playing state.
-    private fun onDirectEnded() {
+    private fun newDirectSession(device: DirectCastDevice): DirectCastSession {
+        lateinit var session: DirectCastSession
+        session = DirectCastSession(
+            device, receiverAppId, wifiNetwork(),
+            onMediaStatus = { status -> if (directSession === session) onDirectMediaStatus(status) },
+            onEnded = { error -> if (directSession === session) onDirectEnded(error) },
+        )
+        return session
+    }
+
+    // The direct session ended on its own. A lost connection (an error, while connected) is rejoined:
+    // the TV keeps playing meanwhile. Anything else (stopped on the TV, by another phone) ends the cast.
+    private fun onDirectEnded(error: Throwable?) {
+        val lost = directSession
+        if (error != null && lost != null && directConnected) {
+            rejoinDirect(lost.device)
+            return
+        }
+        endDirectCast()
+    }
+
+    // Reconnect to [device] and join the receiver still playing there, without reloading it; give up
+    // (ending the cast) after a few tries or when the receiver is no longer running.
+    private fun rejoinDirect(device: DirectCastDevice) {
+        rejoinJob?.cancel()
+        rejoinJob = scope.launch {
+            for (wait in REJOIN_DELAYS_MS) {
+                delay(wait)
+                val fresh = newDirectSession(device)
+                directSession = fresh
+                val joined = runCatching { fresh.start(joinOnly = true) }.isSuccess
+                // runCatching also catches a cancellation (Cet appareil meanwhile): stop there.
+                if (!isActive || directSession !== fresh) {
+                    fresh.close()
+                    return@launch
+                }
+                if (joined) {
+                    directPlayer.attach(fresh)
+                    fresh.requestStatus()
+                    return@launch
+                }
+                fresh.close()
+            }
+            endDirectCast()
+        }
+    }
+
+    // Like any other end of a cast the user did not ask to continue here: stop, and let the UI drop its
+    // playing state.
+    private fun endDirectCast() {
         directSession = null
         leaveDirectPlayer()
         onSessionDisconnected()
@@ -366,6 +415,7 @@ class CastPlayerController(
 
     // End the direct session and stop the receiver; true when there was one.
     private fun stopDirect(): Boolean {
+        rejoinJob?.cancel()
         val session = directSession ?: return false
         directSession = null
         session.stop()
@@ -560,6 +610,7 @@ class CastPlayerController(
     }
 
     fun release() {
+        rejoinJob?.cancel()
         directSession?.close()
         directSession = null
         directPlayer.release()

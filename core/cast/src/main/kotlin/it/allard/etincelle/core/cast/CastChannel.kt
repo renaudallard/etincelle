@@ -43,6 +43,11 @@ internal class CastChannel private constructor(
     @Volatile
     private var closed = false
 
+    // The I/O failure that ended the connection, whichever thread (reader or writer) saw it first; null
+    // when the connection was closed on purpose.
+    @Volatile
+    private var lostConnection: IOException? = null
+
     /** Queues a JSON [payload] on [namespace]; false when the connection is gone. */
     fun send(namespace: String, payload: String, source: String = PLATFORM_SENDER, destination: String = PLATFORM_RECEIVER): Boolean =
         enqueue(CastMessage(source, destination, namespace, payload = payload))
@@ -58,7 +63,6 @@ internal class CastChannel private constructor(
             HEARTBEAT_MS, HEARTBEAT_MS, TimeUnit.MILLISECONDS,
         )
         Thread({
-            var error: Throwable? = null
             try {
                 while (!closing) {
                     val message = read()
@@ -70,10 +74,10 @@ internal class CastChannel private constructor(
                 }
             } catch (e: IOException) {
                 // A read timeout means the device stopped answering heartbeats.
-                if (!closing) error = e
+                lost(e)
             }
             close()
-            onClosed(error)
+            onClosed(lostConnection)
         }, "cast-channel").apply { isDaemon = true }.start()
     }
 
@@ -122,9 +126,16 @@ internal class CastChannel private constructor(
             }
             true
         } catch (e: IOException) {
+            lost(e)
             close()
             false
         }
+    }
+
+    // Record [e] as the end of the connection, unless it was closed on purpose or already lost.
+    @Synchronized
+    private fun lost(e: IOException) {
+        if (!closing && lostConnection == null) lostConnection = e
     }
 
     private fun read(): CastMessage {

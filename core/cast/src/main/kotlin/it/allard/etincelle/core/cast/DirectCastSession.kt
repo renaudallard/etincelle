@@ -61,8 +61,11 @@ internal class DirectCastSession(
     var muted = false
         private set
 
-    /** Connects, authenticates the device and starts or joins the receiver. Throws on failure. */
-    suspend fun start() {
+    /**
+     * Connects, authenticates the device and starts or joins the receiver; with [joinOnly], only joins
+     * a receiver already running (to reconnect to a cast without restarting it). Throws on failure.
+     */
+    suspend fun start(joinOnly: Boolean = false) {
         val ch = withContext(Dispatchers.IO) { CastChannel.open(device.host, device.port, network) }
         channel = ch
         ch.start(::onMessage) { error -> scope.launch { end(error) } }
@@ -72,6 +75,7 @@ internal class DirectCastSession(
         val app = withTimeout(LAUNCH_TIMEOUT_MS) {
             requestReceiver(JSONObject().put("type", "GET_STATUS"))
             runningApp(receiverStatus.filterNotNull().first()) ?: run {
+                if (joinOnly) throw IOException("the receiver is not running")
                 requestReceiver(JSONObject().put("type", "LAUNCH").put("appId", appId))
                 receiverStatus.filterNotNull().first { runningApp(it) != null || it.has(LAUNCH_ERROR_KEY) }
                     .let { runningApp(it) ?: throw IOException("the receiver did not start") }
