@@ -238,10 +238,11 @@ fun TvBrowseScreen(
     // card is saved with the page's state, which outlives the detail.
     val returnKey = rememberSaveable { mutableStateOf<String?>(null) }
     val returnFocus = remember(returnKey) { ReturnFocus(returnKey) }
-    val restoringCard = returnFocus.pending
+    // Without a card to come back to, the search page starts on its field.
     LaunchedEffect(Unit) {
-        val restored = returnFocus.restore()
-        if (!restored && state.tab != Tab.SEARCH) runCatching { tabFocus.getValue(state.tab).requestFocus() }
+        if (!returnFocus.restore()) {
+            runCatching { (if (state.tab == Tab.SEARCH) searchField else tabFocus.getValue(state.tab)).requestFocus() }
+        }
     }
     Column(Modifier.fillMaxSize().padding(start = OVERSCAN, end = OVERSCAN, top = 24.dp)) {
         val tabs = Tab.entries
@@ -280,7 +281,7 @@ fun TvBrowseScreen(
         }
         Spacer(Modifier.height(16.dp))
         if (state.tab == Tab.SEARCH) {
-            TvSearchContent(state, onSearch, onCardClick, onSeeAll, returnFocus, searchField, focusField = !restoringCard)
+            TvSearchContent(state, onSearch, onCardClick, onSeeAll, returnFocus, searchField)
         } else {
             Text(state.current?.title ?: state.tab.label, style = MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(12.dp))
@@ -314,7 +315,6 @@ private fun TvSearchContent(
     onSeeAll: (ContentRail) -> Unit,
     returnFocus: ReturnFocus,
     field: FocusRequester,
-    focusField: Boolean,
 ) {
     // A TextFieldValue so the remote can tell when the cursor is at the end of the text (see below).
     var query by remember { mutableStateOf(TextFieldValue("")) }
@@ -324,7 +324,6 @@ private fun TvSearchContent(
     // passing through. It stays read-only, with no keyboard, until OK is pressed on it.
     var editing by remember { mutableStateOf(false) }
     LaunchedEffect(editing) { if (editing) keyboard?.show() }
-    LaunchedEffect(Unit) { if (focusField) runCatching { field.requestFocus() } }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
@@ -814,9 +813,6 @@ private fun Modifier.dpadLeavesField(focusManager: FocusManager, cursorAtEnd: ()
 private class ReturnFocus(private val saved: MutableState<String?>) {
     private val requester = FocusRequester()
 
-    /** True while a key is waiting to be restored. */
-    val pending: Boolean get() = saved.value != null
-
     fun save(key: String) {
         saved.value = key
     }
@@ -827,7 +823,8 @@ private class ReturnFocus(private val saved: MutableState<String?>) {
     /** Focuses the saved item if it is on screen, and forgets it either way. */
     fun restore(): Boolean {
         if (saved.value == null) return false
-        val ok = runCatching { requester.requestFocus() }.isSuccess
+        // A requester whose item is gone does not throw, it only reports that nothing took the focus.
+        val ok = runCatching { requester.requestFocus(FocusDirection.Enter) }.getOrDefault(false)
         saved.value = null
         return ok
     }
