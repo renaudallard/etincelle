@@ -126,6 +126,10 @@ class CastPlayerController(
     // stop, logout, failed transfer) stops quietly and clears the UI's playing state instead.
     private var returnToPhoneOnEnd = false
 
+    // A direct device picked while a Play Services cast was up: connected once that cast has ended and
+    // playback is back on the phone (see connectTo).
+    private var pendingDirectRoute: String? = null
+
     // Last cast volume we set (0..1), so rapid volume-key presses step from our own value rather than
     // a stale read of the receiver's lagging reported volume. Reset on each session end.
     private var castVolume: Double? = null
@@ -239,7 +243,17 @@ class CastPlayerController(
      * session's end does not bounce playback back to the phone.
      */
     override fun connectTo(routeId: String): Boolean {
-        if (routeId.startsWith(DIRECT_ROUTE_PREFIX)) return connectDirect(routeId)
+        // A switch to or from a direct cast goes through the phone: playback comes back to it where the
+        // TV was, then it is cast to the new device as usual, which picks up from there.
+        val toDirect = routeId.startsWith(DIRECT_ROUTE_PREFIX)
+        if (directConnected) returnToThisDevice()
+        if (toDirect && super.isCastSessionActive) {
+            // The Play Services cast ends asynchronously; connect once it is back on the phone.
+            pendingDirectRoute = routeId
+            returnToThisDevice()
+            return true
+        }
+        if (toDirect) return connectDirect(routeId)
         val willTransfer = _currentPlayer.value === castPlayer && castContext.sessionManager.currentCastSession != null
         val position = if (willTransfer) castPlayer.currentPosition else 0L
         val playWhenReady = if (willTransfer) castPlayer.playWhenReady else true
@@ -629,6 +643,11 @@ class CastPlayerController(
         if (_currentPlayer.value !== castPlayer) {
             transferring = false
             transferFallbackJob?.cancel()
+            // A direct device picked meanwhile: the phone already plays, connect it now.
+            pendingDirectRoute?.takeIf { !super.isCastSessionActive }?.let {
+                pendingDirectRoute = null
+                connectDirect(it)
+            }
             return
         }
         if (transferring) {
@@ -663,8 +682,13 @@ class CastPlayerController(
             // the player. Re-resolve gives a fresh (live edge) URL since the cast may have run a while.
             returnToPhoneOnEnd = false
             swapTo(localPlayer, endingPosition, endingPlayWhenReady)
+            pendingDirectRoute?.let {
+                pendingDirectRoute = null
+                connectDirect(it)
+            }
             return
         }
+        pendingDirectRoute = null
         // Any other end (TV off, external stop, logout): stop, and tell the UI to drop its playing
         // state so the local player is not popped over whatever the user is now browsing.
         stopQuietly()
