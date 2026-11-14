@@ -145,6 +145,10 @@ class CastPlayerController(
     // playback is back on the phone (see connectTo).
     private var pendingDirectRoute: String? = null
 
+    // Our own scan's entry for the device a cast-out through Play Services is connecting to: used
+    // directly if Play Services fails to start the session (see onSessionStartFailed).
+    private var directFallback: DirectCastDevice? = null
+
     // Last cast volume we set (0..1), so rapid volume-key presses step from our own value rather than
     // a stale read of the receiver's lagging reported volume. Reset on each session end.
     private var castVolume: Double? = null
@@ -261,6 +265,7 @@ class CastPlayerController(
         // TV was, then it is cast to the new device as usual, which picks up from there. A direct cast
         // still connecting is given up the same way.
         val toDirect = routeId.startsWith(DIRECT_ROUTE_PREFIX)
+        directFallback = null
         if (directSession != null) returnToThisDevice()
         if (toDirect && super.isCastSessionActive) {
             // The Play Services cast ends asynchronously; connect once it is back on the phone.
@@ -275,10 +280,12 @@ class CastPlayerController(
         // Capture the live rewind now, while the outgoing cast player still has a timeline, so a
         // rewound live stream keeps its position across the device switch.
         val rewind = if (willTransfer) LivePlayback.castRewindOffsetMs(castPlayer, liveWindow) else 0L
+        val twin = if (willTransfer) null else scannedTwin(routeId)
         val selected = super.connectTo(routeId)
         if (selected) {
             receiverEverReady = false
             startConnectWatchdog()
+            directFallback = twin
         }
         // Arm the transfer only once a route was actually selected; it just records the position the
         // new device should resume at (the actual load happens in onSessionConnected by session id).
@@ -647,8 +654,22 @@ class CastPlayerController(
         suspended = true
     }
 
+    // Some phones list a Chromecast through Play Services that they cannot actually connect to. When
+    // our own scan found the same device, cast to it directly instead; the phone is still playing.
+    override fun onSessionStartFailed() {
+        val twin = directFallback
+        directFallback = null
+        onSessionDisconnected()
+        if (twin != null && _currentPlayer.value === localPlayer) {
+            // The failed session's watchdog would otherwise cut the direct connect's animation short.
+            connectWatchdogJob?.cancel()
+            connectDirect(DIRECT_ROUTE_PREFIX + twin.id)
+        }
+    }
+
     override fun onSessionConnected(session: CastSession) {
         super.onSessionConnected(session)
+        directFallback = null
         suspended = false
         if (_currentPlayer.value !== castPlayer) {
             // Casting out from the phone: swap to the cast player (re-resolves a fresh URL). Clear any

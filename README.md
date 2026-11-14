@@ -82,8 +82,10 @@ s'appuie sur un récepteur Cast Widevine personnalisé, hébergé séparément :
 [etincelle_receiver](https://github.com/renaudallard/etincelle_receiver).
 Certains téléphones cessent de trouver les Chromecast par les services Google, jusqu'à ce que l'on
 coupe puis rallume le Wi-Fi. etincelle cherche donc aussi les Chromecast **par lui-même** sur le
-réseau Wi-Fi et ajoute ceux que les services Google ne voient pas à la liste. La diffusion vers un
-tel Chromecast passe par une **connexion directe** : le Chromecast doit d'abord prouver qu'il est un
+réseau Wi-Fi et ajoute ceux que les services Google ne voient pas à la liste ; si les services
+Google affichent un Chromecast sans parvenir à s'y connecter, etincelle s'y connecte lui-même. La
+diffusion vers un tel Chromecast passe par une **connexion directe** : le Chromecast doit d'abord
+prouver qu'il est un
 appareil Cast authentique (certificat signé par Google) avant de recevoir quoi que ce soit, puis
 tout fonctionne comme d'habitude, commandes de lecture, barre du programme en cours, retour au
 direct, volume, passage d'un Chromecast à l'autre et retour sur le téléphone. Si la connexion est

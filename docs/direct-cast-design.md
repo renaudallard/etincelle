@@ -208,5 +208,10 @@ Estimated size: about 1,200 lines of Kotlin plus tests, mostly in `core:cast`.
   while parked at the start of the window and only then jumps to the live edge, which undid a seek sent
   at that first PLAYING (seen on jardin: the TV stayed at the edge). The seek, ours and the receiver's,
   waits until the playhead is more than 5 s past the start of the window.
+- Play Services sometimes lists, for a moment, a Chromecast it cannot reach from that phone (seen on
+  the Edge 20 Pro with jardin). The picker then shows its route and hides our scanned entry for the
+  same device, so a tap goes through Play Services and fails. When that session fails to start
+  (onSessionStartFailed) and our scan has the same device, the cast-out goes direct instead. Whether
+  Play Services reports such a failure, rather than staying stuck connecting, is not verified yet.
 - A Play Services session and a direct session on the same receiver at once (two senders): the last
   LOAD wins, as with two phones today.

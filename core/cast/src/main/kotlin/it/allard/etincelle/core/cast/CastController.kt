@@ -107,7 +107,7 @@ open class CastController(
         // A suspend is transient (brief network drop); keep the cast player current and wait for
         // onSessionResumed/onSessionEnded, rather than bouncing playback to the phone and back.
         override fun onSessionSuspended(session: CastSession, reason: Int) = onSessionSuspendedInternal(session)
-        override fun onSessionStartFailed(session: CastSession, error: Int) = onSessionDisconnected()
+        override fun onSessionStartFailed(session: CastSession, error: Int) = onSessionStartFailed()
         override fun onSessionResumeFailed(session: CastSession, error: Int) = onSessionDisconnected()
         override fun onSessionStarting(session: CastSession) = Unit
         override fun onSessionEnding(session: CastSession) = onSessionEndingInternal(session)
@@ -173,6 +173,9 @@ open class CastController(
         refreshDevices()
     }
 
+    /** A Play Services session could not be started. */
+    protected open fun onSessionStartFailed() = onSessionDisconnected()
+
     /** Subclass hooks for the player swap (overridden by the M2 cast-player controller). */
     protected open fun onSessionConnected(session: CastSession) {
         // Record the route id only when selectedRoute is a real cast route (the same filter the device
@@ -218,12 +221,20 @@ open class CastController(
         val routes = mediaRouter.routes.filter { it.matchesSelector(selector) && !it.isDefault && !it.isBluetooth }
         // A device Play Services sees is used through it; match by Cast device id, or by name in case
         // the two ids differ.
-        val seenIds = routes.mapNotNull { PlayServicesCastDevice.getFromBundle(it.extras)?.deviceId }.toSet()
-        val seenNames = routes.map { it.name }.toSet()
         val scanned = scannedDevices.values.map { it.device }
-            .filter { it.id !in seenIds && it.name !in seenNames }
+            .filter { device -> routes.none { device.isBehind(it) } }
             .map { CastDevice(DIRECT_ROUTE_PREFIX + it.id, it.name) }
         _state.value = _state.value.copy(devices = routes.map { CastDevice(it.id, it.name) } + scanned)
+    }
+
+    // Matched by Cast device id, or by name in case the two ids differ.
+    private fun DirectCastDevice.isBehind(route: MediaRouter.RouteInfo): Boolean =
+        id == PlayServicesCastDevice.getFromBundle(route.extras)?.deviceId || name == route.name
+
+    /** The Chromecast from our own scan that is behind the Play Services route [routeId], if any. */
+    protected fun scannedTwin(routeId: String): DirectCastDevice? {
+        val route = mediaRouter.routes.firstOrNull { it.id == routeId } ?: return null
+        return scannedDevices.values.map { it.device }.firstOrNull { it.isBehind(route) }
     }
 
     /** The Chromecast our own scan found under [routeId] (see [DIRECT_ROUTE_PREFIX]), if any. */
