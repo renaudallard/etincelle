@@ -307,7 +307,12 @@ class CastPlayerController(
             val isLive = (item.localConfiguration?.tag as? PlaybackSource)?.isLive == true
             val rewind = if (isLive) LivePlayback.castRewindOffsetMs(localPlayer, liveWindow) else 0L
             val position = localPlayer.currentPosition
-            if (loadDirect(session, item, position, resolve = true, rewindMs = rewind)) runCatching { localPlayer.stop() }
+            if (loadDirect(session, item, position, resolve = true, rewindMs = rewind)) {
+                runCatching { localPlayer.stop() }
+            } else if (directSession === session) {
+                // The TV did not take it: end the session, the phone keeps playing.
+                stopDirect()
+            }
         }
         return true
     }
