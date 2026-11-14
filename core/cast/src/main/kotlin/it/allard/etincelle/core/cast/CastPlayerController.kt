@@ -349,10 +349,8 @@ class CastPlayerController(
         when (status.optString("playerState")) {
             "PLAYING" -> setReceiverPlaying(true)
             "PAUSED" -> setReceiverPlaying(false)
-            "IDLE" -> if (status.optString("idleReason") == "ERROR") {
-                clearConnecting()
-                onError?.invoke(PLAYBACK_ERROR_MESSAGE)
-            }
+            // The receiver cannot refresh its stream tokens itself: recover from here, as for Play Services.
+            "IDLE" -> if (status.optString("idleReason") == "ERROR") onPlaybackError(directPlayer)
         }
     }
 
@@ -412,19 +410,20 @@ class CastPlayerController(
             delay(LIVENESS_INTERVAL_MS)
             // Stand down while suspended: the CastPlayer freezes its state across a suspend, so a frozen
             // "buffering" would otherwise be mistaken for a wedge and tear down a cast about to resume.
-            if (suspended || _currentPlayer.value !== castPlayer ||
-                castContext.sessionManager.currentCastSession == null
-            ) {
+            val remote = _currentPlayer.value
+            val watched = (remote === castPlayer && castContext.sessionManager.currentCastSession != null) ||
+                (remote === directPlayer && directConnected)
+            if (suspended || !watched) {
                 bufferingForMs = 0L
                 continue
             }
             // A healthy cast is STATE_READY; a user-paused one has playWhenReady=false. Only a session
             // that should be playing yet stays buffering counts toward a stall.
-            if (castPlayer.playWhenReady && castPlayer.playbackState == Player.STATE_BUFFERING) {
+            if (remote.playWhenReady && remote.playbackState == Player.STATE_BUFFERING) {
                 bufferingForMs += LIVENESS_INTERVAL_MS
                 if (bufferingForMs >= LIVENESS_STALL_MS) {
                     bufferingForMs = 0L
-                    onPlaybackError(castPlayer)
+                    onPlaybackError(remote)
                 }
             } else {
                 bufferingForMs = 0L
@@ -841,6 +840,10 @@ class CastPlayerController(
             // If the dead stream was on the cast player, end the session so the bar stops claiming an
             // active cast over playback that never recovered.
             if (_currentPlayer.value === castPlayer && castContext.sessionManager.currentCastSession != null) disconnect()
+            if (_currentPlayer.value === directPlayer && stopDirect()) {
+                currentItem = null
+                onPlaybackStopped?.invoke()
+            }
             return
         }
         castRetryCount++
@@ -852,7 +855,7 @@ class CastPlayerController(
         // Capture the live rewind from the failing player before re-resolving so recovery resumes the
         // viewer's position on the receiver instead of snapping to the live edge (0 if not applicable
         // or its timeline is already gone).
-        val rewind = if (target === castPlayer && source.isLive) LivePlayback.castRewindOffsetMs(target, liveWindow) else 0L
+        val rewind = if (target !== localPlayer && source.isLive) LivePlayback.castRewindOffsetMs(target, liveWindow) else 0L
         reResolveJob?.cancel()
         reResolveJob = scope.launch {
             if (backoff > 0) delay(backoff)
@@ -873,7 +876,13 @@ class CastPlayerController(
                 onPlaybackError(target)
                 return@launch
             }
-            loadOn(target, MediaItemFactory.create(fresh.copy(liveRewindOffsetMs = rewind)), if (fresh.isLive) 0 else position)
+            val freshItem = MediaItemFactory.create(fresh.copy(liveRewindOffsetMs = rewind))
+            val direct = directSession
+            if (target === directPlayer && direct != null) {
+                loadDirect(direct, freshItem, position, resolve = false, rewindMs = rewind)
+            } else {
+                loadOn(target, freshItem, if (fresh.isLive) 0 else position)
+            }
         }
     }
 }
