@@ -67,6 +67,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -311,6 +312,7 @@ private fun TvSearchContent(
     // A TextFieldValue so the remote can tell when the cursor is at the end of the text (see below).
     var query by remember { mutableStateOf(TextFieldValue("")) }
     val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
     LaunchedEffect(Unit) { if (focusField) runCatching { field.requestFocus() } }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -320,8 +322,14 @@ private fun TvSearchContent(
                 label = { Text("Rechercher") },
                 singleLine = true,
                 // The on-screen keyboard takes the D-pad while it is up, so its action key searches.
+                // It then closes, since it would otherwise cover the results.
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { if (query.text.isNotBlank()) onSubmit(query.text) }),
+                keyboardActions = KeyboardActions(onSearch = {
+                    if (query.text.isNotBlank()) {
+                        keyboard?.hide()
+                        onSubmit(query.text)
+                    }
+                }),
                 // Right leaves the field for the Rechercher button once the cursor is at the end.
                 modifier = Modifier.weight(1f).focusRequester(field).dpadLeavesField(focusManager) {
                     query.selection.collapsed && query.selection.end == query.text.length
