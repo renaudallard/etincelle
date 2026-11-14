@@ -113,6 +113,11 @@ class CastPlayerController(
 
     override val isCastSessionActive: Boolean get() = super.isCastSessionActive || directConnected
 
+    // A Chromecast plays the stream (through Play Services or directly), with its session up.
+    private val castingRemotely: Boolean
+        get() = (_currentPlayer.value === castPlayer && castContext.sessionManager.currentCastSession != null) ||
+            (_currentPlayer.value === directPlayer && directConnected)
+
     // The TV has not taken over the direct cast yet and the phone still plays.
     private val phoneStillPlays: Boolean
         get() = _currentPlayer.value === localPlayer && localPlayer.playbackState != Player.STATE_IDLE
@@ -227,8 +232,7 @@ class CastPlayerController(
         // alone instead of reloading and restarting it from the original position. A "depuis le début"
         // restart carries an explicit rewind, so it must reload even on the same channel.
         val newSource = item.localConfiguration?.tag as? PlaybackSource
-        if (_currentPlayer.value === castPlayer &&
-            castContext.sessionManager.currentCastSession != null &&
+        if (castingRemotely &&
             sameContent(currentItem, item) &&
             (newSource?.liveRewindOffsetMs ?: 0L) <= 0L
         ) {
@@ -473,9 +477,7 @@ class CastPlayerController(
             // Stand down while suspended: the CastPlayer freezes its state across a suspend, so a frozen
             // "buffering" would otherwise be mistaken for a wedge and tear down a cast about to resume.
             val remote = _currentPlayer.value
-            val watched = (remote === castPlayer && castContext.sessionManager.currentCastSession != null) ||
-                (remote === directPlayer && directConnected)
-            if (suspended || !watched) {
+            if (suspended || !castingRemotely) {
                 bufferingForMs = 0L
                 continue
             }
