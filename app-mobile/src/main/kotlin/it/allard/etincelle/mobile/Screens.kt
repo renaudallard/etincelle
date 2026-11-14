@@ -293,11 +293,13 @@ private fun GridCard(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
             if (categoryIcon != null) {
                 Icon(painterResource(categoryIcon), contentDescription = card.title, tint = BrandYellow, modifier = Modifier.size(28.dp))
             } else {
+                // A channel logo is fitted whole, as on the rails; cropping it to the 16:9 tile cut
+                // the logo off. Programme artwork still fills the tile.
                 AsyncImage(
                     model = card.imageUrl,
                     contentDescription = card.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().padding(if (card.square) 12.dp else 0.dp),
+                    contentScale = if (card.square) ContentScale.Fit else ContentScale.Crop,
                 )
             }
             if (card.isLocked) {
