@@ -51,6 +51,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.focusGroup
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -62,8 +64,14 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -172,6 +180,8 @@ private fun TvEmailLoginScreen(busy: Boolean, error: String?, onLogin: (String, 
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     val first = remember { FocusRequester() }
+    val passwordField = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
     LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
     Column(
         modifier = Modifier.fillMaxSize().padding(OVERSCAN),
@@ -180,11 +190,21 @@ private fun TvEmailLoginScreen(busy: Boolean, error: String?, onLogin: (String, 
     ) {
         Text("etincelle", style = MaterialTheme.typography.displaySmall)
         Spacer(Modifier.height(24.dp))
-        OutlinedTextField(email, { email = it }, label = { Text("Email") }, singleLine = true, modifier = Modifier.width(480.dp).focusRequester(first))
+        // While the on-screen keyboard is up it takes the D-pad, so its action key is the way on:
+        // from the email to the password, then from the password to signing in.
+        OutlinedTextField(
+            email, { email = it }, label = { Text("Email") }, singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+            keyboardActions = KeyboardActions(onNext = { runCatching { passwordField.requestFocus() } }),
+            modifier = Modifier.width(480.dp).focusRequester(first).dpadLeavesField(focusManager),
+        )
         Spacer(Modifier.height(12.dp))
         OutlinedTextField(
             password, { password = it }, label = { Text("Mot de passe") }, singleLine = true,
-            visualTransformation = PasswordVisualTransformation(), modifier = Modifier.width(480.dp),
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { if (!busy) onLogin(email, password) }),
+            modifier = Modifier.width(480.dp).focusRequester(passwordField).dpadLeavesField(focusManager),
         )
         Spacer(Modifier.height(20.dp))
         TvButton(onClick = { onLogin(email, password) }, enabled = !busy) { Text("Se connecter") }
@@ -208,6 +228,7 @@ fun TvBrowseScreen(
 ) {
     val tabFocus = remember { Tab.entries.associateWith { FocusRequester() } }
     val railsFocus = remember { FocusRequester() }
+    val searchField = remember { FocusRequester() }
     // This screen is rebuilt whenever the page changes (another tab, or back from a detail), so on
     // entry put the focus back on the card that opened the detail, else on the current tab. The
     // card is saved with the page's state, which outlives the detail.
@@ -226,7 +247,8 @@ fun TvBrowseScreen(
                 .focusGroup()
                 .onPreviewKeyEvent { event ->
                     if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
-                        runCatching { railsFocus.requestFocus() }.isSuccess
+                        // The search page has its field on top of the results; elsewhere go to the rails.
+                        runCatching { (if (state.tab == Tab.SEARCH) searchField else railsFocus).requestFocus() }.isSuccess
                     } else {
                         false
                     }
@@ -247,7 +269,7 @@ fun TvBrowseScreen(
         }
         Spacer(Modifier.height(16.dp))
         if (state.tab == Tab.SEARCH) {
-            TvSearchContent(state, onSearch, onCardClick, onSeeAll, returnFocus, focusField = !restoringCard)
+            TvSearchContent(state, onSearch, onCardClick, onSeeAll, returnFocus, searchField, focusField = !restoringCard)
         } else {
             Text(state.current?.title ?: state.tab.label, style = MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(12.dp))
@@ -280,10 +302,12 @@ private fun TvSearchContent(
     onCardClick: (ContentCard) -> Unit,
     onSeeAll: (ContentRail) -> Unit,
     returnFocus: ReturnFocus,
+    field: FocusRequester,
     focusField: Boolean,
 ) {
-    var query by remember { mutableStateOf("") }
-    val field = remember { FocusRequester() }
+    // A TextFieldValue so the remote can tell when the cursor is at the end of the text (see below).
+    var query by remember { mutableStateOf(TextFieldValue("")) }
+    val focusManager = LocalFocusManager.current
     LaunchedEffect(Unit) { if (focusField) runCatching { field.requestFocus() } }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -292,9 +316,15 @@ private fun TvSearchContent(
                 onValueChange = { query = it },
                 label = { Text("Rechercher") },
                 singleLine = true,
-                modifier = Modifier.weight(1f).focusRequester(field),
+                // The on-screen keyboard takes the D-pad while it is up, so its action key searches.
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { if (query.text.isNotBlank()) onSubmit(query.text) }),
+                // Right leaves the field for the Rechercher button once the cursor is at the end.
+                modifier = Modifier.weight(1f).focusRequester(field).dpadLeavesField(focusManager) {
+                    query.selection.collapsed && query.selection.end == query.text.length
+                },
             )
-            TvButton(onClick = { onSubmit(query) }, enabled = query.isNotBlank()) { Text("Rechercher") }
+            TvButton(onClick = { onSubmit(query.text) }, enabled = query.text.isNotBlank()) { Text("Rechercher") }
         }
         Spacer(Modifier.height(16.dp))
         Box(Modifier.fillMaxSize()) {
@@ -719,6 +749,22 @@ private fun TvCard(card: ContentCard, onCardClick: (ContentCard) -> Unit, focusM
         }
     }
 }
+
+/**
+ * A text field keeps the arrow keys to move its cursor, so once the on-screen keyboard is closed a
+ * remote user is stuck in it. Let Up and Down leave the field like any other control, and Right too
+ * when [cursorAtEnd] says there is nothing left to move over.
+ */
+private fun Modifier.dpadLeavesField(focusManager: FocusManager, cursorAtEnd: () -> Boolean = { false }): Modifier =
+    onPreviewKeyEvent { event ->
+        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+        when (event.key) {
+            Key.DirectionDown -> focusManager.moveFocus(FocusDirection.Down)
+            Key.DirectionUp -> focusManager.moveFocus(FocusDirection.Up)
+            Key.DirectionRight -> cursorAtEnd() && focusManager.moveFocus(FocusDirection.Right)
+            else -> false
+        }
+    }
 
 /**
  * Brings the focus back to the item (a card, or a rail's "Tout voir") that opened a detail or a
