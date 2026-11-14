@@ -49,6 +49,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -326,6 +327,21 @@ private fun TvSearchContent(
     // passing through. It stays read-only, with no keyboard, until OK is pressed on it.
     var editing by remember { mutableStateOf(false) }
     LaunchedEffect(editing) { if (editing) keyboard?.show() }
+    // "Tout voir" and Back swap the rows and the grid under the focused item, which would hand the
+    // focus to the first tab: carry it into the grid, or back to the item that opened it.
+    val isGrid = state.current?.isGrid == true
+    var shownGrid by remember { mutableStateOf(isGrid) }
+    LaunchedEffect(isGrid) {
+        if (isGrid == shownGrid) return@LaunchedEffect
+        shownGrid = isGrid
+        // Let the new page lay out its items first.
+        withFrameNanos { }
+        if (isGrid) {
+            runCatching { gridFocus.requestFocus() }
+        } else if (!returnFocus.restore()) {
+            runCatching { field.requestFocus() }
+        }
+    }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
