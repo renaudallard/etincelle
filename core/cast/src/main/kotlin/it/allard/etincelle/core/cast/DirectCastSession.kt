@@ -7,11 +7,15 @@ import android.net.Network
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -66,7 +70,14 @@ internal class DirectCastSession(
      * a receiver already running (to reconnect to a cast without restarting it). Throws on failure.
      */
     suspend fun start(joinOnly: Boolean = false) {
-        val ch = withContext(Dispatchers.IO) { CastChannel.open(device.host, device.port, network) }
+        // Not cancellable, or a channel opened meanwhile would be dropped without being closed.
+        val ch = withContext(Dispatchers.IO + NonCancellable) { CastChannel.open(device.host, device.port, network) }
+        // Closed (another device picked) or cancelled while connecting: nothing else would close it.
+        if (ended || !currentCoroutineContext().isActive) {
+            ch.close()
+            currentCoroutineContext().ensureActive()
+            throw IOException("session closed")
+        }
         channel = ch
         ch.start(::onMessage) { error -> scope.launch { end(error) } }
         ch.send(CastChannel.NS_CONNECTION, """{"type":"CONNECT"}""")
