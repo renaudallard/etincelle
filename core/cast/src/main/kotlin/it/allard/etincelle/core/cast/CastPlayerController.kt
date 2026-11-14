@@ -332,7 +332,7 @@ class CastPlayerController(
         }
         val freshItem = MediaItemFactory.create(fresh.copy(liveRewindOffsetMs = rewindMs))
         currentItem = freshItem
-        directPlayer.setItem(freshItem)
+        directPlayer.setItem(freshItem, if (fresh.isLive) rewindMs else 0L)
         val media = CastLoadData.media(appContext, freshItem, sessionProvider())
         // A live stream asks for a position past the DVR window so the receiver clamps to the edge (it
         // then applies live_rewind_sec); on demand resumes where the phone was.

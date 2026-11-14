@@ -43,6 +43,11 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
     private var duration = 0.0
     private var updatedAt = 0L
 
+    // How far behind the live edge (ms) a rewound live cast should resume. The receiver is told too
+    // (live_rewind_sec), but its own seek runs before playback starts and is lost when the player then
+    // joins the live edge, so it is done from here once the TV plays with a known window.
+    private var pendingRewindMs = 0L
+
     private val handler = Handler(Looper.getMainLooper())
 
     // Statuses only come on changes: ask for one regularly so the position does not drift, and refresh
@@ -64,8 +69,9 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
     }
 
     /** The item now loaded on the receiver (the phone's [MediaItem], with its PlaybackSource tag). */
-    fun setItem(item: MediaItem) {
+    fun setItem(item: MediaItem, liveRewindMs: Long = 0L) {
         this.item = item
+        pendingRewindMs = liveRewindMs
         playerState = "BUFFERING"
         idleReason = ""
         live = false
@@ -79,6 +85,7 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
         handler.removeCallbacks(ticker)
         session = null
         item = null
+        pendingRewindMs = 0
         playerState = ""
         invalidateState()
     }
@@ -101,6 +108,12 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
         }
         times = ReceiverTimes(status.optDouble("currentTime", times.time), start, end)
         updatedAt = SystemClock.elapsedRealtime()
+        if (pendingRewindMs > 0 && live && playerState == "PLAYING" && times.windowMs > 0) {
+            val target = times.liveSeekTarget(times.windowMs - pendingRewindMs)
+            pendingRewindMs = 0
+            session?.seek(target)
+            times = times.copy(time = target)
+        }
         invalidateState()
     }
 

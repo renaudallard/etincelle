@@ -199,5 +199,9 @@ Estimated size: about 1,200 lines of Kotlin plus tests, mostly in `core:cast`.
   the programme bar to within the stream's few seconds of delay (checked on jardin).
 - Receiver statuses only come on changes, and `playbackRate` can read 0 while PLAYING: the player
   takes the speed from `playerState`, extrapolates between statuses and asks for one every 5 s.
+- The receiver applies `live_rewind_sec` on PLAYER_LOAD_COMPLETE, before playback starts, and the
+  player then joins the live edge, losing it (seen on jardin with the deployed receiver). The direct
+  player therefore seeks the TV behind the edge itself once it plays with a known window; the same
+  receiver behaviour probably affects a rewound Play Services cast, not checked.
 - A Play Services session and a direct session on the same receiver at once (two senders): the last
   LOAD wins, as with two phones today.
