@@ -23,7 +23,8 @@ Elle donne accès au **direct**, au **guide des programmes** (EPG), à la **rech
 affichées à ses extrémités), le bord du direct se situant en
 cours de route et la portion pas encore diffusée formant la fin de la barre ; la partie trop ancienne
 pour être rembobinée y est tracée dans une couleur distincte, et un bouton **Revenir au direct**
-apparaît dès que l'on s'éloigne du bord pour y ramener d'un appui. Cliquer sur un programme ouvre d'abord sa **fiche détaillée**
+apparaît dès que l'on s'éloigne du bord pour y ramener d'un appui (sur le téléviseur, il s'affiche
+avec les commandes du lecteur et s'atteint avec la flèche **Haut**). Cliquer sur un programme ouvre d'abord sa **fiche détaillée**
 (synopsis, casting, année, classification) plutôt que de le lire aussitôt, et la fiche regroupe ses
 autres diffusions disponibles. Pour une chaîne en **direct**, la fiche propose, à côté de **Regarder
 en direct**, un bouton **Regarder depuis le début** qui reprend le programme en

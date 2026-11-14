@@ -14,9 +14,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -29,8 +31,7 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
@@ -297,23 +298,45 @@ private fun TvPlayerSurface(
     // The remote only reaches the PlayerView (OK or a direction shows the controls) while that view
     // holds the Android focus; otherwise the keys stop at Compose and the controls cannot be brought
     // back once hidden. A Compose focus request does not move the focus into the embedded view, so ask
-    // the view itself: on start, when the back-to-live pill (which takes the focus) goes away, and each
-    // time the controls hide, since the focused control button then vanishes and Android hands the
-    // focus to the Compose host.
+    // the view itself: on start, when the back-to-live pill shows or goes away, and each time the
+    // controls hide, since the focused control button then vanishes and Android hands the focus to
+    // the Compose host. This holds behind the live edge too, where OK must not land on the pill.
+    // Only when the view does not hold it already: asking again moves it to the first control.
     var playerView by remember { mutableStateOf<PlayerView?>(null) }
-    LaunchedEffect(behindLive, playerView) { if (!behindLive) playerView?.requestFocus() }
+    LaunchedEffect(behindLive, playerView) { playerView?.takeUnless { it.hasFocus() }?.requestFocus() }
     // Up from the controls makes the view's own focus search leave the view for the Compose host,
     // where the remote then does nothing until the controls hide. So Up is handled here: from the
-    // bottom bar it goes to play/pause, and from the main row it stays put (behind the live edge the
-    // back-to-live pill takes the focus itself).
+    // bottom bar it goes to play/pause, and from the main row it stays put, except behind the live
+    // edge where it selects the back-to-live pill (Compose, so out of the view's reach) while the
+    // view keeps the focus. OK then goes back to live, Down returns to the controls, and any other
+    // key or the controls hiding leaves the pill.
+    var pillSelected by remember { mutableStateOf(false) }
+    LaunchedEffect(behindLive, controlsVisible) { if (!behindLive || !controlsVisible) pillSelected = false }
     fun remoteKeyUsed(event: KeyEvent): Boolean {
         val down = event.action == KeyEvent.ACTION_DOWN
+        val ok = event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER || event.keyCode == KeyEvent.KEYCODE_ENTER ||
+            event.keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
         val up = event.keyCode == KeyEvent.KEYCODE_DPAD_UP
         val bottomBar = playerView?.findViewById<View>(androidx.media3.ui.R.id.exo_bottom_bar)
         return when {
+            pillSelected && ok -> {
+                if (!down) {
+                    pillSelected = false
+                    player.seekToDefaultPosition()
+                }
+                true
+            }
+            pillSelected && up -> true
+            pillSelected -> {
+                if (down) pillSelected = false
+                event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN
+            }
             down && up && bottomBar?.hasFocus() == true ->
                 playerView?.findViewById<View>(androidx.media3.ui.R.id.exo_play_pause)?.requestFocus() == true
-            controlsVisible && down && up && !behindLive -> true
+            controlsVisible && down && up -> {
+                if (behindLive) pillSelected = true
+                true
+            }
             else -> false
         }
     }
@@ -361,7 +384,7 @@ private fun TvPlayerSurface(
                     setControllerVisibilityListener(
                         PlayerView.ControllerVisibilityListener { visibility ->
                             controlsVisible = visibility == View.VISIBLE
-                            if (!controlsVisible && !behindLive) post { requestFocus() }
+                            if (!controlsVisible) post { requestFocus() }
                         },
                     )
                 }
@@ -388,14 +411,13 @@ private fun TvPlayerSurface(
                 )
             }
         }
-        if (behindLive) {
-            // The PlayerView controller owns D-pad focus, so claim it for the pill while it is shown
-            // (as the rest of the TV UI does) - otherwise the remote could never reach it.
-            val pillFocus = remember { FocusRequester() }
-            LaunchedEffect(Unit) { runCatching { pillFocus.requestFocus() } }
+        if (behindLive && controlsVisible) {
+            // Shown with the controls, like the bar, and selected from them (see above) rather than
+            // focused, so the OK meant to pause or show the controls does not jump back to live.
             ReturnToLiveButton(
                 onClick = { player.seekToDefaultPosition() },
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 24.dp).focusRequester(pillFocus),
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 24.dp)
+                    .then(if (pillSelected) Modifier.border(3.dp, Color.White, CircleShape) else Modifier),
             )
         }
     }
