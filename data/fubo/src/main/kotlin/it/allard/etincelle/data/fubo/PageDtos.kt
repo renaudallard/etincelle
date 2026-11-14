@@ -80,12 +80,15 @@ data class ComponentDto(
     val footer: FooterDto? = null,
     @Json(name = "channel_id") val channelIdRaw: Any? = null,
     val slug: String? = null,
+    val header: HeaderDto? = null,
 )
 
 // Live ("En direct à la TV") cards carry their show title in a footer rather than in title/heading.
 data class FooterDto(val title: TextDto?, val subtitle: TextDto?)
 
-data class BodyDto(val picture: PictureDto?)
+// A poster card names the channel offering it with a logo, in its body or its header.
+data class BodyDto(val picture: PictureDto?, @Json(name = "station_logo") val stationLogo: PictureDto? = null)
+data class HeaderDto(@Json(name = "station_logo") val stationLogo: PictureDto? = null)
 data class StateDto(@Json(name = "is_locked") val isLocked: Boolean?)
 data class ActionsDto(@Json(name = "on_click") val onClick: List<ActionItemDto>?)
 data class ActionItemDto(val endpoint: EndpointDto?, val type: String? = null)
@@ -274,6 +277,7 @@ private fun ComponentDto.toCard(square: Boolean = false): ContentCard? {
         // channel_id is a number on live cards but a string on poster cards; accept both.
         liveChannelId = (channelIdRaw as? String) ?: (channelIdRaw as? Number)?.toLong()?.toString(),
         square = square,
+        channelLogoUrl = body?.stationLogo?.url ?: header?.stationLogo?.url,
     )
 }
 

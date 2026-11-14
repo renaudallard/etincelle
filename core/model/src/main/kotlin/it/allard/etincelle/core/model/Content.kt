@@ -64,6 +64,8 @@ data class ContentCard(
     val square: Boolean = false,
     /** A small overlay badge on the image, e.g. the episode count on a collapsed recordings card. */
     val badge: String? = null,
+    /** The logo of the channel offering this card, drawn small over its image. */
+    val channelLogoUrl: String? = null,
 )
 
 /**

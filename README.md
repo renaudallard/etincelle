@@ -44,8 +44,8 @@ catalogue (un abonnement peut être requis). Cliquer sur l'en-tête d'une rangé
 la TV*) ouvre la **catégorie complète en grille**, avec le nom de la chaîne sous chaque programme.
 Dans la **recherche**, **Tout voir** sur une rangée de résultats (chaînes, programmes) les affiche
 tous en grille. Un même programme proposé sur plusieurs chaînes n'y apparaît qu'une fois, de
-préférence sur une chaîne incluse dans votre abonnement, et le nombre affiché en tête de rangée en
-tient compte.
+préférence sur une chaîne incluse dans votre abonnement, avec le logo de la chaîne sur la vignette, et
+le nombre affiché en tête de rangée en tient compte.
 L'onglet **Chaînes** ouvre la grille de **toutes les chaînes** (TNT, chaînes thématiques Molotov…)
 pour les parcourir directement ; ouvrir une chaîne propose son **direct** ainsi que ses **replays** et
 ses programmes **les plus vus**. Le **guide** se rafraîchit à chaque ouverture et au retour de l'application (son contenu se périme
@@ -57,7 +57,9 @@ applications tierces (par ex. [multistream](https://github.com/renaudallard/mult
 `etincelle://series/{id}`, `etincelle://program/{id}` ou `etincelle://channel/{id}` (identifiants Fubo).
 
 Elle ajoute un **sélecteur de saison** sur les séries qui en comptent plusieurs, et des **icônes de
-genre** dans les grilles de catégories. Sur téléphone, un menu **Paramètres**, accessible depuis la
+genre** dans les grilles de catégories. Les vignettes portent le **logo de la chaîne** qui propose le
+programme (directs, résultats de recherche…), comme dans l'application officielle. Sur téléphone, un
+menu **Paramètres**, accessible depuis la
 barre du haut, regroupe les réglages : le **masquage des contenus verrouillés** (cache les programmes
 non inclus dans votre abonnement), le choix d'une **icône monochrome** (logo blanc), l'activation
 expérimentale du **récepteur Cast Fubo officiel** (redémarrage requis), un bouton **Vérifier les

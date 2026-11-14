@@ -283,6 +283,19 @@ private fun BoxScope.EpisodeCountBadge(text: String) {
     }
 }
 
+/** The logo of the channel offering a card, in its image's bottom-right corner. */
+@Composable
+private fun BoxScope.ChannelLogo(url: String) {
+    AsyncImage(
+        model = url,
+        contentDescription = null,
+        modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp)
+            .clip(RoundedCornerShape(4.dp)).background(Color.Black.copy(alpha = 0.5f))
+            .padding(horizontal = 4.dp, vertical = 2.dp).width(36.dp).height(14.dp),
+        contentScale = ContentScale.Fit,
+    )
+}
+
 @Composable
 private fun GridCard(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
     val categoryIcon = if (card.channelId == null && card.vodId == null) categoryIconRes(card.title) else null
@@ -316,6 +329,7 @@ private fun GridCard(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
                 }
             }
             card.badge?.let { EpisodeCountBadge(it) }
+            card.channelLogoUrl?.let { ChannelLogo(it) }
         }
         card.title?.let {
             Spacer(Modifier.height(4.dp))
@@ -877,6 +891,7 @@ private fun CardItem(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
                 }
             }
             card.badge?.let { EpisodeCountBadge(it) }
+            card.channelLogoUrl?.let { ChannelLogo(it) }
         }
         card.title?.let {
             Spacer(Modifier.height(4.dp))

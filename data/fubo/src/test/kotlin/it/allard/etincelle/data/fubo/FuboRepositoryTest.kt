@@ -356,6 +356,25 @@ class FuboRepositoryTest {
         assertEquals("Chaînes (40)", page.rails[1].title)
     }
 
+    @Test
+    fun `a search result carries the logo of its channel`() = runTest {
+        session.session = UserSession("AT", "RT", "u1", "p1")
+        server.enqueue(
+            MockResponse().setBody(
+                """{"content":{"sections":[{"title":{"text":"Programmes (2)"},"component_type":"poster","components":[
+                {"id":"a","title":{"text":"Show"},"body":{"picture":{"url":"https://img/a"},"station_logo":{"url":"https://logo/f2"}}},
+                {"id":"b","title":{"text":"Other"},"header":{"station_logo":{"url":"https://logo/tf1"}},"body":{"picture":{"url":"https://img/b"}}}
+                ]}]}}"""
+            )
+        )
+
+        val cards = repo.search("show").rails[0].cards
+
+        assertEquals("https://logo/f2", cards[0].channelLogoUrl)
+        assertEquals("https://img/a", cards[0].imageUrl)
+        assertEquals("https://logo/tf1", cards[1].channelLogoUrl)
+    }
+
     private class FakeSessionStore : SessionStore {
         var saved: UserSession? = null
         override suspend fun read() = saved

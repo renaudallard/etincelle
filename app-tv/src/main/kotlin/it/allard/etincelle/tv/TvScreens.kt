@@ -791,6 +791,17 @@ private fun TvCard(card: ContentCard, onCardClick: (ContentCard) -> Unit, focusM
                     Text(it, color = BrandBlack, style = MaterialTheme.typography.labelSmall)
                 }
             }
+            // The logo of the channel offering the card, as the official app shows it.
+            card.channelLogoUrl?.let {
+                AsyncImage(
+                    model = it,
+                    contentDescription = null,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp)
+                        .clip(RoundedCornerShape(4.dp)).background(Color.Black.copy(alpha = 0.5f))
+                        .padding(horizontal = 4.dp, vertical = 2.dp).width(48.dp).height(18.dp),
+                    contentScale = ContentScale.Fit,
+                )
+            }
         }
         card.title?.let {
             Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelMedium, modifier = Modifier.width(w).padding(top = 4.dp))
