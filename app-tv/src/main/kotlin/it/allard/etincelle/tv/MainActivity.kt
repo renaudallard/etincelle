@@ -309,7 +309,8 @@ private fun TvPlayerSurface(
     // bottom bar it goes to play/pause, and from the main row it stays put, except behind the live
     // edge where it selects the back-to-live pill (Compose, so out of the view's reach) while the
     // view keeps the focus. OK then goes back to live, Down returns to the controls, and any other
-    // key or the controls hiding leaves the pill.
+    // key or the controls hiding leaves the pill. Up from the time bar of a catch-up is left to the
+    // view, whose own search goes up to the main row from there.
     var pillSelected by remember { mutableStateOf(false) }
     LaunchedEffect(behindLive, controlsVisible) { if (!behindLive || !controlsVisible) pillSelected = false }
     fun remoteKeyUsed(event: KeyEvent): Boolean {
@@ -318,6 +319,7 @@ private fun TvPlayerSurface(
             event.keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
         val up = event.keyCode == KeyEvent.KEYCODE_DPAD_UP
         val bottomBar = playerView?.findViewById<View>(androidx.media3.ui.R.id.exo_bottom_bar)
+        val mainRow = playerView?.findViewById<View>(androidx.media3.ui.R.id.exo_center_controls)
         return when {
             pillSelected && ok -> {
                 if (!down) {
@@ -333,7 +335,7 @@ private fun TvPlayerSurface(
             }
             down && up && bottomBar?.hasFocus() == true ->
                 playerView?.findViewById<View>(androidx.media3.ui.R.id.exo_play_pause)?.requestFocus() == true
-            controlsVisible && down && up -> {
+            controlsVisible && down && up && (mainRow?.hasFocus() == true || playerView?.isFocused == true) -> {
                 if (behindLive) pillSelected = true
                 true
             }
