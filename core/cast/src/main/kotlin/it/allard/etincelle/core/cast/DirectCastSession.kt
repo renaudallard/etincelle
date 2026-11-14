@@ -90,6 +90,13 @@ internal class DirectCastSession(
 
     fun seek(seconds: Double) = mediaCommand(JSONObject().put("type", "SEEK").put("currentTime", seconds))
 
+    /** Asks the receiver for a MEDIA_STATUS (statuses otherwise only come on changes). */
+    fun requestStatus() {
+        val transport = transportId ?: return
+        val request = JSONObject().put("type", "GET_STATUS").put("requestId", nextRequestId())
+        channel?.send(CastChannel.NS_MEDIA, request.toString(), source = senderId, destination = transport)
+    }
+
     /** Stops the receiver app (the TV leaves the stream) and closes the session. */
     fun stop() {
         appSessionId?.let { id ->
@@ -157,10 +164,10 @@ internal class DirectCastSession(
             }
             CastChannel.NS_MEDIA -> {
                 if (type == "MEDIA_STATUS") {
-                    (payload.optJSONArray("status") ?: JSONArray()).optJSONObject(0)?.let { status ->
-                        mediaSessionId = status.optInt("mediaSessionId").takeIf { it > 0 } ?: mediaSessionId
-                        onMediaStatus(status)
-                    }
+                    // An empty list means nothing is loaded on the receiver.
+                    val status = (payload.optJSONArray("status") ?: JSONArray()).optJSONObject(0) ?: JSONObject()
+                    mediaSessionId = status.optInt("mediaSessionId").takeIf { it > 0 } ?: mediaSessionId
+                    onMediaStatus(status)
                 }
                 pending[payload.optInt("requestId")]?.complete(payload)
             }

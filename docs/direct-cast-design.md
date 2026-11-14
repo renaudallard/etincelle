@@ -187,7 +187,11 @@ Estimated size: about 1,200 lines of Kotlin plus tests, mostly in `core:cast`.
 - On a LAUNCH, newer firmware first sends LAUNCH_STATUS and a RECEIVER_STATUS without the app; the
   session waits for the status that lists it. The app's transport id equals its session id.
 - Matching a direct device with its Play Services route by id needs checking on hardware.
-- The receiver's player time base for live streams decides how good the programme bar can be on the
-  direct path.
+- The receiver's live time is not epoch-based: `liveSeekableRange` runs from about 0 to the 4 h window
+  length and both ends move forward together; playing sits about 1.5 s behind its end. The window's
+  wall-clock start is therefore estimated from the phone's clock (the edge being now), which places
+  the programme bar to within the stream's few seconds of delay (checked on jardin).
+- Receiver statuses only come on changes, and `playbackRate` can read 0 while PLAYING: the player
+  takes the speed from `playerState`, extrapolates between statuses and asks for one every 5 s.
 - A Play Services session and a direct session on the same receiver at once (two senders): the last
   LOAD wins, as with two phones today.

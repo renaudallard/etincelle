@@ -55,6 +55,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.cast.CastPlayer
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.Player
@@ -640,14 +641,17 @@ private fun PlayerSurface(
     val liveWindow = remember { Timeline.Window() }
     var behindLive by remember { mutableStateOf(false) }
     // The on-screen programme's air-window, marked on the live bar. Kept locally (not on the source)
-    // so re-scoping it on a programme rollover does not restart the stream. Only the local player gets
-    // the custom bar: a CastPlayer reports no live window here, so leave its controller untouched.
-    val showBar = secure && source.isLive
+    // so re-scoping it on a programme rollover does not restart the stream. Media3's CastPlayer reports
+    // no live window here, so its controller keeps its own bar; the local player and a direct cast
+    // (which do report one) get the programme bar.
+    val showBar = source.isLive && (secure || currentPlayer !is CastPlayer)
     var programWindow by remember(source) { mutableStateOf(source.programWindow) }
     var barGeometry by remember { mutableStateOf<LiveBarGeometry?>(null) }
     // A "depuis le début" start asks playback to begin at the current show's start; the local player
     // joins at the live edge first, so seek back once the live window has loaded, then stop retrying.
-    var pendingStartOver by remember(source) { mutableStateOf(source.isLive && source.liveRewindOffsetMs > 0L) }
+    // Local only: a cast is told where to start in its LOAD, and opening the cast controls later must
+    // not send it back to the show's start.
+    var pendingStartOver by remember(source) { mutableStateOf(secure && source.isLive && source.liveRewindOffsetMs > 0L) }
     LaunchedEffect(currentPlayer, source.isLive) {
         // VOD and recordings have no live edge, so do not poll: stay at "not behind" without a 1s loop.
         if (!source.isLive) {
