@@ -313,6 +313,10 @@ private fun TvSearchContent(
     var query by remember { mutableStateOf(TextFieldValue("")) }
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
+    // A text field opens the keyboard as soon as it gets focus, which catches a remote that is only
+    // passing through. It stays read-only, with no keyboard, until OK is pressed on it.
+    var editing by remember { mutableStateOf(false) }
+    LaunchedEffect(editing) { if (editing) keyboard?.show() }
     LaunchedEffect(Unit) { if (focusField) runCatching { field.requestFocus() } }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -321,19 +325,30 @@ private fun TvSearchContent(
                 onValueChange = { query = it },
                 label = { Text("Rechercher") },
                 singleLine = true,
+                readOnly = !editing,
                 // The on-screen keyboard takes the D-pad while it is up, so its action key searches.
                 // It then closes, since it would otherwise cover the results.
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = {
                     if (query.text.isNotBlank()) {
+                        editing = false
                         keyboard?.hide()
                         onSubmit(query.text)
                     }
                 }),
                 // Right leaves the field for the Rechercher button once the cursor is at the end.
-                modifier = Modifier.weight(1f).focusRequester(field).dpadLeavesField(focusManager) {
-                    query.selection.collapsed && query.selection.end == query.text.length
-                },
+                modifier = Modifier.weight(1f).focusRequester(field)
+                    .onFocusChanged { if (!it.isFocused) editing = false }
+                    .onPreviewKeyEvent { event ->
+                        val ok = event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter
+                        if (event.type != KeyEventType.KeyDown || !ok) return@onPreviewKeyEvent false
+                        // Once editing, OK brings back a keyboard that Back has closed.
+                        if (editing) keyboard?.show() else editing = true
+                        true
+                    }
+                    .dpadLeavesField(focusManager) {
+                        query.selection.collapsed && query.selection.end == query.text.length
+                    },
             )
             TvButton(onClick = { onSubmit(query.text) }, enabled = query.text.isNotBlank()) { Text("Rechercher") }
         }
