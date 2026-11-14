@@ -5,6 +5,8 @@ package it.allard.etincelle.core.cast
 
 import androidx.media3.common.C
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Covers the receiver time arithmetic behind the direct cast player's position and live window. */
@@ -42,6 +44,15 @@ class ReceiverTimesTest {
     fun thePositionStaysInsideTheWindow() {
         assertEquals(0L, live.copy(time = 0.0).livePositionMs)
         assertEquals(live.windowMs, live.copy(time = 20_000.0).livePositionMs)
+    }
+
+    @Test
+    fun theLiveStreamIsJoinedOnlyOnceThePlayheadLeavesTheWindowStart() {
+        // Replacing a stream, the receiver first parks at the start of the window, then jumps to the edge.
+        assertFalse(live.copy(time = live.start).joinedLive)
+        assertFalse(live.copy(time = live.start + 4.0).joinedLive)
+        assertTrue(live.joinedLive)
+        assertTrue(live.copy(time = live.end - 1042.0).joinedLive)
     }
 
     @Test

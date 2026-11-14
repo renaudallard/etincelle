@@ -44,8 +44,8 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
     private var updatedAt = 0L
 
     // How far behind the live edge (ms) a rewound live cast should resume. The receiver is told too
-    // (live_rewind_sec), but its own seek runs before playback starts and is lost when the player then
-    // joins the live edge, so it is done from here once the TV plays with a known window.
+    // (live_rewind_sec), but a seek made before the player has joined the live edge is lost, so it is
+    // done from here once the TV plays and has joined (see ReceiverTimes.joinedLive).
     private var pendingRewindMs = 0L
 
     private val handler = Handler(Looper.getMainLooper())
@@ -108,7 +108,7 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
         }
         times = ReceiverTimes(status.optDouble("currentTime", times.time), start, end)
         updatedAt = SystemClock.elapsedRealtime()
-        if (pendingRewindMs > 0 && live && playerState == "PLAYING" && times.windowMs > 0) {
+        if (pendingRewindMs > 0 && live && playerState == "PLAYING" && times.windowMs > 0 && times.joinedLive) {
             val target = times.liveSeekTarget(times.windowMs - pendingRewindMs)
             pendingRewindMs = 0
             session?.seek(target)
@@ -230,6 +230,13 @@ internal data class ReceiverTimes(val time: Double, val start: Double, val end: 
     /** The playhead as a position (ms) in the live window. */
     val livePositionMs: Long get() = ((time - start) * 1000).toLong().coerceIn(0, windowMs)
 
+    /**
+     * The player has joined the live stream. Replacing a playing stream, the receiver reports PLAYING
+     * while still parked at the start of the window, then jumps to the live edge, undoing any seek made
+     * before that jump. Our receiver waits for the same sign before applying live_rewind_sec.
+     */
+    val joinedLive: Boolean get() = time > start + JOIN_MARGIN_S
+
     /** These times [elapsed] seconds later: the playhead moves when [playing], the window when [moving]. */
     fun advance(elapsed: Double, playing: Boolean, moving: Boolean) = ReceiverTimes(
         time + if (playing) elapsed else 0.0,
@@ -240,4 +247,9 @@ internal data class ReceiverTimes(val time: Double, val start: Double, val end: 
     /** The receiver time to seek to for [positionMs] in the live window; unset means the live edge. */
     fun liveSeekTarget(positionMs: Long): Double =
         if (positionMs == C.TIME_UNSET) end else (start + positionMs / 1000.0).coerceIn(start, end)
+
+    private companion object {
+        // As REWIND_JOIN_MARGIN in the receiver.
+        const val JOIN_MARGIN_S = 5.0
+    }
 }

@@ -202,6 +202,11 @@ Estimated size: about 1,200 lines of Kotlin plus tests, mostly in `core:cast`.
 - The receiver applies `live_rewind_sec` on PLAYER_LOAD_COMPLETE, before playback starts, and the
   player then joins the live edge, losing it (seen on jardin with the deployed receiver). The direct
   player therefore seeks the TV behind the edge itself once it plays with a known window; the same
-  receiver behaviour probably affects a rewound Play Services cast, not checked.
+  receiver behaviour probably affects a rewound Play Services cast, not checked. The receiver now waits
+  for playback too (8fc08be in etincelle_receiver).
+- Replacing a playing stream ("Regarder depuis le début" while casting), the receiver reports PLAYING
+  while parked at the start of the window and only then jumps to the live edge, which undid a seek sent
+  at that first PLAYING (seen on jardin: the TV stayed at the edge). The seek, ours and the receiver's,
+  waits until the playhead is more than 5 s past the start of the window.
 - A Play Services session and a direct session on the same receiver at once (two senders): the last
   LOAD wins, as with two phones today.
