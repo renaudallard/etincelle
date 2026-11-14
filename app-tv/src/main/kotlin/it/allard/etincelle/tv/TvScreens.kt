@@ -32,14 +32,11 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -149,7 +146,7 @@ private fun TvCodeLoginScreen(code: String?, busy: Boolean, error: String?, onSt
                 CircularProgressIndicator()
             }
             Spacer(Modifier.height(28.dp))
-            Button(onClick = onUseEmail, modifier = Modifier.focusRequester(emailBtn)) {
+            TvButton(onClick = onUseEmail, modifier = Modifier.focusRequester(emailBtn)) {
                 Text("Se connecter par email")
             }
             if (error != null) {
@@ -160,7 +157,7 @@ private fun TvCodeLoginScreen(code: String?, busy: Boolean, error: String?, onSt
                 // way back. While it is still auto-retrying (busy) no button is needed.
                 if (!busy) {
                     Spacer(Modifier.height(12.dp))
-                    Button(onClick = onStart) { Text("Réessayer") }
+                    TvButton(onClick = onStart) { Text("Réessayer") }
                 }
             }
         }
@@ -187,9 +184,9 @@ private fun TvEmailLoginScreen(busy: Boolean, error: String?, onLogin: (String, 
             visualTransformation = PasswordVisualTransformation(), modifier = Modifier.width(480.dp),
         )
         Spacer(Modifier.height(20.dp))
-        Button(onClick = { onLogin(email, password) }, enabled = !busy) { Text("Se connecter") }
+        TvButton(onClick = { onLogin(email, password) }, enabled = !busy) { Text("Se connecter") }
         Spacer(Modifier.height(12.dp))
-        TextButton(onClick = onUseCode) { Text("Utiliser un code") }
+        TvButton(onClick = onUseCode, highlighted = false) { Text("Utiliser un code") }
         Spacer(Modifier.height(16.dp))
         if (busy) CircularProgressIndicator()
         if (error != null) Text(error, color = MaterialTheme.colorScheme.error)
@@ -283,7 +280,7 @@ private fun TvSearchContent(
                 singleLine = true,
                 modifier = Modifier.weight(1f).focusRequester(field),
             )
-            Button(onClick = { onSubmit(query) }, enabled = query.isNotBlank()) { Text("Rechercher") }
+            TvButton(onClick = { onSubmit(query) }, enabled = query.isNotBlank()) { Text("Rechercher") }
         }
         Spacer(Modifier.height(16.dp))
         Box(Modifier.fillMaxSize()) {
@@ -312,7 +309,11 @@ private fun TvTab(label: String, selected: Boolean, onClick: () -> Unit, modifie
             .clickable { onClick() }
             .padding(horizontal = 18.dp, vertical = 8.dp),
     ) {
-        Text(label, color = if (focused) BrandBlack else Color.White, style = MaterialTheme.typography.titleMedium)
+        Text(
+            label,
+            color = if (focused) BrandBlack else if (selected) BrandYellow else Color.White,
+            style = MaterialTheme.typography.titleMedium,
+        )
     }
 }
 
@@ -331,24 +332,20 @@ fun TvSettingsScreen(
     Column(Modifier.fillMaxSize().padding(OVERSCAN), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Paramètres", style = MaterialTheme.typography.displaySmall)
         if (!confirm) {
-            Button(onClick = { confirm = true }, modifier = Modifier.focusRequester(focus)) { Text("Déconnexion") }
+            TvButton(onClick = { confirm = true }, modifier = Modifier.focusRequester(focus)) { Text("Déconnexion") }
         } else {
             Text("Voulez-vous vraiment vous déconnecter ?", color = Color.White, style = MaterialTheme.typography.titleMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = { confirm = false }, modifier = Modifier.focusRequester(focus)) { Text("Annuler") }
-                Button(onClick = onLogout) { Text("Se déconnecter") }
+                TvButton(onClick = { confirm = false }, modifier = Modifier.focusRequester(focus)) { Text("Annuler") }
+                TvButton(onClick = onLogout) { Text("Se déconnecter") }
             }
         }
         Text("Vignettes par ligne : $gridColumns", style = MaterialTheme.typography.titleMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for (n in TvPrefs.MIN_GRID_COLUMNS..TvPrefs.MAX_GRID_COLUMNS) {
-                Button(
+                TvButton(
                     onClick = { TvPrefs.setGridColumns(context, n); onGridColumns(n) },
-                    colors = if (n == gridColumns) {
-                        ButtonDefaults.buttonColors(containerColor = BrandYellow, contentColor = BrandBlack)
-                    } else {
-                        ButtonDefaults.buttonColors()
-                    },
+                    highlighted = n == gridColumns,
                 ) { Text("$n") }
             }
         }
@@ -373,8 +370,8 @@ fun TvUpdateDialog(info: UpdateInfo, onDownload: () -> Unit, onDismiss: () -> Un
                 style = MaterialTheme.typography.titleMedium,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = onDownload, modifier = Modifier.focusRequester(focus)) { Text("Télécharger") }
-                Button(onClick = onDismiss) { Text("Plus tard") }
+                TvButton(onClick = onDownload, modifier = Modifier.focusRequester(focus)) { Text("Télécharger") }
+                TvButton(onClick = onDismiss) { Text("Plus tard") }
             }
         }
     }
@@ -453,12 +450,12 @@ fun TvProgramDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     if (showWatch) {
-                        Button(onClick = onWatch, enabled = !busy, modifier = Modifier.focusRequester(watchFocus)) {
+                        TvButton(onClick = onWatch, enabled = !busy, modifier = Modifier.focusRequester(watchFocus)) {
                             Text(if (detail.isLive) "Regarder en direct" else "Regarder")
                         }
                     }
                     if (showWatch && detail.isLive) {
-                        Button(onClick = onStartOver, enabled = !busy) { Text("Regarder depuis le début") }
+                        TvButton(onClick = onStartOver, enabled = !busy) { Text("Regarder depuis le début") }
                     }
                     // Each record option (the episode and/or the whole series) is its own D-pad button,
                     // using the backend's own label. When there is no Regarder and no recording/episode to
@@ -466,7 +463,7 @@ fun TvProgramDetailScreen(
                     // watchFocus.
                     val recordTakesFocus = !showWatch && detail.recordings.isEmpty() && detail.episodes.isEmpty()
                     detail.recordActions.forEachIndexed { i, action ->
-                        Button(
+                        TvButton(
                             onClick = { onRecord(action) }, enabled = !busy,
                             modifier = if (recordTakesFocus && i == 0) Modifier.focusRequester(watchFocus) else Modifier,
                         ) { Text(action.label) }
@@ -531,9 +528,7 @@ private fun TvEpisodesSection(
     if (seasons.size > 1) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             seasons.forEachIndexed { i, (label, _) ->
-                TextButton(onClick = { selected = i }) {
-                    Text(label, color = if (i == idx) BrandYellow else Color.White)
-                }
+                TvButton(onClick = { selected = i }, highlighted = i == idx) { Text(label) }
             }
         }
     }
@@ -553,6 +548,7 @@ private fun TvEpisodeRow(card: ContentCard, enabled: Boolean, onClick: () -> Uni
             .onFocusChanged { focused = it.isFocused }
             .clip(RoundedCornerShape(8.dp))
             .background(if (focused) BackgroundLevel2 else Color.Transparent)
+            .border(if (focused) 3.dp else 0.dp, if (focused) Color.White else Color.Transparent, RoundedCornerShape(8.dp))
             .clickable(enabled = enabled) { onClick() }
             .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -583,9 +579,10 @@ private fun TvRecordingRow(recording: Recording, enabled: Boolean, onWatch: () -
             modifier = Modifier.weight(1f),
         )
         Spacer(Modifier.width(8.dp))
-        TextButton(
+        TvButton(
             onClick = onWatch,
             enabled = enabled,
+            highlighted = false,
             modifier = if (focus != null) Modifier.focusRequester(focus) else Modifier,
         ) { Text("Regarder l'enregistrement") }
     }
