@@ -57,6 +57,7 @@ import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -247,6 +248,12 @@ fun TvBrowseScreen(
         LazyRow(
             modifier = Modifier
                 .fillMaxWidth()
+                // Coming up from the page lands on the current tab, not on the one nearest on screen.
+                .focusProperties {
+                    onEnter = {
+                        if (requestedFocusDirection == FocusDirection.Up) runCatching { tabFocus.getValue(state.tab).requestFocus() }
+                    }
+                }
                 .focusGroup()
                 .onPreviewKeyEvent { event ->
                     if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
