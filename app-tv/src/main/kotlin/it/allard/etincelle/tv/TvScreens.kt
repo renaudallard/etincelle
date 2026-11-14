@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,6 +30,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -571,7 +573,13 @@ private fun TvEpisodesSection(
     Spacer(Modifier.height(8.dp))
     Text("Épisodes disponibles", style = MaterialTheme.typography.titleMedium, color = Color.White)
     if (seasons.size > 1) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Scrolls so that every season stays reachable; the focused one is brought into view. The
+        // scroll clips at its edges, so the padding leaves room for a focused button to grow and the
+        // offset keeps the first one in line with the heading.
+        Row(
+            Modifier.offset(x = (-6).dp).horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             seasons.forEachIndexed { i, (label, _) ->
                 TvButton(onClick = { selected = i }, highlighted = i == idx) { Text(label) }
             }
