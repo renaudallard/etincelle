@@ -55,6 +55,12 @@ internal class DirectCastSession(
     @Volatile
     private var ended = false
 
+    /** The receiver's volume (0..1) and mute, as last reported. */
+    var volumeLevel = 1.0
+        private set
+    var muted = false
+        private set
+
     /** Connects, authenticates the device and starts or joins the receiver. Throws on failure. */
     suspend fun start() {
         val ch = withContext(Dispatchers.IO) { CastChannel.open(device.host, device.port, network) }
@@ -90,6 +96,10 @@ internal class DirectCastSession(
 
     fun seek(seconds: Double) = mediaCommand(JSONObject().put("type", "SEEK").put("currentTime", seconds))
 
+    fun setVolume(level: Double) = receiverCommand(JSONObject().put("type", "SET_VOLUME").put("volume", JSONObject().put("level", level)))
+
+    fun setMuted(muted: Boolean) = receiverCommand(JSONObject().put("type", "SET_VOLUME").put("volume", JSONObject().put("muted", muted)))
+
     /** Asks the receiver for a MEDIA_STATUS (statuses otherwise only come on changes). */
     fun requestStatus() {
         val transport = transportId ?: return
@@ -121,6 +131,11 @@ internal class DirectCastSession(
         val transport = transportId ?: return
         command.put("mediaSessionId", id).put("requestId", nextRequestId())
         channel?.send(CastChannel.NS_MEDIA, command.toString(), source = senderId, destination = transport)
+    }
+
+    private fun receiverCommand(command: JSONObject) {
+        if (transportId == null) return
+        requestReceiver(command)
     }
 
     private fun requestReceiver(request: JSONObject) {
@@ -157,6 +172,10 @@ internal class DirectCastSession(
                 "RECEIVER_STATUS" -> {
                     val status = payload.optJSONObject("status") ?: return
                     receiverStatus.value = status
+                    status.optJSONObject("volume")?.let {
+                        volumeLevel = it.optDouble("level", volumeLevel)
+                        muted = it.optBoolean("muted", muted)
+                    }
                     // The app was stopped from elsewhere (the TV, another phone): the session is over.
                     if (transportId != null && runningApp(status) == null) end(null)
                 }

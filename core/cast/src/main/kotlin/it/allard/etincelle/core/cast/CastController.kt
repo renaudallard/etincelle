@@ -79,7 +79,7 @@ open class CastController(
     // A real Cast session is up right now. Stricter than [CastUiState.isCasting], which can briefly lag
     // a session that has already torn down: used to gate volume-key interception so a press is never
     // swallowed once the receiver is gone.
-    val isCastSessionActive: Boolean get() = castContext.sessionManager.currentCastSession != null
+    open val isCastSessionActive: Boolean get() = castContext.sessionManager.currentCastSession != null
 
     // Drives the idle re-discovery loop; recreated on each start() so a fresh start gets a fresh
     // loop and stop() can cancel it cleanly.

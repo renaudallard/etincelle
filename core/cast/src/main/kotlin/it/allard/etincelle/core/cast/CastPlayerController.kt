@@ -101,6 +101,12 @@ class CastPlayerController(
     // The player the UI binds to while such a session plays (the counterpart of castPlayer).
     private val directPlayer = DirectCastPlayer()
 
+    // The direct session is connected (not just starting).
+    private val directConnected: Boolean
+        get() = directSession != null && state.value.connectedRouteId?.startsWith(DIRECT_ROUTE_PREFIX) == true
+
+    override val isCastSessionActive: Boolean get() = super.isCastSessionActive || directConnected
+
     // Scratch window for measuring how far the local player is behind the live edge at cast-out.
     private val liveWindow = Timeline.Window()
 
@@ -501,6 +507,14 @@ class CastPlayerController(
      * when no session is active. Publishes the new level so the UI can flash a brief overlay.
      */
     fun adjustCastVolume(up: Boolean) {
+        directSession?.takeIf { directConnected }?.let { direct ->
+            val next = ((castVolume ?: direct.volumeLevel) + if (up) VOLUME_STEP else -VOLUME_STEP).coerceIn(0.0, 1.0)
+            castVolume = next
+            direct.setVolume(next)
+            if (direct.muted) direct.setMuted(false)
+            publishVolume(next.toFloat())
+            return
+        }
         val session = castContext.sessionManager.currentCastSession ?: return
         // Step from our own last value, not a fresh read: the receiver's reported volume lags the
         // writes, so reading it on every press would collapse a fast burst of presses into one step.
@@ -519,6 +533,12 @@ class CastPlayerController(
 
     /** Toggle mute on the cast device (the phone's mute key routes here while casting). */
     fun toggleCastMute() {
+        directSession?.takeIf { directConnected }?.let { direct ->
+            val muted = direct.muted
+            direct.setMuted(!muted)
+            publishVolume(if (!muted) 0f else (castVolume ?: direct.volumeLevel).toFloat())
+            return
+        }
         val session = castContext.sessionManager.currentCastSession ?: return
         val muted = runCatching { session.isMute }.getOrDefault(false)
         runCatching { session.isMute = !muted }
