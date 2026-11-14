@@ -258,7 +258,8 @@ fun TvBrowseScreen(
             items(tabs) { tab ->
                 TvTab(
                     label = tab.label,
-                    selected = state.tab == tab && !state.canGoBack,
+                    // Stays marked on the tab's sub-pages, so the bar always says where you are.
+                    selected = state.tab == tab,
                     onClick = { onSelectTab(tab) },
                     modifier = Modifier.focusRequester(tabFocus.getValue(tab)),
                 )

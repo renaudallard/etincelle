@@ -31,6 +31,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -67,6 +68,8 @@ import it.allard.etincelle.core.designsystem.LiveProgramBar
 import it.allard.etincelle.core.designsystem.LiveProgramBarBottomOffset
 import it.allard.etincelle.core.designsystem.R as DesignR
 import it.allard.etincelle.core.designsystem.ReturnToLiveButton
+import it.allard.etincelle.core.designsystem.theme.BrandBlack
+import it.allard.etincelle.core.designsystem.theme.BrandYellow
 import it.allard.etincelle.core.designsystem.theme.EtincelleTheme
 import it.allard.etincelle.core.domain.DetailKind
 import it.allard.etincelle.core.model.PlaybackSource
@@ -498,9 +501,17 @@ private fun AppRoot(
                                     },
                                 ) {
                                     Tab.entries.forEach { tab ->
+                                        // The tab stays marked on its sub-pages ("Tout voir", categories),
+                                        // so the bar always says where you are; tapping it goes back to
+                                        // the tab's first page.
                                         NavigationBarItem(
-                                            selected = state.tab == tab && !state.canGoBack,
+                                            selected = state.tab == tab,
                                             onClick = { vm.selectTab(tab) },
+                                            colors = NavigationBarItemDefaults.colors(
+                                                indicatorColor = BrandYellow,
+                                                selectedIconColor = BrandBlack,
+                                                selectedTextColor = BrandYellow,
+                                            ),
                                             icon = {
                                                 val iconRes = tabIconRes(tab)
                                                 if (iconRes != null) {
