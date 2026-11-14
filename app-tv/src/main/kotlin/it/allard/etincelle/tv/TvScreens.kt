@@ -43,6 +43,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -203,9 +206,18 @@ fun TvBrowseScreen(
     onSeeAll: (ContentRail) -> Unit,
     gridColumns: Int,
 ) {
-    val firstTab = remember { FocusRequester() }
+    val tabFocus = remember { Tab.entries.associateWith { FocusRequester() } }
     val railsFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { firstTab.requestFocus() } }
+    // This screen is rebuilt whenever the page changes (another tab, or back from a detail), so on
+    // entry put the focus back on the card that opened the detail, else on the current tab. The
+    // card is saved with the page's state, which outlives the detail.
+    val returnKey = rememberSaveable { mutableStateOf<String?>(null) }
+    val returnFocus = remember(returnKey) { ReturnFocus(returnKey) }
+    val restoringCard = returnFocus.pending
+    LaunchedEffect(Unit) {
+        val restored = returnFocus.restore()
+        if (!restored && state.tab != Tab.SEARCH) runCatching { tabFocus.getValue(state.tab).requestFocus() }
+    }
     Column(Modifier.fillMaxSize().padding(start = OVERSCAN, end = OVERSCAN, top = 24.dp)) {
         val tabs = Tab.entries
         LazyRow(
@@ -221,12 +233,12 @@ fun TvBrowseScreen(
                 },
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            itemsIndexed(tabs) { i, tab ->
+            items(tabs) { tab ->
                 TvTab(
                     label = tab.label,
                     selected = state.tab == tab && !state.canGoBack,
                     onClick = { onSelectTab(tab) },
-                    modifier = if (i == 0) Modifier.focusRequester(firstTab) else Modifier,
+                    modifier = Modifier.focusRequester(tabFocus.getValue(tab)),
                 )
             }
             item {
@@ -235,21 +247,21 @@ fun TvBrowseScreen(
         }
         Spacer(Modifier.height(16.dp))
         if (state.tab == Tab.SEARCH) {
-            TvSearchContent(state, onSearch, onCardClick, onSeeAll)
+            TvSearchContent(state, onSearch, onCardClick, onSeeAll, returnFocus, focusField = !restoringCard)
         } else {
             Text(state.current?.title ?: state.tab.label, style = MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(12.dp))
             Box(Modifier.fillMaxSize()) {
                 val page = state.current
                 if (page?.isGrid == true) {
-                    TvGridContent(page.rails, onCardClick, railsFocus, gridColumns)
+                    TvGridContent(page.rails, onCardClick, railsFocus, gridColumns, returnFocus)
                 } else {
                     LazyColumn(
                         modifier = Modifier.focusGroup().focusRequester(railsFocus),
                         contentPadding = PaddingValues(bottom = 48.dp),
                         verticalArrangement = Arrangement.spacedBy(20.dp),
                     ) {
-                        items(page?.rails.orEmpty(), key = { it.id }) { rail -> TvRail(rail, onCardClick, onSeeAll) }
+                        items(page?.rails.orEmpty(), key = { it.id }) { rail -> TvRail(rail, onCardClick, onSeeAll, returnFocus = returnFocus) }
                     }
                 }
                 if (state.busy) CircularProgressIndicator(Modifier.align(Alignment.Center))
@@ -267,10 +279,12 @@ private fun TvSearchContent(
     onSubmit: (String) -> Unit,
     onCardClick: (ContentCard) -> Unit,
     onSeeAll: (ContentRail) -> Unit,
+    returnFocus: ReturnFocus,
+    focusField: Boolean,
 ) {
     var query by remember { mutableStateOf("") }
     val field = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { field.requestFocus() } }
+    LaunchedEffect(Unit) { if (focusField) runCatching { field.requestFocus() } }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
@@ -288,7 +302,7 @@ private fun TvSearchContent(
                 contentPadding = PaddingValues(bottom = 48.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
-                items(state.current?.rails.orEmpty(), key = { it.id }) { rail -> TvRail(rail, onCardClick, onSeeAll) }
+                items(state.current?.rails.orEmpty(), key = { it.id }) { rail -> TvRail(rail, onCardClick, onSeeAll, returnFocus = returnFocus) }
             }
             if (state.busy) CircularProgressIndicator(Modifier.align(Alignment.Center))
             state.error?.let {
@@ -594,18 +608,21 @@ private fun TvRail(
     onCardClick: (ContentCard) -> Unit,
     onSeeAll: (ContentRail) -> Unit,
     showSeeAll: Boolean = true,
+    returnFocus: ReturnFocus? = null,
 ) {
     Column {
         rail.title?.takeIf { it.isNotBlank() }?.let { title ->
             if (showSeeAll && rail.expandable()) {
                 var focused by remember { mutableStateOf(false) }
+                val key = "seeall|${rail.id}"
                 Text(
                     "$title   ›  Tout voir",
                     style = MaterialTheme.typography.titleSmall,
                     color = if (focused) BrandYellow else Color.White,
                     modifier = Modifier
+                        .then(returnFocus?.target(key) ?: Modifier)
                         .onFocusChanged { focused = it.isFocused }
-                        .clickable { onSeeAll(rail) }
+                        .clickable { returnFocus?.save(key); onSeeAll(rail) }
                         .padding(bottom = 6.dp),
                 )
             } else {
@@ -614,14 +631,23 @@ private fun TvRail(
         }
         LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             // Index in the key: a card id can repeat within a rail, and a duplicate lazy key crashes.
-            itemsIndexed(rail.cards, key = { i, c -> "${c.id}#$i" }) { _, card -> TvCard(card, onCardClick) }
+            itemsIndexed(rail.cards, key = { i, c -> "${c.id}#$i" }) { i, card ->
+                val key = "${rail.id}|$i|${card.id}"
+                TvCard(card, { returnFocus?.save(key); onCardClick(it) }, returnFocus?.target(key) ?: Modifier)
+            }
         }
     }
 }
 
 /** A "see all" / Direct page on TV as a D-pad grid (5 per row), keeping section headers. */
 @Composable
-private fun TvGridContent(rails: List<ContentRail>, onCardClick: (ContentCard) -> Unit, focus: FocusRequester, columns: Int) {
+private fun TvGridContent(
+    rails: List<ContentRail>,
+    onCardClick: (ContentCard) -> Unit,
+    focus: FocusRequester,
+    columns: Int,
+    returnFocus: ReturnFocus,
+) {
     val multiSection = rails.size > 1
     LazyVerticalGrid(
         columns = GridCells.Fixed(columns),
@@ -637,13 +663,16 @@ private fun TvGridContent(rails: List<ContentRail>, onCardClick: (ContentCard) -
                     Text(header, style = MaterialTheme.typography.titleMedium, color = Color.White)
                 }
             }
-            items(rail.cards, key = { "${rail.id}-${it.id}" }) { card -> TvCard(card, onCardClick) }
+            items(rail.cards, key = { "${rail.id}-${it.id}" }) { card ->
+                val key = "${rail.id}|${card.id}"
+                TvCard(card, { returnFocus.save(key); onCardClick(it) }, returnFocus.target(key))
+            }
         }
     }
 }
 
 @Composable
-private fun TvCard(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
+private fun TvCard(card: ContentCard, onCardClick: (ContentCard) -> Unit, focusModifier: Modifier = Modifier) {
     val isChannel = card.square
     // A genre/category tile carries no artwork; draw the brand icon instead of a blank box.
     val categoryIcon = if (card.channelId == null && card.vodId == null) categoryIconRes(card.title) else null
@@ -653,6 +682,7 @@ private fun TvCard(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
     Column(Modifier.width(w)) {
         Box(
             Modifier.size(w, h)
+                .then(focusModifier)
                 .onFocusChanged { focused = it.isFocused }
                 .clip(RoundedCornerShape(10.dp))
                 .background(BackgroundLevel1)
@@ -687,5 +717,33 @@ private fun TvCard(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
         card.subtitle?.let {
             Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis, color = BrandYellow, style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(w))
         }
+    }
+}
+
+/**
+ * Brings the focus back to the item (a card, or a rail's "Tout voir") that opened a detail or a
+ * sub-page. [saved] holds that item's key; it must live in the page's saveable state so it survives
+ * the detail covering the page.
+ */
+@Stable
+private class ReturnFocus(private val saved: MutableState<String?>) {
+    private val requester = FocusRequester()
+
+    /** True while a key is waiting to be restored. */
+    val pending: Boolean get() = saved.value != null
+
+    fun save(key: String) {
+        saved.value = key
+    }
+
+    /** The modifier to put on the item with [key]: the restore target when it is the saved one. */
+    fun target(key: String): Modifier = if (saved.value == key) Modifier.focusRequester(requester) else Modifier
+
+    /** Focuses the saved item if it is on screen, and forgets it either way. */
+    fun restore(): Boolean {
+        if (saved.value == null) return false
+        val ok = runCatching { requester.requestFocus() }.isSuccess
+        saved.value = null
+        return ok
     }
 }
