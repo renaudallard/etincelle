@@ -158,7 +158,7 @@ class FuboRepository(
     override suspend fun loadHome(): ContentPage = withRefresh {
         val page = api.homePage().toPage()
         val apps = appsRail()
-        val recordings = loadRecordings()
+        val recordings = recordingsOrEmpty()
         val extra = buildList {
             if (recordings.isNotEmpty()) {
                 // One card per show (collapsed); "tout voir" opens the genre-grouped recordings page.
@@ -324,8 +324,8 @@ class FuboRepository(
         val detailProgramId = detail.programId
         val matches = when (kind) {
             DetailKind.PROGRAM ->
-                if (detailProgramId == null) emptyList() else loadRecordings().filter { it.programId == detailProgramId }
-            DetailKind.SERIES -> loadRecordings().filter { it.seriesId == id }
+                if (detailProgramId == null) emptyList() else recordingsOrEmpty().filter { it.programId == detailProgramId }
+            DetailKind.SERIES -> recordingsOrEmpty().filter { it.seriesId == id }
             DetailKind.CHANNEL -> emptyList()
         }
         // When the show has no real poster, fall back to a recording's own image (a real thumbnail).
@@ -357,6 +357,18 @@ class FuboRepository(
         @Suppress("UNCHECKED_CAST")
         val body = coerceWholeNumbers(action.payload) as Map<String, Any?>
         api.postAction(action.url, body).close()
+    }
+
+    /**
+     * The recordings for a page that only shows them next to its own content (home, details). An account
+     * without the recording option gets a 404 from dvr/v2/list, which must not take the whole page down,
+     * so any failure but a dead session reads as no recordings.
+     */
+    private suspend fun recordingsOrEmpty(): List<Recording> = try {
+        loadRecordings()
+    } catch (e: AppError) {
+        if (e is AppError.Unauthorized) throw e
+        emptyList()
     }
 
     override suspend fun loadRecordings(): List<Recording> = withRefresh {

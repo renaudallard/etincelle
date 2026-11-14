@@ -5,6 +5,7 @@ package it.allard.etincelle.data.fubo
 
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import it.allard.etincelle.core.domain.DetailKind
 import it.allard.etincelle.core.model.AppError
 import it.allard.etincelle.core.model.DrmSpec
 import it.allard.etincelle.core.model.PlaybackSource
@@ -104,6 +105,31 @@ class FuboRepositoryTest {
         val refresh = server.takeRequest()
         assertEquals("/refresh", refresh.path)
         assertEquals("Bearer RT", refresh.getHeader("Authorization"))
+    }
+
+    @Test
+    fun `the home still loads for an account without recordings`() = runTest {
+        session.session = UserSession("AT", "RT", "u1", "p1")
+        server.enqueue(MockResponse().setBody("""{"title":{"text":"Accueil"},"content":{"template":"catalog","sections":[]}}"""))
+        server.enqueue(MockResponse().setBody("""{"content":{"sections":[]}}""")) // channels page (apps)
+        server.enqueue(MockResponse().setResponseCode(404).setBody("404 page not found")) // no recording option
+
+        val home = repo.loadHome()
+
+        assertEquals("Accueil", home.title)
+        assertTrue(home.rails.none { it.id == "recordings" })
+    }
+
+    @Test
+    fun `a series detail still opens for an account without recordings`() = runTest {
+        session.session = UserSession("AT", "RT", "u1", "p1")
+        server.enqueue(MockResponse().setBody("""{"title":{"text":"Une série"},"content":{"sections":[]}}"""))
+        server.enqueue(MockResponse().setResponseCode(404).setBody("404 page not found"))
+
+        val detail = repo.fetchProgramDetail("100001", DetailKind.SERIES)
+
+        assertEquals(2, server.requestCount)
+        assertTrue(detail.recordings.isEmpty())
     }
 
     @Test
