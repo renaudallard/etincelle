@@ -72,6 +72,15 @@ brièvement). Côté Chromecast, les contenus à la demande sont eux aussi mis e
 loin à l'avance pour absorber les coupures réseau. La diffusion
 s'appuie sur un récepteur Cast Widevine personnalisé, hébergé séparément :
 [etincelle_receiver](https://github.com/renaudallard/etincelle_receiver).
+Certains téléphones cessent de trouver les Chromecast par les services Google, jusqu'à ce que l'on
+coupe puis rallume le Wi-Fi. etincelle cherche donc aussi les Chromecast **par lui-même** sur le
+réseau Wi-Fi et ajoute ceux que les services Google ne voient pas à la liste. La diffusion vers un
+tel Chromecast passe par une **connexion directe** : le Chromecast doit d'abord prouver qu'il est un
+appareil Cast authentique (certificat signé par Google) avant de recevoir quoi que ce soit, puis
+tout fonctionne comme d'habitude, commandes de lecture, barre du programme en cours, retour au
+direct, volume, passage d'un Chromecast à l'autre et retour sur le téléphone. Si la connexion est
+coupée, etincelle se reconnecte au Chromecast sans interrompre la lecture. Seule la notification
+système de diffusion manque dans ce cas.
 À chaque démarrage, etincelle **vérifie les mises à jour** sur GitHub et propose de télécharger la
 dernière version lorsqu'une plus récente est disponible.
 
@@ -156,7 +165,7 @@ etincelle/
 │   ├── domain/             l'interface MolotovRepository (abstraction du backend)
 │   ├── network/            OkHttp/Retrofit/Moshi + intercepteurs Fubo + session + TokenStore
 │   ├── player/             mapping Media3 : DrmSpec vers MediaItem Widevine
-│   ├── cast/               diffusion Chromecast Widevine (téléphone uniquement)
+│   ├── cast/               diffusion Chromecast Widevine, par Play Services ou en direct (téléphone)
 │   └── ui/                 MainViewModel/UiState partagés + vérif. de mise à jour GitHub
 ├── data/
 │   └── fubo/               FuboRepository (implémente MolotovRepository) + DTO/mappers + DI
