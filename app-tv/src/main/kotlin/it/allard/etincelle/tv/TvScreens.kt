@@ -370,6 +370,8 @@ private fun TvSearchContent(
         Box(Modifier.fillMaxSize()) {
             if (page?.isGrid == true) {
                 TvGridContent(page.rails, onCardClick, gridFocus, gridColumns, returnFocus)
+            } else if (page != null && page.rails.isEmpty() && !state.busy && state.error == null) {
+                Text("Aucun résultat trouvé", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 32.dp))
             } else {
                 LazyColumn(
                     contentPadding = PaddingValues(bottom = 48.dp),

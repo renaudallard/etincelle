@@ -551,6 +551,7 @@ fun SearchScreen(
     isGrid: Boolean = false,
     columns: Int = LocalPrefs.DEFAULT_GRID_COLUMNS,
     pageTitle: String? = null,
+    searched: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     var query by remember { mutableStateOf("") }
@@ -576,6 +577,13 @@ fun SearchScreen(
                 columns = columns,
                 pageTitle = pageTitle,
                 modifier = Modifier.weight(1f),
+            )
+        } else if (searched && rails.isEmpty() && !busy && error == null) {
+            Text(
+                "Aucun résultat trouvé",
+                style = MaterialTheme.typography.titleMedium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(32.dp),
             )
         } else {
             PageContent(

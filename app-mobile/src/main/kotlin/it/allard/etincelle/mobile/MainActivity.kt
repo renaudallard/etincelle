@@ -563,6 +563,7 @@ private fun AppRoot(
                                         isGrid = state.current?.isGrid == true,
                                         columns = gridColumns,
                                         pageTitle = state.current?.title,
+                                        searched = state.current != null,
                                         modifier = modifier,
                                     )
                                 } else if (state.current?.isGrid == true) {

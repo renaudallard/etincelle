@@ -45,7 +45,8 @@ la TV*) ouvre la **catégorie complète en grille**, avec le nom de la chaîne s
 Dans la **recherche**, **Tout voir** sur une rangée de résultats (chaînes, programmes) les affiche
 tous en grille. Un même programme proposé sur plusieurs chaînes n'y apparaît qu'une fois, de
 préférence sur une chaîne incluse dans votre abonnement, avec le logo de la chaîne sur la vignette, et
-le nombre affiché en tête de rangée en tient compte.
+le nombre affiché en tête de rangée en tient compte. Une recherche sans résultat l'indique par
+« Aucun résultat trouvé ».
 L'onglet **Chaînes** ouvre la grille de **toutes les chaînes** (TNT, chaînes thématiques Molotov…)
 pour les parcourir directement ; ouvrir une chaîne propose son **direct** ainsi que ses **replays** et
 ses programmes **les plus vus**. Le **guide** se rafraîchit à chaque ouverture et au retour de l'application (son contenu se périme
