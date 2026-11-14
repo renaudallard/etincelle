@@ -113,6 +113,10 @@ class CastPlayerController(
 
     override val isCastSessionActive: Boolean get() = super.isCastSessionActive || directConnected
 
+    // The TV has not taken over the direct cast yet and the phone still plays.
+    private val phoneStillPlays: Boolean
+        get() = _currentPlayer.value === localPlayer && localPlayer.playbackState != Player.STATE_IDLE
+
     // Scratch window for measuring how far the local player is behind the live edge at cast-out.
     private val liveWindow = Timeline.Window()
 
@@ -409,11 +413,13 @@ class CastPlayerController(
     }
 
     // Like any other end of a cast the user did not ask to continue here: stop, and let the UI drop its
-    // playing state.
+    // playing state. Before the TV took over, the phone still plays: leave it so.
     private fun endDirectCast() {
+        val phonePlays = phoneStillPlays
         directSession = null
         leaveDirectPlayer()
         onSessionDisconnected()
+        if (phonePlays) return
         currentItem = null
         onPlaybackStopped?.invoke()
     }
