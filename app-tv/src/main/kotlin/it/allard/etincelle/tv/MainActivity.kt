@@ -293,6 +293,14 @@ private fun TvPlayerSurface(
     // the live edge first, so seek back once the live window has loaded, then stop retrying.
     var pendingStartOver by remember(source) { mutableStateOf(source.isLive && source.liveRewindOffsetMs > 0L) }
     var controlsVisible by remember { mutableStateOf(true) }
+    // The remote only reaches the PlayerView (OK or a direction shows the controls) while that view
+    // holds the Android focus; otherwise the keys stop at Compose and the controls cannot be brought
+    // back once hidden. A Compose focus request does not move the focus into the embedded view, so ask
+    // the view itself: on start, when the back-to-live pill (which takes the focus) goes away, and each
+    // time the controls hide, since the focused control button then vanishes and Android hands the
+    // focus to the Compose host.
+    var playerView by remember { mutableStateOf<View?>(null) }
+    LaunchedEffect(behindLive, playerView) { if (!behindLive) playerView?.requestFocus() }
     LaunchedEffect(source.isLive) {
         // VOD and recordings have no live edge, so do not poll: stay at "not behind" without a 1s loop.
         if (!source.isLive) {
@@ -324,12 +332,14 @@ private fun TvPlayerSurface(
             factory = { context ->
                 PlayerView(context).apply {
                     this.player = player
+                    playerView = this
                     // The programme bar replaces the default time bar, which spans the bare 4h DVR
                     // window with no show markers.
                     if (source.isLive) findViewById<View?>(androidx.media3.ui.R.id.exo_progress)?.visibility = View.GONE
                     setControllerVisibilityListener(
                         PlayerView.ControllerVisibilityListener { visibility ->
                             controlsVisible = visibility == View.VISIBLE
+                            if (!controlsVisible && !behindLive) post { requestFocus() }
                         },
                     )
                 }
@@ -338,6 +348,7 @@ private fun TvPlayerSurface(
                 if (source.isLive) it.findViewById<View?>(androidx.media3.ui.R.id.exo_progress)?.visibility = View.GONE
             },
             onRelease = {
+                playerView = null
                 it.player = null
                 it.setControllerVisibilityListener(null as PlayerView.ControllerVisibilityListener?)
             },
