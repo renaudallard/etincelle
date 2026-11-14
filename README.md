@@ -43,8 +43,9 @@ mémoire de l'appareil, pour qu'une brève coupure réseau n'interrompe pas la l
 catalogue (un abonnement peut être requis). Cliquer sur l'en-tête d'une rangée (par ex. *En direct à
 la TV*) ouvre la **catégorie complète en grille**, avec le nom de la chaîne sous chaque programme.
 Dans la **recherche**, **Tout voir** sur une rangée de résultats (chaînes, programmes) les affiche
-tous en grille. Un même programme proposé sur plusieurs chaînes n'y apparaît qu'une fois, et le
-nombre affiché en tête de rangée en tient compte.
+tous en grille. Un même programme proposé sur plusieurs chaînes n'y apparaît qu'une fois, de
+préférence sur une chaîne incluse dans votre abonnement, et le nombre affiché en tête de rangée en
+tient compte.
 L'onglet **Chaînes** ouvre la grille de **toutes les chaînes** (TNT, chaînes thématiques Molotov…)
 pour les parcourir directement ; ouvrir une chaîne propose son **direct** ainsi que ses **replays** et
 ses programmes **les plus vus**. Le **guide** se rafraîchit à chaque ouverture et au retour de l'application (son contenu se périme

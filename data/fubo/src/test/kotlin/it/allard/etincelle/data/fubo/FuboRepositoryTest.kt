@@ -334,14 +334,14 @@ class FuboRepositoryTest {
     }
 
     @Test
-    fun `search keeps one card per title and recounts the rail it shortened`() = runTest {
+    fun `search keeps one card per title, preferring an included copy, and recounts the rail`() = runTest {
         session.session = UserSession("AT", "RT", "u1", "p1")
-        fun card(id: String, title: String) =
-            """{"id":"$id","title":{"text":"$title"},"actions":{"on_click":[{"type":"navigation","endpoint":{"url":"program-details/program/$id"}}]}}"""
+        fun card(id: String, title: String, locked: Boolean = false) =
+            """{"id":"$id","title":{"text":"$title"},"is_locked":$locked,"actions":{"on_click":[{"type":"navigation","endpoint":{"url":"program-details/program/$id"}}]}}"""
         server.enqueue(
             MockResponse().setBody(
                 """{"content":{"sections":[
-                {"title":{"text":"Programmes (3)"},"component_type":"poster","components":[${card("a", "Show")},${card("b", "show ")},${card("c", "Other")}]},
+                {"title":{"text":"Programmes (3)"},"component_type":"poster","components":[${card("a", "Show", locked = true)},${card("c", "Other")},${card("b", "show ")}]},
                 {"title":{"text":"Chaînes (40)"},"component_type":"square","components":[${card("d", "Same")},${card("e", "Same")}]}
                 ]}}"""
             )
@@ -349,7 +349,8 @@ class FuboRepositoryTest {
 
         val page = repo.search("show")
 
-        assertEquals(listOf("a", "c"), page.rails[0].cards.map { it.id })
+        // The copy the subscription includes stands in for the locked one, where the first copy was.
+        assertEquals(listOf("b", "c"), page.rails[0].cards.map { it.id })
         assertEquals("Programmes (2)", page.rails[0].title)
         // A count above the cards received is a total the page does not hold: leave it.
         assertEquals("Chaînes (40)", page.rails[1].title)

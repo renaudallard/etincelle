@@ -285,11 +285,16 @@ class FuboRepository(
 
     override suspend fun search(query: String): ContentPage = withRefresh { api.search(query).toPage().groupByTitle() }
 
-    /** Search returns the same show several times (one per channel); keep one card per title. */
+    /**
+     * Search returns the same show several times (one per channel); keep one card per title, in the
+     * place of its first copy, preferring a copy the subscription includes.
+     */
     private fun ContentPage.groupByTitle(): ContentPage = copy(
         rails = rails.map { rail ->
-            val seen = HashSet<String>()
-            val cards = rail.cards.filter { card -> card.title?.trim()?.lowercase()?.let(seen::add) ?: true }
+            // An untitled card is keyed by its position, so it is never merged.
+            val cards = rail.cards.withIndex()
+                .groupBy { (i, card) -> card.title?.trim()?.lowercase() ?: i }
+                .values.map { copies -> (copies.firstOrNull { !it.value.isLocked } ?: copies.first()).value }
             rail.copy(title = rail.title?.let { recount(it, rail.cards.size, cards.size) }, cards = cards)
         },
     )
