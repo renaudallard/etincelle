@@ -4,8 +4,12 @@
 package it.allard.etincelle.core.cast
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import androidx.mediarouter.media.MediaRouteSelector
 import androidx.mediarouter.media.MediaRouter
+import com.google.android.gms.cast.CastDevice as PlayServicesCastDevice
 import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.CastSession
 import com.google.android.gms.cast.framework.SessionManagerListener
@@ -18,6 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** A reachable Cast device (a Chromecast / Cast-enabled TV). */
 data class CastDevice(val routeId: String, val name: String)
@@ -60,6 +65,13 @@ open class CastController(
 ) {
     private val mediaRouter = MediaRouter.getInstance(context.applicationContext)
     private val selector: MediaRouteSelector = castContext.mergedSelector ?: MediaRouteSelector.EMPTY
+    private val receiverAppId = CastReceiver.appId(context)
+    private val connectivity = context.applicationContext.getSystemService(ConnectivityManager::class.java)
+
+    // Chromecasts found by our own scan (see CastScanner), by device id, with the number of scans in
+    // a row that missed them. They are listed only when Play Services does not see them itself.
+    private class ScannedDevice(val device: DirectCastDevice, var missed: Int = 0)
+    private val scannedDevices = LinkedHashMap<String, ScannedDevice>()
 
     private val _state = MutableStateFlow(CastUiState())
     val state: StateFlow<CastUiState> = _state.asStateFlow()
@@ -203,10 +215,34 @@ open class CastController(
     }
 
     private fun refreshDevices() {
-        val devices = mediaRouter.routes
-            .filter { it.matchesSelector(selector) && !it.isDefault && !it.isBluetooth }
-            .map { CastDevice(it.id, it.name) }
-        _state.value = _state.value.copy(devices = devices)
+        val routes = mediaRouter.routes.filter { it.matchesSelector(selector) && !it.isDefault && !it.isBluetooth }
+        // A device Play Services sees is used through it; match by Cast device id, or by name in case
+        // the two ids differ.
+        val seenIds = routes.mapNotNull { PlayServicesCastDevice.getFromBundle(it.extras)?.deviceId }.toSet()
+        val seenNames = routes.map { it.name }.toSet()
+        val scanned = scannedDevices.values.map { it.device }
+            .filter { it.id !in seenIds && it.name !in seenNames }
+            .map { CastDevice(DIRECT_ROUTE_PREFIX + it.id, it.name) }
+        _state.value = _state.value.copy(devices = routes.map { CastDevice(it.id, it.name) } + scanned)
+    }
+
+    // Our own scan, run with each active scan pulse; folds the answers into [scannedDevices].
+    private suspend fun scanDirectly() {
+        val network = wifiNetwork() ?: return
+        val found = withContext(Dispatchers.IO) { CastScanner.scan(receiverAppId, network) }
+        val foundIds = found.map { it.id }.toSet()
+        for (entry in scannedDevices.values) if (entry.device.id !in foundIds) entry.missed++
+        scannedDevices.values.removeAll { it.missed >= MAX_MISSED_SCANS }
+        for (device in found) scannedDevices[device.id] = ScannedDevice(device)
+    }
+
+    // The Wi-Fi network, so the scan never goes out over mobile data or into a VPN. allNetworks is the
+    // only way to list the networks on API 23 to 30.
+    @Suppress("DEPRECATION")
+    private fun wifiNetwork(): Network? = connectivity?.allNetworks?.firstOrNull { network ->
+        val caps = connectivity.getNetworkCapabilities(network)
+        caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) &&
+            !caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
     }
 
     // While the app is foregrounded and not casting, a Chromecast that briefly dropped off WiFi is
@@ -223,8 +259,11 @@ open class CastController(
     }
 
     // One short active scan, then back to passive discovery, refreshing the device list afterwards.
+    // Our own scan runs alongside, for the Chromecasts Play Services cannot see.
     private suspend fun activeScanPulse() {
         mediaRouter.addCallback(selector, routerCallback, MediaRouter.CALLBACK_FLAG_PERFORM_ACTIVE_SCAN)
+        scanDirectly()
+        refreshDevices()
         delay(ACTIVE_SCAN_MS)
         mediaRouter.addCallback(selector, routerCallback, MediaRouter.CALLBACK_FLAG_REQUEST_DISCOVERY)
         refreshDevices()
@@ -234,6 +273,10 @@ open class CastController(
         // Idle re-discovery cadence: a short active scan every interval brings a dropped Chromecast
         // back within roughly fifteen seconds, without scanning continuously.
         const val REDISCOVERY_INTERVAL_MS = 12_000L
+        // A Chromecast our own scan misses this many times in a row is dropped from the list.
+        const val MAX_MISSED_SCANS = 3
+        // Route id prefix of a Chromecast found by our own scan rather than by Play Services.
+        const val DIRECT_ROUTE_PREFIX = "direct:"
         const val ACTIVE_SCAN_MS = 4_000L
     }
 }

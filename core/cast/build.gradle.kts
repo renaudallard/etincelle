@@ -31,4 +31,5 @@ dependencies {
     api(libs.play.services.cast.framework)
     api(libs.androidx.mediarouter)
     implementation(libs.kotlinx.coroutines.android)
+    testImplementation(libs.junit)
 }
