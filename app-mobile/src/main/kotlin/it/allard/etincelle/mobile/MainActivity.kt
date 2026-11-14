@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.AlertDialog
@@ -65,6 +64,7 @@ import androidx.media3.ui.PlayerView
 import it.allard.etincelle.core.cast.CastPlayerController
 import it.allard.etincelle.core.cast.CastUiState
 import it.allard.etincelle.core.designsystem.LiveProgramBar
+import it.allard.etincelle.core.designsystem.LiveProgramBarBottomOffset
 import it.allard.etincelle.core.designsystem.R as DesignR
 import it.allard.etincelle.core.designsystem.ReturnToLiveButton
 import it.allard.etincelle.core.designsystem.theme.EtincelleTheme
@@ -684,7 +684,7 @@ private fun PlayerSurface(
                     }
                     // The live programme bar replaces the default time bar (which spans the bare 4h
                     // DVR window with no show markers), so hide the built-in one for the local player.
-                    if (showBar) findViewById<View?>(androidx.media3.ui.R.id.exo_progress)?.visibility = View.GONE
+                    LivePlayback.useProgramBar(this, showBar)
                     setControllerVisibilityListener(
                         PlayerView.ControllerVisibilityListener { visibility ->
                             controlsVisible = visibility == View.VISIBLE
@@ -694,7 +694,7 @@ private fun PlayerSurface(
             },
             update = {
                 it.player = currentPlayer
-                if (showBar) it.findViewById<View?>(androidx.media3.ui.R.id.exo_progress)?.visibility = View.GONE
+                LivePlayback.useProgramBar(it, showBar)
                 // The cast player never auto-shows the controller, so show it explicitly and keep it
                 // pinned (controllerShowTimeoutMs=0 / hideOnTouch=false) for the cast controller.
                 if (!secure) it.showController()
@@ -720,13 +720,16 @@ private fun PlayerSurface(
         }
         barGeometry?.let { bar ->
             if (controlsVisible) {
+                val pw = programWindow?.takeIf { bar.hasProgramBand }
                 LiveProgramBar(
                     playedFraction = bar.playedFraction,
                     liveFraction = bar.liveFraction,
                     seekFloorFraction = bar.seekFloorFraction,
                     onSeekToFraction = { LivePlayback.seekToFraction(currentPlayer, liveWindow, it, programWindow) },
-                    modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                        .padding(start = 16.dp, end = 16.dp, bottom = LiveProgramBarBottomOffset),
+                    startLabel = pw?.let { LivePlayback.clockLabel(it.startMs) },
+                    endLabel = pw?.let { LivePlayback.clockLabel(it.endMs) },
                 )
             }
         }

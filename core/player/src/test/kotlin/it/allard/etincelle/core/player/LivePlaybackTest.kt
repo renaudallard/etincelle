@@ -10,6 +10,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.TimeZone
 
 /** Covers the pure live-bar geometry: the bar is scaled to the current programme, not the DVR window. */
 class LivePlaybackTest {
@@ -176,5 +177,17 @@ class LivePlaybackTest {
             programWindow = oneHourShow,
         )
         assertEquals(2 * hour, target)
+    }
+
+    @Test
+    fun `clockLabel gives the local hour and minute`() {
+        val saved = TimeZone.getDefault()
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("Europe/Paris"))
+            // 2026-11-14T19:05:00Z is 20:05 in Paris (UTC+1 in November).
+            assertEquals("20:05", LivePlayback.clockLabel(1_794_683_100_000L))
+        } finally {
+            TimeZone.setDefault(saved)
+        }
     }
 }

@@ -3,10 +3,15 @@
 
 package it.allard.etincelle.core.player
 
+import android.view.View
 import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
+import androidx.media3.ui.PlayerView
 import it.allard.etincelle.core.model.ProgramWindow
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * Where the live seek bar's marks sit on a bar whose full width is the current programme:
@@ -169,6 +174,20 @@ object LivePlayback {
         }
         return target.coerceIn(0L, liveEdgeMs)
     }
+
+    /**
+     * Shows the controller's own time bar and position/duration text only when [programBar] is false.
+     * For live playback the LiveProgramBar replaces them: they span the bare 4h rewind window, so their
+     * times ("3:59:30 · 3:59:55") would contradict the programme-scaled bar.
+     */
+    fun useProgramBar(view: PlayerView, programBar: Boolean) {
+        val visibility = if (programBar) View.GONE else View.VISIBLE
+        view.findViewById<View?>(androidx.media3.ui.R.id.exo_progress)?.visibility = visibility
+        view.findViewById<View?>(androidx.media3.ui.R.id.exo_time)?.visibility = visibility
+    }
+
+    /** [epochMs] as a local wall-clock "HH:mm", for the programme's start and end on the live bar. */
+    fun clockLabel(epochMs: Long): String = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(epochMs))
 
     /** The live edge as wall-clock epoch ms, or null when the window carries no epoch anchor. Used to
      * tell when the live edge has crossed the current programme's end and the bar must re-scope. */

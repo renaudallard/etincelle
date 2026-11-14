@@ -15,7 +15,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
@@ -44,6 +43,7 @@ import androidx.media3.common.Timeline
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import it.allard.etincelle.core.designsystem.LiveProgramBar
+import it.allard.etincelle.core.designsystem.LiveProgramBarBottomOffset
 import it.allard.etincelle.core.designsystem.ReturnToLiveButton
 import it.allard.etincelle.core.designsystem.theme.EtincelleTheme
 import it.allard.etincelle.core.domain.DetailKind
@@ -335,7 +335,7 @@ private fun TvPlayerSurface(
                     playerView = this
                     // The programme bar replaces the default time bar, which spans the bare 4h DVR
                     // window with no show markers.
-                    if (source.isLive) findViewById<View?>(androidx.media3.ui.R.id.exo_progress)?.visibility = View.GONE
+                    LivePlayback.useProgramBar(this, source.isLive)
                     setControllerVisibilityListener(
                         PlayerView.ControllerVisibilityListener { visibility ->
                             controlsVisible = visibility == View.VISIBLE
@@ -344,9 +344,7 @@ private fun TvPlayerSurface(
                     )
                 }
             },
-            update = {
-                if (source.isLive) it.findViewById<View?>(androidx.media3.ui.R.id.exo_progress)?.visibility = View.GONE
-            },
+            update = { LivePlayback.useProgramBar(it, source.isLive) },
             onRelease = {
                 playerView = null
                 it.player = null
@@ -356,12 +354,15 @@ private fun TvPlayerSurface(
         )
         barGeometry?.let { bar ->
             if (controlsVisible) {
+                val pw = programWindow?.takeIf { bar.hasProgramBand }
                 LiveProgramBar(
                     playedFraction = bar.playedFraction,
                     liveFraction = bar.liveFraction,
                     seekFloorFraction = bar.seekFloorFraction,
-                    modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding()
-                        .padding(horizontal = 48.dp, vertical = 24.dp),
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                        .padding(start = 48.dp, end = 48.dp, bottom = LiveProgramBarBottomOffset),
+                    startLabel = pw?.let { LivePlayback.clockLabel(it.startMs) },
+                    endLabel = pw?.let { LivePlayback.clockLabel(it.endMs) },
                 )
             }
         }

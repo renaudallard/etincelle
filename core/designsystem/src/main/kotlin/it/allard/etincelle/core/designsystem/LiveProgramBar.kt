@@ -6,13 +6,18 @@ package it.allard.etincelle.core.designsystem
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -30,6 +35,13 @@ private val LiveTick = Color(0xFFE53935) // the live edge, echoing the back-to-l
 private val Thumb = Color(0xFFFFFFFF)
 
 /**
+ * The bottom padding that puts a LiveProgramBar where the player controller draws its own time bar:
+ * above the controller's 60dp bottom row (time and settings), centred in the 48dp band media3 keeps
+ * 52dp up for it. Measured in the player view, which media3 lays out without system bar insets.
+ */
+val LiveProgramBarBottomOffset = 62.dp
+
+/**
  * A live seek bar scaled to the current programme: the whole bar is the on-screen show, the watched
  * part is [Played] yellow, the stretch older than the rewind buffer is the distinct [Earlier] colour,
  * and a [LiveTick] marks the live edge part-way along (the not-yet-aired remainder is the tail past
@@ -37,7 +49,8 @@ private val Thumb = Color(0xFFFFFFFF)
  * LivePlayback.liveBarGeometry).
  *
  * [onSeekToFraction] makes the bar draggable (phone, touch); pass null for a position-only indicator
- * (TV, where the remote scrubs with the rewind/forward buttons).
+ * (TV, where the remote scrubs with the rewind/forward buttons). [startLabel]/[endLabel], when given,
+ * are drawn at either end of the bar: the programme's start and end times.
  */
 @Composable
 fun LiveProgramBar(
@@ -46,6 +59,8 @@ fun LiveProgramBar(
     seekFloorFraction: Float,
     modifier: Modifier = Modifier,
     onSeekToFraction: ((Float) -> Unit)? = null,
+    startLabel: String? = null,
+    endLabel: String? = null,
 ) {
     // While dragging, follow the finger locally and commit the seek on release, so the thumb tracks
     // smoothly instead of fighting the 1s position poll.
@@ -72,8 +87,16 @@ fun LiveProgramBar(
             }
     }
 
-    Canvas(modifier.fillMaxWidth().height(28.dp).then(gestures)) {
-        drawLiveBar(played, liveFraction, seekFloorFraction)
+    Row(
+        modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        startLabel?.let { Text(it, color = Thumb, style = MaterialTheme.typography.labelMedium) }
+        Canvas(Modifier.weight(1f).height(28.dp).then(gestures)) {
+            drawLiveBar(played, liveFraction, seekFloorFraction)
+        }
+        endLabel?.let { Text(it, color = Thumb, style = MaterialTheme.typography.labelMedium) }
     }
 }
 

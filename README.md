@@ -19,7 +19,8 @@ contenus directement sur l'appareil avec le **DRM Widevine** via AndroidX Media3
 
 Elle donne accès au **direct**, au **guide des programmes** (EPG), à la **recherche**, au
 **rattrapage** et à la **VOD**. Le **direct** se **rembobine** : la barre de progression du lecteur
-épouse le **programme en cours** (du début à la fin de sa diffusion), le bord du direct se situant en
+épouse le **programme en cours** (du début à la fin de sa diffusion, heures de début et de fin
+affichées à ses extrémités), le bord du direct se situant en
 cours de route et la portion pas encore diffusée formant la fin de la barre ; la partie trop ancienne
 pour être rembobinée y est tracée dans une couleur distincte, et un bouton **Revenir au direct**
 apparaît dès que l'on s'éloigne du bord pour y ramener d'un appui. Cliquer sur un programme ouvre d'abord sa **fiche détaillée**
