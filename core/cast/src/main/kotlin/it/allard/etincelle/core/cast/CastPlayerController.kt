@@ -627,6 +627,10 @@ class CastPlayerController(
     }
 
     override fun onSessionDisconnected() {
+        // "No Play Services session" says nothing about a direct cast, which ends through its own path
+        // (that clears directSession first). Without this, coming back to the foreground, where start()
+        // reports no Play Services session, would wipe the state of a direct cast still playing.
+        if (directConnected) return
         // Capture the in-flight transfer target name before super clears it, so the bar can keep
         // animating the connect toward the incoming device across the hand-off gap.
         val transferTargetName = state.value.connectingDeviceName
