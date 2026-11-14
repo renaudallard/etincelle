@@ -45,6 +45,9 @@ private const val PROGRESS_MIN_MS = 10_000L
 // the genre-grouped recordings page.
 private const val RECORDINGS_PAGE_URL = "etincelle:recordings?selectedTab=recordings"
 
+// The count closing a search result rail's title, as in "Programmes (8)".
+private val RAIL_COUNT = Regex("""\((\d+)\)\s*$""")
+
 /** Fubo implementation of auth + content + playback, with persisted sessions and token refresh. */
 class FuboRepository(
     private val api: FuboApi,
@@ -286,9 +289,18 @@ class FuboRepository(
     private fun ContentPage.groupByTitle(): ContentPage = copy(
         rails = rails.map { rail ->
             val seen = HashSet<String>()
-            rail.copy(cards = rail.cards.filter { card -> card.title?.trim()?.lowercase()?.let(seen::add) ?: true })
+            val cards = rail.cards.filter { card -> card.title?.trim()?.lowercase()?.let(seen::add) ?: true }
+            rail.copy(title = rail.title?.let { recount(it, rail.cards.size, cards.size) }, cards = cards)
         },
     )
+
+    // A result rail is titled with its count ("Programmes (8)"): follow the cards kept. A count that
+    // is not the number of cards received (a larger total) is left as it is.
+    private fun recount(title: String, received: Int, kept: Int): String {
+        val count = RAIL_COUNT.find(title)?.groups?.get(1) ?: return title
+        if (count.value.toIntOrNull() != received) return title
+        return title.replaceRange(count.range, kept.toString())
+    }
 
     override suspend fun fetchProgramDetail(id: String, kind: DetailKind): ProgramDetail = withRefresh {
         var episodes = emptyList<ContentCard>()
