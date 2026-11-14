@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger
 /**
  * A Cast session with a Chromecast found by [CastScanner], driven over our own [CastChannel] instead of
  * Play Services: it starts (or joins) the receiver app [appId] and talks to it on the media namespace.
- * [onMediaStatus] and [onEnded] are called on the main thread.
+ * [onMediaStatus] and [onEnded] are called on the main thread, [onEnded] only once [start] has returned.
  */
 internal class DirectCastSession(
     val device: DirectCastDevice,
@@ -59,6 +59,10 @@ internal class DirectCastSession(
     @Volatile
     private var ended = false
 
+    // start() has returned: from then on the end of the session is reported through onEnded.
+    @Volatile
+    private var started = false
+
     /** The receiver's volume (0..1) and mute, as last reported. */
     var volumeLevel = 1.0
         private set
@@ -85,16 +89,25 @@ internal class DirectCastSession(
         // first answers a launch with a status that does not list the app yet, so wait for one that does.
         val app = withTimeout(LAUNCH_TIMEOUT_MS) {
             requestReceiver(JSONObject().put("type", "GET_STATUS"))
-            runningApp(receiverStatus.filterNotNull().first()) ?: run {
+            runningApp(nextReceiverStatus { true }) ?: run {
                 if (joinOnly) throw IOException("the receiver is not running")
                 requestReceiver(JSONObject().put("type", "LAUNCH").put("appId", appId))
-                receiverStatus.filterNotNull().first { runningApp(it) != null || it.has(LAUNCH_ERROR_KEY) }
+                nextReceiverStatus { runningApp(it) != null || it.has(LAUNCH_ERROR_KEY) }
                     .let { runningApp(it) ?: throw IOException("the receiver did not start") }
             }
         }
         transportId = app.getString("transportId")
         appSessionId = app.optString("sessionId")
         ch.send(CastChannel.NS_CONNECTION, """{"type":"CONNECT"}""", source = senderId, destination = app.getString("transportId"))
+        if (ended) throw IOException("connection lost")
+        started = true
+    }
+
+    // The first receiver status matching [accept]; throws once the connection is lost (see end()).
+    private suspend fun nextReceiverStatus(accept: (JSONObject) -> Boolean): JSONObject {
+        val status = receiverStatus.filterNotNull().first { ended || accept(it) }
+        if (ended) throw IOException("connection lost")
+        return status
     }
 
     /** Loads [media] (see [CastLoadData.mediaJson]); [currentTime] in seconds, or null for the default. */
@@ -214,7 +227,8 @@ internal class DirectCastSession(
         ended = true
         channel?.close()
         failPending(error ?: IOException("session ended"))
-        onEnded(error)
+        // Still starting: wake start() up so it fails, its caller handles that.
+        if (started) onEnded(error) else receiverStatus.value = JSONObject()
         scope.cancel()
     }
 
