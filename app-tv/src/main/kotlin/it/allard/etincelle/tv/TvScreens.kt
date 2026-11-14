@@ -26,7 +26,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -281,7 +281,7 @@ fun TvBrowseScreen(
         }
         Spacer(Modifier.height(16.dp))
         if (state.tab == Tab.SEARCH) {
-            TvSearchContent(state, onSearch, onCardClick, onSeeAll, returnFocus, searchField)
+            TvSearchContent(state, onSearch, onCardClick, onSeeAll, returnFocus, searchField, railsFocus, gridColumns)
         } else {
             Text(state.current?.title ?: state.tab.label, style = MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(12.dp))
@@ -315,6 +315,8 @@ private fun TvSearchContent(
     onSeeAll: (ContentRail) -> Unit,
     returnFocus: ReturnFocus,
     field: FocusRequester,
+    gridFocus: FocusRequester,
+    gridColumns: Int,
 ) {
     // A TextFieldValue so the remote can tell when the cursor is at the end of the text (see below).
     var query by remember { mutableStateOf(TextFieldValue("")) }
@@ -359,12 +361,22 @@ private fun TvSearchContent(
             TvButton(onClick = { onSubmit(query.text) }, enabled = query.text.isNotBlank()) { Text("Rechercher") }
         }
         Spacer(Modifier.height(16.dp))
+        val page = state.current
+        // A rail opened with "Tout voir" lists all its results in a grid, under its own title.
+        if (page?.isGrid == true) {
+            page.title?.let { Text(it, style = MaterialTheme.typography.headlineMedium) }
+            Spacer(Modifier.height(12.dp))
+        }
         Box(Modifier.fillMaxSize()) {
-            LazyColumn(
-                contentPadding = PaddingValues(bottom = 48.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp),
-            ) {
-                items(state.current?.rails.orEmpty(), key = { it.id }) { rail -> TvRail(rail, onCardClick, onSeeAll, returnFocus = returnFocus) }
+            if (page?.isGrid == true) {
+                TvGridContent(page.rails, onCardClick, gridFocus, gridColumns, returnFocus)
+            } else {
+                LazyColumn(
+                    contentPadding = PaddingValues(bottom = 48.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp),
+                ) {
+                    items(page?.rails.orEmpty(), key = { it.id }) { rail -> TvRail(rail, onCardClick, onSeeAll, returnFocus = returnFocus) }
+                }
             }
             if (state.busy) CircularProgressIndicator(Modifier.align(Alignment.Center))
             state.error?.let {
@@ -731,7 +743,8 @@ private fun TvGridContent(
                     Text(header, style = MaterialTheme.typography.titleMedium, color = Color.White)
                 }
             }
-            items(rail.cards, key = { "${rail.id}-${it.id}" }) { card ->
+            // Index in the key too: a card id can repeat within a rail, and a duplicate key crashes the grid.
+            itemsIndexed(rail.cards, key = { i, c -> "${rail.id}-${c.id}#$i" }) { _, card ->
                 val key = "${rail.id}|${card.id}"
                 TvCard(card, { returnFocus.save(key); onCardClick(it) }, returnFocus.target(key))
             }

@@ -42,6 +42,8 @@ mémoire de l'appareil, pour qu'une brève coupure réseau n'interrompe pas la l
 **applications des diffuseurs** (france.tv, MyTF1, M6+…) : ouvrez l'une d'elles pour parcourir son
 catalogue (un abonnement peut être requis). Cliquer sur l'en-tête d'une rangée (par ex. *En direct à
 la TV*) ouvre la **catégorie complète en grille**, avec le nom de la chaîne sous chaque programme.
+Dans la **recherche**, **Tout voir** sur une rangée de résultats (chaînes, programmes) les affiche
+tous en grille.
 L'onglet **Chaînes** ouvre la grille de **toutes les chaînes** (TNT, chaînes thématiques Molotov…)
 pour les parcourir directement ; ouvrir une chaîne propose son **direct** ainsi que ses **replays** et
 ses programmes **les plus vus**. Le **guide** se rafraîchit à chaque ouverture et au retour de l'application (son contenu se périme

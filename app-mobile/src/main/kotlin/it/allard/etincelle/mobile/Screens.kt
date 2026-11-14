@@ -534,6 +534,9 @@ fun SearchScreen(
     onSeeAll: (ContentRail) -> Unit,
     refreshing: Boolean = false,
     onRefresh: () -> Unit = {},
+    isGrid: Boolean = false,
+    columns: Int = LocalPrefs.DEFAULT_GRID_COLUMNS,
+    pageTitle: String? = null,
     modifier: Modifier = Modifier,
 ) {
     var query by remember { mutableStateOf("") }
@@ -547,16 +550,31 @@ fun SearchScreen(
             keyboardActions = KeyboardActions(onSearch = { onSubmit(query) }),
             modifier = Modifier.fillMaxWidth().padding(16.dp),
         )
-        PageContent(
-            rails = rails,
-            busy = busy,
-            error = error,
-            onCardClick = onCardClick,
-            onSeeAll = onSeeAll,
-            refreshing = refreshing,
-            onRefresh = onRefresh,
-            modifier = Modifier.weight(1f),
-        )
+        // A rail opened with "Tout voir" lists all its results in a grid, as elsewhere.
+        if (isGrid) {
+            GridContent(
+                rails = rails,
+                busy = busy,
+                error = error,
+                onCardClick = onCardClick,
+                refreshing = refreshing,
+                onRefresh = onRefresh,
+                columns = columns,
+                pageTitle = pageTitle,
+                modifier = Modifier.weight(1f),
+            )
+        } else {
+            PageContent(
+                rails = rails,
+                busy = busy,
+                error = error,
+                onCardClick = onCardClick,
+                onSeeAll = onSeeAll,
+                refreshing = refreshing,
+                onRefresh = onRefresh,
+                modifier = Modifier.weight(1f),
+            )
+        }
     }
 }
 

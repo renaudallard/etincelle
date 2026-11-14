@@ -560,6 +560,9 @@ private fun AppRoot(
                                         onSeeAll = vm::onRailSeeAll,
                                         refreshing = state.refreshing,
                                         onRefresh = vm::refreshCurrent,
+                                        isGrid = state.current?.isGrid == true,
+                                        columns = gridColumns,
+                                        pageTitle = state.current?.title,
                                         modifier = modifier,
                                     )
                                 } else if (state.current?.isGrid == true) {
