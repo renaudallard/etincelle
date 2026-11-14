@@ -71,6 +71,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
@@ -555,6 +556,7 @@ fun SearchScreen(
     modifier: Modifier = Modifier,
 ) {
     var query by remember { mutableStateOf("") }
+    val keyboard = LocalSoftwareKeyboardController.current
     Column(modifier.fillMaxSize()) {
         OutlinedTextField(
             value = query,
@@ -562,7 +564,11 @@ fun SearchScreen(
             label = { Text("Rechercher une chaîne, un film, une série…") },
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { onSubmit(query) }),
+            // The keyboard would hide the results: close it once the search is sent.
+            keyboardActions = KeyboardActions(onSearch = {
+                keyboard?.hide()
+                onSubmit(query)
+            }),
             modifier = Modifier.fillMaxWidth().padding(16.dp),
         )
         // A rail opened with "Tout voir" lists all its results in a grid, as elsewhere.
