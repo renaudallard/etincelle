@@ -130,18 +130,24 @@ A media3 `SimpleBasePlayer` (available in 1.7.1) backed by the channel:
 
 ## 4. Integration
 
-- `CastPlayerController` gets the direct player as a second remote player next to `castPlayer`.
-  Its hand-off logic (swap, deferred stop, re-resolve, liveness watchdog, recovery, transfer) works
-  on `Player` and is reused as is.
-- The Play Services session callbacks become calls on a small `RemoteSession` interface (session id,
-  device name, volume, mute, end), implemented once over `CastSession` and once over the direct
-  channel. The existing `onSessionConnected`, `onSessionDisconnected` and volume code then serve
-  both paths.
-- `CastUiState` and the UI do not change: the device list, cast bar, full-screen cast controls,
-  connect animation and volume overlay behave the same on both paths.
-- Background: the channel lives in the app process. Going to the background leaves the receiver
-  playing (a CAF receiver keeps playing when its sender leaves). On return, the app reconnects to
-  the same device and joins the running session (step 2 above), as Play Services does today.
+As built (step 4), slightly simpler than first planned:
+
+- The direct path has its own small branches in `CastPlayerController` instead of a `RemoteSession`
+  interface over both paths, so the Play Services cast code is left exactly as it was.
+- `DirectCastPlayer` is the current player during a direct cast, so the cast bar, the full-screen cast
+  controls, the connect animation and the volume overlay behave as on the Play Services path.
+- Volume keys: while a direct cast is up they drive the receiver volume (SET_VOLUME). A Chromecast
+  reporting `fixed` volume still applies the level in software (checked on jardin).
+- Switching device to or from a direct cast goes through the phone: playback comes back to it where
+  the TV was ("Cet appareil"), then it is cast to the new device, which picks up from there. A Play
+  Services cast ends asynchronously, so the direct connect waits for playback to be back on the phone.
+- Recovery: the receiver handles its own errors (it reloads its cached request, reported as IDLE
+  INTERRUPTED), so, as on the Play Services path, a stall of 30 s or a reported error makes the phone
+  resolve a fresh stream and load it again, within the same retry budget.
+- A dropped connection (an I/O error, not a stop on the TV) is rejoined: reconnect to the same device
+  and join the receiver still running, at 1, 3 and 6 s, then give up. Returning to the foreground no
+  longer clears the state of a direct cast. Back on the root screen only backgrounds the app (Android
+  12 and later), so the session survives it; a killed process does not (not a goal).
 
 ## 5. Security
 
