@@ -254,9 +254,10 @@ class CastPlayerController(
      */
     override fun connectTo(routeId: String): Boolean {
         // A switch to or from a direct cast goes through the phone: playback comes back to it where the
-        // TV was, then it is cast to the new device as usual, which picks up from there.
+        // TV was, then it is cast to the new device as usual, which picks up from there. A direct cast
+        // still connecting is given up the same way.
         val toDirect = routeId.startsWith(DIRECT_ROUTE_PREFIX)
-        if (directConnected) returnToThisDevice()
+        if (directSession != null) returnToThisDevice()
         if (toDirect && super.isCastSessionActive) {
             // The Play Services cast ends asynchronously; connect once it is back on the phone.
             pendingDirectRoute = routeId
