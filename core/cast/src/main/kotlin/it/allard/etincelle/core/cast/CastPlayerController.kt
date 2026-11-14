@@ -44,6 +44,7 @@ private const val TRANSFER_TIMEOUT_MS = 8000L
 private const val CONNECT_TIMEOUT_MS = 30_000L
 
 private const val PLAYBACK_ERROR_MESSAGE = "Lecture impossible, réessayez"
+private const val CONNECT_ERROR_MESSAGE = "Connexion au Chromecast impossible"
 
 // Recover a failing cast by re-resolving fresh credentials (the receiver cannot refresh its own
 // short-lived stream/DRM tokens, so reloading them on the receiver loops forever). Retry up to this
@@ -87,11 +88,16 @@ class CastPlayerController(
     private val reResolve: (suspend (PlaybackSource) -> PlaybackSource?)? = null,
     private val onError: ((String) -> Unit)? = null,
     private val onPlaybackStopped: (() -> Unit)? = null,
-    sessionProvider: () -> UserSession? = { null },
+    private val sessionProvider: () -> UserSession? = { null },
 ) : CastController(context, castContext) {
+
+    private val appContext = context.applicationContext
 
     private val castPlayer = CastPlayer(castContext, FuboCastMediaItemConverter(context, sessionProvider))
     private val scope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
+
+    // A session with a Chromecast Play Services does not see, driven over our own connection.
+    private var directSession: DirectCastSession? = null
 
     // Scratch window for measuring how far the local player is behind the live edge at cast-out.
     private val liveWindow = Timeline.Window()
@@ -210,6 +216,12 @@ class CastPlayerController(
         castRetryCount = 0
         transferring = false
         transferFallbackJob?.cancel()
+        val direct = directSession
+        if (direct != null && state.value.isCasting) {
+            currentItem = item
+            scope.launch { loadDirect(direct, item, startPositionMs, resolve = false) }
+            return
+        }
         loadOn(_currentPlayer.value, item, startPositionMs)
     }
 
@@ -219,6 +231,7 @@ class CastPlayerController(
      * session's end does not bounce playback back to the phone.
      */
     override fun connectTo(routeId: String): Boolean {
+        if (routeId.startsWith(DIRECT_ROUTE_PREFIX)) return connectDirect(routeId)
         val willTransfer = _currentPlayer.value === castPlayer && castContext.sessionManager.currentCastSession != null
         val position = if (willTransfer) castPlayer.currentPosition else 0L
         val playWhenReady = if (willTransfer) castPlayer.playWhenReady else true
@@ -239,6 +252,97 @@ class CastPlayerController(
             transferring = true
         }
         return selected
+    }
+
+    // Connect to a Chromecast from our own scan, then cast what the phone is playing onto it.
+    private fun connectDirect(routeId: String): Boolean {
+        val device = scannedDevice(routeId) ?: return false
+        directSession?.stop()
+        markConnecting(device.name)
+        lateinit var session: DirectCastSession
+        session = DirectCastSession(
+            device, receiverAppId, wifiNetwork(),
+            onMediaStatus = { status -> if (directSession === session) onDirectMediaStatus(status) },
+            onEnded = { if (directSession === session) onDirectEnded() },
+        )
+        directSession = session
+        scope.launch {
+            val started = runCatching { session.start() }
+            if (directSession !== session) return@launch
+            if (started.isFailure) {
+                directSession = null
+                session.close()
+                clearConnecting()
+                onError?.invoke(CONNECT_ERROR_MESSAGE)
+                return@launch
+            }
+            markDirectConnected(device)
+            val item = currentItem ?: run { clearConnecting(); return@launch }
+            // Casting out a rewound live stream: resume the TV that far behind the edge.
+            val isLive = (item.localConfiguration?.tag as? PlaybackSource)?.isLive == true
+            val rewind = if (isLive) LivePlayback.castRewindOffsetMs(localPlayer, liveWindow) else 0L
+            val position = localPlayer.currentPosition
+            if (loadDirect(session, item, position, resolve = true, rewindMs = rewind)) runCatching { localPlayer.stop() }
+        }
+        return true
+    }
+
+    // Load [item] on the direct session, re-resolving a fresh stream first when [resolve]; true once
+    // the receiver has accepted it.
+    private suspend fun loadDirect(
+        session: DirectCastSession,
+        item: MediaItem,
+        positionMs: Long,
+        resolve: Boolean,
+        rewindMs: Long = (item.localConfiguration?.tag as? PlaybackSource)?.liveRewindOffsetMs ?: 0L,
+    ): Boolean {
+        val source = item.localConfiguration?.tag as? PlaybackSource ?: return false
+        val resolver = reResolve
+        val fresh = if (resolve && resolver != null) runCatching { resolver(source) }.getOrNull() else source
+        if (directSession !== session) return false
+        if (fresh == null) {
+            clearConnecting()
+            onError?.invoke(PLAYBACK_ERROR_MESSAGE)
+            return false
+        }
+        val freshItem = MediaItemFactory.create(fresh.copy(liveRewindOffsetMs = rewindMs))
+        currentItem = freshItem
+        val media = CastLoadData.media(appContext, freshItem, sessionProvider())
+        // A live stream asks for a position past the DVR window so the receiver clamps to the edge (it
+        // then applies live_rewind_sec); on demand resumes where the phone was.
+        val seconds = (if (fresh.isLive) LIVE_EDGE_POSITION_MS else positionMs.coerceAtLeast(0)) / 1000.0
+        val loaded = runCatching { session.load(CastLoadData.mediaJson(media), seconds) }.isSuccess
+        if (!loaded && directSession === session) {
+            clearConnecting()
+            onError?.invoke(PLAYBACK_ERROR_MESSAGE)
+        }
+        return loaded
+    }
+
+    private fun onDirectMediaStatus(status: org.json.JSONObject) {
+        when (status.optString("playerState")) {
+            "PLAYING" -> setReceiverPlaying(true)
+            "PAUSED" -> setReceiverPlaying(false)
+            "IDLE" -> if (status.optString("idleReason") == "ERROR") {
+                clearConnecting()
+                onError?.invoke(PLAYBACK_ERROR_MESSAGE)
+            }
+        }
+    }
+
+    // The direct session ended on its own (stopped on the TV, connection lost).
+    private fun onDirectEnded() {
+        directSession = null
+        onSessionDisconnected()
+    }
+
+    // End the direct session and stop the receiver; true when there was one.
+    private fun stopDirect(): Boolean {
+        val session = directSession ?: return false
+        directSession = null
+        session.stop()
+        onSessionDisconnected()
+        return true
     }
 
     private fun startConnectWatchdog() {
@@ -305,6 +409,11 @@ class CastPlayerController(
      * locally at the cast position, re-surfacing the player. Distinct from [disconnect], which stops.
      */
     fun returnToThisDevice() {
+        // Direct session: stop the TV and play the stream on the phone again.
+        if (stopDirect()) {
+            currentItem?.let { loadResolved(localPlayer, it, 0L, true) }
+            return
+        }
         // No live session to end (it already tore down): do nothing. Arming returnToPhoneOnEnd with no
         // onSessionEnded coming would leave it set to mis-fire a return-to-phone on a later cast.
         if (castContext.sessionManager.currentCastSession == null) return
@@ -316,6 +425,7 @@ class CastPlayerController(
     }
 
     override fun disconnect() {
+        if (stopDirect()) return
         // A plain disconnect (e.g. logout) stops casting without resuming on the phone; the session
         // end takes the quiet-stop path. Clear transfer/re-resolve so nothing ejects after teardown.
         returnToPhoneOnEnd = false
@@ -353,7 +463,7 @@ class CastPlayerController(
      */
     fun stopPlayback(): Pair<Long, Long>? {
         // Casting: leaving or switching the player keeps the TV stream running, nothing to save here.
-        if (_currentPlayer.value === castPlayer) return null
+        if (_currentPlayer.value === castPlayer || (directSession != null && state.value.isCasting)) return null
         // Nothing is loaded locally (e.g. a cast session was just stopped quietly): nothing to save.
         if (currentItem == null) return null
         reResolveJob?.cancel()
@@ -398,6 +508,8 @@ class CastPlayerController(
     }
 
     fun release() {
+        directSession?.close()
+        directSession = null
         clearDeferredStop()
         connectWatchdogJob?.cancel()
         localPlayer.removeListener(localErrorListener)

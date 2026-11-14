@@ -179,8 +179,13 @@ Estimated size: about 1,200 lines of Kotlin plus tests, mostly in `core:cast`.
 
 ## Risks and open points
 
-- Device authentication details (signature algorithms, which root certificates) are taken from
-  Chromium and must be checked against a real Chromecast early, in step 2.
+- Device authentication follows Open Screen's sender (`cast/sender/channel/cast_auth_util.cc`): the
+  device signs the nonce followed by its TLS certificate (RSA PKCS#1 v1.5, SHA-256 or SHA-1), its
+  chain must lead to the Cast Root CA or the Eureka Root CA, and its TLS certificate may live at
+  most 4 days. Checked on jardin (chain: device, Chromecast ICA 21 (ATV), Cast Root CA; TLS 1.3; a
+  2-day TLS certificate).
+- On a LAUNCH, newer firmware first sends LAUNCH_STATUS and a RECEIVER_STATUS without the app; the
+  session waits for the status that lists it. The app's transport id equals its session id.
 - Matching a direct device with its Play Services route by id needs checking on hardware.
 - The receiver's player time base for live streams decides how good the programme bar can be on the
   direct path.

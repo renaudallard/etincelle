@@ -65,7 +65,7 @@ open class CastController(
 ) {
     private val mediaRouter = MediaRouter.getInstance(context.applicationContext)
     private val selector: MediaRouteSelector = castContext.mergedSelector ?: MediaRouteSelector.EMPTY
-    private val receiverAppId = CastReceiver.appId(context)
+    protected val receiverAppId: String = CastReceiver.appId(context)
     private val connectivity = context.applicationContext.getSystemService(ConnectivityManager::class.java)
 
     // Chromecasts found by our own scan (see CastScanner), by device id, with the number of scans in
@@ -226,6 +226,15 @@ open class CastController(
         _state.value = _state.value.copy(devices = routes.map { CastDevice(it.id, it.name) } + scanned)
     }
 
+    /** The Chromecast our own scan found under [routeId] (see [DIRECT_ROUTE_PREFIX]), if any. */
+    protected fun scannedDevice(routeId: String): DirectCastDevice? =
+        routeId.takeIf { it.startsWith(DIRECT_ROUTE_PREFIX) }?.let { scannedDevices[it.removePrefix(DIRECT_ROUTE_PREFIX)]?.device }
+
+    /** A session with a Chromecast from our own scan is up (it does not go through Play Services). */
+    protected fun markDirectConnected(device: DirectCastDevice) {
+        _state.value = _state.value.copy(connectedDeviceName = device.name, connectedRouteId = DIRECT_ROUTE_PREFIX + device.id)
+    }
+
     // Our own scan, run with each active scan pulse; folds the answers into [scannedDevices].
     private suspend fun scanDirectly() {
         val network = wifiNetwork() ?: return
@@ -239,7 +248,7 @@ open class CastController(
     // The Wi-Fi network, so the scan never goes out over mobile data or into a VPN. allNetworks is the
     // only way to list the networks on API 23 to 30.
     @Suppress("DEPRECATION")
-    private fun wifiNetwork(): Network? = connectivity?.allNetworks?.firstOrNull { network ->
+    protected fun wifiNetwork(): Network? = connectivity?.allNetworks?.firstOrNull { network ->
         val caps = connectivity.getNetworkCapabilities(network)
         caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) &&
             !caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
@@ -269,7 +278,7 @@ open class CastController(
         refreshDevices()
     }
 
-    private companion object {
+    protected companion object {
         // Idle re-discovery cadence: a short active scan every interval brings a dropped Chromecast
         // back within roughly fifteen seconds, without scanning continuously.
         const val REDISCOVERY_INTERVAL_MS = 12_000L
