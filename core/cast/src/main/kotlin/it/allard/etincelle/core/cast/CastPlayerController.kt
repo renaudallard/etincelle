@@ -1179,6 +1179,8 @@ class CastPlayerController(
 
     private fun loadOn(player: Player, item: MediaItem, positionMs: Long) {
         currentItem = item
+        // A new item on the receiver: the last position it reported was the previous item's.
+        if (player === castPlayer) receiverPositionMs = 0L
         val isLive = (item.localConfiguration?.tag as? PlaybackSource)?.isLive == true
         // CastPlayer loads live DASH at the start of the receiver's DVR window (currentTime=0); ask
         // for a position well past the window so the receiver clamps to the live edge. ExoPlayer
