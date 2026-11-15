@@ -157,6 +157,10 @@ ouvrez etincelle, allez dans **Paramètres > Connecter une TV** (ou sur molotov.
 et saisissez le code : le téléviseur se connecte automatiquement. La connexion par email reste
 disponible en secours.
 
+Un compte protégé par la **validation en deux étapes** se connecte comme dans l'application
+officielle : après l'email et le mot de passe, etincelle demande le **code** envoyé par Molotov,
+avec **Renvoyer le code** s'il n'arrive pas.
+
 ## Installation
 
 Téléchargez l'APK signé pour votre appareil depuis la

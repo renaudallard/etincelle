@@ -415,6 +415,7 @@ private fun AppRoot(
     val favoriteOrder = state.favoriteOrder
     val profileScreen = state.profileScreen
     val profileEditor = state.profileEditor
+    val mfa = state.mfa
     CompositionLocalProvider(LocalFavoriteToggle provides vm::toggleFavorite) {
         Box(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize()) {
@@ -643,6 +644,11 @@ private fun AppRoot(
                                     }
                                 }
                             }
+                        }
+
+                        mfa != null -> {
+                            BackHandler { vm.cancelCode() }
+                            CodeScreen(mfa, state.busy, state.error, state.info, vm::verifyCode, vm::resendCode, vm::cancelCode)
                         }
 
                         else -> LoginScreen(state.busy, state.error, vm::login)

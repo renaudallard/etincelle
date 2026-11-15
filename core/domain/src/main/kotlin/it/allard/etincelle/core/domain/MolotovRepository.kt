@@ -5,6 +5,8 @@ package it.allard.etincelle.core.domain
 
 import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.FavoriteOrder
+import it.allard.etincelle.core.model.LoginResult
+import it.allard.etincelle.core.model.MfaChallenge
 import it.allard.etincelle.core.model.PairingCode
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.Profile
@@ -23,7 +25,14 @@ enum class DetailKind { PROGRAM, SERIES, CHANNEL }
  * depends only on this interface, so the backend (Fubo today) stays swappable.
  */
 interface MolotovRepository {
-    suspend fun login(email: String, password: String): UserSession
+    /** Signs in with a password; an account with two-factor login answers with a code to ask for. */
+    suspend fun login(email: String, password: String): LoginResult
+
+    /** Finishes a two-factor sign-in with the [code] the user received. */
+    suspend fun verifyCode(challenge: MfaChallenge, code: String): UserSession
+
+    /** Asks for a new code; the returned challenge replaces [challenge]. */
+    suspend fun resendCode(challenge: MfaChallenge): MfaChallenge
     suspend fun restoreSession(): Boolean
     suspend fun logout()
 

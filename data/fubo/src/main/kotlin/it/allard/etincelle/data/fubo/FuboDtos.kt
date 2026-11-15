@@ -5,6 +5,7 @@ package it.allard.etincelle.data.fubo
 
 import com.squareup.moshi.Json
 import it.allard.etincelle.core.model.Avatar
+import it.allard.etincelle.core.model.MfaChallenge
 import it.allard.etincelle.core.model.Profile
 import it.allard.etincelle.core.model.Profiles
 
@@ -26,8 +27,65 @@ data class SigninResponse(
     @Json(name = "refresh_token") val refreshToken: String?,
     @Json(name = "id_token") val idToken: String?,
     val payload: SigninResponse? = null,
+    // The v2 envelope's kind: tokens, or "MFA" when the account asks for a code, with [token] (the MFA
+    // token) in the payload.
+    val type: String? = null,
+    val token: String? = null,
 ) {
     val tokens: SigninResponse get() = payload ?: this
+
+    /** The MFA token when the backend asks for a code instead of signing in, else null. */
+    val mfaToken: String? get() = payload?.token?.takeIf { type.equals("MFA", ignoreCase = true) && it.isNotBlank() }
+}
+
+// --- Two-factor sign-in code page (/papi/v1/signin/mfa, template "mfa") ---
+// Labels are texts ({"text": …}) in the page API, read leniently in case a plain string comes instead.
+
+data class MfaPageResponse(val content: MfaContentDto?)
+data class MfaContentDto(
+    val metadata: MfaMetadataDto?,
+    val form: MfaFormDto?,
+    @Json(name = "resend_code_label") val resendCodeLabel: Any?,
+    @Json(name = "resend_code_button") val resendCodeButton: MfaButtonDto?,
+)
+data class MfaMetadataDto(val title: Any?, val subtitle: Any?, val description: Any?)
+data class MfaFormDto(val inputs: List<MfaInputDto>?, @Json(name = "submit_button") val submitButton: MfaButtonDto?)
+data class MfaInputDto(val name: String?, val label: Any?, val placeholder: Any?, val length: Int?)
+data class MfaButtonDto(val text: Any?, val actions: MfaActionsDto?)
+data class MfaActionsDto(@Json(name = "on_click") val onClick: List<MfaActionDto>?)
+data class MfaActionDto(val type: String?, val template: String?, val endpoint: EndpointDto?)
+
+private fun textOf(value: Any?): String? = when (value) {
+    is String -> value
+    is Map<*, *> -> value["text"] as? String
+    else -> null
+}?.takeIf { it.isNotBlank() }
+
+private fun MfaButtonDto.endpoint(template: String): EndpointDto? =
+    actions?.onClick.orEmpty().firstOrNull { it.template == template }?.endpoint
+
+/** The code challenge for [token] from its code page, or null when the page cannot verify a code. */
+fun MfaPageResponse.toChallenge(token: String): MfaChallenge? {
+    val c = content ?: return null
+    val input = c.form?.inputs.orEmpty().firstOrNull { !it.name.isNullOrBlank() } ?: return null
+    val inputName = input.name ?: return null
+    val submit = c.form?.submitButton ?: return null
+    val verify = submit.endpoint("mfa-verify") ?: return null
+    val resend = c.resendCodeButton?.endpoint("resend-code")?.url
+    val meta = c.metadata
+    return MfaChallenge(
+        token = token,
+        title = textOf(meta?.title) ?: "Validation en deux étapes",
+        message = listOfNotNull(textOf(meta?.subtitle), textOf(meta?.description)).joinToString("\n").ifBlank { null },
+        inputLabel = textOf(input.label) ?: textOf(input.placeholder) ?: "Code",
+        inputName = inputName,
+        codeLength = input.length?.takeIf { it > 0 },
+        submitLabel = textOf(submit.text) ?: "Valider",
+        verifyUrl = verify.url ?: return null,
+        verifyPayload = verify.payload.orEmpty(),
+        resendLabel = resend?.let { textOf(c.resendCodeButton?.text) ?: textOf(c.resendCodeLabel) ?: "Renvoyer le code" },
+        resendUrl = resend,
+    )
 }
 
 // --- TV code/QR pairing (signin/code) ---

@@ -96,6 +96,7 @@ import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.expandable
 import it.allard.etincelle.core.model.FavoriteOrder
 import it.allard.etincelle.core.model.groupBySeason
+import it.allard.etincelle.core.model.MfaChallenge
 import it.allard.etincelle.core.model.Profile
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.RecordAction
@@ -228,6 +229,48 @@ private fun TvEmailLoginScreen(busy: Boolean, error: String?, onLogin: (String, 
         Spacer(Modifier.height(16.dp))
         if (busy) CircularProgressIndicator()
         if (error != null) Text(error, color = MaterialTheme.colorScheme.error)
+    }
+}
+
+/** Two-factor login with the remote: asks for the code the backend sent, with the code page's texts. */
+@Composable
+fun TvCodeScreen(
+    challenge: MfaChallenge,
+    busy: Boolean,
+    error: String?,
+    info: String?,
+    onVerify: (String) -> Unit,
+    onResend: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    var code by remember(challenge.verifyUrl) { mutableStateOf("") }
+    val field = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        runCatching { field.requestFocus() }
+    }
+    Column(Modifier.fillMaxSize().padding(OVERSCAN), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(challenge.title, style = MaterialTheme.typography.displaySmall)
+        challenge.message?.let { Text(it, color = Color.White.copy(alpha = 0.8f), modifier = Modifier.padding(top = 12.dp)) }
+        Spacer(Modifier.height(24.dp))
+        // While the on-screen keyboard is up it takes the D-pad, so its action key sends the code.
+        OutlinedTextField(
+            code, { v -> code = challenge.codeLength?.let { v.take(it) } ?: v }, label = { Text(challenge.inputLabel) }, singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { if (!busy) onVerify(code) }),
+            modifier = Modifier.width(480.dp).focusRequester(field).dpadLeavesField(focusManager),
+        )
+        Spacer(Modifier.height(20.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            TvButton(onClick = { onVerify(code) }, enabled = !busy && code.isNotBlank()) { Text(challenge.submitLabel) }
+            challenge.resendLabel?.let { TvButton(onClick = onResend, enabled = !busy, highlighted = false) { Text(it) } }
+            TvButton(onClick = onCancel, highlighted = false) { Text("Annuler") }
+        }
+        Spacer(Modifier.height(16.dp))
+        if (busy) CircularProgressIndicator()
+        if (error != null) Text(error, color = MaterialTheme.colorScheme.error)
+        if (info != null && error == null) Text(info, color = Color.White)
     }
 }
 

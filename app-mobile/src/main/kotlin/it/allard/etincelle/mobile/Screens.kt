@@ -95,6 +95,7 @@ import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.FavoriteOrder
 import it.allard.etincelle.core.model.expandable
 import it.allard.etincelle.core.model.groupBySeason
+import it.allard.etincelle.core.model.MfaChallenge
 import it.allard.etincelle.core.model.Profile
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.RecordAction
@@ -133,6 +134,51 @@ fun LoginScreen(busy: Boolean, error: String?, onLogin: (String, String) -> Unit
         Spacer(Modifier.height(16.dp))
         if (busy) CircularProgressIndicator()
         if (error != null) Text(error, color = MaterialTheme.colorScheme.error)
+    }
+}
+
+/** Two-factor login: asks for the code the backend sent, with the code page's own texts. */
+@Composable
+fun CodeScreen(
+    challenge: MfaChallenge,
+    busy: Boolean,
+    error: String?,
+    info: String?,
+    onVerify: (String) -> Unit,
+    onResend: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    var code by remember(challenge.verifyUrl) { mutableStateOf("") }
+    Column(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(challenge.title, style = MaterialTheme.typography.headlineSmall)
+        challenge.message?.let {
+            Spacer(Modifier.height(8.dp))
+            Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.height(24.dp))
+        OutlinedTextField(
+            code,
+            { v -> code = challenge.codeLength?.let { v.take(it) } ?: v },
+            label = { Text(challenge.inputLabel) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { if (!busy) onVerify(code) }),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(16.dp))
+        Button(onClick = { onVerify(code) }, enabled = !busy && code.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
+            Text(challenge.submitLabel)
+        }
+        challenge.resendLabel?.let { TextButton(onClick = onResend, enabled = !busy) { Text(it) } }
+        TextButton(onClick = onCancel) { Text("Annuler") }
+        Spacer(Modifier.height(16.dp))
+        if (busy) CircularProgressIndicator()
+        if (error != null) Text(error, color = MaterialTheme.colorScheme.error)
+        if (info != null && error == null) Text(info)
     }
 }
 

@@ -120,6 +120,7 @@ class MainActivity : ComponentActivity() {
                     val favoriteOrder = state.favoriteOrder
                     val profileScreen = state.profileScreen
                     val profileEditor = state.profileEditor
+                    val mfa = state.mfa
                     CompositionLocalProvider(LocalFavoriteToggle provides viewModel::toggleFavorite) {
                     Box(Modifier.fillMaxSize()) {
                     when {
@@ -205,6 +206,11 @@ class MainActivity : ComponentActivity() {
                                     onFavoriteOrder = viewModel::openFavoriteOrder,
                                 )
                             }
+                        }
+
+                        mfa != null -> {
+                            BackHandler { viewModel.cancelCode() }
+                            TvCodeScreen(mfa, state.busy, state.error, state.info, viewModel::verifyCode, viewModel::resendCode, viewModel::cancelCode)
                         }
 
                         else -> TvLoginScreen(

@@ -20,6 +20,22 @@ interface FuboApi {
     @PUT("v2/signin")
     suspend fun signin(@Body body: SigninRequest): SigninResponse
 
+    /** Two-factor sign-in: the page asking for the code, for the MFA token sign-in returned. */
+    @GET("papi/v1/signin/mfa")
+    suspend fun mfaPage(@Header("X-MFA-Token") token: String): MfaPageResponse
+
+    /** Two-factor sign-in: sends the code to the page's verify url; answers with the tokens. */
+    @PUT
+    suspend fun mfaVerify(
+        @Url url: String,
+        @Header("X-MFA-Token") token: String,
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+    ): SigninResponse
+
+    /** Two-factor sign-in: asks for a new code; answers with a new MFA token. */
+    @PUT
+    suspend fun mfaResend(@Url url: String, @Header("X-MFA-Token") token: String): SigninResponse
+
     /** TV pairing: generates a short pairing code (no auth) tied to [deviceId] (a fresh id per attempt
      * so each generated code is distinct; the poll must reuse the same id). */
     @GET("signin/code")

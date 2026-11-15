@@ -13,8 +13,9 @@ object EnvConfig {
     const val USER_AGENT = "MolotovTV/5.51.0 (Linux; U; ANDROID; fr-FR; etincelle)"
 
     /** `use_drm_v2_response` makes /vapi/asset include the drm_v2 (license url + headers) we use;
-     * `auto_play_up_next` makes an episode's page carry the slate that offers the next one. */
+     * `auto_play_up_next` makes an episode's page carry the slate that offers the next one;
+     * `mfa_v1` lets sign-in ask for a code (two-factor login), as the official app always allows. */
     const val SUPPORTED_FEATURES =
         "use_drm_v2_response,playback_template_v2,play_start_from_offset,load_channels_in_guide," +
-            "auto_play_up_next"
+            "auto_play_up_next,mfa_v1"
 }

@@ -13,6 +13,8 @@ import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.FavoriteOrder
+import it.allard.etincelle.core.model.LoginResult
+import it.allard.etincelle.core.model.MfaChallenge
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.Profile
 import it.allard.etincelle.core.model.Profiles
@@ -75,6 +77,8 @@ data class UiState(
     val settings: Boolean = false,
     // The favourite channels being reordered (the reorder screen is open), or null.
     val favoriteOrder: FavoriteOrder? = null,
+    // A two-factor sign-in waiting for its code (the code screen is shown), or null.
+    val mfa: MfaChallenge? = null,
     // The profiles screen (asking who is watching, or opened from the settings), or null.
     val profileScreen: ProfileScreen? = null,
     // A profile being created (profile null) or edited, over the profiles screen.
@@ -166,18 +170,55 @@ class MainViewModel(
     fun login(email: String, password: String) {
         _state.update { it.copy(busy = true, error = null) }
         viewModelScope.launch {
-            runCatching {
-                repo.login(email.trim(), password)
-                repo.loadHome()
-            }.onSuccess { page ->
-                _state.update { it.copy(busy = false, loggedIn = true, tab = Tab.HOME, backStack = listOf(page)) }
-                consumeDeepLink()
-                askWhoIsWatching()
-            }.onFailure { e ->
-                applyFailure(e, "Échec de connexion")
-            }
+            runCatching { repo.login(email.trim(), password) }
+                .onSuccess { result ->
+                    when (result) {
+                        is LoginResult.SignedIn -> enterHome()
+                        // Two-factor login: the code screen asks for the code the backend sent.
+                        is LoginResult.CodeRequired -> _state.update { it.copy(busy = false, mfa = result.challenge) }
+                    }
+                }
+                .onFailure { e -> applyFailure(e, "Échec de connexion") }
         }
     }
+
+    // Signed in: load the home, then follow a pending deep link and ask who is watching.
+    private suspend fun enterHome() {
+        runCatching { repo.loadHome() }
+            .onSuccess { page ->
+                _state.update { it.copy(busy = false, mfa = null, loggedIn = true, tab = Tab.HOME, backStack = listOf(page)) }
+                consumeDeepLink()
+                askWhoIsWatching()
+            }
+            .onFailure { e -> applyFailure(e, "Échec de connexion") }
+    }
+
+    /** Two-factor login: sends the [code] the user received. */
+    fun verifyCode(code: String) {
+        val challenge = _state.value.mfa ?: return
+        if (code.isBlank() || _state.value.busy) return
+        _state.update { it.copy(busy = true, error = null, info = null) }
+        viewModelScope.launch {
+            runCatching { repo.verifyCode(challenge, code) }
+                .onSuccess { enterHome() }
+                .onFailure { e -> applyFailure(e, "Code refusé") }
+        }
+    }
+
+    /** Two-factor login: asks the backend to send a new code. */
+    fun resendCode() {
+        val challenge = _state.value.mfa ?: return
+        if (_state.value.busy) return
+        _state.update { it.copy(busy = true, error = null, info = null) }
+        viewModelScope.launch {
+            runCatching { repo.resendCode(challenge) }
+                .onSuccess { next -> _state.update { it.copy(busy = false, mfa = next, info = "Nouveau code envoyé") } }
+                .onFailure { e -> applyFailure(e, "Échec de l'envoi du code") }
+        }
+    }
+
+    /** Leaves the code screen, back to the sign-in form. */
+    fun cancelCode() = _state.update { it.copy(mfa = null, busy = false, error = null, info = null) }
 
     private var pairingJob: Job? = null
     private var confirmJob: Job? = null

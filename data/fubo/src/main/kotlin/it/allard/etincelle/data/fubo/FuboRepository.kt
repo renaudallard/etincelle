@@ -13,6 +13,8 @@ import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.DrmSpec
 import it.allard.etincelle.core.model.FavoriteOrder
+import it.allard.etincelle.core.model.LoginResult
+import it.allard.etincelle.core.model.MfaChallenge
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.Profile
 import it.allard.etincelle.core.model.Profiles
@@ -91,8 +93,8 @@ class FuboRepository(
         }
     }
 
-    /** Signs in, loads the user/profile id, and persists the session. */
-    override suspend fun login(email: String, password: String): UserSession {
+    /** Signs in, loads the user/profile id, and persists the session; or asks for a code (two-factor). */
+    override suspend fun login(email: String, password: String): LoginResult {
         val response = try {
             api.signin(SigninRequest(email, password))
         } catch (e: HttpException) {
@@ -110,11 +112,42 @@ class FuboRepository(
         } catch (e: IOException) {
             throw AppError.Network("Pas de connexion, vérifiez votre réseau")
         }
+        response.mfaToken?.let { return LoginResult.CodeRequired(mfaChallenge(it)) }
         val tokens = response.tokens
         val accessToken = tokens.accessToken ?: throw AppError.Unknown(WRONG_CREDENTIALS)
         // The user/profile load runs after credentials are accepted, so its errors are not credential
         // failures: map them normally (a 403 here is Forbidden, a 401 an expired token).
+        return LoginResult.SignedIn(translateErrors { finishLogin(accessToken, tokens.refreshToken) })
+    }
+
+    // The code page for a two-factor sign-in; it names the code field and where to send the code.
+    private suspend fun mfaChallenge(token: String): MfaChallenge = mfaCall {
+        api.mfaPage(token).toChallenge(token) ?: throw AppError.Unknown(MFA_UNAVAILABLE)
+    }
+
+    override suspend fun verifyCode(challenge: MfaChallenge, code: String): UserSession {
+        @Suppress("UNCHECKED_CAST")
+        val body = coerceWholeNumbers(challenge.verifyPayload + (challenge.inputName to code.trim())) as Map<String, Any?>
+        val tokens = mfaCall { api.mfaVerify(challenge.verifyUrl, challenge.token, body) }.tokens
+        val accessToken = tokens.accessToken ?: throw AppError.Unknown(codeMessage(null))
         return translateErrors { finishLogin(accessToken, tokens.refreshToken) }
+    }
+
+    override suspend fun resendCode(challenge: MfaChallenge): MfaChallenge {
+        val url = challenge.resendUrl ?: return challenge
+        val response = mfaCall { api.mfaResend(url, challenge.token) }
+        return challenge.copy(token = response.mfaToken ?: challenge.token)
+    }
+
+    // A two-factor call: a code the backend refuses gets its own message, and an expired MFA token
+    // means signing in again (Unauthorized with no session takes the app back to the sign-in screen).
+    private suspend fun <T> mfaCall(block: suspend () -> T): T = try {
+        block()
+    } catch (e: HttpException) {
+        val error = e.backendError()
+        throw if (error?.code == "MFA_TOKEN_EXPIRED") AppError.Unauthorized else AppError.Unknown(codeMessage(error))
+    } catch (e: IOException) {
+        throw AppError.Network("Pas de connexion, vérifiez votre réseau")
     }
 
     /** TV pairing: fetch a fresh code and its lifetime for the user to confirm on their phone. A fresh
@@ -626,10 +659,19 @@ private const val WRONG_CREDENTIALS = "Email ou mot de passe incorrect"
  * password.
  */
 private fun signinMessage(error: BackendError?): String = when (error?.code) {
-    "MFA_TOKEN_EXPIRED" -> "Validation en deux étapes requise, non prise en charge par l'application"
+    "MFA_TOKEN_EXPIRED" -> "Délai de validation dépassé, reconnectez-vous"
     "FORGOT_CREDENTIALS" -> "Réinitialisation de mot de passe en cours, terminez-la puis réessayez"
     "INVALID_USERNAME_PASSWORD" -> WRONG_CREDENTIALS
     else -> error?.message ?: WRONG_CREDENTIALS
+}
+
+private const val MFA_UNAVAILABLE = "Validation en deux étapes indisponible, réessayez"
+
+/** The message for a code the backend refused (two-factor sign-in). */
+private fun codeMessage(error: BackendError?): String = when (error?.code) {
+    "INVALID_CODE" -> "Code incorrect"
+    "EXPIRED_CODE" -> "Code expiré, demandez-en un nouveau"
+    else -> error?.message ?: "Code refusé"
 }
 
 /**

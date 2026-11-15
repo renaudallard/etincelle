@@ -8,6 +8,7 @@ import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import it.allard.etincelle.core.domain.DetailKind
 import it.allard.etincelle.core.model.AppError
 import it.allard.etincelle.core.model.DrmSpec
+import it.allard.etincelle.core.model.LoginResult
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.UserSession
 import it.allard.etincelle.core.network.ProfilePick
@@ -53,7 +54,7 @@ class FuboRepositoryTest {
         server.enqueue(MockResponse().setBody("""{"access_token":"AT","refresh_token":"RT","id_token":"IT"}"""))
         server.enqueue(MockResponse().setBody("""{"data":{"id":"u1","profiles":[{"id":"p1"}]}}"""))
 
-        val result = repo.login("e@x", "pw")
+        val result = (repo.login("e@x", "pw") as LoginResult.SignedIn).session
 
         assertEquals("u1", result.userId)
         assertEquals("p1", result.profileId)
@@ -70,7 +71,7 @@ class FuboRepositoryTest {
         )
         server.enqueue(MockResponse().setBody("""{"data":{"id":"u1","profiles":[{"id":"p1"}]}}"""))
 
-        val result = repo.login("e@x", "pw")
+        val result = (repo.login("e@x", "pw") as LoginResult.SignedIn).session
 
         val request = server.takeRequest()
         assertEquals("/v2/signin", request.path)
@@ -292,10 +293,7 @@ class FuboRepositoryTest {
                 .setBody("""{"error":{"code":"MFA_TOKEN_EXPIRED","message":"mfa"}}""")
         )
         val mfa = runCatching { repo.login("e@x", "pw") }.exceptionOrNull()
-        assertEquals(
-            "Validation en deux étapes requise, non prise en charge par l'application",
-            mfa?.message,
-        )
+        assertEquals("Délai de validation dépassé, reconnectez-vous", mfa?.message)
 
         // A wrong password keeps the curated message.
         server.enqueue(

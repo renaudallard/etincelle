@@ -67,6 +67,18 @@ Geo/market is derived server-side from the egress IP (no `x-client-country` need
   and the home greeting follow it. The official app asks "Qui regarde ?" again when the saved choice
   is over two days old or the list of profile ids changed.
 
+## Two-factor sign-in — FROM CODE ONLY (no account with it to validate)
+
+- The official app always sends `mfa_v1` in `x-supported-features`. `PUT /v2/signin` then answers
+  `{"type":"TOKEN","payload":{tokens}}` or `{"type":"MFA","payload":{"type","token":<JWT>}}`.
+- With an MFA token: `GET /papi/v1/signin/mfa` with header `X-MFA-Token` (live: 400 without it, 401
+  with a malformed one) gives template `mfa`: `metadata{title,subtitle,description}`,
+  `form{inputs[{name,label,length,...}], submit_button}` (its `form_submit` template `mfa-verify`),
+  `resend_code_label`, `resend_code_button` (template `resend-code`).
+- Verify: `PUT <verify url>` with `X-MFA-Token`, body = endpoint payload + `{<input name>: code}` →
+  flat tokens. Resend: `PUT <resend url>` with `X-MFA-Token`, no body → a new `MFA` envelope.
+- Errors: `INVALID_CODE`, `EXPIRED_CODE` (400), `MFA_TOKEN_EXPIRED` (401, sign in again).
+
 ## Content — server-driven "page API" (papi)
 
 Everything is a server-rendered page of sections/components; the client renders generically and
