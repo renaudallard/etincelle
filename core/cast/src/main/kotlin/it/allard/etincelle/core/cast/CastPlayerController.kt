@@ -256,7 +256,9 @@ class CastPlayerController(
             if (!failed && status != null && status.playerState != MediaStatus.PLAYER_STATE_IDLE) {
                 receiverPositionMs = client.approximateStreamPosition
             }
-            if (failed && !receiverFailed && _currentPlayer.value === castPlayer) onPlaybackError(castPlayer)
+            // Only for what this phone loaded: a session resumed after the app was killed holds nothing
+            // to reload, and a receiver that gave up earlier would only bring an error and a disconnect.
+            if (failed && !receiverFailed && _currentPlayer.value === castPlayer && currentItem != null) onPlaybackError(castPlayer)
             receiverFailed = failed
         }
     }
