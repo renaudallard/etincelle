@@ -28,6 +28,15 @@ class UpdateCheckerTest {
     }
 
     @Test
+    fun aCalendarVersionFollowsTheLastNumberedOne() {
+        // Releases moved from 0.1.x to year.month.release with 2026.11.0.
+        assertTrue(isNewer("v2026.11.0", "0.1.39"))
+        assertTrue(isNewer("2026.11.1", "2026.11.0"))
+        assertTrue(isNewer("2026.12.0", "2026.11.9"))
+        assertFalse(isNewer("0.1.39", "2026.11.0"))
+    }
+
+    @Test
     fun sameVersionIsNotNewer() {
         assertFalse(isNewer("0.0.7", "0.0.7"))
     }
