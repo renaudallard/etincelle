@@ -92,6 +92,7 @@ import it.allard.etincelle.core.model.groupBySeason
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.RecordAction
 import it.allard.etincelle.core.model.Recording
+import it.allard.etincelle.core.ui.UpdateInfo
 import kotlin.math.roundToInt
 
 @Composable
@@ -355,6 +356,30 @@ private fun GridCard(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
             )
         }
     }
+}
+
+/**
+ * Prompt offering the newer GitHub release. Installer downloads it, showing the progress, and hands it
+ * to the system installer; a download in progress is only stopped by Plus tard.
+ */
+@Composable
+fun UpdateDialog(info: UpdateInfo, progress: Int?, error: String?, onInstall: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = { if (progress == null) onDismiss() },
+        title = { Text("Mise à jour disponible") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("La version ${info.version} est disponible. Voulez-vous l'installer ?")
+                if (progress != null) {
+                    Text("Téléchargement… $progress %", style = MaterialTheme.typography.bodySmall)
+                    LinearProgressIndicator(progress = { progress / 100f }, modifier = Modifier.fillMaxWidth(), color = BrandYellow)
+                }
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+            }
+        },
+        confirmButton = { TextButton(onClick = onInstall, enabled = progress == null) { Text("Installer") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Plus tard") } },
+    )
 }
 
 /** Settings page: app-icon, hide-locked and Cast-receiver toggles, plus Déconnexion (with confirmation). */

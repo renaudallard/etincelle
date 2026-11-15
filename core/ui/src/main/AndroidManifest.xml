@@ -1,2 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Updates are downloaded from GitHub and handed to the system installer. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <application>
+        <receiver
+            android:name="it.allard.etincelle.core.ui.InstallResultReceiver"
+            android:exported="false" />
+    </application>
+</manifest>

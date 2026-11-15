@@ -9,8 +9,8 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
-/** A newer release found on GitHub, with the direct link to its APK asset. */
-data class UpdateInfo(val version: String, val apkUrl: String)
+/** A newer release found on GitHub: the direct link to its APK asset, with the size and sha256 GitHub published. */
+data class UpdateInfo(val version: String, val apkUrl: String, val size: Long, val sha256: String)
 
 /** Outcome of an explicit "check for updates", so the UI can tell up-to-date apart from a failure. */
 sealed interface UpdateCheck {
@@ -64,20 +64,27 @@ internal fun parseUpdate(body: String, currentVersion: String, variant: String):
     if (!isNewer(tag, currentVersion)) return null
     val json = root.optJSONArray("assets") ?: return null
     val assets = (0 until json.length()).mapNotNull { json.optJSONObject(it) }
-        .map { ReleaseAsset(it.optString("name"), it.optString("browser_download_url")) }
+        .map { ReleaseAsset(it.optString("name"), it.optString("browser_download_url"), it.optLong("size"), sha256Of(it.optString("digest"))) }
     val apk = apkFor(assets, variant) ?: return null
-    return UpdateInfo(tag.removePrefix("v").removePrefix("V"), apk.url)
+    return UpdateInfo(tag.removePrefix("v").removePrefix("V"), apk.url, apk.size, apk.sha256 ?: return null)
 }
 
-internal data class ReleaseAsset(val name: String, val url: String)
+internal data class ReleaseAsset(val name: String, val url: String, val size: Long, val sha256: String?)
+
+/** The hex sha256 from a GitHub asset digest ("sha256:<64 hex>"), or null for anything else. */
+internal fun sha256Of(digest: String): String? =
+    digest.removePrefix("sha256:").lowercase().takeIf { digest.startsWith("sha256:") && it.length == 64 && it.all { c -> c in "0123456789abcdef" } }
 
 /**
  * The APK of this [variant] among a release's assets. A release ships one APK per app, so taking any
- * APK would hand the TV the phone's. Release assets are served from github.com; anything else is
- * ignored.
+ * APK would hand the TV the phone's. Release assets are served from github.com, and the download is
+ * checked against the digest GitHub publishes; an asset without both is ignored.
  */
 internal fun apkFor(assets: List<ReleaseAsset>, variant: String): ReleaseAsset? =
-    assets.firstOrNull { it.name.endsWith("-$variant.apk", ignoreCase = true) && it.url.startsWith("https://github.com/") }
+    assets.firstOrNull {
+        it.name.endsWith("-$variant.apk", ignoreCase = true) && it.url.startsWith("https://github.com/") &&
+            it.size > 0 && it.sha256 != null
+    }
 
 /** True when [latest] is a strictly higher dotted version than [current]; a leading "v" is ignored. */
 internal fun isNewer(latest: String, current: String): Boolean {

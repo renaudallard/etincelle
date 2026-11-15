@@ -93,8 +93,11 @@ coupée, etincelle se reconnecte au Chromecast sans interrompre la lecture. Seul
 système de diffusion manque dans ce cas.
 
 etincelle **vérifie les mises à jour** sur GitHub à chaque démarrage, puis une fois par jour tant
-qu'elle reste ouverte, et propose de télécharger la dernière version lorsqu'une plus récente est
-disponible (l'APK téléphone sur le téléphone, l'APK TV sur la TV).
+qu'elle reste ouverte, et propose d'installer la dernière version lorsqu'une plus récente est
+disponible (l'APK téléphone sur le téléphone, l'APK TV sur la TV). **Installer** la télécharge,
+vérifie sa taille et son empreinte SHA-256 publiées par GitHub, puis la confie à l'installateur
+d'Android, qui demande confirmation. La première fois, etincelle ouvre la page des paramètres où
+l'autoriser à installer des applications ; appuyez ensuite à nouveau sur **Installer**.
 
 > ### ⚠️ Avertissement
 >

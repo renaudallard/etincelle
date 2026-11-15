@@ -5,7 +5,6 @@ package it.allard.etincelle.mobile
 
 import android.app.Activity
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
@@ -22,7 +21,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -82,6 +80,7 @@ import it.allard.etincelle.core.player.LiveBarGeometry
 import it.allard.etincelle.core.player.LivePlayback
 import it.allard.etincelle.core.player.MediaItemFactory
 import it.allard.etincelle.core.player.PlaybackProgress
+import it.allard.etincelle.core.ui.installUpdate
 import it.allard.etincelle.core.ui.MainViewModel
 import it.allard.etincelle.core.ui.MainViewModelFactory
 import it.allard.etincelle.core.ui.Tab
@@ -206,22 +205,10 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 state.update?.let { up ->
-                    AlertDialog(
-                        onDismissRequest = { viewModel.dismissUpdate() },
-                        title = { Text("Mise à jour disponible") },
-                        text = { Text("La version ${up.version} est disponible. Voulez-vous la télécharger ?") },
-                        confirmButton = {
-                            TextButton(onClick = {
-                                runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(up.apkUrl))) }
-                                    .onFailure {
-                                        Toast.makeText(this@MainActivity, "Impossible d'ouvrir le téléchargement", Toast.LENGTH_SHORT).show()
-                                    }
-                                viewModel.dismissUpdate()
-                            }) { Text("Télécharger") }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { viewModel.dismissUpdate() }) { Text("Plus tard") }
-                        },
+                    UpdateDialog(
+                        up, state.updateProgress, state.updateError,
+                        onInstall = { installUpdate(viewModel) },
+                        onDismiss = viewModel::dismissUpdate,
                     )
                 }
             }

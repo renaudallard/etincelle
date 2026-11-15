@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.File
 
 // TV pairing poll cadence: poll every few seconds, and regenerate the code a little before its
 // server expiry so a confirm racing the deadline is not lost.
@@ -67,6 +68,9 @@ data class UiState(
     val playing: PlaybackSource? = null,
     val settings: Boolean = false,
     val update: UpdateInfo? = null,
+    // The proposed update is downloading (percent), and the message when installing it failed.
+    val updateProgress: Int? = null,
+    val updateError: String? = null,
     // An explicit "check for updates" is running, and its result message when up-to-date or failed.
     val checkingUpdate: Boolean = false,
     val updateStatus: String? = null,
@@ -659,7 +663,47 @@ class MainViewModel(
         }
     }
 
-    fun dismissUpdate() = _state.update { it.copy(update = null) }
+    private var updateJob: Job? = null
+
+    /**
+     * Downloads the proposed update to [target] and hands it to [install] (the system installer, which
+     * asks the user to confirm). Progress and failures show in the update prompt.
+     */
+    fun installUpdate(target: File, install: suspend (File) -> Unit) {
+        val info = _state.value.update ?: return
+        if (updateJob?.isActive == true) return
+        _state.update { it.copy(updateProgress = 0, updateError = null) }
+        val dismissed = updateJob
+        updateJob = viewModelScope.launch {
+            // A dismissed download may still be winding down on the same file.
+            dismissed?.cancelAndJoin()
+            val error = try {
+                if (!downloadUpdate(info, target) { p -> _state.update { it.copy(updateProgress = p) } }) {
+                    "Téléchargement impossible, réessayez."
+                } else {
+                    install(target)
+                    null
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                "Installation impossible, réessayez."
+            } finally {
+                // The installer keeps its own copy.
+                target.delete()
+            }
+            _state.update {
+                if (error == null) it.copy(update = null, updateProgress = null) else it.copy(updateProgress = null, updateError = error)
+            }
+        }
+    }
+
+    fun setUpdateError(message: String) = _state.update { it.copy(updateError = message) }
+
+    fun dismissUpdate() {
+        updateJob?.cancel()
+        _state.update { it.copy(update = null, updateProgress = null, updateError = null) }
+    }
 
     /** Explicit "check for updates" from settings; reports newer / up-to-date / failed to the user. */
     fun checkForUpdateNow() {

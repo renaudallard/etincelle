@@ -5,7 +5,6 @@ package it.allard.etincelle.tv
 
 import android.app.Activity
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
@@ -58,6 +57,7 @@ import it.allard.etincelle.core.player.LiveBarGeometry
 import it.allard.etincelle.core.player.LivePlayback
 import it.allard.etincelle.core.player.MediaItemFactory
 import it.allard.etincelle.core.player.PlaybackProgress
+import it.allard.etincelle.core.ui.installUpdate
 import it.allard.etincelle.core.ui.MainViewModel
 import it.allard.etincelle.core.ui.MainViewModelFactory
 import it.allard.etincelle.core.ui.Tab
@@ -175,11 +175,8 @@ class MainActivity : ComponentActivity() {
                     }
                     state.update?.let { up ->
                         TvUpdateDialog(
-                            info = up,
-                            onDownload = {
-                                runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(up.apkUrl))) }
-                                viewModel.dismissUpdate()
-                            },
+                            up, state.updateProgress, state.updateError,
+                            onInstall = { installUpdate(viewModel) },
                             onDismiss = viewModel::dismissUpdate,
                         )
                     }

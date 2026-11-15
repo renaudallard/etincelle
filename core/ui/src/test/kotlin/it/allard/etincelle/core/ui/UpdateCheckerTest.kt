@@ -43,9 +43,10 @@ class UpdateCheckerTest {
         assertFalse(isNewer("9.9.9", ""))
     }
 
+    private val sha = "9de6b5828204cd2b318579c2c8acb7ceb8bcac35c3468024ba537ee70a31bebf"
     private val release = listOf(
-        ReleaseAsset("etincelle-0.1.37-mobile.apk", "https://github.com/o/r/releases/download/v0.1.37/etincelle-0.1.37-mobile.apk"),
-        ReleaseAsset("etincelle-0.1.37-tv.apk", "https://github.com/o/r/releases/download/v0.1.37/etincelle-0.1.37-tv.apk"),
+        ReleaseAsset("etincelle-0.1.37-mobile.apk", "https://github.com/o/r/releases/download/v0.1.37/etincelle-0.1.37-mobile.apk", 10, sha),
+        ReleaseAsset("etincelle-0.1.37-tv.apk", "https://github.com/o/r/releases/download/v0.1.37/etincelle-0.1.37-tv.apk", 10, sha),
     )
 
     @Test
@@ -61,6 +62,22 @@ class UpdateCheckerTest {
 
     @Test
     fun apkServedOutsideGithubIsIgnored() {
-        assertNull(apkFor(listOf(ReleaseAsset("etincelle-0.1.37-tv.apk", "https://example.org/etincelle-0.1.37-tv.apk")), "tv"))
+        assertNull(apkFor(listOf(release[1].copy(url = "https://example.org/etincelle-0.1.37-tv.apk")), "tv"))
+    }
+
+    @Test
+    fun apkWithoutDigestIsIgnored() {
+        assertNull(apkFor(listOf(release[1].copy(sha256 = null)), "tv"))
+    }
+
+    @Test
+    fun digestMustBeSha256Hex() {
+        assertEquals(sha, sha256Of("sha256:$sha"))
+        assertEquals(sha, sha256Of("sha256:" + sha.uppercase()))
+        assertNull(sha256Of(sha))
+        assertNull(sha256Of("sha512:$sha"))
+        assertNull(sha256Of("sha256:" + sha.dropLast(1)))
+        assertNull(sha256Of("sha256:" + sha.dropLast(1) + "g"))
+        assertNull(sha256Of(""))
     }
 }

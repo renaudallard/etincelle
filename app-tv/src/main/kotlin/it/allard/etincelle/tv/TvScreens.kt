@@ -458,25 +458,31 @@ fun TvSettingsScreen(
     }
 }
 
-/** Startup prompt offering the newer GitHub release: focusable card over the current screen. */
+/**
+ * Prompt offering the newer GitHub release: focusable card over the current screen. Installer
+ * downloads it, showing the progress, and hands it to the system installer; a download in progress is
+ * only stopped by Plus tard.
+ */
 @Composable
-fun TvUpdateDialog(info: UpdateInfo, onDownload: () -> Unit, onDismiss: () -> Unit) {
+fun TvUpdateDialog(info: UpdateInfo, progress: Int?, error: String?, onInstall: () -> Unit, onDismiss: () -> Unit) {
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     // A real Dialog traps D-pad focus and routes Back to onDismissRequest, unlike a plain overlay.
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(onDismissRequest = { if (progress == null) onDismiss() }) {
         Column(
             Modifier.clip(RoundedCornerShape(12.dp)).background(BackgroundLevel1).padding(32.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text("Mise à jour disponible", style = MaterialTheme.typography.headlineSmall)
             Text(
-                "La version ${info.version} est disponible. Voulez-vous la télécharger ?",
+                "La version ${info.version} est disponible. Voulez-vous l'installer ?",
                 color = Color.White,
                 style = MaterialTheme.typography.titleMedium,
             )
+            if (progress != null) Text("Téléchargement… $progress %", color = Color.White, style = MaterialTheme.typography.bodyLarge)
+            error?.let { Text(it, color = BrandYellow, style = MaterialTheme.typography.bodyLarge) }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                TvButton(onClick = onDownload, modifier = Modifier.focusRequester(focus)) { Text("Télécharger") }
+                TvButton(onClick = onInstall, modifier = Modifier.focusRequester(focus)) { Text("Installer") }
                 TvButton(onClick = onDismiss) { Text("Plus tard") }
             }
         }
