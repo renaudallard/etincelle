@@ -62,6 +62,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.session.MediaSession
 import androidx.media3.ui.PlayerView
 import it.allard.etincelle.core.cast.CastPlayerController
 import it.allard.etincelle.core.cast.CastUiState
@@ -101,7 +102,7 @@ class MainActivity : ComponentActivity() {
     private var player: ExoPlayer? = null
     private var castController: CastPlayerController? = null
     private var loadControl: AdaptiveLoadControl? = null
-    private var pausedForBackground = false
+    private var mediaSession: MediaSession? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -141,6 +142,9 @@ class MainActivity : ComponentActivity() {
         viewModel.setHideLocked(LocalPrefs.hideLocked(this))
 
         val onPlay: (PlaybackSource) -> Unit = { source ->
+            // Hosts the media session so playback can go on in the background (started from the UI,
+            // while the app is in the foreground).
+            startService(Intent(this, PlaybackService::class.java))
             val item = MediaItemFactory.create(source)
             if (controller != null) {
                 controller.play(item, source.startPositionMs)
@@ -167,6 +171,13 @@ class MainActivity : ComponentActivity() {
             }
         }
         val playerFlow: StateFlow<Player> = controller?.currentPlayer ?: MutableStateFlow<Player>(exo).asStateFlow()
+        // The media notification and lock screen control what plays: this phone, or the TV during a
+        // direct cast. A Play Services cast has its own notification, so the session then stays on the
+        // idle local player and shows none.
+        val session = PlaybackService.createSession(this, exo)
+        mediaSession = session
+        PlaybackService.session = session
+        lifecycleScope.launch { playerFlow.collect { session.player = if (it is CastPlayer) exo else it } }
 
         setContent {
             EtincelleTheme {
@@ -268,18 +279,12 @@ class MainActivity : ComponentActivity() {
         // Back in the foreground: any memory pressure that shrank the buffer has passed.
         loadControl?.restoreFullBuffer()
         castController?.start()
-        if (pausedForBackground) {
-            pausedForBackground = false
-            // Do not resume the local player if a cast session is now active (e.g. casting began while
-            // backgrounded): the Chromecast is playing, so resuming locally too would double the audio.
-            if (castController?.isCastSessionActive != true) player?.playWhenReady = true
-        }
+        player?.let { it.trackSelectionParameters = it.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, false).build() }
     }
 
     override fun onStop() {
         castController?.stop()
-        // Pause local playback in the background (no decoding/audio); resume on return. While casting
-        // the local player is idle, so this is a no-op and the Chromecast keeps playing.
+        // Playback goes on in the background, sound only: no video decoding for a screen nobody sees.
         player?.let {
             if (it.isPlaying) {
                 // Persist the resume point now too: the player surface only saves on dispose, which a
@@ -291,9 +296,8 @@ class MainActivity : ComponentActivity() {
                     val pos = PlaybackProgress.positionToSave(it.currentPosition, it.duration)
                     if (pos > 0) viewModel.savePlaybackPosition(src.resumeKey, pos)
                 }
-                pausedForBackground = true
-                it.playWhenReady = false
             }
+            it.trackSelectionParameters = it.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, true).build()
         }
         super.onStop()
     }
@@ -305,6 +309,10 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        stopService(Intent(this, PlaybackService::class.java))
+        PlaybackService.session = null
+        mediaSession?.release()
+        mediaSession = null
         castController?.release()
         player?.release()
         player = null

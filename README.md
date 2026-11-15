@@ -89,8 +89,14 @@ prouver qu'il est un
 appareil Cast authentique (certificat signé par Google) avant de recevoir quoi que ce soit, puis
 tout fonctionne comme d'habitude, commandes de lecture, barre du programme en cours, retour au
 direct, volume, passage d'un Chromecast à l'autre et retour sur le téléphone. Si la connexion est
-coupée, etincelle se reconnecte au Chromecast sans interrompre la lecture. Seule la notification
-système de diffusion manque dans ce cas.
+coupée, etincelle se reconnecte au Chromecast sans interrompre la lecture. La notification de
+lecture d'etincelle (voir plus bas) pilote alors le Chromecast.
+
+Sur téléphone, la **lecture continue en arrière-plan** et écran verrouillé (le son seul, la vidéo
+reprenant au retour dans l'application), avec une **notification de lecture** et des **commandes sur
+l'écran de verrouillage** : lecture/pause, recul de 10 s et avance de 30 s. Elles pilotent le
+téléphone, ou le Chromecast pendant une diffusion directe ; une diffusion par les services Google
+garde sa propre notification. Toucher la notification ramène dans l'application.
 
 etincelle **vérifie les mises à jour** sur GitHub à chaque démarrage, puis une fois par jour tant
 qu'elle reste ouverte, et propose d'installer la dernière version lorsqu'une plus récente est
