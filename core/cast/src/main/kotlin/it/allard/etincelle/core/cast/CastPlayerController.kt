@@ -18,6 +18,7 @@ import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.UserSession
 import it.allard.etincelle.core.player.LivePlayback
 import it.allard.etincelle.core.player.MediaItemFactory
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -353,7 +354,18 @@ class CastPlayerController(
         val load = ++directLoads
         val current = { directSession === session && load == directLoads }
         val resolver = reResolve
-        val fresh = if (resolve && resolver != null) runCatching { resolver(source) }.getOrNull() else source
+        // A cancelled load (a recovery dropped for a new choice) ends here: it is no failure to report.
+        val fresh = if (resolve && resolver != null) {
+            try {
+                resolver(source)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                null
+            }
+        } else {
+            source
+        }
         if (!current()) return null
         if (fresh == null) {
             clearConnecting()
@@ -367,7 +379,14 @@ class CastPlayerController(
         // A live stream asks for a position past the DVR window so the receiver clamps to the edge (it
         // then applies live_rewind_sec); on demand resumes where the phone was.
         val seconds = (if (fresh.isLive) LIVE_EDGE_POSITION_MS else positionMs.coerceAtLeast(0)) / 1000.0
-        val loaded = runCatching { session.load(CastLoadData.mediaJson(media), seconds) }.isSuccess
+        val loaded = try {
+            session.load(CastLoadData.mediaJson(media), seconds)
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            false
+        }
         if (!current()) return null
         if (loaded) {
             _currentPlayer.value = directPlayer
