@@ -13,8 +13,10 @@ import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import com.google.android.gms.cast.MediaSeekOptions
+import com.google.android.gms.cast.MediaStatus
 import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.CastSession
+import com.google.android.gms.cast.framework.media.RemoteMediaClient
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.UserSession
 import it.allard.etincelle.core.player.LivePlayback
@@ -214,6 +216,36 @@ class CastPlayerController(
     }
     private val localErrorListener = errorListenerFor(localPlayer)
     private val castErrorListener = errorListenerFor(castPlayer)
+
+    // Media3's CastPlayer never reports an error (getPlayerError is always null), so a receiver that
+    // stopped on one, typically a stream or DRM token that expired, went unnoticed and retried its stale
+    // token until it gave up. Watch the session's own status for that stop and recover from here with a
+    // fresh stream, once per failure, resuming where the receiver last was.
+    private var watchedClient: RemoteMediaClient? = null
+    private var receiverFailed = false
+    private var receiverPositionMs = 0L
+    private val receiverStatusCallback = object : RemoteMediaClient.Callback() {
+        override fun onStatusUpdated() {
+            val client = watchedClient ?: return
+            val status = client.mediaStatus
+            val failed = status?.playerState == MediaStatus.PLAYER_STATE_IDLE && status.idleReason == MediaStatus.IDLE_REASON_ERROR
+            if (!failed && status != null && status.playerState != MediaStatus.PLAYER_STATE_IDLE) {
+                receiverPositionMs = client.approximateStreamPosition
+            }
+            if (failed && !receiverFailed && _currentPlayer.value === castPlayer) onPlaybackError(castPlayer)
+            receiverFailed = failed
+        }
+    }
+
+    private fun watchReceiver(session: CastSession?) {
+        val client = session?.remoteMediaClient
+        if (client === watchedClient) return
+        watchedClient?.unregisterCallback(receiverStatusCallback)
+        watchedClient = client
+        receiverFailed = false
+        receiverPositionMs = 0L
+        client?.registerCallback(receiverStatusCallback)
+    }
 
     // Drives the connect animation: the bar fills while connecting and snaps full once the receiver
     // actually plays. Only meaningful while the cast player is current.
@@ -693,6 +725,7 @@ class CastPlayerController(
         localPlayer.removeListener(localErrorListener)
         castPlayer.removeListener(castErrorListener)
         castPlayer.removeListener(castPlaybackListener)
+        watchReceiver(null)
         scope.cancel()
         castPlayer.release()
     }
@@ -717,6 +750,7 @@ class CastPlayerController(
 
     override fun onSessionConnected(session: CastSession) {
         super.onSessionConnected(session)
+        watchReceiver(session)
         directFallback = null
         suspended = false
         if (_currentPlayer.value !== castPlayer) {
@@ -770,6 +804,7 @@ class CastPlayerController(
         // (that clears directSession first). Without this, coming back to the foreground, where start()
         // reports no Play Services session, would wipe the state of a direct cast still playing.
         if (directConnected) return
+        watchReceiver(null)
         // Capture the in-flight transfer target name before super clears it, so the bar can keep
         // animating the connect toward the incoming device across the hand-off gap.
         val transferTargetName = state.value.connectingDeviceName
@@ -1005,7 +1040,9 @@ class CastPlayerController(
         // staying under the receiver's reconnect grace so its own stale-token reload does not fire first.
         val backoff = ((castRetryCount - 1) * CAST_RETRY_BACKOFF_MS).coerceAtMost(CAST_RETRY_MAX_BACKOFF_MS)
         val target = _currentPlayer.value
-        val position = target.currentPosition.coerceAtLeast(0)
+        // A receiver stopped on an error may no longer report where it was: fall back to the position
+        // it last reported while playing.
+        val position = (target.currentPosition.takeIf { it > 0 || target !== castPlayer } ?: receiverPositionMs).coerceAtLeast(0)
         // Capture the live rewind from the failing player before re-resolving so recovery resumes the
         // viewer's position on the receiver instead of snapping to the live edge (0 if not applicable
         // or its timeline is already gone).
