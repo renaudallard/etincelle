@@ -74,6 +74,8 @@ class MainViewModelTest {
     fun stoppingWhileTheNextEpisodeLoadsLeavesNoSpinner() {
         val repo = FakeRepo()
         val vm = viewModel(repo)
+        // Playing from the episode's page, which the next one will replace.
+        vm.onCardClick(CARD)
         vm.watchRecording("REC_1")
         repo.detail = { _, _ -> CompletableDeferred<ProgramDetail>().await() }
         vm.playUpNext()
@@ -82,6 +84,19 @@ class MainViewModelTest {
         vm.stopPlaying()
         assertFalse(vm.state.value.busy)
         assertEquals(null, vm.state.value.playing)
+    }
+
+    @Test
+    fun theNextEpisodeOfACastLeavesThePageBeingBrowsed() {
+        val repo = FakeRepo()
+        val vm = viewModel(repo)
+        vm.watchRecording("REC_1")
+        // The viewer went back to Accueil while it plays on (a cast): no page is pushed over it.
+        vm.playUpNext()
+
+        assertEquals(NEXT, vm.state.value.playing)
+        assertTrue(vm.state.value.detailStack.isEmpty())
+        assertFalse(vm.state.value.busy)
     }
 
     @Test
@@ -164,6 +179,7 @@ class MainViewModelTest {
         override suspend fun fetchProgramDetail(id: String, kind: DetailKind) = detail(id, kind)
         override suspend fun profilesToPick(): Profiles? = null
         val resolvedRecordings = mutableListOf<String>()
+        override suspend fun resolveVod(vodId: String) = NEXT
         override suspend fun resolveRecording(assetId: String): PlaybackSource {
             resolvedRecordings += assetId
             return SOURCE
@@ -199,6 +215,8 @@ class MainViewModelTest {
             drm = DrmSpec.None,
             isLive = false,
             upNext = UpNext(60, 10, "Next", null, "Commence dans %s", "Regarder", "Générique", "VOD_2"),
+            originVodId = "VOD_1",
         )
+        val NEXT = PlaybackSource(manifestUrl = "https://example.invalid/b.mpd", drm = DrmSpec.None, isLive = false, originVodId = "VOD_2")
     }
 }

@@ -610,20 +610,31 @@ class MainViewModel(
      * lands on the episode being watched.
      */
     fun playUpNext() {
-        val next = _state.value.playing?.upNext ?: return
-        _state.update { it.copy(busy = true, error = null, info = null) }
-        navLaunch {
+        val current = _state.value.playing ?: return
+        val next = current.upNext ?: return
+        // A cast plays on while the viewer browses: its next episode then only changes what plays, and
+        // neither takes over the page on screen nor cancels a page being opened (nor is cancelled).
+        val onEpisodePage = { st: UiState -> current.originVodId != null && st.detailStack.lastOrNull()?.id == current.originVodId }
+        val busy = onEpisodePage(_state.value)
+        if (busy) _state.update { it.copy(busy = true, error = null, info = null) }
+        upNextJob?.cancel()
+        upNextJob = viewModelScope.launch {
             runCatchingNav {
                 val detail = repo.fetchProgramDetail(next.nextVodId, DetailKind.PROGRAM)
                 detail to repo.resolveVod(next.nextVodId).withUpNext(detail.upNext)
             }.onSuccess { (detail, src) ->
                 _state.update { st ->
+                    // Stopped, or something else chosen, meanwhile: leave it so.
+                    if (st.playing !== current) return@update if (busy) st.copy(busy = false) else st
                     val entry = DetailEntry(detail, null, next.nextVodId, DetailKind.PROGRAM)
-                    st.copy(busy = false, playing = src, detailStack = st.detailStack.dropLast(1) + entry)
+                    val stack = if (onEpisodePage(st)) st.detailStack.dropLast(1) + entry else st.detailStack
+                    st.copy(busy = if (busy) false else st.busy, playing = src, detailStack = stack)
                 }
             }.onFailure { e -> applyFailure(e, "Échec de lecture de l'épisode suivant") }
         }
     }
+
+    private var upNextJob: Job? = null
 
     /**
      * Plays what a phone of this account sent to this TV (see core/remote): [id] as [kind], from
