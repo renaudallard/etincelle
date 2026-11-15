@@ -315,9 +315,18 @@ class MainViewModel(
     // so a slower earlier load cannot overwrite the state of a newer one (last-writer-wins races).
     private var navJob: Job? = null
 
-    private fun navLaunch(block: suspend () -> Unit) {
+    // [refresh] marks a silent reload, which keeps the progress bar it just put up; any other
+    // navigation supersedes a reload still in flight, whose bar would otherwise never come down.
+    private fun navLaunch(refresh: Boolean = false, block: suspend () -> Unit) {
         navJob?.cancel()
+        if (!refresh) _state.update { it.copy(refreshing = false) }
         navJob = viewModelScope.launch { block() }
+    }
+
+    // Drops the in-flight navigation along with the spinner or progress bar it put up.
+    private fun cancelNav() {
+        navJob?.cancel()
+        _state.update { it.copy(busy = false, refreshing = false) }
     }
 
     // Like runCatching, but lets coroutine cancellation propagate: when navJob cancels a superseded
@@ -393,7 +402,7 @@ class MainViewModel(
             if (silent) it.copy(tab = Tab.GUIDE, error = null, refreshing = true)
             else it.copy(tab = Tab.GUIDE, error = null, busy = true, backStack = emptyList())
         }
-        navLaunch {
+        navLaunch(refresh = silent) {
             runCatchingNav { repo.loadGuide() }
                 .onSuccess { page -> _state.update { it.copy(busy = false, refreshing = false, backStack = listOf(page)) } }
                 .onFailure { e -> applyFailure(e, "Guide indisponible") }
@@ -405,7 +414,7 @@ class MainViewModel(
             if (silent) it.copy(tab = Tab.HOME, error = null, refreshing = true)
             else it.copy(tab = Tab.HOME, error = null, busy = true, backStack = emptyList())
         }
-        navLaunch {
+        navLaunch(refresh = silent) {
             runCatchingNav { repo.loadHome() }
                 .onSuccess { page -> _state.update { it.copy(busy = false, refreshing = false, backStack = listOf(page)) } }
                 .onFailure { e -> applyFailure(e, "Accueil indisponible") }
@@ -440,7 +449,7 @@ class MainViewModel(
     /** Re-fetches the top page's papi url, replacing only that entry so the back stack is kept. */
     private fun reloadPageTop(url: String, grid: Boolean) {
         _state.update { it.copy(refreshing = true, error = null) }
-        navLaunch {
+        navLaunch(refresh = true) {
             runCatchingNav { repo.loadPage(url) }
                 .onSuccess { page ->
                     _state.update {
@@ -463,7 +472,7 @@ class MainViewModel(
         if (query.isBlank()) return
         lastQuery = query.trim()
         _state.update { if (silent) it.copy(refreshing = true, error = null) else it.copy(busy = true, error = null) }
-        navLaunch {
+        navLaunch(refresh = silent) {
             runCatchingNav { repo.search(query.trim()) }
                 .onSuccess { page -> _state.update { it.copy(busy = false, refreshing = false, backStack = listOf(page.copy(title = "Résultats"))) } }
                 .onFailure { e -> applyFailure(e, "Échec de recherche") }
@@ -817,8 +826,8 @@ class MainViewModel(
     /** Closes the top detail page: back to its parent detail if any, otherwise back to browsing. */
     fun closeDetail() {
         // Drop any in-flight load/play so it cannot re-open this screen after the user backed out.
-        navJob?.cancel()
-        _state.update { it.copy(detailStack = it.detailStack.dropLast(1), busy = false, error = null, info = null) }
+        cancelNav()
+        _state.update { it.copy(detailStack = it.detailStack.dropLast(1), error = null, info = null) }
     }
 
     private fun loadPageInto(url: String, replace: Boolean, fallbackTitle: String?, grid: Boolean = false) {
@@ -836,8 +845,8 @@ class MainViewModel(
     }
 
     fun back() {
-        navJob?.cancel()
-        _state.update { if (it.canGoBack) it.copy(backStack = it.backStack.dropLast(1), busy = false) else it }
+        cancelNav()
+        _state.update { if (it.canGoBack) it.copy(backStack = it.backStack.dropLast(1)) else it }
     }
 
     fun stopPlaying() {
