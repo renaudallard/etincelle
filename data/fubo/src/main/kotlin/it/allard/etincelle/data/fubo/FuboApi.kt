@@ -157,6 +157,7 @@ interface FuboApi {
         @Query("startTime") startTime: String,
         @Query("endTime") endTime: String,
         @Query("limit") limit: Int,
+        @Query("offset") offset: Int? = null,
         @Query("ignoreEmpty") ignoreEmpty: Boolean = true,
     ): EpgResponse
 

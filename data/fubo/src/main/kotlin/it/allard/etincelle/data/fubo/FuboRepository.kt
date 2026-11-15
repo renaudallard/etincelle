@@ -45,7 +45,10 @@ import java.io.IOException
 
 // A full day of guide so a channel's "tout voir" grid covers at least 24h.
 private const val GUIDE_WINDOW_MS = 24L * 60 * 60 * 1000
-private const val GUIDE_CHANNEL_LIMIT = 40
+// The guide pages its channels (183 in November 2026, about 3.5 MB of JSON per 40).
+private const val GUIDE_PAGE_SIZE = 100
+// Bounds the paging should the backend ever hand back an offset that does not move on.
+private const val GUIDE_MAX_PAGES = 10
 private const val PROGRESS_OFFSET_KEY = "lastOffset"
 private const val PROGRESS_END_MS = 15_000L
 private const val PROGRESS_MIN_MS = 10_000L
@@ -405,11 +408,16 @@ class FuboRepository(
 
     override suspend fun loadGuide(): ContentPage = withRefresh {
         val now = System.currentTimeMillis()
-        api.epg(
-            startTime = rfc3339Utc(now),
-            endTime = rfc3339Utc(now + GUIDE_WINDOW_MS),
-            limit = GUIDE_CHANNEL_LIMIT,
-        ).toGuidePage()
+        val start = rfc3339Utc(now)
+        val end = rfc3339Utc(now + GUIDE_WINDOW_MS)
+        val entries = ArrayList<EpgEntryDto>()
+        var offset = 0
+        for (page in 1..GUIDE_MAX_PAGES) {
+            val response = api.epg(startTime = start, endTime = end, limit = GUIDE_PAGE_SIZE, offset = offset.takeIf { it > 0 })
+            entries += response.response.orEmpty()
+            offset = response.nextOffset?.takeIf { it > offset } ?: break
+        }
+        EpgResponse(entries).toGuidePage()
     }
 
     override suspend fun search(query: String): ContentPage = withRefresh { api.search(query).toPage().groupByTitle() }

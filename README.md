@@ -58,7 +58,7 @@ ses programmes **les plus vus**. Les **chaînes favorites** ouvrent cet onglet, 
 choisissez : sur téléphone, l'**étoile** d'une chaîne l'ajoute aux favoris ou l'en retire, et l'étoile
 de la barre du haut ouvre **Réorganiser les favoris** (▲ et ▼ déplacent une chaîne) ; sur la TV, un
 **appui long sur OK** fait de même, et le bouton **Réorganiser les favoris** permet de saisir une
-chaîne avec OK puis de la déplacer avec Haut et Bas. Le **guide** se rafraîchit à chaque ouverture et au retour de l'application (son contenu se périme
+chaîne avec OK puis de la déplacer avec Haut et Bas. Le **guide** couvre toutes les chaînes de l'offre sur 24 heures et se rafraîchit à chaque ouverture et au retour de l'application (son contenu se périme
 avec l'heure) ; sur téléphone, n'importe quelle page se **rafraîchit** en tirant au-delà du haut ou
 du bas de la liste.
 

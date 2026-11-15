@@ -201,7 +201,8 @@ follows each component's `actions`.
   ```
 - `data.channel.id` is the live channel id (e.g. France 2 = `600019`) → feeds the live VAPI call, so
   a guide programme tap resolves to live playback. Airing times live on `assets[].accessRights`.
-  ~102 channels total; page with `limit`/`nextOffset`.
+  183 channels in November 2026 (about 3.5 MB of JSON per 40 over 24 h); page with `limit` and
+  `offset`, following `metadata.paginationState.nextOffset` until it is null (validated live).
 
 ## Playback — VALIDATED end-to-end (captured live, France 2)
 

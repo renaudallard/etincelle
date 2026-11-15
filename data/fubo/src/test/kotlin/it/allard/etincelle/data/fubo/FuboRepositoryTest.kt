@@ -20,6 +20,7 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -48,6 +49,26 @@ class FuboRepositoryTest {
 
     @After
     fun tearDown() = server.shutdown()
+
+    @Test
+    fun `the guide follows the pages to the last channel`() = runTest {
+        session.session = UserSession("AT", "RT", "u1", "p1")
+        fun page(id: String, next: String) = MockResponse().setBody(
+            """{"response":[{"data":{"channel":{"id":"$id","name":"C$id"},"programsWithAssets":[
+              {"program":{"title":"P$id"},"assets":[{"assetId":"LIVE_$id","accessRights":
+                {"startTime":"2026-11-15T20:00:00Z","endTime":"2026-11-15T21:00:00Z"}}]}]}}],
+              "metadata":[{"type":"paginationState","data":{"totalResults":2,"currentOffset":0,"nextOffset":$next}}]}""",
+        )
+        server.enqueue(page("1", "100"))
+        server.enqueue(page("2", "null"))
+
+        val guide = repo.loadGuide()
+
+        assertEquals(listOf("C1", "C2"), guide.rails.map { it.title })
+        assertFalse(server.takeRequest().path!!.contains("offset="))
+        assertTrue(server.takeRequest().path!!.contains("offset=100"))
+        assertEquals(2, server.requestCount)
+    }
 
     @Test
     fun `login loads the profile and persists the session`() = runTest {

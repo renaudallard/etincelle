@@ -16,7 +16,13 @@ import java.util.TimeZone
 
 // --- /epg live guide ---
 
-data class EpgResponse(val response: List<EpgEntryDto>?)
+data class EpgResponse(val response: List<EpgEntryDto>?, val metadata: List<EpgMetadataDto>? = null) {
+    /** Where the next page of channels starts, or null on the last page. */
+    val nextOffset: Int? get() = metadata?.firstOrNull { it.type == "paginationState" }?.data?.nextOffset
+}
+
+data class EpgMetadataDto(val type: String?, val data: EpgPaginationDto?)
+data class EpgPaginationDto(val nextOffset: Int?)
 
 data class EpgEntryDto(val data: EpgChannelDataDto?)
 
