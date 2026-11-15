@@ -17,9 +17,11 @@ import java.util.UUID
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -62,14 +64,22 @@ class TvRemoteServer(
 
     fun start() {
         if (scope != null) return
+        // Bound here, so stop() always finds them to close (binding sends nothing on the network).
+        val server = runCatching { ServerSocket(0) }.getOrNull() ?: return
+        val discovery = runCatching {
+            DatagramSocket(null).apply {
+                reuseAddress = true
+                bind(InetSocketAddress(RemoteDiscovery.PORT))
+            }
+        }.getOrNull()
+        this.server = server
+        this.discovery = discovery
         writer = Executors.newSingleThreadExecutor()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate).also { scope = it }
         // Ready before the first phone connects.
         scope.launch { accountKeyOnce() }
+        discovery?.let { socket -> scope.launch(Dispatchers.IO) { answerDiscovery(socket, server.localPort) } }
         scope.launch {
-            val server = runCatching { withContext(Dispatchers.IO) { ServerSocket(0) } }.getOrNull() ?: return@launch
-            this@TvRemoteServer.server = server
-            launch(Dispatchers.IO) { answerDiscovery(server.localPort) }
             while (isActive) {
                 val socket = runCatching { withContext(Dispatchers.IO) { server.accept() } }.getOrNull() ?: break
                 launch { serve(socket) }
@@ -115,12 +125,17 @@ class TvRemoteServer(
             delay(HANDSHAKE_DEADLINE_MS)
             runCatching { socket.close() }
         }
+        // Not cancellable, so a handshake ending as the server stops still has its connection closed.
         val phone = try {
-            runCatching { withContext(Dispatchers.IO) { RemoteLink.accept(socket, key) } }.getOrNull()
+            runCatching { withContext(Dispatchers.IO + NonCancellable) { RemoteLink.accept(socket, key) } }.getOrNull()
         } finally {
             handshakes--
             deadline?.cancel()
         } ?: return
+        if (!currentCoroutineContext().isActive) {
+            phone.close()
+            return
+        }
         link?.close()
         link = phone
         try {
@@ -140,15 +155,8 @@ class TvRemoteServer(
         key ?: runCatching { accountKey() }.getOrNull()?.also { key = it }
     }
 
-    // Tells each phone looking for TV apps where to connect, until the server stops.
-    private fun answerDiscovery(port: Int) {
-        val socket = runCatching {
-            DatagramSocket(null).apply {
-                reuseAddress = true
-                bind(InetSocketAddress(RemoteDiscovery.PORT))
-            }
-        }.getOrNull() ?: return
-        discovery = socket
+    // Tells each phone looking for TV apps where to connect, on [socket], until the server stops.
+    private fun answerDiscovery(socket: DatagramSocket, port: Int) {
         val answer = RemoteDiscovery.answer(port, installId(), deviceName())
         val buffer = ByteArray(512)
         runCatching {
