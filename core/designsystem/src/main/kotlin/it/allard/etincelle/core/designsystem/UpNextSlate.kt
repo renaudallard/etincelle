@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,7 +36,8 @@ import kotlinx.coroutines.delay
  * [UpNext.playLabel] (play it now) and [UpNext.creditsLabel] (hide the slate and watch the end). When
  * the countdown reaches zero, [onPlayNext] runs once. The countdown follows [position] (pausing holds
  * it); a hidden slate comes back only after a seek before it. [button] draws a button in the app's own
- * style; with [takeFocus] (TV) the play button gets the focus when the slate appears.
+ * style; with [takeFocus] (TV) the play button gets the focus when the slate appears, and [onLeave]
+ * runs when the slate goes away, so the caller can hand the focus back.
  */
 @Composable
 fun UpNextSlate(
@@ -46,6 +48,7 @@ fun UpNextSlate(
     button: @Composable RowScope.(label: String, primary: Boolean, onClick: () -> Unit, modifier: Modifier) -> Unit,
     modifier: Modifier = Modifier,
     takeFocus: Boolean = false,
+    onLeave: () -> Unit = {},
 ) {
     var left by remember(upNext) { mutableStateOf<Long?>(null) }
     var hidden by remember(upNext) { mutableStateOf(false) }
@@ -68,6 +71,10 @@ fun UpNextSlate(
     if (seconds == null || hidden) return
     val focus = remember { FocusRequester() }
     if (takeFocus) LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    // The focused button leaves with the slate (credits chosen, a seek back, the next episode), and
+    // the focus would otherwise stay on nothing.
+    val leave by rememberUpdatedState(onLeave)
+    DisposableEffect(Unit) { onDispose { leave() } }
     Column(
         modifier.widthIn(max = 420.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xE6000000)).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),

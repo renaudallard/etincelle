@@ -484,6 +484,8 @@ private fun TvPlayerSurface(
                 button = { label, primary, onClick, mod -> TvButton(onClick = onClick, modifier = mod, highlighted = primary) { Text(label) } },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(48.dp),
                 takeFocus = true,
+                // Back to the player view, or the remote no longer reaches the controls.
+                onLeave = { playerView?.let { v -> v.post { if (!v.hasFocus()) v.requestFocus() } } },
             )
         }
     }
