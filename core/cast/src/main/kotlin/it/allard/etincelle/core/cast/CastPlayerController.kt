@@ -112,6 +112,8 @@ class CastPlayerController(
     private val directPlayer = DirectCastPlayer()
     // Reconnecting a direct cast whose connection dropped (see rejoinDirect).
     private var rejoinJob: Job? = null
+    // Counts the direct loads, so a load overtaken by a newer one leaves the receiver and the UI to it.
+    private var directLoads = 0
 
     // The direct session is connected (not just starting).
     private val directConnected: Boolean
@@ -329,9 +331,7 @@ class CastPlayerController(
             val isLive = (item.localConfiguration?.tag as? PlaybackSource)?.isLive == true
             val rewind = if (isLive) LivePlayback.castRewindOffsetMs(localPlayer, liveWindow) else 0L
             val position = localPlayer.currentPosition
-            if (loadDirect(session, item, position, resolve = true, rewindMs = rewind)) {
-                runCatching { localPlayer.stop() }
-            } else if (directSession === session) {
+            if (loadDirect(session, item, position, resolve = true, rewindMs = rewind) == false && directSession === session) {
                 // The TV did not take it: end the session, the phone keeps playing.
                 stopDirect()
             }
@@ -339,19 +339,22 @@ class CastPlayerController(
         return true
     }
 
-    // Load [item] on the direct session, re-resolving a fresh stream first when [resolve]; true once
-    // the receiver has accepted it.
+    // Load [item] on the direct session, re-resolving a fresh stream first when [resolve]: true once
+    // the receiver has accepted it, false when it failed, null when a newer load (a channel picked
+    // while the cast connected, a quick zap) or the end of the session overtook it.
     private suspend fun loadDirect(
         session: DirectCastSession,
         item: MediaItem,
         positionMs: Long,
         resolve: Boolean,
         rewindMs: Long = (item.localConfiguration?.tag as? PlaybackSource)?.liveRewindOffsetMs ?: 0L,
-    ): Boolean {
+    ): Boolean? {
         val source = item.localConfiguration?.tag as? PlaybackSource ?: return false
+        val load = ++directLoads
+        val current = { directSession === session && load == directLoads }
         val resolver = reResolve
         val fresh = if (resolve && resolver != null) runCatching { resolver(source) }.getOrNull() else source
-        if (directSession !== session) return false
+        if (!current()) return null
         if (fresh == null) {
             clearConnecting()
             onError?.invoke(PLAYBACK_ERROR_MESSAGE)
@@ -365,8 +368,12 @@ class CastPlayerController(
         // then applies live_rewind_sec); on demand resumes where the phone was.
         val seconds = (if (fresh.isLive) LIVE_EDGE_POSITION_MS else positionMs.coerceAtLeast(0)) / 1000.0
         val loaded = runCatching { session.load(CastLoadData.mediaJson(media), seconds) }.isSuccess
-        if (loaded && directSession === session) _currentPlayer.value = directPlayer
-        if (!loaded && directSession === session) {
+        if (!current()) return null
+        if (loaded) {
+            _currentPlayer.value = directPlayer
+            // The phone stops once the TV has the stream, whichever load got it there.
+            runCatching { localPlayer.stop() }
+        } else {
             clearConnecting()
             onError?.invoke(PLAYBACK_ERROR_MESSAGE)
         }
