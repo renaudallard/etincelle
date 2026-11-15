@@ -26,7 +26,10 @@ pour être rembobinée y est tracée dans une couleur distincte, et un bouton **
 apparaît dès que l'on s'éloigne du bord pour y ramener d'un appui (sur le téléviseur, il s'affiche
 avec les commandes du lecteur et s'atteint avec la flèche **Haut**). Cliquer sur un programme ouvre d'abord sa **fiche détaillée**
 (synopsis, casting, année, classification) plutôt que de le lire aussitôt, et la fiche regroupe ses
-autres diffusions disponibles ; sur le téléviseur, l'image du programme en occupe le fond, comme dans
+autres diffusions disponibles. Comme dans l'application officielle, la fiche indique au-dessus du titre
+quand le programme a été **diffusé** (« Diffusé: 12 févr. ») ou jusqu'à quand il reste disponible
+(« Expire dans 6j »), les vignettes affichent la même mention (ou « Encore 32min » pour un direct) et
+chaque épisode de la liste sa date de diffusion (« 07 juin à 13h25 ») ; sur le téléviseur, l'image du programme en occupe le fond, comme dans
 l'application officielle. Pour une chaîne en **direct**, la fiche propose, à côté de **Regarder
 en direct**, un bouton **Regarder depuis le début** qui reprend le programme en
 cours à son commencement (dans la limite de la fenêtre de rembobinage), et un menu **Enregistrer** pour

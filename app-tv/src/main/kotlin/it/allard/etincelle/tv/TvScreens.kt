@@ -867,6 +867,9 @@ fun TvProgramDetailScreen(
                         )
                     }
                 }
+                detail.timeLabel?.let {
+                    Text(it, style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.7f))
+                }
                 Text(detail.title ?: "", style = MaterialTheme.typography.displaySmall)
                 val sub = listOfNotNull(detail.subtitle, detail.genre).joinToString(" • ")
                 if (sub.isNotBlank()) Text(sub, style = MaterialTheme.typography.titleMedium, color = Color.White)
@@ -1005,7 +1008,13 @@ private fun TvEpisodeRow(card: ContentCard, enabled: Boolean, onClick: () -> Uni
             contentScale = ContentScale.Crop,
         )
         Spacer(Modifier.width(12.dp))
-        Text(card.title ?: "Épisode", color = Color.White, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Column {
+            Text(card.title ?: "Épisode", color = Color.White, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            // When it aired, as the official app lists it.
+            card.timeLabel?.let {
+                Text(it, color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.bodySmall, maxLines = 1)
+            }
+        }
     }
 }
 
@@ -1177,6 +1186,9 @@ private fun TvCard(card: ContentCard, onCardClick: (ContentCard) -> Unit, focusM
         }
         card.subtitle?.let {
             Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis, color = BrandYellow, style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(w))
+        }
+        card.timeLabel?.let {
+            Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(w))
         }
     }
 }

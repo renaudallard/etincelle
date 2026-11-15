@@ -70,6 +70,9 @@ data class ContentCard(
     val favorite: RecordAction? = null,
     /** The channel is one of the user's favourites. */
     val isFavorite: Boolean = false,
+    /** When it aired, or how long it stays, in the backend's words ("07 juin à 13h25", "Diffusé: 12
+     * févr.", "Encore 32min"). */
+    val timeLabel: String? = null,
 )
 
 /**
@@ -165,6 +168,9 @@ data class ProgramDetail(
     val sections: List<ContentRail> = emptyList(),
     /** The episode that follows this one, played at its end (see [UpNext]). */
     val upNext: UpNext? = null,
+    /** The line above the title, in the backend's words: when it aired ("Diffusé: 12 févr.") or how long
+     * it stays ("Expire dans 6j"). */
+    val timeLabel: String? = null,
 )
 
 /** A programme for the Android TV home screen: the app's recommendations row, or Continue watching. */

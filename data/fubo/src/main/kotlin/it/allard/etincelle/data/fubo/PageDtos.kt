@@ -83,6 +83,7 @@ data class MetadataDto(
     val artwork: PictureDto?,
     val tags: List<TagDto>?,
     val ctas: List<CtaDto>?,
+    @Json(name = "hat_title") val hatTitle: TextDto? = null,
 )
 
 // The record actions live in the metadata CTAs. The backend delivers them two ways: as a direct
@@ -128,10 +129,13 @@ data class ComponentDto(
     val slug: String? = null,
     val header: HeaderDto? = null,
     @Json(name = "is_favorite") val isFavorite: Boolean? = null,
+    // An episode row says when it aired here ("07 juin à 13h25").
+    val info: TextDto? = null,
 )
 
 // Live ("En direct à la TV") cards carry their show title in a footer rather than in title/heading.
-data class FooterDto(val title: TextDto?, val subtitle: TextDto?)
+// Its time label says when the programme aired or how long it stays ("Diffusé: 12 févr.", "Encore 32min").
+data class FooterDto(val title: TextDto?, val subtitle: TextDto?, @Json(name = "time_label") val timeLabel: TextDto? = null)
 
 // A poster card names the channel offering it with a logo, in its body or its header.
 data class BodyDto(val picture: PictureDto?, @Json(name = "station_logo") val stationLogo: PictureDto? = null)
@@ -235,6 +239,7 @@ fun PageResponse.toProgramDetail(channelId: String?, vodId: String?, isLive: Boo
         programId = programId,
         upcomingMessage = upcomingMessage,
         upNext = content?.player?.toUpNext(),
+        timeLabel = meta?.hatTitle?.text?.takeIf { it.isNotBlank() },
     )
 }
 
@@ -341,6 +346,7 @@ private fun ComponentDto.toCard(shape: CardShape = CardShape.WIDE): ContentCard?
         channelLogoUrl = body?.stationLogo?.url ?: header?.stationLogo?.url,
         favorite = actions?.onFavIconClick?.let { apiCall(it, if (isFavorite == true) "Retirer des favoris" else "Ajouter aux favoris") },
         isFavorite = isFavorite == true,
+        timeLabel = (footer?.timeLabel?.text ?: info?.text)?.takeIf { it.isNotBlank() },
     )
 }
 

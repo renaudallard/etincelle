@@ -432,6 +432,17 @@ private fun GridCard(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+        card.timeLabel?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }
 
@@ -980,6 +991,9 @@ fun ProgramDetailScreen(
             }
         }
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            detail.timeLabel?.let {
+                Text(it, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             Text(detail.title ?: "", style = MaterialTheme.typography.headlineSmall)
             val sub = listOfNotNull(detail.subtitle, detail.genre).joinToString(" • ")
             if (sub.isNotBlank()) {
@@ -1096,13 +1110,13 @@ private fun EpisodeRow(card: ContentCard, enabled: Boolean, onClick: () -> Unit)
             contentScale = ContentScale.Crop,
         )
         Spacer(Modifier.width(12.dp))
-        Text(
-            card.title ?: "Épisode",
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
+        Column(Modifier.weight(1f)) {
+            Text(card.title ?: "Épisode", style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            // When it aired, as the official app lists it.
+            card.timeLabel?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            }
+        }
         Spacer(Modifier.width(8.dp))
         Text("›", style = MaterialTheme.typography.titleLarge, color = BrandYellow)
     }
@@ -1236,6 +1250,17 @@ private fun CardItem(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
             Text(
                 it,
                 style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(cardWidth),
+            )
+        }
+        card.timeLabel?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
