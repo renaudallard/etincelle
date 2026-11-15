@@ -16,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,6 +40,17 @@ import kotlinx.coroutines.delay
  * style; with [takeFocus] (TV) the play button gets the focus when the slate appears, and [onLeave]
  * runs when the slate goes away, so the caller can hand the focus back.
  */
+/**
+ * What the viewer did with the slate of one episode: watching its credits ([hidden]) or past the
+ * countdown ([fired]). Kept by the caller when the slate may move between screens (the show page and
+ * the cast controller), so neither choice is forgotten on the way.
+ */
+@Stable
+class UpNextSlateState {
+    var hidden by mutableStateOf(false)
+    var fired = false
+}
+
 @Composable
 fun UpNextSlate(
     upNext: UpNext,
@@ -49,29 +61,28 @@ fun UpNextSlate(
     modifier: Modifier = Modifier,
     takeFocus: Boolean = false,
     onLeave: () -> Unit = {},
+    state: UpNextSlateState = remember(upNext) { UpNextSlateState() },
 ) {
     var left by remember(upNext) { mutableStateOf<Long?>(null) }
-    var hidden by remember(upNext) { mutableStateOf(false) }
     val playNext by rememberUpdatedState(onPlayNext)
     // The player can change under a running countdown (the cast moving to another device).
     val positionNow by rememberUpdatedState(position)
     val durationNow by rememberUpdatedState(duration)
-    LaunchedEffect(upNext) {
-        var fired = false
+    LaunchedEffect(upNext, state) {
         while (true) {
             val now = upNext.secondsLeft(positionNow(), durationNow())
-            if (now == null) hidden = false
+            if (now == null) state.hidden = false
             left = now
             // Watching the credits (a hidden slate) lets the episode end without going on.
-            if (now == 0L && !fired && !hidden) {
-                fired = true
+            if (now == 0L && !state.fired && !state.hidden) {
+                state.fired = true
                 playNext()
             }
             delay(TICK_MS)
         }
     }
     val seconds = left
-    if (seconds == null || hidden) return
+    if (seconds == null || state.hidden) return
     val focus = remember { FocusRequester() }
     if (takeFocus) LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     // The focused button leaves with the slate (credits chosen, a seek back, the next episode), and
@@ -87,7 +98,7 @@ fun UpNextSlate(
         Text(upNext.countdown.replace("%s", "$seconds s"), style = MaterialTheme.typography.bodyMedium, color = BrandYellow)
         Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             button(upNext.playLabel, true, playNext, if (takeFocus) Modifier.focusRequester(focus) else Modifier)
-            button(upNext.creditsLabel, false, { hidden = true }, Modifier)
+            button(upNext.creditsLabel, false, { state.hidden = true }, Modifier)
         }
     }
 }

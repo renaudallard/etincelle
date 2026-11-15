@@ -84,6 +84,7 @@ import it.allard.etincelle.core.designsystem.theme.BrandBlack
 import it.allard.etincelle.core.designsystem.theme.BrandYellow
 import it.allard.etincelle.core.designsystem.theme.EtincelleTheme
 import it.allard.etincelle.core.designsystem.UpNextSlate
+import it.allard.etincelle.core.designsystem.UpNextSlateState
 import it.allard.etincelle.core.domain.DetailKind
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramWindow
@@ -423,6 +424,9 @@ private fun AppRoot(
         if (!castState.toTvApp) tvRemoteOpen = false
     }
     val tvRemote = castState.toTvApp && tvRemoteOpen
+    // The next-episode slate shows in the player, the cast controller or over the show page as the
+    // viewer moves between them: one state per episode keeps its credits choice and countdown.
+    val upNextSlate = remember(playing?.upNext) { UpNextSlateState() }
     // The cast bar is shown (and the nav bar then drops its bottom inset) when there is a device to
     // name and the full-screen player is not up - except while a connect is in flight, so casting
     // from the player still shows the "Connexion à …" animation instead of no feedback at all. It is
@@ -471,6 +475,7 @@ private fun AppRoot(
                                 playing!!, currentPlayer, castState, onCastConnect, onCastDisconnect,
                                 fetchProgramWindow = vm::liveProgramWindow,
                                 onPlayNext = vm::playUpNext,
+                                upNextSlate = upNextSlate,
                             )
                         }
 
@@ -487,6 +492,7 @@ private fun AppRoot(
                                 playing!!, currentPlayer, castState, onCastConnect, onCastDisconnect,
                                 fetchProgramWindow = vm::liveProgramWindow, secure = false,
                                 onPlayNext = vm::playUpNext,
+                                upNextSlate = upNextSlate,
                             )
                         }
 
@@ -723,6 +729,7 @@ private fun AppRoot(
                     playing,
                     currentPlayer,
                     vm::playUpNext,
+                    upNextSlate,
                     Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = UP_NEXT_ABOVE_BARS),
                 )
             }
@@ -742,7 +749,7 @@ private fun AppRoot(
  * the Chromecast's, so the next episode also follows on the TV.
  */
 @Composable
-private fun UpNextOverlay(source: PlaybackSource, player: Player, onPlayNext: () -> Unit, modifier: Modifier) {
+private fun UpNextOverlay(source: PlaybackSource, player: Player, onPlayNext: () -> Unit, slate: UpNextSlateState, modifier: Modifier) {
     val upNext = source.upNext ?: return
     UpNextSlate(
         upNext,
@@ -757,6 +764,7 @@ private fun UpNextOverlay(source: PlaybackSource, player: Player, onPlayNext: ()
             }
         },
         modifier = modifier,
+        state = slate,
     )
 }
 
@@ -770,6 +778,7 @@ private fun PlayerSurface(
     fetchProgramWindow: suspend (String) -> ProgramWindow?,
     secure: Boolean = true,
     onPlayNext: () -> Unit = {},
+    upNextSlate: UpNextSlateState = remember(source.upNext) { UpNextSlateState() },
 ) {
     val view = LocalView.current
     DisposableEffect(secure) {
@@ -899,7 +908,7 @@ private fun PlayerSurface(
         // The next episode, near the end of this one, on the phone or the Chromecast (an etincelle TV
         // app plays it itself).
         if (!castState.toTvApp) {
-            UpNextOverlay(source, currentPlayer, onPlayNext, Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(16.dp))
+            UpNextOverlay(source, currentPlayer, onPlayNext, upNextSlate, Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(16.dp))
         }
     }
 }
