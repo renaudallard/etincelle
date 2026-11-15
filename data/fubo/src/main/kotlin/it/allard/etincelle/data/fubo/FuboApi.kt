@@ -110,6 +110,10 @@ interface FuboApi {
         @Query("tabID") tab: String = "id-tab-about",
     ): PageResponse
 
+    /** Every channel with its programmes over the next [minutes], for the system's TV guide. */
+    @GET("device-integrations/epg")
+    suspend fun deviceEpg(@Query("period") minutes: Int): EpgResponse
+
     /** Programmes recommended for the Android TV home screen row. */
     @GET("recommendations/topshelf/v1")
     suspend fun homeRecommendations(): TopshelfResponse

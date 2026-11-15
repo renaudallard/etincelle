@@ -170,6 +170,15 @@ follows each component's `actions`.
 - The official app fills a preview channel and Watch Next from them. On the Chromecast with Google
   TV tested, the provider took the channel but answered every Watch Next insert with SQLITE_FULL.
 
+## Device guide feed — VALIDATED live (2026-11-15)
+
+- `GET /device-integrations/epg?period=<minutes>` → `{response:[{type:"channelWithProgramAssets",
+  data:{channel, network, programsWithAssets}}]}` for all 205 channels; `period` is in minutes
+  (120: the programme on air, 720: up to 172 per channel, 10 MB; 1440: 19 MB). Air times are in
+  `assets[0].accessRights.startTime/endTime`.
+- The official app only uses it for Fire TV; etincelle writes 12 hours of it for its own TV input,
+  and tuning a channel through a TvView played it (video available after about 3.5 s on jardin).
+
 ## Live guide (EPG) — VALIDATED live
 
 `GET /epg` on `api-eu.fubo.tv` (NOT the dead `services-api-eu.fubo.tv`):

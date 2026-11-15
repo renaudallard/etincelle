@@ -18,15 +18,18 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 /**
- * Keeps the home screen row and Watch Next fresh (see [TvHome]): every few hours, and at once when
- * the app starts or leaves the screen, or when the system asks for the app's channels.
+ * Keeps the home screen row, Watch Next ([TvHome]) and the system guide's channels ([TvLive]) fresh:
+ * every few hours, and at once when the app starts or leaves the screen, or when the system asks for
+ * the app's channels.
  */
 class TvHomeJob : JobService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onStartJob(params: JobParameters): Boolean {
         scope.launch {
-            runCatching { TvHome.sync(applicationContext, (application as EtincelleTvApp).container.repository) }
+            val repo = (application as EtincelleTvApp).container.repository
+            runCatching { TvHome.sync(applicationContext, repo) }
+            runCatching { TvLive.sync(applicationContext, repo) }
             jobFinished(params, false)
         }
         return true

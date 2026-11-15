@@ -6,6 +6,7 @@ package it.allard.etincelle.core.domain
 import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.FavoriteOrder
 import it.allard.etincelle.core.model.HomeProgram
+import it.allard.etincelle.core.model.LiveChannel
 import it.allard.etincelle.core.model.LoginResult
 import it.allard.etincelle.core.model.MfaChallenge
 import it.allard.etincelle.core.model.PairingCode
@@ -64,6 +65,9 @@ interface MolotovRepository {
 
     /** Schedules a recording by replaying the backend's own record [action] (episode or whole series). */
     suspend fun record(action: RecordAction)
+
+    /** Every channel with its programmes over the next [hours], for the system's TV guide. */
+    suspend fun liveChannels(hours: Int): List<LiveChannel>
 
     /** Programmes recommended for the Android TV home screen. */
     suspend fun homeRecommendations(): List<HomeProgram>

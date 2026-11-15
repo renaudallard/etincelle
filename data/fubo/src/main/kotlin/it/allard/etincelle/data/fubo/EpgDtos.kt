@@ -7,6 +7,8 @@ import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.HomeProgram
+import it.allard.etincelle.core.model.LiveChannel
+import it.allard.etincelle.core.model.LiveProgram
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -151,5 +153,31 @@ fun TopshelfResponse.toHomePrograms(): List<HomeProgram> = response.orEmpty().ma
         // A live airing carries its air times; a replay or VOD carries its availability window.
         liveStartMs = start.takeIf { asset.assetId.startsWith("LIVE_") },
         liveEndMs = end.takeIf { asset.assetId.startsWith("LIVE_") },
+    )
+}
+
+/** The channels of a device guide feed (/device-integrations/epg), each with its timed programmes. */
+fun EpgResponse.toLiveChannels(): List<LiveChannel> = response.orEmpty().mapNotNull { entry ->
+    val channel = entry.data?.channel ?: return@mapNotNull null
+    val programs = entry.data.programsWithAssets.orEmpty().mapNotNull { pwa ->
+        val program = pwa.program ?: return@mapNotNull null
+        val asset = pwa.assets.orEmpty().firstOrNull() ?: return@mapNotNull null
+        val start = rfc3339UtcToEpochMillis(asset.accessRights?.startTime) ?: return@mapNotNull null
+        val end = rfc3339UtcToEpochMillis(asset.accessRights?.endTime)?.takeIf { it > start } ?: return@mapNotNull null
+        LiveProgram(
+            id = asset.assetId ?: program.programId ?: "$start",
+            title = program.heading ?: program.title ?: return@mapNotNull null,
+            episodeTitle = program.title?.takeIf { program.heading != null && it != program.heading },
+            description = program.shortDescription,
+            imageUrl = program.horizontalImage,
+            startMs = start,
+            endMs = end,
+        )
+    }
+    LiveChannel(
+        id = channel.id ?: return@mapNotNull null,
+        name = channel.displayName ?: channel.name ?: return@mapNotNull null,
+        logoUrl = channel.logoOnDarkUrl,
+        programs = programs,
     )
 }

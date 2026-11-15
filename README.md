@@ -164,6 +164,12 @@ ou fermeture de l'application ; choisir un programme ouvre sa fiche. L'écran d'
 classique les affiche ; le lanceur Google TV n'affiche pas les rangées des applications et, sur le
 Chromecast avec Google TV essayé, refuse les entrées de Watch Next.
 
+etincelle est aussi une **entrée TV** du système : ses chaînes Molotov, avec douze heures de
+programmes, rejoignent le **guide des chaînes** d'Android TV (l'onglet Direct de Google TV, là où il
+existe, ou l'application Chaînes en direct), et etincelle les lit elle-même quand on en choisit une.
+Le guide se met à jour au plus toutes les trois heures ; dans les paramètres du téléviseur
+(**Chaînes et entrées**), l'entrée etincelle ajoute les chaînes à la demande.
+
 Un compte protégé par la **validation en deux étapes** se connecte comme dans l'application
 officielle : après l'email et le mot de passe, etincelle demande le **code** envoyé par Molotov,
 avec **Renvoyer le code** s'il n'arrive pas.

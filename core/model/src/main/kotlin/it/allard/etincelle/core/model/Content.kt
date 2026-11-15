@@ -175,3 +175,16 @@ data class HomeProgram(
 ) {
     enum class Kind { MOVIE, EPISODE, OTHER }
 }
+
+/** A channel for the system's TV guide (Google TV live tab), with its programmes to come. */
+data class LiveChannel(val id: String, val name: String, val logoUrl: String?, val programs: List<LiveProgram>)
+
+data class LiveProgram(
+    val id: String,
+    val title: String,
+    val episodeTitle: String?,
+    val description: String?,
+    val imageUrl: String?,
+    val startMs: Long,
+    val endMs: Long,
+)

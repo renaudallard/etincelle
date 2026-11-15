@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- etincelle's TV input (TvLiveInputService): its setup writes Molotov's channels to the guide. -->
+<tv-input xmlns:android="http://schemas.android.com/apk/res/android"
+    android:setupActivity="it.allard.etincelle.tv.TvLiveSetupActivity" />
