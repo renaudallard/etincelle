@@ -4,6 +4,7 @@
 package it.allard.etincelle.mobile
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -38,6 +39,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -87,14 +89,19 @@ import it.allard.etincelle.core.designsystem.R as DesignR
 import it.allard.etincelle.core.designsystem.theme.BackgroundLevel1
 import it.allard.etincelle.core.designsystem.theme.BrandBlack
 import it.allard.etincelle.core.designsystem.theme.BrandYellow
+import it.allard.etincelle.core.model.Avatar
 import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.FavoriteOrder
 import it.allard.etincelle.core.model.expandable
 import it.allard.etincelle.core.model.groupBySeason
+import it.allard.etincelle.core.model.Profile
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.RecordAction
 import it.allard.etincelle.core.model.Recording
+import it.allard.etincelle.core.ui.PROFILE_NAME_MAX
+import it.allard.etincelle.core.ui.ProfileEditor
+import it.allard.etincelle.core.ui.ProfileScreen
 import it.allard.etincelle.core.ui.UpdateInfo
 import kotlin.math.roundToInt
 
@@ -403,6 +410,151 @@ fun UpdateDialog(info: UpdateInfo, progress: Int?, error: String?, onInstall: ()
     )
 }
 
+/**
+ * The profiles: "Qui regarde ?" when the app asks, or the list opened from the settings. A tile watches
+ * as that profile; with Modifier on, it opens the profile's editor instead. Ajouter un profil appears
+ * while the account has room for one more.
+ */
+@Composable
+fun ProfilesScreen(
+    screen: ProfileScreen,
+    busy: Boolean,
+    error: String?,
+    onPick: (Profile) -> Unit,
+    onEdit: (Profile?) -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var editing by remember { mutableStateOf(false) }
+    val list = screen.list
+    Column(modifier.fillMaxSize().statusBarsPadding()) {
+        Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = onBack) { Text("← Retour") }
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = { editing = !editing }, enabled = !busy) { Text(if (editing) "Terminé" else "Modifier") }
+        }
+        Text(
+            if (screen.asking) "Qui regarde ?" else "Profils",
+            style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp)) }
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(112.dp),
+            contentPadding = PaddingValues(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            items(list.profiles, key = { it.id }) { profile ->
+                ProfileTile(
+                    name = profile.name,
+                    avatarUrl = profile.avatarUrl,
+                    current = profile.id == screen.currentId,
+                    badge = if (editing) "✎" else null,
+                    onClick = { if (!busy) (if (editing) onEdit(profile) else onPick(profile)) },
+                )
+            }
+            if (list.profiles.size < list.maxAllowed) {
+                item(key = "add") { ProfileTile(name = "Ajouter un profil", avatarUrl = null, current = false, badge = "+", onClick = { if (!busy) onEdit(null) }) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileTile(name: String, avatarUrl: String?, current: Boolean, badge: String?, onClick: () -> Unit) {
+    Column(Modifier.clickable(onClick = onClick), horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            Modifier.size(96.dp).clip(CircleShape).background(BackgroundLevel1)
+                .border(if (current) 3.dp else 0.dp, if (current) BrandYellow else Color.Transparent, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (avatarUrl != null) {
+                AsyncImage(model = avatarUrl, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            }
+            badge?.let {
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (avatarUrl != null) 0.5f else 0f)), contentAlignment = Alignment.Center) {
+                    Text(it, style = MaterialTheme.typography.headlineMedium, color = Color.White)
+                }
+            }
+        }
+        Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+    }
+}
+
+/** Creates a profile or edits one: its name, its avatar, and (for an existing profile) deleting it. */
+@Composable
+fun ProfileEditorScreen(
+    editor: ProfileEditor,
+    avatars: List<Avatar>,
+    canDelete: Boolean,
+    busy: Boolean,
+    error: String?,
+    onSave: (String, Int?) -> Unit,
+    onDelete: () -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val profile = editor.profile
+    var name by remember(editor) { mutableStateOf(profile?.name.orEmpty()) }
+    var avatarId by remember(editor) { mutableStateOf(profile?.avatarId ?: avatars.firstOrNull()?.id) }
+    var confirm by remember(editor) { mutableStateOf(false) }
+    Column(modifier.fillMaxSize().statusBarsPadding()) {
+        Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = onBack) { Text("← Retour") }
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = { onSave(name, avatarId) }, enabled = !busy && name.isNotBlank()) { Text("Enregistrer") }
+        }
+        Text(
+            if (profile == null) "Ajouter un profil" else "Modifier le profil",
+            style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it.take(PROFILE_NAME_MAX) },
+            label = { Text("Nom du profil") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        )
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
+        Text("Avatar", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 16.dp, top = 16.dp))
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(72.dp),
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(avatars, key = { it.id }) { avatar ->
+                val selected = avatar.id == avatarId
+                AsyncImage(
+                    model = avatar.url,
+                    contentDescription = null,
+                    modifier = Modifier.size(72.dp).clip(CircleShape)
+                        .border(if (selected) 3.dp else 0.dp, if (selected) BrandYellow else Color.Transparent, CircleShape)
+                        .clickable { avatarId = avatar.id },
+                    contentScale = ContentScale.Crop,
+                )
+            }
+        }
+        if (profile != null && canDelete) {
+            TextButton(onClick = { confirm = true }, enabled = !busy, modifier = Modifier.padding(16.dp)) {
+                Text("Supprimer le profil", color = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+    if (confirm) {
+        AlertDialog(
+            onDismissRequest = { confirm = false },
+            title = { Text("Supprimer le profil ?") },
+            text = { Text("Tous les enregistrements et les données de ce profil seront définitivement supprimés.") },
+            confirmButton = { TextButton(onClick = { confirm = false; onDelete() }) { Text("Supprimer") } },
+            dismissButton = { TextButton(onClick = { confirm = false }) { Text("Annuler") } },
+        )
+    }
+}
+
 /** Reorders the favourite channels: ▲ and ▼ move a channel, Enregistrer saves the new order. */
 @Composable
 fun FavoriteOrderScreen(
@@ -479,6 +631,7 @@ fun SettingsScreen(
     connectInfo: String? = null,
     connectError: String? = null,
     connecting: Boolean = false,
+    onProfiles: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var confirm by remember { mutableStateOf(false) }
@@ -497,6 +650,17 @@ fun SettingsScreen(
             Spacer(Modifier.width(8.dp))
             Text("Paramètres", style = MaterialTheme.typography.titleLarge)
         }
+        Column(
+            Modifier.fillMaxWidth().clickable(onClick = onProfiles).padding(horizontal = 16.dp, vertical = 12.dp),
+        ) {
+            Text("Profils", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "Changer de profil, en ajouter ou les modifier",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        HorizontalDivider(Modifier.padding(horizontal = 16.dp))
         SettingToggle(
             title = "Masquer les contenus verrouillés",
             subtitle = "Cache les programmes non inclus dans votre abonnement",

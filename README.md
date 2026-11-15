@@ -65,6 +65,12 @@ L'application accepte aussi des **liens profonds** vers une fiche, pour l'intég
 applications tierces (par ex. [multistream](https://github.com/renaudallard/multistream)) :
 `etincelle://series/{id}`, `etincelle://program/{id}` ou `etincelle://channel/{id}` (identifiants Fubo).
 
+Les **profils** du compte sont pris en charge : avec plusieurs profils, etincelle demande **Qui
+regarde ?** au démarrage, comme l'application officielle (quand le choix date de plus de deux jours
+ou que les profils ont changé). **Profils**, dans les paramètres, permet de changer de profil, d'en
+**ajouter** (jusqu'à la limite du compte), et avec **Modifier** de renommer un profil, de changer
+son avatar ou de le supprimer. Les chaînes favorites et l'accueil suivent le profil choisi.
+
 Elle ajoute un **sélecteur de saison** sur les séries qui en comptent plusieurs, et des **icônes de
 genre** dans les grilles de catégories. Les vignettes portent le **logo de la chaîne** qui propose le
 programme (directs, résultats de recherche…), comme dans l'application officielle. Sur téléphone, un

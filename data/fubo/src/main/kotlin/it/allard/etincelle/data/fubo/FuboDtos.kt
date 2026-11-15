@@ -4,6 +4,9 @@
 package it.allard.etincelle.data.fubo
 
 import com.squareup.moshi.Json
+import it.allard.etincelle.core.model.Avatar
+import it.allard.etincelle.core.model.Profile
+import it.allard.etincelle.core.model.Profiles
 
 // --- Auth ---
 
@@ -52,6 +55,28 @@ data class UserResponse(val data: UserData?)
 data class UserData(val id: String?, val profiles: List<ProfileDto>?)
 
 data class ProfileDto(val id: String?, val name: String?)
+
+// --- Profiles (/profile) ---
+
+data class ProfilesResponse(
+    val profiles: List<ProfileFullDto>?,
+    val avatars: List<AvatarDto>?,
+    @Json(name = "max_allowed") val maxAllowed: Int?,
+)
+data class ProfileFullDto(val id: String?, val name: String?, val avatar: AvatarDto?)
+data class AvatarDto(val id: Int?, val url: String?)
+data class ProfileRequest(val name: String, @Json(name = "avatar_id") val avatarId: Int?)
+data class ProfileResponse(val profile: ProfileFullDto?)
+
+fun ProfileFullDto.toProfile(): Profile? =
+    Profile(id ?: return null, name?.takeIf { it.isNotBlank() } ?: "Profil", avatar?.id, avatar?.url)
+
+// The official app allows 6 profiles when the backend gives no limit.
+fun ProfilesResponse.toProfiles() = Profiles(
+    profiles = profiles.orEmpty().mapNotNull { it.toProfile() },
+    avatars = avatars.orEmpty().mapNotNull { a -> Avatar(a.id ?: return@mapNotNull null, a.url ?: return@mapNotNull null) },
+    maxAllowed = maxAllowed ?: 6,
+)
 
 // --- Playback (/vapi/asset/v1) ---
 

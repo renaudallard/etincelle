@@ -4,6 +4,7 @@
 package it.allard.etincelle.data.fubo
 
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
@@ -42,6 +43,19 @@ interface FuboApi {
 
     @GET("user")
     suspend fun user(): UserResponse
+
+    /** The account's profiles, the avatars to choose from, and the profile limit. */
+    @GET("profile")
+    suspend fun profiles(): ProfilesResponse
+
+    @POST("profile")
+    suspend fun createProfile(@Body body: ProfileRequest): ProfileResponse
+
+    @PUT("profile/{id}")
+    suspend fun updateProfile(@Path("id") id: String, @Body body: ProfileRequest): ProfileResponse
+
+    @DELETE("profile/{id}")
+    suspend fun deleteProfile(@Path("id") id: String): retrofit2.Response<Unit>
 
     /** Server-driven home page (carousels of cards). */
     @GET("papi/v1/page/home")

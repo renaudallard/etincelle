@@ -14,6 +14,8 @@ import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.FavoriteOrder
 import it.allard.etincelle.core.model.PlaybackSource
+import it.allard.etincelle.core.model.Profile
+import it.allard.etincelle.core.model.Profiles
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.ProgramWindow
 import it.allard.etincelle.core.model.RecordAction
@@ -38,6 +40,8 @@ private const val PAIRING_RETRY_MS = 5000L
 // the login screen cannot poll indefinitely.
 private const val PAIRING_MAX_ROUNDS = 12
 private const val UPDATE_INTERVAL_MS = 24 * 60 * 60 * 1000L
+// The official app caps a profile name at 30 characters.
+const val PROFILE_NAME_MAX = 30
 
 enum class Tab(val label: String, val icon: String, val path: String) {
     HOME("Accueil", "🏠", "papi/v1/page/home"),
@@ -71,6 +75,10 @@ data class UiState(
     val settings: Boolean = false,
     // The favourite channels being reordered (the reorder screen is open), or null.
     val favoriteOrder: FavoriteOrder? = null,
+    // The profiles screen (asking who is watching, or opened from the settings), or null.
+    val profileScreen: ProfileScreen? = null,
+    // A profile being created (profile null) or edited, over the profiles screen.
+    val profileEditor: ProfileEditor? = null,
     val update: UpdateInfo? = null,
     // The proposed update is downloading (percent), and the message when installing it failed.
     val updateProgress: Int? = null,
@@ -111,6 +119,12 @@ data class UiState(
     }
 }
 
+/** The profiles screen: [asking] when the app asks who is watching, else opened from the settings. */
+data class ProfileScreen(val list: Profiles, val currentId: String?, val asking: Boolean)
+
+/** The profile being edited, or a new one when [profile] is null. */
+data class ProfileEditor(val profile: Profile?)
+
 /** Shared presentation logic for both the phone and TV apps. */
 class MainViewModel(
     private val repo: MolotovRepository,
@@ -128,6 +142,7 @@ class MainViewModel(
                     .onSuccess { page ->
                         _state.update { it.copy(checking = false, loggedIn = true, tab = Tab.HOME, backStack = listOf(page)) }
                         consumeDeepLink()
+                        askWhoIsWatching()
                     }
                     .onFailure { e ->
                         // Only a genuinely dead session (the repo cleared it) returns to login; a transient
@@ -157,6 +172,7 @@ class MainViewModel(
             }.onSuccess { page ->
                 _state.update { it.copy(busy = false, loggedIn = true, tab = Tab.HOME, backStack = listOf(page)) }
                 consumeDeepLink()
+                askWhoIsWatching()
             }.onFailure { e ->
                 applyFailure(e, "Échec de connexion")
             }
@@ -210,6 +226,7 @@ class MainViewModel(
                             }
                         }
                         consumeDeepLink()
+                        askWhoIsWatching()
                         return@launch
                     }
                 }
@@ -594,6 +611,100 @@ class MainViewModel(
                     }
                 }
                 .onFailure { e -> applyFailure(e, "Échec de l'enregistrement") }
+        }
+    }
+
+    // With several profiles, asks who is watching when the official app would (best-effort: a failed
+    // lookup keeps the current profile).
+    private fun askWhoIsWatching() {
+        viewModelScope.launch {
+            val list = runCatching { repo.profilesToPick() }.getOrNull() ?: return@launch
+            _state.update { it.copy(profileScreen = ProfileScreen(list, repo.currentSession()?.profileId, asking = true)) }
+        }
+    }
+
+    /** Opens the profiles screen from the settings. */
+    fun openProfiles() {
+        if (_state.value.busy) return
+        _state.update { it.copy(busy = true, error = null, info = null) }
+        viewModelScope.launch {
+            runCatching { repo.profiles() }
+                .onSuccess { list ->
+                    _state.update { it.copy(busy = false, profileScreen = ProfileScreen(list, repo.currentSession()?.profileId, asking = false)) }
+                }
+                .onFailure { e -> applyFailure(e, "Échec de chargement des profils") }
+        }
+    }
+
+    /** Watches as [profile]: closes the profiles screen and, for another profile, reloads from Accueil. */
+    fun pickProfile(profile: Profile) {
+        if (_state.value.busy) return
+        val switching = profile.id != repo.currentSession()?.profileId
+        _state.update { it.copy(busy = true, error = null, info = null) }
+        viewModelScope.launch {
+            runCatching { repo.selectProfile(profile.id) }
+                .onSuccess {
+                    _state.update {
+                        it.copy(busy = false, profileScreen = null, profileEditor = null, settings = false, detailStack = emptyList())
+                    }
+                    if (switching) reloadHome(silent = false)
+                }
+                .onFailure { e -> applyFailure(e, "Échec du changement de profil") }
+        }
+    }
+
+    fun closeProfiles() = _state.update { it.copy(profileScreen = null, profileEditor = null) }
+
+    /** Opens the editor on [profile], or on a new profile when null. */
+    fun editProfile(profile: Profile?) = _state.update { it.copy(profileEditor = ProfileEditor(profile), error = null) }
+
+    fun closeProfileEditor() = _state.update { it.copy(profileEditor = null, error = null) }
+
+    /** Creates the profile in the editor, or renames it and changes its avatar, then refreshes the list. */
+    fun saveProfile(name: String, avatarId: Int?) {
+        val editor = _state.value.profileEditor ?: return
+        val trimmed = name.trim().take(PROFILE_NAME_MAX)
+        if (trimmed.isEmpty() || _state.value.busy) return
+        _state.update { it.copy(busy = true, error = null, info = null) }
+        viewModelScope.launch {
+            runCatching {
+                val profile = editor.profile
+                if (profile == null) repo.createProfile(trimmed, avatarId) else repo.updateProfile(profile.id, trimmed, avatarId)
+                repo.profiles()
+            }.onSuccess { list ->
+                _state.update { st ->
+                    st.copy(
+                        busy = false,
+                        profileEditor = null,
+                        profileScreen = st.profileScreen?.copy(list = list),
+                        info = if (editor.profile == null) "Profil créé" else "Profil modifié",
+                    )
+                }
+            }.onFailure { e -> applyFailure(e, "Échec de l'enregistrement du profil") }
+        }
+    }
+
+    /** Deletes the profile in the editor; deleting the current one switches to another and reloads. */
+    fun deleteProfile() {
+        val profile = _state.value.profileEditor?.profile ?: return
+        if (_state.value.busy) return
+        val current = profile.id == repo.currentSession()?.profileId
+        _state.update { it.copy(busy = true, error = null, info = null) }
+        viewModelScope.launch {
+            runCatching {
+                repo.deleteProfile(profile.id)
+                repo.profiles()
+            }.onSuccess { list ->
+                _state.update { st ->
+                    st.copy(
+                        busy = false,
+                        profileEditor = null,
+                        profileScreen = st.profileScreen?.copy(list = list, currentId = repo.currentSession()?.profileId),
+                        info = "Profil supprimé",
+                    )
+                }
+                if (current) reloadHome(silent = false)
+            }.onFailure { e -> applyFailure(e, "Échec de la suppression du profil") }
         }
     }
 

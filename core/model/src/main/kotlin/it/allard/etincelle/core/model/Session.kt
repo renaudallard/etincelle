@@ -11,6 +11,14 @@ data class UserSession(
     val profileId: String,
 )
 
+/** A viewer profile of the account; [avatarId] picks one of [Profiles.avatars]. */
+data class Profile(val id: String, val name: String, val avatarId: Int?, val avatarUrl: String?)
+
+data class Avatar(val id: Int, val url: String)
+
+/** The account's profiles, the avatars a profile can take, and how many profiles it may have. */
+data class Profiles(val profiles: List<Profile>, val avatars: List<Avatar>, val maxAllowed: Int)
+
 /** Domain-level failures surfaced to the UI, carrying user-facing French messages. */
 sealed class AppError(message: String) : Exception(message) {
     data object Unauthorized : AppError("Session expirée, reconnectez-vous")

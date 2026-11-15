@@ -55,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.focus.FocusRequester
@@ -89,14 +90,19 @@ import it.allard.etincelle.core.designsystem.theme.BackgroundLevel1
 import it.allard.etincelle.core.designsystem.theme.BackgroundLevel2
 import it.allard.etincelle.core.designsystem.theme.BrandBlack
 import it.allard.etincelle.core.designsystem.theme.BrandYellow
+import it.allard.etincelle.core.model.Avatar
 import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.expandable
 import it.allard.etincelle.core.model.FavoriteOrder
 import it.allard.etincelle.core.model.groupBySeason
+import it.allard.etincelle.core.model.Profile
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.RecordAction
 import it.allard.etincelle.core.model.Recording
+import it.allard.etincelle.core.ui.PROFILE_NAME_MAX
+import it.allard.etincelle.core.ui.ProfileEditor
+import it.allard.etincelle.core.ui.ProfileScreen
 import it.allard.etincelle.core.ui.Tab
 import it.allard.etincelle.core.ui.UiState
 import it.allard.etincelle.core.ui.UpdateInfo
@@ -447,6 +453,7 @@ fun TvSettingsScreen(
     onLogout: () -> Unit,
     gridColumns: Int,
     onGridColumns: (Int) -> Unit,
+    onProfiles: () -> Unit = {},
 ) {
     var confirm by remember { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
@@ -463,6 +470,7 @@ fun TvSettingsScreen(
                 TvButton(onClick = onLogout) { Text("Se déconnecter") }
             }
         }
+        TvButton(onClick = onProfiles, highlighted = false) { Text("Profils") }
         Text("Vignettes par ligne : $gridColumns", style = MaterialTheme.typography.titleMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for (n in TvPrefs.MIN_GRID_COLUMNS..TvPrefs.MAX_GRID_COLUMNS) {
@@ -470,6 +478,158 @@ fun TvSettingsScreen(
                     onClick = { TvPrefs.setGridColumns(context, n); onGridColumns(n) },
                     highlighted = n == gridColumns,
                 ) { Text("$n") }
+            }
+        }
+    }
+}
+
+/**
+ * The profiles with the remote: "Qui regarde ?" when the app asks, or the list opened from the settings.
+ * OK on a profile watches as it; with Modifier les profils on, it opens the profile's editor instead.
+ */
+@Composable
+fun TvProfilesScreen(
+    screen: ProfileScreen,
+    busy: Boolean,
+    error: String?,
+    onPick: (Profile) -> Unit,
+    onEdit: (Profile?) -> Unit,
+    onBack: () -> Unit,
+) {
+    var editing by remember { mutableStateOf(false) }
+    val first = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        runCatching { first.requestFocus() }
+    }
+    val list = screen.list
+    Column(Modifier.fillMaxSize().padding(OVERSCAN), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+        Text(if (screen.asking) "Qui regarde ?" else "Profils", style = MaterialTheme.typography.displaySmall)
+        error?.let { Text(it, color = BrandYellow) }
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(32.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+            itemsIndexed(list.profiles, key = { _, p -> p.id }) { i, profile ->
+                TvProfileTile(
+                    profile.name, profile.avatarUrl, profile.id == screen.currentId, if (editing) "✎" else null,
+                    onClick = { if (!busy) (if (editing) onEdit(profile) else onPick(profile)) },
+                    modifier = if (i == 0) Modifier.focusRequester(first) else Modifier,
+                )
+            }
+            if (list.profiles.size < list.maxAllowed) {
+                item(key = "add") { TvProfileTile("Ajouter un profil", null, false, "+", onClick = { if (!busy) onEdit(null) }) }
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            TvButton(onClick = { editing = !editing }, highlighted = false) {
+                Text(if (editing) "Terminé" else "Modifier les profils")
+            }
+            TvButton(onClick = onBack, highlighted = false) { Text("Retour") }
+        }
+    }
+}
+
+@Composable
+private fun TvProfileTile(name: String, avatarUrl: String?, current: Boolean, badge: String?, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    var focused by remember { mutableStateOf(false) }
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier.size(128.dp)
+                .onFocusChanged { focused = it.isFocused }
+                .clip(CircleShape)
+                .background(BackgroundLevel2)
+                .border(
+                    if (focused || current) 4.dp else 0.dp,
+                    if (focused) Color.White else if (current) BrandYellow else Color.Transparent,
+                    CircleShape,
+                )
+                .clickable(onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (avatarUrl != null) {
+                AsyncImage(model = avatarUrl, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            }
+            badge?.let {
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (avatarUrl != null) 0.5f else 0f)), contentAlignment = Alignment.Center) {
+                    Text(it, style = MaterialTheme.typography.displaySmall, color = Color.White)
+                }
+            }
+        }
+        Text(name, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
+    }
+}
+
+/** Creates a profile or edits one with the remote: its name, its avatar, and deleting it. */
+@Composable
+fun TvProfileEditorScreen(
+    editor: ProfileEditor,
+    avatars: List<Avatar>,
+    canDelete: Boolean,
+    busy: Boolean,
+    error: String?,
+    onSave: (String, Int?) -> Unit,
+    onDelete: () -> Unit,
+    onBack: () -> Unit,
+) {
+    val profile = editor.profile
+    var name by remember(editor) { mutableStateOf(profile?.name.orEmpty()) }
+    var avatarId by remember(editor) { mutableStateOf(profile?.avatarId ?: avatars.firstOrNull()?.id) }
+    var confirm by remember(editor) { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    val saveFocus = remember { FocusRequester() }
+    LaunchedEffect(confirm) {
+        withFrameNanos { }
+        runCatching { saveFocus.requestFocus() }
+    }
+    Column(Modifier.fillMaxSize().padding(OVERSCAN), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        Text(if (profile == null) "Ajouter un profil" else "Modifier le profil", style = MaterialTheme.typography.displaySmall)
+        if (confirm) {
+            Text("Supprimer le profil ?", color = Color.White, style = MaterialTheme.typography.titleLarge)
+            Text(
+                "Tous les enregistrements et les données de ce profil seront définitivement supprimés.",
+                color = Color.White.copy(alpha = 0.8f),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                TvButton(onClick = { confirm = false }, modifier = Modifier.focusRequester(saveFocus)) { Text("Annuler") }
+                TvButton(onClick = { confirm = false; onDelete() }, highlighted = false, enabled = !busy) { Text("Supprimer") }
+            }
+            return@Column
+        }
+        OutlinedTextField(
+            name, { name = it.take(PROFILE_NAME_MAX) }, label = { Text("Nom du profil") }, singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { runCatching { saveFocus.requestFocus() } }),
+            modifier = Modifier.width(480.dp).dpadLeavesField(focusManager),
+        )
+        error?.let { Text(it, color = BrandYellow) }
+        Text("Avatar", style = MaterialTheme.typography.titleMedium)
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 6.dp)) {
+            items(avatars, key = { it.id }) { avatar ->
+                var focused by remember { mutableStateOf(false) }
+                val selected = avatar.id == avatarId
+                AsyncImage(
+                    model = avatar.url,
+                    contentDescription = null,
+                    modifier = Modifier.size(88.dp)
+                        // Down goes on to Enregistrer, not to the button nearest on screen.
+                        .focusProperties { down = saveFocus }
+                        .onFocusChanged { focused = it.isFocused }
+                        .clip(CircleShape)
+                        .border(
+                            if (focused || selected) 4.dp else 0.dp,
+                            if (focused) Color.White else if (selected) BrandYellow else Color.Transparent,
+                            CircleShape,
+                        )
+                        .clickable { avatarId = avatar.id },
+                    contentScale = ContentScale.Crop,
+                )
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            TvButton(onClick = { onSave(name, avatarId) }, enabled = !busy && name.isNotBlank(), modifier = Modifier.focusRequester(saveFocus)) {
+                Text("Enregistrer")
+            }
+            TvButton(onClick = onBack, highlighted = false) { Text("Annuler") }
+            if (profile != null && canDelete) {
+                TvButton(onClick = { confirm = true }, highlighted = false, enabled = !busy) { Text("Supprimer le profil") }
             }
         }
     }

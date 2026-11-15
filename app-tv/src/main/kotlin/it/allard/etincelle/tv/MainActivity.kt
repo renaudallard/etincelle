@@ -118,6 +118,8 @@ class MainActivity : ComponentActivity() {
                     // the screen `when` so it survives that swap (the browse branch leaves composition).
                     val contentStateHolder = rememberSaveableStateHolder()
                     val favoriteOrder = state.favoriteOrder
+                    val profileScreen = state.profileScreen
+                    val profileEditor = state.profileEditor
                     CompositionLocalProvider(LocalFavoriteToggle provides viewModel::toggleFavorite) {
                     Box(Modifier.fillMaxSize()) {
                     when {
@@ -143,6 +145,28 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
+                        profileEditor != null -> {
+                            BackHandler { viewModel.closeProfileEditor() }
+                            TvProfileEditorScreen(
+                                profileEditor,
+                                avatars = profileScreen?.list?.avatars.orEmpty(),
+                                canDelete = (profileScreen?.list?.profiles?.size ?: 0) > 1,
+                                busy = state.busy,
+                                error = state.error,
+                                onSave = viewModel::saveProfile,
+                                onDelete = viewModel::deleteProfile,
+                                onBack = viewModel::closeProfileEditor,
+                            )
+                        }
+
+                        profileScreen != null -> {
+                            BackHandler { viewModel.closeProfiles() }
+                            TvProfilesScreen(
+                                profileScreen, state.busy, state.error,
+                                viewModel::pickProfile, viewModel::editProfile, viewModel::closeProfiles,
+                            )
+                        }
+
                         favoriteOrder != null -> {
                             BackHandler { viewModel.closeFavoriteOrder() }
                             TvFavoriteOrderScreen(
@@ -156,6 +180,7 @@ class MainActivity : ComponentActivity() {
                             TvSettingsScreen(
                                 onBack = viewModel::closeSettings,
                                 onLogout = viewModel::logout,
+                                onProfiles = viewModel::openProfiles,
                                 gridColumns = gridColumns,
                                 onGridColumns = { gridColumns = it },
                             )

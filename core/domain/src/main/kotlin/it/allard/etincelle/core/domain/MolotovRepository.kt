@@ -7,6 +7,8 @@ import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.FavoriteOrder
 import it.allard.etincelle.core.model.PairingCode
 import it.allard.etincelle.core.model.PlaybackSource
+import it.allard.etincelle.core.model.Profile
+import it.allard.etincelle.core.model.Profiles
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.ProgramWindow
 import it.allard.etincelle.core.model.RecordAction
@@ -52,6 +54,25 @@ interface MolotovRepository {
 
     /** Schedules a recording by replaying the backend's own record [action] (episode or whole series). */
     suspend fun record(action: RecordAction)
+
+    /** The account's profiles, with the avatars to choose from and the profile limit. */
+    suspend fun profiles(): Profiles
+
+    /**
+     * The profiles when the viewer should say who is watching, as the official app asks: with several
+     * profiles, when the current one is gone, the profiles changed, or the choice is over two days old.
+     * Null keeps the current profile.
+     */
+    suspend fun profilesToPick(): Profiles?
+
+    /** Watches as profile [id] from now on (it sends the x-profile-id of every request). */
+    suspend fun selectProfile(id: String)
+
+    suspend fun createProfile(name: String, avatarId: Int?): Profile
+    suspend fun updateProfile(id: String, name: String, avatarId: Int?)
+
+    /** Deletes profile [id]; deleting the current one switches to another profile. */
+    suspend fun deleteProfile(id: String)
 
     /** Adds a channel to the favourites or removes it, by replaying the card's own [action]. */
     suspend fun toggleFavorite(action: RecordAction)

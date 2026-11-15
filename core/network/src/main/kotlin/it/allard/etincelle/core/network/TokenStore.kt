@@ -5,6 +5,7 @@ package it.allard.etincelle.core.network
 
 import android.content.Context
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import it.allard.etincelle.core.model.UserSession
@@ -41,10 +42,24 @@ class TokenStore(private val context: Context) : SessionStore {
         context.dataStore.edit { it.clear() }
     }
 
+    override suspend fun readPick(): ProfilePick? {
+        val prefs = context.dataStore.data.first()
+        return ProfilePick(prefs[PICKED_AT] ?: return null, prefs[PICKED_IDS] ?: return null)
+    }
+
+    override suspend fun savePick(pick: ProfilePick) {
+        context.dataStore.edit { prefs ->
+            prefs[PICKED_AT] = pick.atMs
+            prefs[PICKED_IDS] = pick.ids
+        }
+    }
+
     private companion object {
         val ACCESS = stringPreferencesKey("access_token")
         val REFRESH = stringPreferencesKey("refresh_token")
         val USER_ID = stringPreferencesKey("user_id")
         val PROFILE_ID = stringPreferencesKey("profile_id")
+        val PICKED_AT = longPreferencesKey("profile_picked_at")
+        val PICKED_IDS = stringPreferencesKey("profile_picked_ids")
     }
 }

@@ -57,6 +57,16 @@ Geo/market is derived server-side from the egress IP (no `x-client-country` need
   `NO_SERVICE_FOR_SUBSCRIPTION`, `VPN_NETWORK`; **403** = `BLOCKED`, `BLOCKED_USER`; **429** =
   `TOO_MANY_REQUESTS`; **400** = `INVALID_BEARER_TOKEN`, `INVALID_REQUEST`.
 
+## Profiles — VALIDATED live (2026-11-15)
+
+- `GET /profile` → `{profiles:[{id, name, avatar:{id, url}, created_at, updated_at}], avatars:[{id,
+  url}] (10, images-eu.fubo.tv/profile_avatars/NN.png), max_allowed: 6}`.
+- `POST /profile` and `PUT /profile/{id}` with `{"name", "avatar_id"}` → `{"profile":{...}}`;
+  `DELETE /profile/{id}`. All three exercised live with a throwaway profile.
+- There is no select call: the chosen profile is only the `x-profile-id` header. Favourite channels
+  and the home greeting follow it. The official app asks "Qui regarde ?" again when the saved choice
+  is over two days old or the list of profile ids changed.
+
 ## Content — server-driven "page API" (papi)
 
 Everything is a server-rendered page of sections/components; the client renders generically and

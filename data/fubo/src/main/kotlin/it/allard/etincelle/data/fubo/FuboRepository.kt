@@ -14,6 +14,8 @@ import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.DrmSpec
 import it.allard.etincelle.core.model.FavoriteOrder
 import it.allard.etincelle.core.model.PlaybackSource
+import it.allard.etincelle.core.model.Profile
+import it.allard.etincelle.core.model.Profiles
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.ProgramWindow
 import it.allard.etincelle.core.model.RecordAction
@@ -22,6 +24,7 @@ import it.allard.etincelle.core.model.PairingCode
 import it.allard.etincelle.core.model.UserSession
 import it.allard.etincelle.core.model.coerceWholeNumbers
 import it.allard.etincelle.core.network.NetworkClient
+import it.allard.etincelle.core.network.ProfilePick
 import it.allard.etincelle.core.network.ProgressStore
 import it.allard.etincelle.core.network.SessionManager
 import it.allard.etincelle.core.network.SessionStore
@@ -42,6 +45,8 @@ private const val GUIDE_CHANNEL_LIMIT = 40
 private const val PROGRESS_OFFSET_KEY = "lastOffset"
 private const val PROGRESS_END_MS = 15_000L
 private const val PROGRESS_MIN_MS = 10_000L
+// The official app asks who is watching again once the last choice is two days old.
+private const val PROFILE_PICK_TTL_MS = 2L * 24 * 60 * 60 * 1000
 // See-all target for the injected recordings rail; loadPage routes any selectedTab=recordings url to
 // the genre-grouped recordings page.
 private const val RECORDINGS_PAGE_URL = "etincelle:recordings?selectedTab=recordings"
@@ -55,6 +60,7 @@ class FuboRepository(
     private val session: SessionManager,
     private val store: SessionStore,
     private val progress: ProgressStore,
+    private val clock: () -> Long = System::currentTimeMillis,
 ) : MolotovRepository {
     constructor(network: NetworkClient, store: SessionStore, progress: ProgressStore) : this(
         network.retrofit.create(FuboApi::class.java),
@@ -152,12 +158,74 @@ class FuboRepository(
         // the previous account's history.
         progress.clearAll()
         // Drop the cached channel data so the next account does not see the previous one's channels.
-        channelsPageCache = null
-        channelDirectory = null
+        dropAccountCaches()
         recordingGenres.clear()
     }
 
     override fun currentSession(): UserSession? = session.session
+
+    override suspend fun profiles(): Profiles = withRefresh { api.profiles().toProfiles() }
+
+    override suspend fun profilesToPick(): Profiles? {
+        val list = profiles()
+        val current = session.session ?: return null
+        val ids = list.profiles.map { it.id }
+        if (ids.isEmpty()) return null
+        if (ids.size == 1) {
+            // Nothing to choose: just make sure the one profile is the one in use.
+            if (current.profileId != ids[0]) selectProfile(ids[0])
+            return null
+        }
+        val pick = store.readPick()
+        val stale = current.profileId !in ids || pick == null || pick.ids != ids.joinToString(",") ||
+            clock() - pick.atMs > PROFILE_PICK_TTL_MS
+        return list.takeIf { stale }
+    }
+
+    override suspend fun selectProfile(id: String) {
+        val current = session.session ?: return
+        val ids = runCatching { profiles().profiles.map { it.id } }.getOrDefault(emptyList())
+        current.copy(profileId = id).let {
+            session.session = it
+            store.save(it)
+        }
+        store.savePick(ProfilePick(clock(), ids.joinToString(",")))
+        dropAccountCaches()
+    }
+
+    override suspend fun createProfile(name: String, avatarId: Int?): Profile = withRefresh {
+        val created = api.createProfile(ProfileRequest(name, avatarId)).profile?.toProfile()
+            ?: throw AppError.Unknown("Profil non créé")
+        rememberProfileIds()
+        created
+    }
+
+    override suspend fun updateProfile(id: String, name: String, avatarId: Int?) = withRefresh {
+        api.updateProfile(id, ProfileRequest(name, avatarId))
+        Unit
+    }
+
+    override suspend fun deleteProfile(id: String) {
+        withRefresh {
+            val response = api.deleteProfile(id)
+            if (!response.isSuccessful) throw HttpException(response)
+        }
+        val next = profiles().profiles.firstOrNull()
+        if (session.session?.profileId == id && next != null) selectProfile(next.id) else rememberProfileIds()
+    }
+
+    // The profiles changed from this device: keep the current choice instead of asking again.
+    private suspend fun rememberProfileIds() {
+        val pick = store.readPick() ?: return
+        val ids = profiles().profiles.joinToString(",") { it.id }
+        store.savePick(pick.copy(ids = ids))
+    }
+
+    // Pages that depend on the profile (favourite channels) must not be served from the cache.
+    private fun dropAccountCaches() {
+        channelsPageCache = null
+        channelDirectory = null
+    }
 
     override suspend fun loadHome(): ContentPage = withRefresh {
         val page = api.homePage().toPage()

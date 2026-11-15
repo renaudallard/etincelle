@@ -10,6 +10,7 @@ import it.allard.etincelle.core.model.AppError
 import it.allard.etincelle.core.model.DrmSpec
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.UserSession
+import it.allard.etincelle.core.network.ProfilePick
 import it.allard.etincelle.core.network.ProgressStore
 import it.allard.etincelle.core.network.SessionManager
 import it.allard.etincelle.core.network.SessionStore
@@ -379,7 +380,10 @@ class FuboRepositoryTest {
         var saved: UserSession? = null
         override suspend fun read() = saved
         override suspend fun save(session: UserSession) { saved = session }
-        override suspend fun clear() { saved = null }
+        override suspend fun clear() { saved = null; pick = null }
+        var pick: ProfilePick? = null
+        override suspend fun readPick() = pick
+        override suspend fun savePick(pick: ProfilePick) { this.pick = pick }
     }
 
     private class FakeProgressStore : ProgressStore {

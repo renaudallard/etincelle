@@ -413,6 +413,8 @@ private fun AppRoot(
     // that swap (the logged-in branch leaves composition while a detail is shown).
     val contentStateHolder = rememberSaveableStateHolder()
     val favoriteOrder = state.favoriteOrder
+    val profileScreen = state.profileScreen
+    val profileEditor = state.profileEditor
     CompositionLocalProvider(LocalFavoriteToggle provides vm::toggleFavorite) {
         Box(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize()) {
@@ -461,6 +463,30 @@ private fun AppRoot(
                             )
                         }
 
+                        profileEditor != null -> {
+                            BackHandler { vm.closeProfileEditor() }
+                            ProfileEditorScreen(
+                                profileEditor,
+                                avatars = state.profileScreen?.list?.avatars.orEmpty(),
+                                canDelete = (state.profileScreen?.list?.profiles?.size ?: 0) > 1,
+                                busy = state.busy,
+                                error = state.error,
+                                onSave = vm::saveProfile,
+                                onDelete = vm::deleteProfile,
+                                onBack = vm::closeProfileEditor,
+                            )
+                        }
+
+                        profileScreen != null -> {
+                            BackHandler { vm.closeProfiles() }
+                            ProfilesScreen(
+                                profileScreen, state.busy, state.error,
+                                onPick = vm::pickProfile,
+                                onEdit = vm::editProfile,
+                                onBack = vm::closeProfiles,
+                            )
+                        }
+
                         favoriteOrder != null -> {
                             BackHandler { vm.closeFavoriteOrder() }
                             FavoriteOrderScreen(
@@ -476,6 +502,7 @@ private fun AppRoot(
                             SettingsScreen(
                                 onBack = { vm.closeSettings() },
                                 onLogout = { vm.logout() },
+                                onProfiles = vm::openProfiles,
                                 hideLocked = state.hideLocked,
                                 onHideLocked = vm::setHideLocked,
                                 gridColumns = gridColumns,
