@@ -95,6 +95,16 @@ class MainViewModelTest {
         assertTrue(vm.state.value.backStack.isEmpty())
     }
 
+    @Test
+    fun loggingOutKeepsHideLocked() {
+        val vm = viewModel(FakeRepo())
+        vm.setHideLocked(true)
+        vm.logout()
+
+        assertFalse(vm.state.value.loggedIn)
+        assertTrue(vm.state.value.hideLocked)
+    }
+
     private fun viewModel(repo: FakeRepo) = MainViewModel(repo, UpdateChecker("0", "mobile", "http://127.0.0.1:9/")).also {
         assertTrue(it.state.value.loggedIn)
     }

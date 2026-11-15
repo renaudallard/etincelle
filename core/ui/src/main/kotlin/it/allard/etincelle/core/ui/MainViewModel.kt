@@ -982,7 +982,8 @@ class MainViewModel(
             // and leak the previous account's continue-watching position to the next one.
             saveJob?.cancelAndJoin()
             runCatching { repo.logout() }
-            _state.value = UiState(checking = false)
+            // Local prefs survive, as in applyFailure.
+            _state.update { UiState(checking = false, hideLocked = it.hideLocked, update = it.update) }
         }
     }
 }
