@@ -180,7 +180,18 @@ private fun recordActionFrom(text: TextDto?, actions: CtaActionsDto?): RecordAct
     return RecordAction(label = label, url = url, payload = payload)
 }
 
-fun PageResponse.toPage(): ContentPage = ContentPage(title?.text, toRails())
+fun PageResponse.toPage(): ContentPage {
+    val page = ContentPage(title?.text, toRails())
+    if (content?.template?.startsWith("my-stuff") != true) return page
+    // The user's own pages (Enregistrements, a show's folder of recordings) are grids, and a programme
+    // linked from them is a recording: its LIVE_ airing plays from the DVR, not as catch-up.
+    return page.copy(
+        isGrid = true,
+        rails = page.rails.map { rail ->
+            rail.copy(cards = rail.cards.map { if (it.vodId?.startsWith("LIVE_") == true) it.copy(recordingAssetId = it.vodId) else it })
+        },
+    )
+}
 
 /** Maps a `program-details/...` page (its `metadata` + the "À propos" `about` section) to a detail. */
 fun PageResponse.toProgramDetail(channelId: String?, vodId: String?, isLive: Boolean): ProgramDetail {
@@ -282,7 +293,8 @@ fun PageResponse.toRails(): List<ContentRail> {
     val sections = content?.sections ?: return emptyList()
     return sections.mapIndexedNotNull { index, section ->
         // Banners are single promo images, not browsable content; skip them (avoids a title-less 1-card row).
-        if (section.componentType == "banner") return@mapIndexedNotNull null
+        // Filter chips (Tout, Films, Séries… above the recordings) are not content either.
+        if (section.componentType == "banner" || section.componentType == "chip-filter") return@mapIndexedNotNull null
         val shape = cardShape(section.componentType)
         val cards = section.components.orEmpty().mapNotNull { it.toCard(shape) }
         if (cards.isEmpty()) null else ContentRail("rail-$index", section.title?.text, cards, section.seeAllUrl())
@@ -346,6 +358,8 @@ private fun ComponentDto.toCard(shape: CardShape = CardShape.WIDE): ContentCard?
         channelLogoUrl = body?.stationLogo?.url ?: header?.stationLogo?.url,
         favorite = actions?.onFavIconClick?.let { apiCall(it, if (isFavorite == true) "Retirer des favoris" else "Ajouter aux favoris") },
         isFavorite = isFavorite == true,
+        // A folder of recordings says how many episodes it holds ("14 épisodes").
+        badge = footer?.subtitle?.text?.takeIf { path?.contains("my-stuff/folder/") == true },
         timeLabel = (footer?.timeLabel?.text ?: info?.text)?.takeIf { it.isNotBlank() },
     )
 }

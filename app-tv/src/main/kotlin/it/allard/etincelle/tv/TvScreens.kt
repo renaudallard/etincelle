@@ -1164,8 +1164,9 @@ private fun TvCard(card: ContentCard, onCardClick: (ContentCard) -> Unit, focusM
                     modifier = Modifier.align(Alignment.TopStart).padding(6.dp).size(20.dp),
                 )
             }
+            // At the top: a narrow poster has no room for it beside the channel logo below.
             card.badge?.let {
-                Box(Modifier.align(Alignment.BottomStart).padding(4.dp).clip(RoundedCornerShape(4.dp)).background(BrandYellow).padding(horizontal = 4.dp)) {
+                Box(Modifier.align(Alignment.TopStart).padding(4.dp).clip(RoundedCornerShape(4.dp)).background(BrandYellow).padding(horizontal = 4.dp)) {
                     Text(it, color = BrandBlack, style = MaterialTheme.typography.labelSmall)
                 }
             }

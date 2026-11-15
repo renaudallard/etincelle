@@ -31,6 +31,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarDefaults
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.ui.unit.sp
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
@@ -362,8 +366,13 @@ private fun tabIconRes(tab: Tab): Int? = when (tab) {
     Tab.GUIDE -> DesignR.drawable.ic_grille
     Tab.MOVIES -> DesignR.drawable.ic_films
     Tab.SERIES -> DesignR.drawable.ic_series
+    Tab.RECORDINGS -> DesignR.drawable.ic_enregistrements
     Tab.SEARCH -> DesignR.drawable.ic_recherche
 }
+
+// The phone's bottom bar has room for seven tabs: Chaînes gives way to Enregistrements, as the channel
+// grid is also one "Tout voir" away on Accueil.
+private val PHONE_TABS = Tab.entries - Tab.CHANNELS
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -548,7 +557,7 @@ private fun AppRoot(
                                             }
                                         },
                                         actions = {
-                                            if (state.tab == Tab.CHANNELS && !state.canGoBack) {
+                                            if (state.onChannelsPage) {
                                                 IconButton(onClick = { vm.openFavoriteOrder() }) {
                                                     Icon(painterResource(DesignR.drawable.ic_favoris), contentDescription = "Réorganiser les favoris")
                                                 }
@@ -569,7 +578,7 @@ private fun AppRoot(
                                             NavigationBarDefaults.windowInsets
                                         },
                                     ) {
-                                        Tab.entries.forEach { tab ->
+                                        PHONE_TABS.forEach { tab ->
                                             // The tab stays marked on its sub-pages ("Tout voir", categories),
                                             // so the bar always says where you are; tapping it goes back to
                                             // the tab's first page.
@@ -590,11 +599,15 @@ private fun AppRoot(
                                                     }
                                                 },
                                                 label = {
-                                                    Text(
-                                                        tab.label,
-                                                        style = MaterialTheme.typography.labelSmall,
+                                                    // Seven tabs leave little room: a name that does not fit
+                                                    // shrinks rather than being cut.
+                                                    val labelStyle = MaterialTheme.typography.labelSmall
+                                                    BasicText(
+                                                        tab.shortLabel,
+                                                        style = labelStyle.copy(color = LocalContentColor.current),
                                                         maxLines = 1,
                                                         softWrap = false,
+                                                        autoSize = TextAutoSize.StepBased(minFontSize = 7.sp, maxFontSize = labelStyle.fontSize),
                                                     )
                                                 },
                                             )

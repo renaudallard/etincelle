@@ -43,7 +43,9 @@ générique reprend ensuite depuis le début. Un programme **pas encore diffusé
 passera (par exemple « Ce programme sera en direct dans 4 jours. ») au lieu d'un « Regarder » qui
 échouerait. La fiche d'une **série** offre un bouton **Enregistrer la série** (qui devient **Arrêter
 d'enregistrer la série** une fois l'enregistrement programmé) ; vous retrouvez vos
-**enregistrements** (DVR) dans une rangée dédiée sur l'accueil. Les contenus à la demande
+**enregistrements** (DVR) dans l'onglet **Enregistrements** (« Enregistrés » sur téléphone), en grille
+comme dans l'application officielle : une vignette par série indique son nombre d'épisodes et ouvre la
+liste des épisodes enregistrés, avec leur date d'enregistrement. Les contenus à la demande
 (rattrapage, VOD, enregistrements) sont mis en **mémoire tampon** plus loin à l'avance, selon la
 mémoire de l'appareil, pour qu'une brève coupure réseau n'interrompe pas la lecture. L'accueil réunit aussi les
 **applications des diffuseurs** (france.tv, MyTF1, M6+…) : ouvrez l'une d'elles pour parcourir son
@@ -55,9 +57,10 @@ préférence sur une chaîne incluse dans votre abonnement, avec le logo de la c
 le nombre affiché en tête de rangée en tient compte. Une recherche sans résultat l'indique par
 « Aucun résultat trouvé », et sur téléphone le clavier se ferme dès la recherche lancée pour laisser
 voir les résultats.
-L'onglet **Chaînes** ouvre la grille de **toutes les chaînes** (TNT, chaînes thématiques Molotov…)
-pour les parcourir directement ; ouvrir une chaîne propose son **direct** ainsi que ses **replays** et
-ses programmes **les plus vus**. Les **chaînes favorites** ouvrent cet onglet, dans l'ordre que vous
+La grille de **toutes les chaînes** (TNT, chaînes thématiques Molotov…) s'ouvre avec l'onglet
+**Chaînes** sur la TV, et sur téléphone avec **Tout voir** de la rangée *Chaînes en direct* de
+l'accueil (sa place dans la barre du bas revient aux enregistrements), pour les parcourir directement ; ouvrir une chaîne propose son **direct** ainsi que ses **replays** et
+ses programmes **les plus vus**. Les **chaînes favorites** ouvrent cette grille, dans l'ordre que vous
 choisissez : sur téléphone, l'**étoile** d'une chaîne l'ajoute aux favoris ou l'en retire, et l'étoile
 de la barre du haut ouvre **Réorganiser les favoris** (▲ et ▼ déplacent une chaîne) ; sur la TV, un
 **appui long sur OK** fait de même, et le bouton **Réorganiser les favoris** permet de saisir une

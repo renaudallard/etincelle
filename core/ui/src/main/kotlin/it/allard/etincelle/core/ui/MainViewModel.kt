@@ -48,13 +48,15 @@ private const val UPDATE_INTERVAL_MS = 24 * 60 * 60 * 1000L
 // The official app caps a profile name at 30 characters.
 const val PROFILE_NAME_MAX = 30
 
-enum class Tab(val label: String, val icon: String, val path: String) {
+// [shortLabel] is what the phone's crowded bottom bar shows.
+enum class Tab(val label: String, val icon: String, val path: String, val shortLabel: String = label) {
     HOME("Accueil", "🏠", "papi/v1/page/home"),
     LIVE("Direct", "📡", "papi/v1/page/live-tv"),
     CHANNELS("Chaînes", "📺", "papi/v1/page/channels"),
     GUIDE("Guide", "🗓", ""),
     MOVIES("Films", "🎬", "papi/v1/page/films"),
     SERIES("Séries", "📺", "papi/v1/page/series"),
+    RECORDINGS("Enregistrements", "⏺", "papi/v1/my-stuff/status/recordings", shortLabel = "Enregistrés"),
     SEARCH("Recherche", "🔍", ""),
 }
 
@@ -107,6 +109,9 @@ data class UiState(
 ) {
     val current: ContentPage? get() = backStack.lastOrNull()
     val canGoBack: Boolean get() = backStack.size > 1
+
+    /** The channel grid is shown, from its tab or a rail's "Tout voir": the favourites are reordered there. */
+    val onChannelsPage: Boolean get() = current?.reloadUrl?.substringBefore('?')?.endsWith(Tab.CHANNELS.path) == true
 
     /** The detail page currently shown (the top of the stack), or null when browsing. */
     val detail: ProgramDetail? get() = detailStack.lastOrNull()?.detail
@@ -404,7 +409,7 @@ class MainViewModel(
         _state.update { it.copy(busy = true, error = null, tab = tab) }
         // The Direct and Chaînes tabs load a page (/live-tv, /channels) that is also reachable from a
         // rail header, so render them as the same full-screen grid for a coherent experience.
-        loadPageInto(tab.path, replace = true, fallbackTitle = tab.label, grid = tab == Tab.LIVE || tab == Tab.CHANNELS)
+        loadPageInto(tab.path, replace = true, fallbackTitle = tab.label, grid = tab == Tab.LIVE || tab == Tab.CHANNELS || tab == Tab.RECORDINGS)
     }
 
     private fun reloadGuide(silent: Boolean) {
@@ -844,7 +849,7 @@ class MainViewModel(
         navLaunch {
             runCatchingNav { repo.loadPage(url) }
                 .onSuccess { page ->
-                    val titled = page.copy(title = page.title ?: fallbackTitle, isGrid = grid, reloadUrl = url)
+                    val titled = page.copy(title = page.title ?: fallbackTitle, isGrid = grid || page.isGrid, reloadUrl = url)
                     _state.update {
                         val stack = if (replace) listOf(titled) else it.backStack + titled
                         it.copy(busy = false, backStack = stack)
