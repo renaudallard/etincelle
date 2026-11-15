@@ -20,6 +20,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -52,6 +53,9 @@ class TvRemoteServer(
     // call to the backend, or any device on the network could flood the app's own calls with them.
     private var key: ByteArray? = null
     private val keyLock = Mutex()
+
+    // Handshakes in progress (main thread): each holds a thread, so a few at a time is all a phone needs.
+    private var handshakes = 0
 
     /** A phone is connected. */
     val connected: Boolean get() = link != null
@@ -101,7 +105,22 @@ class TvRemoteServer(
             runCatching { socket.close() }
             return
         }
-        val phone = runCatching { withContext(Dispatchers.IO) { RemoteLink.accept(socket, key) } }.getOrNull() ?: return
+        // Its read timeout only bounds each read: a device trickling bytes must not hold a thread for long.
+        if (handshakes >= MAX_HANDSHAKES) {
+            runCatching { socket.close() }
+            return
+        }
+        handshakes++
+        val deadline = scope?.launch {
+            delay(HANDSHAKE_DEADLINE_MS)
+            runCatching { socket.close() }
+        }
+        val phone = try {
+            runCatching { withContext(Dispatchers.IO) { RemoteLink.accept(socket, key) } }.getOrNull()
+        } finally {
+            handshakes--
+            deadline?.cancel()
+        } ?: return
         link?.close()
         link = phone
         try {
@@ -157,5 +176,7 @@ class TvRemoteServer(
     private companion object {
         const val PREFS = "remote"
         const val KEY_ID = "install_id"
+        const val MAX_HANDSHAKES = 4
+        const val HANDSHAKE_DEADLINE_MS = 5_000L
     }
 }
