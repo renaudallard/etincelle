@@ -105,15 +105,15 @@ data class FavoriteOrder(
 )
 
 /**
- * A DVR recording: a recorded (or scheduled) airing the user can play back. [assetId] is the dvr asset
- * passed to playback. [programId]/[seriesId] let a detail page keep only the recordings of its show.
+ * A DVR recording the user can play back: [title] is the episode, [subtitle] the day it was recorded.
+ * [assetId] is the dvr asset passed to playback. [programId]/[seriesId] let a detail page keep only the
+ * recordings of its show.
  */
 data class Recording(
     val assetId: String,
     val title: String?,
     val subtitle: String?,
     val imageUrl: String?,
-    val channelName: String?,
     val programId: String?,
     val seriesId: String?,
 )

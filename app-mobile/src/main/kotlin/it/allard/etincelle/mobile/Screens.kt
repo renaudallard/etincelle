@@ -1145,14 +1145,15 @@ private fun RecordButton(actions: List<RecordAction>, enabled: Boolean, onRecord
 /** One DVR recording on a detail page: its subtitle/channel plus a "Regarder l'enregistrement" action. */
 @Composable
 private fun RecordingRow(recording: Recording, enabled: Boolean, onWatch: () -> Unit) {
-    val label = listOfNotNull(recording.subtitle, recording.channelName).joinToString(" • ")
+    // The episode and the day it was recorded ("S16 E6 Agde • Enregistré: 30 sept.").
+    val label = listOfNotNull(recording.title, recording.subtitle).joinToString(" • ")
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            label.ifBlank { recording.title ?: "Enregistrement" },
+            label.ifBlank { "Enregistrement" },
             style = MaterialTheme.typography.bodyMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

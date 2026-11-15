@@ -1040,10 +1040,11 @@ private fun TvEpisodeRow(
 @Composable
 private fun TvRecordingRow(recording: Recording, enabled: Boolean, onWatch: () -> Unit, focus: FocusRequester? = null) {
     if (focus != null) LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    val label = listOfNotNull(recording.subtitle, recording.channelName).joinToString(" • ")
+    // The episode and the day it was recorded ("S16 E6 Agde • Enregistré: 30 sept.").
+    val label = listOfNotNull(recording.title, recording.subtitle).joinToString(" • ")
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(
-            label.ifBlank { recording.title ?: "Enregistrement" },
+            label.ifBlank { "Enregistrement" },
             style = MaterialTheme.typography.bodyMedium,
             color = Color.White,
             maxLines = 1,

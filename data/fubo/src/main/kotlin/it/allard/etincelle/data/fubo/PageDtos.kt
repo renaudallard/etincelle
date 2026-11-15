@@ -286,7 +286,6 @@ fun PageResponse.toRecordings(seriesId: String): List<Recording> = content?.sect
             title = card.title,
             subtitle = card.caption,
             imageUrl = card.imageUrl,
-            channelName = null,
             programId = row.id?.substringBefore('-')?.let { PROGRAM_ID_REGEX.find(it)?.groupValues?.get(1) },
             seriesId = seriesId,
         )
