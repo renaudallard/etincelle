@@ -685,8 +685,13 @@ class MainViewModel(
         viewModelScope.launch {
             runCatching { repo.selectProfile(profile.id) }
                 .onSuccess {
+                    // The same profile keeps what was open, such as a programme opened from a link.
                     _state.update {
-                        it.copy(busy = false, profileScreen = null, profileEditor = null, settings = false, detailStack = emptyList())
+                        if (switching) {
+                            it.copy(busy = false, profileScreen = null, profileEditor = null, settings = false, detailStack = emptyList())
+                        } else {
+                            it.copy(busy = false, profileScreen = null, profileEditor = null)
+                        }
                     }
                     if (switching) reloadHome(silent = false)
                 }
