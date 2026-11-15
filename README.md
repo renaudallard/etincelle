@@ -141,7 +141,9 @@ qu'elle reste ouverte, et propose d'installer la dernière version lorsqu'une pl
 disponible (l'APK téléphone sur le téléphone, l'APK TV sur la TV). **Installer** la télécharge,
 vérifie sa taille et son empreinte SHA-256 publiées par GitHub, puis la confie à l'installateur
 d'Android, qui demande confirmation. La première fois, etincelle ouvre la page des paramètres où
-l'autoriser à installer des applications ; appuyez ensuite à nouveau sur **Installer**.
+l'autoriser à installer des applications ; appuyez ensuite à nouveau sur **Installer**. Sur un
+téléviseur qui n'a pas cette page, etincelle ouvre ses paramètres et indique le chemin : **Applications
+> Sécurité et restrictions > Sources inconnues**, puis etincelle.
 
 > ### ⚠️ Avertissement
 >

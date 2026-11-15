@@ -9,6 +9,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -24,11 +25,24 @@ import java.io.File
  */
 fun Activity.installUpdate(viewModel: MainViewModel) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
-        val page = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName"))
-        val opened = runCatching { startActivity(page) }.isSuccess
+        // The closest page the device has: this app's own switch, the list of apps that may install
+        // apps, then the security or main settings. Some TVs have none of the first two, and asking
+        // for a page nothing handles only gets Android's "no app can do this".
+        val opened = listOf(
+            Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")),
+            Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES),
+            Intent(Settings.ACTION_SECURITY_SETTINGS),
+            Intent(Settings.ACTION_SETTINGS),
+        ).firstOrNull { page ->
+            packageManager.queryIntentActivities(page, PackageManager.MATCH_DEFAULT_ONLY).isNotEmpty() &&
+                runCatching { startActivity(page) }.isSuccess
+        }
         viewModel.setUpdateError(
-            if (opened) "Autorisez etincelle à installer des applications, puis appuyez à nouveau sur Installer."
-            else "Autorisez etincelle à installer des applications dans les paramètres Android, puis réessayez.",
+            when (opened?.action) {
+                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES -> "Autorisez etincelle à installer des applications, puis appuyez à nouveau sur Installer."
+                null -> "Autorisez etincelle dans Paramètres > Applications > Sécurité et restrictions > Sources inconnues, puis réessayez."
+                else -> "Dans Applications > Sécurité et restrictions > Sources inconnues, autorisez etincelle, puis appuyez à nouveau sur Installer."
+            },
         )
         return
     }
