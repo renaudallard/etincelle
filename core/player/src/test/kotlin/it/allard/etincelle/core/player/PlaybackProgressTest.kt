@@ -25,6 +25,20 @@ class PlaybackProgressTest {
     }
 
     @Test
+    fun sampledPositionKeepsTheResumePointWhileLoading() {
+        val withNext = episode.copy(upNext = upNext)
+        // A load under way (position 0 before its seek) leaves the saved point alone.
+        assertEquals(null, PlaybackProgress.sampledToSave(withNext, 0, 200_000))
+        assertEquals(null, PlaybackProgress.sampledToSave(withNext, 9_999, 200_000))
+        assertEquals(120_000L, PlaybackProgress.sampledToSave(withNext, 120_000, 200_000))
+        // Into the credits or near the end, the episode starts over next time.
+        assertEquals(0L, PlaybackProgress.sampledToSave(withNext, 170_000, 200_000))
+        assertEquals(0L, PlaybackProgress.sampledToSave(episode, 190_000, 200_000))
+        // Without a duration yet, nothing is known about the end: keep the saved point.
+        assertEquals(null, PlaybackProgress.sampledToSave(episode, 120_000, -1))
+    }
+
+    @Test
     fun resumePointPastTheSlateStartsOver() {
         assertEquals(0L, episode.copy(startPositionMs = 176_000).withUpNext(upNext).startPositionMs)
         assertEquals(60_000L, episode.copy(startPositionMs = 60_000).withUpNext(upNext).startPositionMs)

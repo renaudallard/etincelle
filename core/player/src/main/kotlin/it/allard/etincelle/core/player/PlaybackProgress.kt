@@ -24,4 +24,12 @@ object PlaybackProgress {
      */
     fun positionToSave(source: PlaybackSource, positionMs: Long, durationMs: Long): Long =
         if (source.upNext?.let { positionMs >= it.atSec * 1000 } == true) 0L else positionToSave(positionMs, durationMs)
+
+    /**
+     * As above for a position sampled while playback goes on elsewhere (a cast), or null to keep the
+     * saved one: a position this close to the start, or without a duration yet, is a load still getting
+     * under way, which must not wipe the resume point it is about to seek to.
+     */
+    fun sampledToSave(source: PlaybackSource, positionMs: Long, durationMs: Long): Long? =
+        if (positionMs < MIN_MS || durationMs <= 0) null else positionToSave(source, positionMs, durationMs)
 }

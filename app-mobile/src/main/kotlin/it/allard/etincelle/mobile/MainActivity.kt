@@ -196,6 +196,17 @@ class MainActivity : ComponentActivity() {
         mediaSession = session
         PlaybackService.session = session
         lifecycleScope.launch { playerFlow.collect { session.player = it } }
+        // The phone resumes from its own store, which nothing writes during a cast, and most ends of a
+        // cast (stopped on the TV, TV off, receiver giving up) leave no position to read: keep it as it goes.
+        if (controller != null) {
+            lifecycleScope.launch {
+                while (true) {
+                    delay(CAST_PROGRESS_MS)
+                    val (source, pos, dur) = controller.castProgress() ?: continue
+                    PlaybackProgress.sampledToSave(source, pos, dur)?.let { viewModel.savePlaybackPosition(source.resumeKey, it) }
+                }
+            }
+        }
 
         // Playback follows `playing`, not the player screen: while casting the show page stays up and
         // the stream keeps running, and in the background the next episode starts on its own. The UI
@@ -362,6 +373,9 @@ private val UP_NEXT_ABOVE_BARS = 140.dp
 
 // How long the cast volume overlay stays up after the last volume-key press.
 private const val VOLUME_OVERLAY_MS = 1500L
+
+// How often the position of a cast is kept as its resume point.
+private const val CAST_PROGRESS_MS = 15_000L
 
 /** Brand-pack vector icon for the tabs it covers; the rest keep their emoji glyph. */
 @DrawableRes

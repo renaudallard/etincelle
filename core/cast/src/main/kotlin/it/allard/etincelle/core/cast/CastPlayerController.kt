@@ -833,6 +833,21 @@ class CastPlayerController(
     }
 
     /**
+     * What a Chromecast or the TV app plays for this phone, with its position and duration, so the
+     * phone keeps a resume point meanwhile: most ends of a cast leave nothing to read it from. Null
+     * when playing here, while loading, or when the TV plays something else than what this phone sent
+     * (the next episode it moved on to, or a stream not yet replaced by a fresh one).
+     */
+    fun castProgress(): Triple<PlaybackSource, Long, Long>? {
+        val player = _currentPlayer.value
+        if (player === localPlayer || player.playbackState != Player.STATE_READY) return null
+        val item = currentItem ?: return null
+        val source = item.localConfiguration?.tag as? PlaybackSource ?: return null
+        if (source.resumeKey == null || player.currentMediaItem?.localConfiguration?.uri != item.localConfiguration?.uri) return null
+        return Triple(source, player.currentPosition, player.duration)
+    }
+
+    /**
      * Stop local playback and return (position, duration) for resume persistence. Returns null while
      * casting (the stream stays on the Chromecast) or when nothing is loaded locally.
      */
