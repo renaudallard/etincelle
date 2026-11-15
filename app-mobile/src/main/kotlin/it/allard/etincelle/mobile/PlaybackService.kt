@@ -87,9 +87,10 @@ class PlaybackService : MediaSessionService() {
                     }
                 })
                 .apply {
-                    context.packageManager.getLaunchIntentForPackage(context.packageName)?.let {
-                        setSessionActivity(PendingIntent.getActivity(context, 0, it, PendingIntent.FLAG_IMMUTABLE))
-                    }
+                    // The activity itself, not the launch intent: that one names whichever launcher alias
+                    // is enabled now, and switching the app icon disables it.
+                    val open = Intent(context, MainActivity::class.java).setAction(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+                    setSessionActivity(PendingIntent.getActivity(context, 0, open, PendingIntent.FLAG_IMMUTABLE))
                 }
                 .build()
     }
