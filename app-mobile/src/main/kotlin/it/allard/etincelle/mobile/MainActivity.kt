@@ -98,6 +98,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 @UnstableApi
@@ -110,6 +112,8 @@ class MainActivity : ComponentActivity() {
     private var castController: CastPlayerController? = null
     private var loadControl: AdaptiveLoadControl? = null
     private var mediaSession: MediaSession? = null
+    // Stops what plays and saves its resume point; set in onCreate, run when the activity ends.
+    private var endPlayback: () -> Unit = {}
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -149,9 +153,10 @@ class MainActivity : ComponentActivity() {
         viewModel.setHideLocked(LocalPrefs.hideLocked(this))
 
         val onPlay: (PlaybackSource) -> Unit = { source ->
-            // Hosts the media session so playback can go on in the background (started from the UI,
-            // while the app is in the foreground).
-            startService(Intent(this, PlaybackService::class.java))
+            // Hosts the media session so playback can go on in the background. The next episode starts
+            // from the background, where Android may refuse the call; the service then still runs from
+            // the episode before, whose playback kept it in the foreground.
+            runCatching { startService(Intent(this, PlaybackService::class.java)) }
             val item = MediaItemFactory.create(source)
             if (controller != null) {
                 controller.play(item, source.startPositionMs)
@@ -186,6 +191,22 @@ class MainActivity : ComponentActivity() {
         PlaybackService.session = session
         lifecycleScope.launch { playerFlow.collect { session.player = it } }
 
+        // Playback follows `playing`, not the player screen: while casting the show page stays up and
+        // the stream keeps running, and in the background the next episode starts on its own. The UI
+        // pauses while the app is away, so the switch is made here rather than from a composable.
+        var current: PlaybackSource? = null
+        lifecycleScope.launch {
+            viewModel.state.map { it.playing }.distinctUntilChanged().collect { next ->
+                current?.let(onStop)
+                current = next
+                next?.let(onPlay)
+            }
+        }
+        endPlayback = {
+            current?.let(onStop)
+            current = null
+        }
+
         setContent {
             EtincelleTheme {
                 val state by viewModel.state.collectAsStateWithLifecycle()
@@ -206,8 +227,6 @@ class MainActivity : ComponentActivity() {
                         onLocalPlayer = currentPlayer === exo,
                         vm = viewModel,
                         castState = castState,
-                        onPlay = onPlay,
-                        onStop = onStop,
                         // connectTo returns false when the tapped route is already gone (a Chromecast
                         // that dropped between opening the picker and tapping); tell the user instead
                         // of failing silently with no connect animation.
@@ -316,6 +335,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        endPlayback()
         stopService(Intent(this, PlaybackService::class.java))
         PlaybackService.session = null
         mediaSession?.release()
@@ -353,8 +373,6 @@ private fun AppRoot(
     onLocalPlayer: Boolean,
     vm: MainViewModel,
     castState: CastUiState,
-    onPlay: (PlaybackSource) -> Unit,
-    onStop: (PlaybackSource) -> Unit,
     onCastConnect: (String) -> Unit,
     onCastDisconnect: () -> Unit,
     onCastActiveScan: (Boolean) -> Unit = {},
@@ -390,13 +408,6 @@ private fun AppRoot(
     // Grid density (cards per row on the "tout voir" pages); persisted, set live from the settings.
     var gridColumns by remember { mutableStateOf(LocalPrefs.gridColumns(context)) }
 
-    // Playback follows `playing`, not the player screen. While casting we keep the show page up (the
-    // stream is ambient on the TV), yet the stream must keep running, so this effect stays mounted as
-    // long as something is playing, whichever screen is on top.
-    DisposableEffect(playing) {
-        if (playing != null) onPlay(playing)
-        onDispose { if (playing != null) onStop(playing) }
-    }
 
     // Flash a brief volume overlay on each cast volume-key press (the system bar is suppressed).
     var showVolume by remember { mutableStateOf(false) }
