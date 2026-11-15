@@ -257,7 +257,7 @@ class CastPlayerController(
         transferFallbackJob?.cancel()
         val direct = directSession
         if (direct != null && state.value.isCasting) {
-            currentItem = item
+            // loadDirect makes it the current item, and puts back the one the TV kept if it fails.
             scope.launch { loadDirect(direct, item, startPositionMs, resolve = false) }
             return
         }
@@ -351,6 +351,7 @@ class CastPlayerController(
         rewindMs: Long = (item.localConfiguration?.tag as? PlaybackSource)?.liveRewindOffsetMs ?: 0L,
     ): Boolean? {
         val source = item.localConfiguration?.tag as? PlaybackSource ?: return false
+        val previous = currentItem
         val load = ++directLoads
         val current = { directSession === session && load == directLoads }
         val resolver = reResolve
@@ -393,6 +394,9 @@ class CastPlayerController(
             // The phone stops once the TV has the stream, whichever load got it there.
             runCatching { localPlayer.stop() }
         } else {
+            // The TV keeps what it had, and so does the session: picking the programme again retries it.
+            currentItem = previous
+            previous?.let { directPlayer.setItem(it) }
             clearConnecting()
             onError?.invoke(PLAYBACK_ERROR_MESSAGE)
         }
