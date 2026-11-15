@@ -20,10 +20,13 @@ class TokenStore(private val context: Context) : SessionStore {
         val prefs = context.dataStore.data.first()
         // The tokens are stored encrypted; a decrypt failure (e.g. a legacy plaintext token from
         // before encryption was added) is treated as "no session", so the user signs in again.
+        // That holds for the refresh token too: a session read without it would be saved back
+        // without it, wiping a stored refresh token over what may be a passing Keystore error.
         val access = prefs[ACCESS]?.let { TokenCrypto.decrypt(it) } ?: return null
+        val refresh = prefs[REFRESH]?.let { TokenCrypto.decrypt(it) ?: return null }
         val userId = prefs[USER_ID] ?: return null
         val profileId = prefs[PROFILE_ID] ?: return null
-        return UserSession(access, prefs[REFRESH]?.let { TokenCrypto.decrypt(it) }, userId, profileId)
+        return UserSession(access, refresh, userId, profileId)
     }
 
     override suspend fun save(session: UserSession) {
