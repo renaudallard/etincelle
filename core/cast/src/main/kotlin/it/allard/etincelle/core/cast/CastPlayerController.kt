@@ -12,6 +12,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import com.google.android.gms.cast.MediaSeekOptions
 import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.CastSession
 import it.allard.etincelle.core.model.PlaybackSource
@@ -27,8 +28,10 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -135,7 +138,16 @@ class CastPlayerController(
     private val liveWindow = Timeline.Window()
 
     private val _currentPlayer = MutableStateFlow<Player>(localPlayer)
-    val currentPlayer: StateFlow<Player> = _currentPlayer.asStateFlow()
+
+    // The Play Services cast player as the UI and the media session use it, with skips on live streams.
+    private val castPlayerShown = LiveSkipCastPlayer(
+        castPlayer,
+        live = { (currentItem?.localConfiguration?.tag as? PlaybackSource)?.isLive == true },
+        skipLive = ::skipCastLive,
+    )
+    val currentPlayer: StateFlow<Player> = _currentPlayer
+        .map { if (it === castPlayer) castPlayerShown else it }
+        .stateIn(scope, SharingStarted.Eagerly, localPlayer)
 
     private var currentItem: MediaItem? = null
     private var endingPosition = 0L
@@ -949,6 +961,17 @@ class CastPlayerController(
         if (effectivePos > 0) player.setMediaItem(item, effectivePos) else player.setMediaItem(item)
         player.prepare()
         player.playWhenReady = true
+    }
+
+    // Moves a live Play Services cast by [deltaMs] around the receiver's position, kept within the
+    // stream's seekable range when the receiver reports one.
+    private fun skipCastLive(deltaMs: Long) {
+        val client = castContext.sessionManager.currentCastSession?.remoteMediaClient ?: return
+        var target = client.approximateStreamPosition + deltaMs
+        val start = client.approximateLiveSeekableRangeStart
+        val end = client.approximateLiveSeekableRangeEnd
+        if (start >= 0 && end >= start) target = target.coerceIn(start, end)
+        client.seek(MediaSeekOptions.Builder().setPosition(target).build())
     }
 
     private fun onPlaybackError(failedPlayer: Player) {

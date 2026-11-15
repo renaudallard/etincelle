@@ -65,7 +65,6 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import androidx.media3.cast.CastPlayer
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.Player
@@ -76,6 +75,7 @@ import androidx.media3.session.MediaSession
 import androidx.media3.ui.PlayerView
 import it.allard.etincelle.core.cast.CastPlayerController
 import it.allard.etincelle.core.cast.CastUiState
+import it.allard.etincelle.core.cast.LiveSkipCastPlayer
 import it.allard.etincelle.core.designsystem.LiveProgramBar
 import it.allard.etincelle.core.designsystem.LiveProgramBarBottomOffset
 import it.allard.etincelle.core.designsystem.R as DesignR
@@ -772,7 +772,7 @@ private fun PlayerSurface(
     // so re-scoping it on a programme rollover does not restart the stream. Media3's CastPlayer reports
     // no live window here, so its controller keeps its own bar; the local player and a direct cast
     // (which do report one) get the programme bar.
-    val showBar = source.isLive && (secure || currentPlayer !is CastPlayer)
+    val showBar = source.isLive && (secure || currentPlayer !is LiveSkipCastPlayer)
     var programWindow by remember(source) { mutableStateOf(source.programWindow) }
     var barGeometry by remember { mutableStateOf<LiveBarGeometry?>(null) }
     // A "depuis le début" start asks playback to begin at the current show's start; the local player
