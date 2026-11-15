@@ -40,7 +40,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -66,6 +68,8 @@ object TvLive {
     /** Writes the channels and their programmes for the input; signed out, removes them. */
     suspend fun sync(context: Context, repo: MolotovRepository) = lock.withLock {
         if (repo.currentSession() == null) runCatching { repo.restoreSession() }
+        // A restore cut short by the job being stopped is not a sign-out: leave the guide as it is.
+        currentCoroutineContext().ensureActive()
         if (repo.currentSession() == null) {
             context.contentResolver.delete(TvContract.buildChannelsUriForInput(inputId(context)), null, null)
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(SYNCED_AT).apply()
@@ -181,6 +185,8 @@ class TvLiveInputService : TvInputService() {
                         repo.resolveLiveChannel(id)
                     }
                 }.getOrNull()
+                // A newer tune cancelled this one: it reports its own state.
+                ensureActive()
                 if (source == null) {
                     notifyVideoUnavailable(TvInputManager.VIDEO_UNAVAILABLE_REASON_UNKNOWN)
                     return@launch
