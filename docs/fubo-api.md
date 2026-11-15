@@ -123,7 +123,10 @@ follows each component's `actions`.
   cards); a locked app carries only a `tracking` action and is flagged via `is_locked`/`state.is_locked`.
   etincelle reads this via `PageResponse.toAppsRail()` to build the home "Applications" rail.
 - **Recordings "see all":** the "Vos enregistrements" rail's see-all is `/papi/v1/my-stuff/main?selectedTab=recordings`,
-  which has no standard `content.sections` — use the `dvr/v2/list` data instead.
+  which has no standard `content.sections`; open `/papi/v1/my-stuff/status/recordings` instead (see Recordings).
+- **Card tags and captions:** a card's `body.tags[]` (`label` + `leading_icon.url`, e.g. "REC", "DIRECT", "20h35")
+  is drawn on its image, and the official app shows `footer.subtitle` under the title, not `footer.time_label`.
+  List rows (`list-item-wide`) carry `tags`, `channel_picture` and `info` ("07 juin à 13h25") at their top level.
 - **Poster cards** (`card-poster`, e.g. "Ce soir") carry no title field; their display name is in the
   action URL's `trkOriginElement` query param. `channel_id` is a number on live cards but a **string**
   on poster cards — accept both.
@@ -248,6 +251,20 @@ multi-device concurrency counting — none of which kill playback. So the app om
 "Molotov Extra" add-on** — their detail page shows upsell CTAs and `locked` markers instead of a player.
 
 ## Recordings (DVR) — endpoint known, gated by a DVR entitlement
+
+**Since November 2026 `GET /dvr/v2/list` answers `404 page not found`** (checked 2026-11-15). The
+official app's "Mes vidéos" pages serve the recordings instead (validated 2026-11-15):
+
+- `GET /papi/v1/my-stuff/status/recordings` (template `my-stuff`): a `chip-filter` section (Tout, Films,
+  Séries…) and a `card-poster` grid, one card per show linking `/papi/v1/my-stuff/folder/seriesId/{id}`
+  ("14 épisodes" in `footer.subtitle`), or per single recording linking `program-details/program/LIVE_…`.
+- `GET /papi/v1/my-stuff/folder/seriesId/{id}` (template `my-stuff-details`): `list-item-wide` rows, `info`
+  "Enregistré: 30 sept.", id `{programId}-{index}`, linking `program-details/program/LIVE_…`.
+- A recording's programme page names its stream in `content.player.actions.on_display[type=play]`:
+  `vapi/asset/v1?id=LIVE_…&type=dvr` (catch-up pages say `type=vod`, live ones `type=live`). Only the
+  page's default tab carries it, not `tabID=id-tab-about`. Asking `type=vod` for a recording gets a 528.
+
+The rest of this section is the earlier DVR list, kept for reference.
 
 Recordings are **not** a `papi` page (no `my-stuff`/`recordings`/`mes-videos` slug exists — those all
 return `400 dynamic path not found`). They come from the knowledge-graph DVR service:
