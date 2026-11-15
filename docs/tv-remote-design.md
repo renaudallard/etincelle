@@ -17,7 +17,8 @@ The phone lists each TV app as "<name> (appli TV)", route id `tv:<install id>`.
 
 Both apps derive the same 32-byte key from the account they are signed in to:
 SHA-256 of `etincelle-remote-v1`, the user id and the sorted profile ids. Profile ids are random UUIDs
-that only a device signed in to the account can read, and they never cross the local network.
+that only a device signed in to the account can read, and the remote control never sends them. (A cast
+does pass them, with the access token, to the Chromecast, over TLS: the key is no more secret than that.)
 
 Over TCP, frames are a 4-byte big-endian length and UTF-8 text (at most 64 KiB).
 

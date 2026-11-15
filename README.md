@@ -127,7 +127,8 @@ et se pilote depuis la barre de diffusion, la notification ou les touches de vol
 Toucher la barre de diffusion ouvre une **télécommande** : ce qui passe, lecture/pause, recul de
 10 s, avance de 30 s, et les flèches, OK et Retour pour naviguer dans l'application TV. Seul un
 téléphone connecté au **même compte** Molotov peut piloter le téléviseur, et réciproquement : chacun
-le prouve à l'autre à partir du compte, sans qu'aucun identifiant ne passe sur le réseau local.
+le prouve à l'autre à partir du compte, sans que la télécommande n'envoie le moindre identifiant sur
+le réseau local.
 
 Sur téléphone, la **lecture continue en arrière-plan** et écran verrouillé (le son seul, la vidéo
 reprenant au retour dans l'application), avec une **notification de lecture** et des **commandes sur

@@ -21,8 +21,8 @@ object RemoteProtocol {
 
     /**
      * The key both apps derive from the account they are signed in to: its user id and profile ids. The
-     * profile ids are random UUIDs only a device signed in to the account can read, and they never cross
-     * the local network, so a device of another account (or none) cannot compute this key.
+     * profile ids are random UUIDs only a device signed in to the account can read, and the remote control
+     * never sends them, so a device of another account (or none) cannot compute this key.
      */
     fun accountKey(userId: String, profileIds: Collection<String>): ByteArray =
         MessageDigest.getInstance("SHA-256").digest("etincelle-remote-v1\n$userId\n${profileIds.sorted().joinToString(",")}".toByteArray())
