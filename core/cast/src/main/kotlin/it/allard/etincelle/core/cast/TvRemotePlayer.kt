@@ -67,6 +67,12 @@ internal class TvRemotePlayer : SimpleBasePlayer(Looper.getMainLooper()) {
         invalidateState()
     }
 
+    /** The TV plays something other than what this phone sent: show it by its title alone. */
+    fun showTvContent() {
+        item = MediaItem.Builder().setMediaId(TV_ITEM_ID).build()
+        invalidateState()
+    }
+
     fun detach() {
         handler.removeCallbacks(ticker)
         session = null

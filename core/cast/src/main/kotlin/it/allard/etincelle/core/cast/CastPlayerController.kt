@@ -131,7 +131,8 @@ class CastPlayerController(
     // An etincelle TV app driven by etincelle's own remote control, and its player for the UI.
     private var tvSession: TvRemoteSession? = null
     private val tvPlayer = TvRemotePlayer()
-    // The TV has played what was last sent to it, so its going idle means it stopped.
+    // The TV has played what was last sent to it: its going idle then means it stopped, and its playing
+    // something else that it moved on (zapped there, or played the next episode itself).
     private var tvStarted = false
     // Where playback coming back to the phone resumes (see loadResolved), for a TV app picked before
     // the phone has started it again.
@@ -428,20 +429,9 @@ class CastPlayerController(
     // Has the TV app play [item] from [positionMs] (on demand) or [rewindMs] behind the live edge.
     private fun playOnTv(item: MediaItem, positionMs: Long, rewindMs: Long) {
         val session = tvSession ?: return
-        val source = item.localConfiguration?.tag as? PlaybackSource ?: return
-        val channelId = source.originChannelId
-        val recordingId = source.originRecordingAssetId
-        val vodId = source.originVodId
-        val message = JSONObject().put(RemoteMessages.TYPE, RemoteMessages.PLAY)
-        when {
-            channelId != null -> message.put(RemoteMessages.KIND, RemoteMessages.KIND_LIVE).put(RemoteMessages.ID, channelId)
-                .put(RemoteMessages.REWIND, rewindMs)
-            recordingId != null -> message.put(RemoteMessages.KIND, RemoteMessages.KIND_RECORDING).put(RemoteMessages.ID, recordingId)
-                .put(RemoteMessages.POSITION, positionMs)
-            vodId != null -> message.put(RemoteMessages.KIND, RemoteMessages.KIND_VOD).put(RemoteMessages.ID, vodId)
-                .put(RemoteMessages.POSITION, positionMs)
-            else -> return
-        }
+        val (kind, id) = remoteTarget(item) ?: return
+        val message = JSONObject().put(RemoteMessages.TYPE, RemoteMessages.PLAY).put(RemoteMessages.KIND, kind).put(RemoteMessages.ID, id)
+        if (kind == RemoteMessages.KIND_LIVE) message.put(RemoteMessages.REWIND, rewindMs) else message.put(RemoteMessages.POSITION, positionMs)
         currentItem = item
         tvStarted = false
         tvPlayer.setItem(item)
@@ -449,18 +439,32 @@ class CastPlayerController(
         session.send(message)
     }
 
+    // What [item] is for the TV app: its kind and id, as the play message and the TV's status name it.
+    private fun remoteTarget(item: MediaItem?): Pair<String, String>? {
+        val source = item?.localConfiguration?.tag as? PlaybackSource ?: return null
+        return source.originChannelId?.let { RemoteMessages.KIND_LIVE to it }
+            ?: source.originRecordingAssetId?.let { RemoteMessages.KIND_RECORDING to it }
+            ?: source.originVodId?.let { RemoteMessages.KIND_VOD to it }
+    }
+
     private fun onTvMessage(message: JSONObject) {
         if (message.optString(RemoteMessages.TYPE) != RemoteMessages.STATUS) return
         tvPlayer.onStatus(message)
+        val playing = message.optString(RemoteMessages.ID).takeIf { it.isNotEmpty() }?.let { message.optString(RemoteMessages.KIND) to it }
+        val sent = remoteTarget(currentItem)
+        if (playing != null && sent != null) {
+            if (playing == sent) {
+                tvStarted = true
+            } else if (tvStarted) {
+                // The TV moved on: what the phone sent no longer plays there, so sending it again plays it.
+                tvStarted = false
+                currentItem = null
+                tvPlayer.showTvContent()
+            }
+        }
         when (message.optString(RemoteMessages.STATE)) {
-            RemoteMessages.STATE_PLAYING -> {
-                tvStarted = true
-                setReceiverPlaying(true)
-            }
-            RemoteMessages.STATE_PAUSED, RemoteMessages.STATE_BUFFERING -> {
-                tvStarted = true
-                setReceiverPlaying(false)
-            }
+            RemoteMessages.STATE_PLAYING -> setReceiverPlaying(true)
+            RemoteMessages.STATE_PAUSED, RemoteMessages.STATE_BUFFERING -> setReceiverPlaying(false)
             RemoteMessages.STATE_IDLE -> if (tvStarted && currentItem != null) {
                 // Stopped on the TV (Back from its player): the phone drops what it was playing too.
                 tvStarted = false
@@ -750,7 +754,8 @@ class CastPlayerController(
     fun returnToThisDevice() {
         // TV app: stop it and play on the phone again, where the TV was.
         if (tvSession != null) {
-            val playsOnTv = _currentPlayer.value === tvPlayer
+            // Only what the phone knows can continue here; something else the TV plays stays on it.
+            val playsOnTv = _currentPlayer.value === tvPlayer && currentItem != null
             val position = tvPlayer.currentPosition
             stopTvSession(stopTv = playsOnTv)
             if (playsOnTv) currentItem?.let { loadResolved(localPlayer, it, position, true) }
