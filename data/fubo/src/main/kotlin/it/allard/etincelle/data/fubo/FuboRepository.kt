@@ -224,8 +224,11 @@ class FuboRepository(
     }
 
     override suspend fun selectProfile(id: String) {
-        val current = session.session ?: return
+        if (session.session == null) return
         val ids = runCatching { profiles().profiles.map { it.id } }.getOrDefault(emptyList())
+        // Read the session only now: the call above may have renewed the tokens, which an earlier
+        // copy would write back over.
+        val current = session.session ?: return
         current.copy(profileId = id).let {
             session.session = it
             store.save(it)
@@ -576,7 +579,9 @@ class FuboRepository(
         val refreshToken = current.refreshToken ?: throw AppError.Unauthorized
         val tokens = api.refresh("Bearer $refreshToken").tokens
         val newAccess = tokens.accessToken ?: throw AppError.Unauthorized
-        val updated = current.copy(accessToken = newAccess, refreshToken = tokens.refreshToken ?: refreshToken)
+        // Apply the tokens to the session as it is now: a profile chosen during the call stays chosen.
+        val latest = session.session ?: throw AppError.Unauthorized
+        val updated = latest.copy(accessToken = newAccess, refreshToken = tokens.refreshToken ?: refreshToken)
         session.session = updated
         store.save(updated)
     }

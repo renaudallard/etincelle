@@ -116,6 +116,19 @@ class ProfilesTest {
         assertEquals("p9", created.id)
     }
 
+    @Test
+    fun choosingAProfileKeepsTokensRenewedMeanwhile() = runTest {
+        server.enqueue(MockResponse().setResponseCode(401))
+        server.enqueue(MockResponse().setBody("""{"access_token":"NEW","refresh_token":"RT2"}"""))
+        server.enqueue(profiles("p1", "p2"))
+        repo.selectProfile("p2")
+        val now = session.session
+        assertEquals("NEW", now?.accessToken)
+        assertEquals("RT2", now?.refreshToken)
+        assertEquals("p2", now?.profileId)
+        assertEquals(now, store.saved)
+    }
+
     private class MemoryStore : SessionStore {
         var saved: UserSession? = null
         var pick: ProfilePick? = null
