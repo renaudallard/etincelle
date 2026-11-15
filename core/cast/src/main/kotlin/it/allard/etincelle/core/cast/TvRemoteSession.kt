@@ -73,9 +73,11 @@ internal class TvRemoteSession(
 
     fun close() {
         closed = true
-        link?.close()
-        scope.cancel()
+        val link = link
+        // After the messages already queued, such as a last stop, so they are not lost.
+        if (runCatching { writer.execute { link?.close() } }.isFailure) link?.close()
         writer.shutdown()
+        scope.cancel()
     }
 
     private suspend fun read(link: RemoteLink) {
