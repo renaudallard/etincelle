@@ -178,13 +178,13 @@ class MainActivity : ComponentActivity() {
             }
         }
         val playerFlow: StateFlow<Player> = controller?.currentPlayer ?: MutableStateFlow<Player>(exo).asStateFlow()
-        // The media notification and lock screen control what plays: this phone, or the TV during a
-        // direct cast. A Play Services cast has its own notification, so the session then stays on the
-        // idle local player and shows none.
+        // The media notification and lock screen control what plays: this phone, or the Chromecast
+        // during a cast. The Cast framework posts no notification of its own here (its notification
+        // service is not declared), so the session follows the cast player too.
         val session = PlaybackService.createSession(this, exo)
         mediaSession = session
         PlaybackService.session = session
-        lifecycleScope.launch { playerFlow.collect { session.player = if (it is CastPlayer) exo else it } }
+        lifecycleScope.launch { playerFlow.collect { session.player = it } }
 
         setContent {
             EtincelleTheme {

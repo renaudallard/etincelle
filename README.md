@@ -110,8 +110,7 @@ lecture d'etincelle (voir plus bas) pilote alors le Chromecast.
 Sur téléphone, la **lecture continue en arrière-plan** et écran verrouillé (le son seul, la vidéo
 reprenant au retour dans l'application), avec une **notification de lecture** et des **commandes sur
 l'écran de verrouillage** : lecture/pause, recul de 10 s et avance de 30 s. Elles pilotent le
-téléphone, ou le Chromecast pendant une diffusion directe ; une diffusion par les services Google
-garde sa propre notification. Toucher la notification ramène dans l'application.
+téléphone, ou le Chromecast pendant une diffusion. Toucher la notification ramène dans l'application.
 
 etincelle **vérifie les mises à jour** sur GitHub à chaque démarrage, puis une fois par jour tant
 qu'elle reste ouverte, et propose d'installer la dernière version lorsqu'une plus récente est

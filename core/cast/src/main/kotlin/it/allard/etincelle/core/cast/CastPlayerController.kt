@@ -97,7 +97,13 @@ class CastPlayerController(
 
     private val appContext = context.applicationContext
 
-    private val castPlayer = CastPlayer(castContext, FuboCastMediaItemConverter(context, sessionProvider))
+    // Skips by the same steps as the phone's own player (the Cast player defaults to 5 s and 15 s).
+    private val castPlayer = CastPlayer(
+        castContext,
+        FuboCastMediaItemConverter(context, sessionProvider),
+        LivePlayback.SEEK_BACK_MS,
+        LivePlayback.SEEK_FORWARD_MS,
+    )
     private val scope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
 
     // A session with a Chromecast Play Services does not see, driven over our own connection.
