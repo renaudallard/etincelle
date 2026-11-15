@@ -621,7 +621,7 @@ class MainViewModel(
         upNextJob = viewModelScope.launch {
             runCatchingNav {
                 val detail = repo.fetchProgramDetail(next.nextVodId, DetailKind.PROGRAM)
-                detail to repo.resolveVod(next.nextVodId).withUpNext(detail.upNext)
+                detail to resolveProgramme(next.nextVodId, detail).withUpNext(detail.upNext)
             }.onSuccess { (detail, src) ->
                 _state.update { st ->
                     // Stopped, or something else chosen, meanwhile: leave it so.
@@ -635,6 +635,11 @@ class MainViewModel(
     }
 
     private var upNextJob: Job? = null
+
+    // The stream of programme [id], from the DVR when its page says it is a recording (it then has no
+    // catch-up stream).
+    private suspend fun resolveProgramme(id: String, detail: ProgramDetail): PlaybackSource =
+        detail.recordingAssetId?.let { repo.resolveRecording(it) } ?: repo.resolveVod(id)
 
     /**
      * Plays what a phone of this account sent to this TV (see core/remote): [id] as [kind], from
@@ -650,7 +655,7 @@ class MainViewModel(
                     PlayKind.RECORDING -> null to repo.resolveRecording(id).startingAt(positionMs)
                     PlayKind.VOD -> {
                         val detail = repo.fetchProgramDetail(id, DetailKind.PROGRAM)
-                        DetailEntry(detail, null, id, DetailKind.PROGRAM) to repo.resolveVod(id).startingAt(positionMs).withUpNext(detail.upNext)
+                        DetailEntry(detail, null, id, DetailKind.PROGRAM) to resolveProgramme(id, detail).startingAt(positionMs).withUpNext(detail.upNext)
                     }
                 }
             }.onSuccess { (entry, src) ->
