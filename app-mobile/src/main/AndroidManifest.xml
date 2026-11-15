@@ -21,12 +21,14 @@
             android:value="it.allard.etincelle.core.cast.CastOptionsProvider" />
 
         <!-- One instance only: it owns the player and the media session, which must be unique, so a
-             link opened while the app runs goes to onNewIntent instead of starting a second copy. -->
+             link opened while the app runs goes to onNewIntent instead of starting a second copy.
+             It takes every configuration change in place (Compose redraws), as a recreation would
+             restart what plays from where it was opened. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
-            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|uiMode|density|fontScale|locale"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|touchscreen|uiMode|density|fontScale|fontWeightAdjustment|locale|layoutDirection|colorMode|mcc|mnc"
             android:theme="@style/Theme.Etincelle">
             <!-- Deep links to a show: etincelle://series|program|channel/{id} (e.g. from multistream). -->
             <intent-filter>
