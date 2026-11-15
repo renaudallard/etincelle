@@ -81,6 +81,20 @@ class MainViewModelTest {
         assertEquals(null, vm.state.value.playing)
     }
 
+    @Test
+    fun aPageStillLoadingDoesNotLandInSearch() {
+        val repo = FakeRepo()
+        val vm = viewModel(repo)
+        val films = CompletableDeferred<ContentPage>()
+        repo.page = { films.await() }
+        vm.selectTab(Tab.MOVIES)
+        vm.selectTab(Tab.SEARCH)
+        films.complete(ContentPage("Films", emptyList()))
+
+        assertEquals(Tab.SEARCH, vm.state.value.tab)
+        assertTrue(vm.state.value.backStack.isEmpty())
+    }
+
     private fun viewModel(repo: FakeRepo) = MainViewModel(repo, UpdateChecker("0", "mobile", "http://127.0.0.1:9/")).also {
         assertTrue(it.state.value.loggedIn)
     }

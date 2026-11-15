@@ -375,7 +375,9 @@ class MainViewModel(
 
     fun selectTab(tab: Tab) {
         if (tab == Tab.SEARCH) {
-            _state.update { it.copy(tab = tab, busy = false, error = null, backStack = emptyList()) }
+            // A page still loading for the tab being left must not land in the search results.
+            cancelNav()
+            _state.update { it.copy(tab = tab, error = null, backStack = emptyList()) }
             return
         }
         if (tab == Tab.GUIDE) {
