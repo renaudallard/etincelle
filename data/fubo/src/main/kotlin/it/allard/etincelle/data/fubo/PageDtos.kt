@@ -7,6 +7,8 @@ import com.squareup.moshi.Json
 import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.ContentRail
+import it.allard.etincelle.core.model.FavoriteChannel
+import it.allard.etincelle.core.model.FavoriteOrder
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.RecordAction
 
@@ -81,6 +83,7 @@ data class ComponentDto(
     @Json(name = "channel_id") val channelIdRaw: Any? = null,
     val slug: String? = null,
     val header: HeaderDto? = null,
+    @Json(name = "is_favorite") val isFavorite: Boolean? = null,
 )
 
 // Live ("En direct à la TV") cards carry their show title in a footer rather than in title/heading.
@@ -90,7 +93,11 @@ data class FooterDto(val title: TextDto?, val subtitle: TextDto?)
 data class BodyDto(val picture: PictureDto?, @Json(name = "station_logo") val stationLogo: PictureDto? = null)
 data class HeaderDto(@Json(name = "station_logo") val stationLogo: PictureDto? = null)
 data class StateDto(@Json(name = "is_locked") val isLocked: Boolean?)
-data class ActionsDto(@Json(name = "on_click") val onClick: List<ActionItemDto>?)
+data class ActionsDto(
+    @Json(name = "on_click") val onClick: List<ActionItemDto>?,
+    // A channel card's favourite toggle: an api_call to favorite-channel or unfavorite-channel.
+    @Json(name = "on_fav_icon_click") val onFavIconClick: List<ActionItemDto>? = null,
+)
 data class ActionItemDto(val endpoint: EndpointDto?, val type: String? = null)
 data class EndpointDto(
     val url: String?,
@@ -278,7 +285,49 @@ private fun ComponentDto.toCard(square: Boolean = false): ContentCard? {
         liveChannelId = (channelIdRaw as? String) ?: (channelIdRaw as? Number)?.toLong()?.toString(),
         square = square,
         channelLogoUrl = body?.stationLogo?.url ?: header?.stationLogo?.url,
+        favorite = actions?.onFavIconClick?.let { apiCall(it, if (isFavorite == true) "Retirer des favoris" else "Ajouter aux favoris") },
+        isFavorite = isFavorite == true,
     )
+}
+
+// The first api_call among [items] as a replayable action, or null when there is none.
+private fun apiCall(items: List<ActionItemDto>, label: String): RecordAction? {
+    val endpoint = items.firstOrNull { it.type == "api_call" }?.endpoint ?: return null
+    return RecordAction(label, endpoint.url ?: return null, endpoint.payload ?: return null)
+}
+
+// --- favourite channels order ---
+
+data class FavoriteOrderResponse(val content: FavoriteOrderContentDto?)
+data class FavoriteOrderContentDto(
+    val title: TextDto?,
+    val subtitle: TextDto?,
+    val items: List<FavoriteItemDto>?,
+    @Json(name = "submit_button") val submitButton: SubmitButtonDto?,
+)
+data class FavoriteItemDto(val id: String?, val name: TextDto?, @Json(name = "logo_dark") val logoDark: PictureDto?)
+data class SubmitButtonDto(val text: TextDto?, val actions: ActionsDto?)
+
+/** The favourite channels in their order, or null when the page carries no save action. */
+fun FavoriteOrderResponse.toFavoriteOrder(): FavoriteOrder? {
+    val c = content ?: return null
+    val endpoint = c.submitButton?.actions?.onClick.orEmpty()
+        .firstOrNull { it.type == "save_favorite_channel_reorder" }?.endpoint ?: return null
+    val save = RecordAction(c.submitButton?.text?.text ?: "Enregistrer", endpoint.url ?: return null, endpoint.payload ?: return null)
+    val channels = c.items.orEmpty().mapNotNull { item ->
+        FavoriteChannel(item.id ?: return@mapNotNull null, item.name?.text ?: return@mapNotNull null, item.logoDark?.url)
+    }
+    return FavoriteOrder(c.title?.text ?: "Réorganiser les favoris", c.subtitle?.text, channels, save)
+}
+
+/**
+ * The body that saves [channelIds] as the favourites order: the backend's own payload with the new
+ * order in its custom_action_data, as the official app sends it.
+ */
+fun favoriteOrderPayload(save: RecordAction, channelIds: List<String>): Map<String, Any?> {
+    @Suppress("UNCHECKED_CAST")
+    val custom = (save.payload["custom_action_data"] as? Map<String, Any?>).orEmpty()
+    return save.payload + ("custom_action_data" to custom + ("channel_ids" to channelIds))
 }
 
 /**

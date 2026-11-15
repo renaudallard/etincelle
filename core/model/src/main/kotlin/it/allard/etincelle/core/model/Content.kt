@@ -66,6 +66,21 @@ data class ContentCard(
     val badge: String? = null,
     /** The logo of the channel offering this card, drawn small over its image. */
     val channelLogoUrl: String? = null,
+    /** A channel card's favourite toggle (add or remove, as the backend offers it), or null. */
+    val favorite: RecordAction? = null,
+    /** The channel is one of the user's favourites. */
+    val isFavorite: Boolean = false,
+)
+
+/** A favourite channel, in the user's order. */
+data class FavoriteChannel(val id: String, val name: String, val logoUrl: String?)
+
+/** The favourite channels in their current order, and the backend action that saves a new one. */
+data class FavoriteOrder(
+    val title: String,
+    val subtitle: String?,
+    val channels: List<FavoriteChannel>,
+    val save: RecordAction,
 )
 
 /**

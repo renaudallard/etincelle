@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -114,6 +115,8 @@ class MainActivity : ComponentActivity() {
                     // so backing out keeps the grid where it was instead of jumping to the top. Lives above
                     // the screen `when` so it survives that swap (the browse branch leaves composition).
                     val contentStateHolder = rememberSaveableStateHolder()
+                    val favoriteOrder = state.favoriteOrder
+                    CompositionLocalProvider(LocalFavoriteToggle provides viewModel::toggleFavorite) {
                     Box(Modifier.fillMaxSize()) {
                     when {
                         state.checking -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -135,6 +138,14 @@ class MainActivity : ComponentActivity() {
                                 viewModel::watchDetail, viewModel::startOverDetail, viewModel::recordDetail, viewModel::watchRecording,
                                 viewModel::onCardClick,
                                 isRecording = state.detailRecordingAssetId != null,
+                            )
+                        }
+
+                        favoriteOrder != null -> {
+                            BackHandler { viewModel.closeFavoriteOrder() }
+                            TvFavoriteOrderScreen(
+                                favoriteOrder, state.busy, state.error,
+                                viewModel::moveFavorite, viewModel::saveFavoriteOrder, viewModel::closeFavoriteOrder,
                             )
                         }
 
@@ -164,6 +175,7 @@ class MainActivity : ComponentActivity() {
                                 TvBrowseScreen(
                                     state, viewModel::selectTab, viewModel::onCardClick, viewModel::search,
                                     viewModel::openSettings, viewModel::onRailSeeAll, gridColumns,
+                                    onFavoriteOrder = viewModel::openFavoriteOrder,
                                 )
                             }
                         }
@@ -179,6 +191,7 @@ class MainActivity : ComponentActivity() {
                             onInstall = { installUpdate(viewModel) },
                             onDismiss = viewModel::dismissUpdate,
                         )
+                    }
                     }
                     }
                 }

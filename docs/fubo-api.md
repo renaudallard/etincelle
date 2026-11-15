@@ -113,6 +113,20 @@ follows each component's `actions`.
 - Live channel IDs (FRA): France 2 = **600019**, France 4 = 600018, France 5 = 600042, Arte = 600034,
   BFMTV = 600035, CNEWS = 600002, LCP = 600008, CSTAR = 600038. (France 3 ≈ another 6000xx.)
 
+## Favourite channels — VALIDATED live (2026-11-15)
+
+- Each `square` channel card on `/papi/v1/page/channels` (and in the home "Chaînes en direct" rail)
+  carries `is_favorite` (top level) and `actions.on_fav_icon_click`: an `api_call` to
+  `POST /action/v1/favorite-channel` (or `unfavorite-channel`) with payload
+  `{action_name, params:{channel_id, channel_name}, metadatas, callback_actions}`, replayed verbatim.
+  Channel pages (`channel-details/{id}`) only carry `state.is_favorite`, no action.
+- `/page/channels` starts with a "Chaînes favorites" carousel in the user's order.
+- Reorder: `GET /papi/v1/favorite/channels` (template `reorder-favorites`) gives `title`, `subtitle`,
+  `items[{id, name, logo_dark, logo_light}]` and `submit_button`, whose `save_favorite_channel_reorder`
+  action is `POST /action/v1/save-favorite-channel-reorder`; the official app sends its payload with
+  `custom_action_data.channel_ids` set to the new order (ids as strings). The entry to that page is
+  `reorder_favorites_entry` on `GET /papi/v1/guide`.
+
 ## Live guide (EPG) — VALIDATED live
 
 `GET /epg` on `api-eu.fubo.tv` (NOT the dead `services-api-eu.fubo.tv`):

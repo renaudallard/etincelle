@@ -12,6 +12,7 @@ import it.allard.etincelle.core.model.AppError
 import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.ContentRail
+import it.allard.etincelle.core.model.FavoriteOrder
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.ProgramWindow
@@ -67,6 +68,8 @@ data class UiState(
     val detailStack: List<DetailEntry> = emptyList(),
     val playing: PlaybackSource? = null,
     val settings: Boolean = false,
+    // The favourite channels being reordered (the reorder screen is open), or null.
+    val favoriteOrder: FavoriteOrder? = null,
     val update: UpdateInfo? = null,
     // The proposed update is downloading (percent), and the message when installing it failed.
     val updateProgress: Int? = null,
@@ -570,6 +573,60 @@ class MainViewModel(
                 .onFailure { e -> applyFailure(e, "Échec de l'enregistrement") }
         }
     }
+
+    /** Adds the channel of [card] to the favourites or removes it, then reloads the page to show it. */
+    fun toggleFavorite(card: ContentCard) {
+        val action = card.favorite ?: return
+        if (_state.value.busy) return
+        _state.update { it.copy(busy = true, error = null, info = null) }
+        viewModelScope.launch {
+            runCatching { repo.toggleFavorite(action) }
+                .onSuccess {
+                    _state.update {
+                        it.copy(busy = false, info = if (card.isFavorite) "Retirée des favoris" else "Ajoutée aux favoris")
+                    }
+                    refreshCurrent()
+                }
+                .onFailure { e -> applyFailure(e, "Échec de la mise à jour des favoris") }
+        }
+    }
+
+    /** Opens the screen that reorders the favourite channels. */
+    fun openFavoriteOrder() {
+        if (_state.value.busy) return
+        _state.update { it.copy(busy = true, error = null, info = null) }
+        viewModelScope.launch {
+            runCatching { repo.favoriteOrder() }
+                .onSuccess { order -> _state.update { it.copy(busy = false, favoriteOrder = order) } }
+                .onFailure { e -> applyFailure(e, "Échec de chargement des favoris") }
+        }
+    }
+
+    /** Moves the favourite at [from] to position [to] (not saved until [saveFavoriteOrder]). */
+    fun moveFavorite(from: Int, to: Int) = _state.update { st ->
+        val order = st.favoriteOrder ?: return@update st
+        val list = order.channels
+        if (from !in list.indices || to !in list.indices || from == to) return@update st
+        val moved = list.toMutableList().apply { add(to, removeAt(from)) }
+        st.copy(favoriteOrder = order.copy(channels = moved))
+    }
+
+    /** Saves the order shown, closes the screen and reloads the page under it. */
+    fun saveFavoriteOrder() {
+        val order = _state.value.favoriteOrder ?: return
+        if (_state.value.busy) return
+        _state.update { it.copy(busy = true, error = null, info = null) }
+        viewModelScope.launch {
+            runCatching { repo.saveFavoriteOrder(order.save, order.channels.map { it.id }) }
+                .onSuccess {
+                    _state.update { it.copy(busy = false, favoriteOrder = null, info = "Ordre des favoris enregistré") }
+                    refreshCurrent()
+                }
+                .onFailure { e -> applyFailure(e, "Échec de l'enregistrement des favoris") }
+        }
+    }
+
+    fun closeFavoriteOrder() = _state.update { it.copy(favoriteOrder = null) }
 
     /** Closes the detail page, back to browsing. */
     /** Closes the top detail page: back to its parent detail if any, otherwise back to browsing. */

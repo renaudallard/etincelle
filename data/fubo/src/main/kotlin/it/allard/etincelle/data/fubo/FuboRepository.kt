@@ -12,6 +12,7 @@ import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.DrmSpec
+import it.allard.etincelle.core.model.FavoriteOrder
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.ProgramWindow
@@ -367,13 +368,24 @@ class FuboRepository(
         if (series.hasWatchNowTab()) api.seriesDetail(seriesId, "id-tab-watch-now").toEpisodes() else emptyList()
     }.getOrDefault(emptyList())
 
-    override suspend fun record(action: RecordAction) = withRefresh {
-        // Replay the backend's own record api_call (url + payload) verbatim; coerce the JSON numbers
-        // Moshi decoded to Double back to whole numbers so the body matches what the backend sent. The
-        // response body is unused, but a raw ResponseBody must be closed or the connection leaks.
+    override suspend fun record(action: RecordAction) = post(action.url, action.payload)
+
+    override suspend fun toggleFavorite(action: RecordAction) = post(action.url, action.payload)
+
+    override suspend fun favoriteOrder(): FavoriteOrder = withRefresh {
+        api.favoriteChannels().toFavoriteOrder() ?: throw AppError.Unknown("Favoris indisponibles")
+    }
+
+    override suspend fun saveFavoriteOrder(save: RecordAction, channelIds: List<String>) =
+        post(save.url, favoriteOrderPayload(save, channelIds))
+
+    // Replays a backend api_call (url + payload) verbatim; coerce the JSON numbers Moshi decoded to
+    // Double back to whole numbers so the body matches what the backend sent. The response body is
+    // unused, but a raw ResponseBody must be closed or the connection leaks.
+    private suspend fun post(url: String, payload: Map<String, Any?>) = withRefresh {
         @Suppress("UNCHECKED_CAST")
-        val body = coerceWholeNumbers(action.payload) as Map<String, Any?>
-        api.postAction(action.url, body).close()
+        val body = coerceWholeNumbers(payload) as Map<String, Any?>
+        api.postAction(url, body).close()
     }
 
     /**

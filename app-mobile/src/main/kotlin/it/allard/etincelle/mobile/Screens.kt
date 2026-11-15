@@ -60,6 +60,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -82,11 +83,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import coil.compose.AsyncImage
 import it.allard.etincelle.core.cast.CastReceiver
 import it.allard.etincelle.core.designsystem.categoryIconRes
+import it.allard.etincelle.core.designsystem.R as DesignR
 import it.allard.etincelle.core.designsystem.theme.BackgroundLevel1
 import it.allard.etincelle.core.designsystem.theme.BrandBlack
 import it.allard.etincelle.core.designsystem.theme.BrandYellow
 import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentRail
+import it.allard.etincelle.core.model.FavoriteOrder
 import it.allard.etincelle.core.model.expandable
 import it.allard.etincelle.core.model.groupBySeason
 import it.allard.etincelle.core.model.ProgramDetail
@@ -285,6 +288,23 @@ private fun BoxScope.EpisodeCountBadge(text: String) {
     }
 }
 
+/** Toggles a channel card's favourite; provided by the activity, absent where cards cannot toggle. */
+val LocalFavoriteToggle = staticCompositionLocalOf<((ContentCard) -> Unit)?> { null }
+
+/** A channel card's favourite star, in its image's top-left corner: filled for a favourite; tapping it
+ * adds or removes the channel. */
+@Composable
+private fun BoxScope.FavoriteStar(card: ContentCard) {
+    val action = card.favorite ?: return
+    val toggle = LocalFavoriteToggle.current ?: return
+    Icon(
+        painterResource(if (card.isFavorite) DesignR.drawable.ic_favoris_filled else DesignR.drawable.ic_favoris),
+        contentDescription = action.label,
+        tint = if (card.isFavorite) BrandYellow else Color.White,
+        modifier = Modifier.align(Alignment.TopStart).size(32.dp).clickable { toggle(card) }.padding(6.dp),
+    )
+}
+
 /** The logo of the channel offering a card, in its image's bottom-right corner. */
 @Composable
 private fun BoxScope.ChannelLogo(url: String) {
@@ -330,6 +350,7 @@ private fun GridCard(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
                     Text("€", style = MaterialTheme.typography.labelSmall, color = BrandBlack)
                 }
             }
+            FavoriteStar(card)
             card.badge?.let { EpisodeCountBadge(it) }
             card.channelLogoUrl?.let { ChannelLogo(it) }
         }
@@ -380,6 +401,64 @@ fun UpdateDialog(info: UpdateInfo, progress: Int?, error: String?, onInstall: ()
         confirmButton = { TextButton(onClick = onInstall, enabled = progress == null) { Text("Installer") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Plus tard") } },
     )
+}
+
+/** Reorders the favourite channels: ▲ and ▼ move a channel, Enregistrer saves the new order. */
+@Composable
+fun FavoriteOrderScreen(
+    order: FavoriteOrder,
+    busy: Boolean,
+    error: String?,
+    onMove: (Int, Int) -> Unit,
+    onSave: () -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier.fillMaxSize().statusBarsPadding()) {
+        Row(
+            Modifier.fillMaxWidth().padding(start = 4.dp, end = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(onClick = onBack) { Text("← Retour") }
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = onSave, enabled = !busy && order.channels.isNotEmpty()) { Text(order.save.label) }
+        }
+        Text(order.title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 16.dp))
+        order.subtitle?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+        }
+        if (order.channels.isEmpty()) {
+            Text(
+                "Aucune chaîne favorite. Touchez l'étoile d'une chaîne pour l'ajouter.",
+                modifier = Modifier.padding(16.dp),
+            )
+        }
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
+        LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(vertical = 8.dp)) {
+            itemsIndexed(order.channels, key = { _, c -> c.id }) { i, channel ->
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("${i + 1}", modifier = Modifier.width(28.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    AsyncImage(
+                        model = channel.logoUrl,
+                        contentDescription = null,
+                        modifier = Modifier.size(width = 56.dp, height = 32.dp),
+                        contentScale = ContentScale.Fit,
+                    )
+                    Text(channel.name, modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
+                    TextButton(onClick = { onMove(i, i - 1) }, enabled = !busy && i > 0) { Text("▲") }
+                    TextButton(onClick = { onMove(i, i + 1) }, enabled = !busy && i < order.channels.size - 1) { Text("▼") }
+                }
+            }
+        }
+    }
 }
 
 /** Settings page: app-icon, hide-locked and Cast-receiver toggles, plus Déconnexion (with confirmation). */
@@ -929,6 +1008,7 @@ private fun CardItem(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
                     Text("€", style = MaterialTheme.typography.labelSmall, color = BrandBlack)
                 }
             }
+            FavoriteStar(card)
             card.badge?.let { EpisodeCountBadge(it) }
             card.channelLogoUrl?.let { ChannelLogo(it) }
         }

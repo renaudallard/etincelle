@@ -4,6 +4,7 @@
 package it.allard.etincelle.core.domain
 
 import it.allard.etincelle.core.model.ContentPage
+import it.allard.etincelle.core.model.FavoriteOrder
 import it.allard.etincelle.core.model.PairingCode
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramDetail
@@ -51,6 +52,15 @@ interface MolotovRepository {
 
     /** Schedules a recording by replaying the backend's own record [action] (episode or whole series). */
     suspend fun record(action: RecordAction)
+
+    /** Adds a channel to the favourites or removes it, by replaying the card's own [action]. */
+    suspend fun toggleFavorite(action: RecordAction)
+
+    /** The favourite channels in their current order. */
+    suspend fun favoriteOrder(): FavoriteOrder
+
+    /** Saves [channelIds] as the new order of the favourite channels, with the order's [save] action. */
+    suspend fun saveFavoriteOrder(save: RecordAction, channelIds: List<String>)
 
     /** The user's DVR recordings (recorded and scheduled), each with a playable dvr asset. */
     suspend fun loadRecordings(): List<Recording>

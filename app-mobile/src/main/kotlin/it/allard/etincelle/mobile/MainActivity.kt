@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -405,213 +406,231 @@ private fun AppRoot(
     // the logged-in content, so backing out restores it. Lives above the screen `when` so it survives
     // that swap (the logged-in branch leaves composition while a detail is shown).
     val contentStateHolder = rememberSaveableStateHolder()
-    Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
-            Box(Modifier.weight(1f)) {
-                when {
-                    state.checking -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
+    val favoriteOrder = state.favoriteOrder
+    CompositionLocalProvider(LocalFavoriteToggle provides vm::toggleFavorite) {
+        Box(Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize()) {
+                Box(Modifier.weight(1f)) {
+                    when {
+                        state.checking -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
 
-                    // While casting we stay on the show page (the stream is ambient on the TV); only take
-                    // over the whole screen with the player when playing locally on the phone.
-                    playerFullscreen -> {
-                        BackHandler { vm.stopPlaying() }
-                        PlayerSurface(
-                            playing!!, currentPlayer, castState, onCastConnect, onCastDisconnect,
-                            fetchProgramWindow = vm::liveProgramWindow,
-                        )
-                    }
+                        // While casting we stay on the show page (the stream is ambient on the TV); only take
+                        // over the whole screen with the player when playing locally on the phone.
+                        playerFullscreen -> {
+                            BackHandler { vm.stopPlaying() }
+                            PlayerSurface(
+                                playing!!, currentPlayer, castState, onCastConnect, onCastDisconnect,
+                                fetchProgramWindow = vm::liveProgramWindow,
+                            )
+                        }
 
-                    // The cast controller: the same player surface bound to the cast player, so its
-                    // transport controls drive the receiver. Back closes it; the cast keeps playing.
-                    castControls -> {
-                        BackHandler { castControlsOpen = false }
-                        PlayerSurface(
-                            playing!!, currentPlayer, castState, onCastConnect, onCastDisconnect,
-                            fetchProgramWindow = vm::liveProgramWindow, secure = false,
-                        )
-                    }
+                        // The cast controller: the same player surface bound to the cast player, so its
+                        // transport controls drive the receiver. Back closes it; the cast keeps playing.
+                        castControls -> {
+                            BackHandler { castControlsOpen = false }
+                            PlayerSurface(
+                                playing!!, currentPlayer, castState, onCastConnect, onCastDisconnect,
+                                fetchProgramWindow = vm::liveProgramWindow, secure = false,
+                            )
+                        }
 
-                    detail != null -> {
-                        BackHandler { vm.closeDetail() }
-                        ProgramDetailScreen(
-                            detail = detail,
-                            busy = state.busy,
-                            error = state.error,
-                            info = state.info,
-                            onWatch = { vm.watchDetail() },
-                            onStartOver = { vm.startOverDetail() },
-                            onRecord = { vm.recordDetail(it) },
-                            onWatchRecording = { vm.watchRecording(it) },
-                            onBack = { vm.closeDetail() },
-                            onEpisode = { vm.onCardClick(it) },
-                            isRecording = state.detailRecordingAssetId != null,
-                            castButton = { CastButton(castState, onCastConnect, onCastDisconnect, onCastActiveScan) },
-                        )
-                    }
+                        detail != null -> {
+                            BackHandler { vm.closeDetail() }
+                            ProgramDetailScreen(
+                                detail = detail,
+                                busy = state.busy,
+                                error = state.error,
+                                info = state.info,
+                                onWatch = { vm.watchDetail() },
+                                onStartOver = { vm.startOverDetail() },
+                                onRecord = { vm.recordDetail(it) },
+                                onWatchRecording = { vm.watchRecording(it) },
+                                onBack = { vm.closeDetail() },
+                                onEpisode = { vm.onCardClick(it) },
+                                isRecording = state.detailRecordingAssetId != null,
+                                castButton = { CastButton(castState, onCastConnect, onCastDisconnect, onCastActiveScan) },
+                            )
+                        }
 
-                    state.settings -> {
-                        BackHandler { vm.closeSettings() }
-                        SettingsScreen(
-                            onBack = { vm.closeSettings() },
-                            onLogout = { vm.logout() },
-                            hideLocked = state.hideLocked,
-                            onHideLocked = vm::setHideLocked,
-                            gridColumns = gridColumns,
-                            onGridColumns = { gridColumns = it },
-                            appVersion = BuildConfig.VERSION_NAME,
-                            checkingUpdate = state.checkingUpdate,
-                            updateStatus = state.updateStatus,
-                            onCheckUpdate = { vm.checkForUpdateNow() },
-                            onConnectTv = { vm.confirmTvCode(it) },
-                            onClearTvConnect = { vm.clearTvConnect() },
-                            connectInfo = state.tvConnectInfo,
-                            connectError = state.tvConnectError,
-                            connecting = state.busy,
-                        )
-                    }
+                        favoriteOrder != null -> {
+                            BackHandler { vm.closeFavoriteOrder() }
+                            FavoriteOrderScreen(
+                                favoriteOrder, state.busy, state.error,
+                                onMove = vm::moveFavorite,
+                                onSave = vm::saveFavoriteOrder,
+                                onBack = vm::closeFavoriteOrder,
+                            )
+                        }
 
-                    state.loggedIn -> {
-                        BackHandler(enabled = state.canGoBack) { vm.back() }
-                        Scaffold(
-                            topBar = {
-                                TopAppBar(
-                                    title = { Text(state.current?.title ?: state.tab.label) },
-                                    navigationIcon = {
-                                        if (state.canGoBack) {
-                                            IconButton(onClick = { vm.back() }) { Text("←") }
-                                        }
-                                    },
-                                    actions = {
-                                        CastButton(castState, onCastConnect, onCastDisconnect, onCastActiveScan)
-                                        TextButton(onClick = { vm.openSettings() }) { Text("Paramètres") }
-                                    },
-                                )
-                            },
-                            bottomBar = {
-                                // With the cast bar sitting below, drop the nav bar's own bottom inset so
-                                // the two do not stack a double gap above the gesture area. Gate on the
-                                // same value as the bar so the inset is never dropped without a bar.
-                                NavigationBar(
-                                    windowInsets = if (showCastBar) {
-                                        WindowInsets(0, 0, 0, 0)
-                                    } else {
-                                        NavigationBarDefaults.windowInsets
-                                    },
-                                ) {
-                                    Tab.entries.forEach { tab ->
-                                        // The tab stays marked on its sub-pages ("Tout voir", categories),
-                                        // so the bar always says where you are; tapping it goes back to
-                                        // the tab's first page.
-                                        NavigationBarItem(
-                                            selected = state.tab == tab,
-                                            onClick = { vm.selectTab(tab) },
-                                            colors = NavigationBarItemDefaults.colors(
-                                                indicatorColor = BrandYellow,
-                                                selectedIconColor = BrandBlack,
-                                                selectedTextColor = BrandYellow,
-                                            ),
-                                            icon = {
-                                                val iconRes = tabIconRes(tab)
-                                                if (iconRes != null) {
-                                                    Icon(painterResource(iconRes), contentDescription = tab.label)
-                                                } else {
-                                                    Text(tab.icon)
+                        state.settings -> {
+                            BackHandler { vm.closeSettings() }
+                            SettingsScreen(
+                                onBack = { vm.closeSettings() },
+                                onLogout = { vm.logout() },
+                                hideLocked = state.hideLocked,
+                                onHideLocked = vm::setHideLocked,
+                                gridColumns = gridColumns,
+                                onGridColumns = { gridColumns = it },
+                                appVersion = BuildConfig.VERSION_NAME,
+                                checkingUpdate = state.checkingUpdate,
+                                updateStatus = state.updateStatus,
+                                onCheckUpdate = { vm.checkForUpdateNow() },
+                                onConnectTv = { vm.confirmTvCode(it) },
+                                onClearTvConnect = { vm.clearTvConnect() },
+                                connectInfo = state.tvConnectInfo,
+                                connectError = state.tvConnectError,
+                                connecting = state.busy,
+                            )
+                        }
+
+                        state.loggedIn -> {
+                            BackHandler(enabled = state.canGoBack) { vm.back() }
+                            Scaffold(
+                                topBar = {
+                                    TopAppBar(
+                                        title = { Text(state.current?.title ?: state.tab.label) },
+                                        navigationIcon = {
+                                            if (state.canGoBack) {
+                                                IconButton(onClick = { vm.back() }) { Text("←") }
+                                            }
+                                        },
+                                        actions = {
+                                            if (state.tab == Tab.CHANNELS && !state.canGoBack) {
+                                                IconButton(onClick = { vm.openFavoriteOrder() }) {
+                                                    Icon(painterResource(DesignR.drawable.ic_favoris), contentDescription = "Réorganiser les favoris")
                                                 }
-                                            },
-                                            label = {
-                                                Text(
-                                                    tab.label,
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    maxLines = 1,
-                                                    softWrap = false,
-                                                )
-                                            },
+                                            }
+                                            CastButton(castState, onCastConnect, onCastDisconnect, onCastActiveScan)
+                                            TextButton(onClick = { vm.openSettings() }) { Text("Paramètres") }
+                                        },
+                                    )
+                                },
+                                bottomBar = {
+                                    // With the cast bar sitting below, drop the nav bar's own bottom inset so
+                                    // the two do not stack a double gap above the gesture area. Gate on the
+                                    // same value as the bar so the inset is never dropped without a bar.
+                                    NavigationBar(
+                                        windowInsets = if (showCastBar) {
+                                            WindowInsets(0, 0, 0, 0)
+                                        } else {
+                                            NavigationBarDefaults.windowInsets
+                                        },
+                                    ) {
+                                        Tab.entries.forEach { tab ->
+                                            // The tab stays marked on its sub-pages ("Tout voir", categories),
+                                            // so the bar always says where you are; tapping it goes back to
+                                            // the tab's first page.
+                                            NavigationBarItem(
+                                                selected = state.tab == tab,
+                                                onClick = { vm.selectTab(tab) },
+                                                colors = NavigationBarItemDefaults.colors(
+                                                    indicatorColor = BrandYellow,
+                                                    selectedIconColor = BrandBlack,
+                                                    selectedTextColor = BrandYellow,
+                                                ),
+                                                icon = {
+                                                    val iconRes = tabIconRes(tab)
+                                                    if (iconRes != null) {
+                                                        Icon(painterResource(iconRes), contentDescription = tab.label)
+                                                    } else {
+                                                        Text(tab.icon)
+                                                    }
+                                                },
+                                                label = {
+                                                    Text(
+                                                        tab.label,
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        maxLines = 1,
+                                                        softWrap = false,
+                                                    )
+                                                },
+                                            )
+                                        }
+                                    }
+                                },
+                            ) { padding ->
+                                val modifier = Modifier.padding(padding)
+                                // Key the saveable state by the back-stack entry so each page keeps its own
+                                // scroll: the key is unchanged while a detail covers the page (the back stack
+                                // does not move), so the scroll offset is restored when the detail closes.
+                                // Search keeps a constant key: it always shows SearchScreen, and its back-stack
+                                // depth flips 0->1 when results arrive, which would otherwise tear down the
+                                // search field and blank the typed query.
+                                // hideLocked is folded in so toggling "hide locked" (which shrinks the lists)
+                                // starts the page fresh at the top instead of restoring a now-out-of-range index.
+                                val pageKey = if (state.tab == Tab.SEARCH) {
+                                    "SEARCH"
+                                } else {
+                                    "${state.tab.name}#${state.backStack.size}#${state.hideLocked}#" +
+                                        (state.current?.reloadUrl ?: state.current?.title.orEmpty())
+                                }
+                                contentStateHolder.SaveableStateProvider(pageKey) {
+                                    if (state.tab == Tab.SEARCH) {
+                                        SearchScreen(
+                                            rails = state.visibleRails,
+                                            busy = state.busy,
+                                            error = state.error,
+                                            onSubmit = vm::search,
+                                            onCardClick = vm::onCardClick,
+                                            onSeeAll = vm::onRailSeeAll,
+                                            refreshing = state.refreshing,
+                                            onRefresh = vm::refreshCurrent,
+                                            isGrid = state.current?.isGrid == true,
+                                            columns = gridColumns,
+                                            pageTitle = state.current?.title,
+                                            searched = state.current != null,
+                                            modifier = modifier,
+                                        )
+                                    } else if (state.current?.isGrid == true) {
+                                        GridContent(
+                                            rails = state.visibleRails,
+                                            busy = state.busy,
+                                            error = state.error,
+                                            onCardClick = vm::onCardClick,
+                                            refreshing = state.refreshing,
+                                            onRefresh = vm::refreshCurrent,
+                                            columns = gridColumns,
+                                            pageTitle = state.current?.title,
+                                            modifier = modifier,
+                                        )
+                                    } else {
+                                        PageContent(
+                                            rails = state.visibleRails,
+                                            busy = state.busy,
+                                            error = state.error,
+                                            onCardClick = vm::onCardClick,
+                                            onSeeAll = vm::onRailSeeAll,
+                                            refreshing = state.refreshing,
+                                            onRefresh = vm::refreshCurrent,
+                                            modifier = modifier,
                                         )
                                     }
                                 }
-                            },
-                        ) { padding ->
-                            val modifier = Modifier.padding(padding)
-                            // Key the saveable state by the back-stack entry so each page keeps its own
-                            // scroll: the key is unchanged while a detail covers the page (the back stack
-                            // does not move), so the scroll offset is restored when the detail closes.
-                            // Search keeps a constant key: it always shows SearchScreen, and its back-stack
-                            // depth flips 0->1 when results arrive, which would otherwise tear down the
-                            // search field and blank the typed query.
-                            // hideLocked is folded in so toggling "hide locked" (which shrinks the lists)
-                            // starts the page fresh at the top instead of restoring a now-out-of-range index.
-                            val pageKey = if (state.tab == Tab.SEARCH) {
-                                "SEARCH"
-                            } else {
-                                "${state.tab.name}#${state.backStack.size}#${state.hideLocked}#" +
-                                    (state.current?.reloadUrl ?: state.current?.title.orEmpty())
-                            }
-                            contentStateHolder.SaveableStateProvider(pageKey) {
-                                if (state.tab == Tab.SEARCH) {
-                                    SearchScreen(
-                                        rails = state.visibleRails,
-                                        busy = state.busy,
-                                        error = state.error,
-                                        onSubmit = vm::search,
-                                        onCardClick = vm::onCardClick,
-                                        onSeeAll = vm::onRailSeeAll,
-                                        refreshing = state.refreshing,
-                                        onRefresh = vm::refreshCurrent,
-                                        isGrid = state.current?.isGrid == true,
-                                        columns = gridColumns,
-                                        pageTitle = state.current?.title,
-                                        searched = state.current != null,
-                                        modifier = modifier,
-                                    )
-                                } else if (state.current?.isGrid == true) {
-                                    GridContent(
-                                        rails = state.visibleRails,
-                                        busy = state.busy,
-                                        error = state.error,
-                                        onCardClick = vm::onCardClick,
-                                        refreshing = state.refreshing,
-                                        onRefresh = vm::refreshCurrent,
-                                        columns = gridColumns,
-                                        pageTitle = state.current?.title,
-                                        modifier = modifier,
-                                    )
-                                } else {
-                                    PageContent(
-                                        rails = state.visibleRails,
-                                        busy = state.busy,
-                                        error = state.error,
-                                        onCardClick = vm::onCardClick,
-                                        onSeeAll = vm::onRailSeeAll,
-                                        refreshing = state.refreshing,
-                                        onRefresh = vm::refreshCurrent,
-                                        modifier = modifier,
-                                    )
-                                }
                             }
                         }
-                    }
 
-                    else -> LoginScreen(state.busy, state.error, vm::login)
+                        else -> LoginScreen(state.busy, state.error, vm::login)
+                    }
+                }
+                if (showCastBar) {
+                    // Offer the tap-to-open affordance only when a tap will actually open functional
+                    // controls (the app holds the playing source). A cast resumed after an app kill has
+                    // none, so the bar stays plain status there (the system cast notification controls it).
+                    CastStatusBar(
+                        castState,
+                        onClick = if (playing != null) ({ castControlsOpen = true }) else null,
+                    )
                 }
             }
-            if (showCastBar) {
-                // Offer the tap-to-open affordance only when a tap will actually open functional
-                // controls (the app holds the playing source). A cast resumed after an app kill has
-                // none, so the bar stays plain status there (the system cast notification controls it).
-                CastStatusBar(
-                    castState,
-                    onClick = if (playing != null) ({ castControlsOpen = true }) else null,
+            if (castState.isCasting && showVolume) {
+                CastVolumeOverlay(
+                    level = castState.volumeLevel,
+                    deviceName = castState.connectedDeviceName,
+                    modifier = Modifier.align(Alignment.Center),
                 )
             }
-        }
-        if (castState.isCasting && showVolume) {
-            CastVolumeOverlay(
-                level = castState.volumeLevel,
-                deviceName = castState.connectedDeviceName,
-                modifier = Modifier.align(Alignment.Center),
-            )
         }
     }
 }

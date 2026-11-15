@@ -80,8 +80,12 @@ interface FuboApi {
         @Query("tabID") tab: String = "id-tab-about",
     ): PageResponse
 
-    /** Replays a server-driven record action (its api_call url + payload); the response body is unused.
-     * The url is absolute, so it also carries the endpoint (add-recording, record-new-episodes, …). */
+    /** The favourite channels in their order, with the action that saves a new order. */
+    @GET("papi/v1/favorite/channels")
+    suspend fun favoriteChannels(): FavoriteOrderResponse
+
+    /** Replays a server-driven action (its api_call url + payload: a recording, a favourite channel…);
+     * the response body is unused. The url is absolute, so it also carries the endpoint. */
     @POST
     suspend fun postAction(
         @Url url: String,

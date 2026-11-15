@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
@@ -73,6 +74,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -82,6 +84,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import it.allard.etincelle.core.designsystem.categoryIconRes
+import it.allard.etincelle.core.designsystem.R as DesignR
 import it.allard.etincelle.core.designsystem.theme.BackgroundLevel1
 import it.allard.etincelle.core.designsystem.theme.BackgroundLevel2
 import it.allard.etincelle.core.designsystem.theme.BrandBlack
@@ -89,6 +92,7 @@ import it.allard.etincelle.core.designsystem.theme.BrandYellow
 import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.expandable
+import it.allard.etincelle.core.model.FavoriteOrder
 import it.allard.etincelle.core.model.groupBySeason
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.RecordAction
@@ -230,6 +234,7 @@ fun TvBrowseScreen(
     onSettings: () -> Unit,
     onSeeAll: (ContentRail) -> Unit,
     gridColumns: Int,
+    onFavoriteOrder: () -> Unit = {},
 ) {
     val tabFocus = remember { Tab.entries.associateWith { FocusRequester() } }
     val railsFocus = remember { FocusRequester() }
@@ -284,7 +289,19 @@ fun TvBrowseScreen(
         if (state.tab == Tab.SEARCH) {
             TvSearchContent(state, onSearch, onCardClick, onSeeAll, returnFocus, searchField, railsFocus, gridColumns)
         } else {
-            Text(state.current?.title ?: state.tab.label, style = MaterialTheme.typography.headlineMedium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(state.current?.title ?: state.tab.label, style = MaterialTheme.typography.headlineMedium)
+                if (state.tab == Tab.CHANNELS && !state.canGoBack) {
+                    Spacer(Modifier.width(24.dp))
+                    TvButton(onClick = onFavoriteOrder, highlighted = false) { Text("Réorganiser les favoris") }
+                    Spacer(Modifier.width(16.dp))
+                    Text(
+                        "Appui long sur OK : ajouter une chaîne aux favoris ou l'en retirer",
+                        color = Color.White.copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
             Spacer(Modifier.height(12.dp))
             Box(Modifier.fillMaxSize()) {
                 val page = state.current
@@ -453,6 +470,98 @@ fun TvSettingsScreen(
                     onClick = { TvPrefs.setGridColumns(context, n); onGridColumns(n) },
                     highlighted = n == gridColumns,
                 ) { Text("$n") }
+            }
+        }
+    }
+}
+
+/** Toggles a channel card's favourite; provided by the activity, absent where cards cannot toggle. */
+val LocalFavoriteToggle = staticCompositionLocalOf<((ContentCard) -> Unit)?> { null }
+
+/**
+ * Reorders the favourite channels with the remote: OK picks a channel up, Up and Down move it, OK sets
+ * it down. Enregistrer saves the new order.
+ */
+@Composable
+fun TvFavoriteOrderScreen(
+    order: FavoriteOrder,
+    busy: Boolean,
+    error: String?,
+    onMove: (Int, Int) -> Unit,
+    onSave: () -> Unit,
+    onBack: () -> Unit,
+) {
+    var picked by remember { mutableStateOf<String?>(null) }
+    val saveFocus = remember { FocusRequester() }
+    val cancelFocus = remember { FocusRequester() }
+    val firstFocus = remember { FocusRequester() }
+    // Start on the first channel, the one most likely to move; the screen it replaces may still hold
+    // the focus during the first frame, hence the wait.
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        runCatching { (if (order.channels.isEmpty()) cancelFocus else firstFocus).requestFocus() }
+    }
+    Column(Modifier.fillMaxSize().padding(start = OVERSCAN, end = OVERSCAN, top = 32.dp)) {
+        Text(order.title, style = MaterialTheme.typography.headlineMedium)
+        order.subtitle?.let { Text(it, color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.bodyLarge) }
+        Spacer(Modifier.height(16.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            TvButton(onClick = onSave, enabled = !busy && order.channels.isNotEmpty(), modifier = Modifier.focusRequester(saveFocus)) {
+                Text(order.save.label)
+            }
+            TvButton(onClick = onBack, highlighted = false, modifier = Modifier.focusRequester(cancelFocus)) { Text("Annuler") }
+        }
+        error?.let { Text(it, color = BrandYellow, modifier = Modifier.padding(top = 12.dp)) }
+        if (order.channels.isEmpty()) {
+            Text(
+                "Aucune chaîne favorite. Appui long sur OK sur une chaîne pour l'ajouter.",
+                color = Color.White,
+                modifier = Modifier.padding(top = 16.dp),
+            )
+        }
+        Spacer(Modifier.height(16.dp))
+        LazyColumn(
+            modifier = Modifier.focusGroup(),
+            contentPadding = PaddingValues(bottom = 48.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            itemsIndexed(order.channels, key = { _, c -> c.id }) { i, channel ->
+                var focused by remember { mutableStateOf(false) }
+                val moving = picked == channel.id
+                Row(
+                    Modifier.width(560.dp)
+                        // Up from the first channel goes to Enregistrer, not to the button nearest on screen.
+                        .then(if (i == 0) Modifier.focusRequester(firstFocus).focusProperties { up = saveFocus } else Modifier)
+                        .onFocusChanged { focused = it.isFocused }
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (moving) BrandYellow else BackgroundLevel1)
+                        .border(if (focused) 3.dp else 0.dp, if (focused) Color.White else Color.Transparent, RoundedCornerShape(10.dp))
+                        .onPreviewKeyEvent { event ->
+                            if (!moving || event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                            when (event.key) {
+                                Key.DirectionUp -> { if (i > 0) onMove(i, i - 1); true }
+                                Key.DirectionDown -> { if (i < order.channels.size - 1) onMove(i, i + 1); true }
+                                else -> false
+                            }
+                        }
+                        .clickable(enabled = !busy) { picked = if (moving) null else channel.id }
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("${i + 1}", color = if (moving) BrandBlack else Color.White, modifier = Modifier.width(36.dp))
+                    AsyncImage(
+                        model = channel.logoUrl,
+                        contentDescription = null,
+                        modifier = Modifier.size(width = 72.dp, height = 40.dp),
+                        contentScale = ContentScale.Fit,
+                    )
+                    Text(
+                        channel.name,
+                        color = if (moving) BrandBlack else Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(start = 16.dp),
+                    )
+                }
             }
         }
     }
@@ -782,6 +891,7 @@ private fun TvCard(card: ContentCard, onCardClick: (ContentCard) -> Unit, focusM
     // A genre/category tile carries no artwork; draw the brand icon instead of a blank box.
     val categoryIcon = if (card.channelId == null && card.vodId == null) categoryIconRes(card.title) else null
     var focused by remember { mutableStateOf(false) }
+    val toggleFavorite = LocalFavoriteToggle.current
     val w = if (isChannel) 112.dp else 208.dp
     val h = if (isChannel) 112.dp else 117.dp
     Column(Modifier.width(w)) {
@@ -792,7 +902,11 @@ private fun TvCard(card: ContentCard, onCardClick: (ContentCard) -> Unit, focusM
                 .clip(RoundedCornerShape(10.dp))
                 .background(BackgroundLevel1)
                 .border(if (focused) 3.dp else 0.dp, if (focused) Color.White else Color.Transparent, RoundedCornerShape(10.dp))
-                .clickable { onCardClick(card) },
+                // A long press of OK on a channel adds it to the favourites or removes it.
+                .combinedClickable(
+                    onLongClick = toggleFavorite?.takeIf { card.favorite != null }?.let { { it(card) } },
+                    onClick = { onCardClick(card) },
+                ),
             contentAlignment = Alignment.Center,
         ) {
             if (categoryIcon != null) {
@@ -809,6 +923,14 @@ private fun TvCard(card: ContentCard, onCardClick: (ContentCard) -> Unit, focusM
                 Box(Modifier.align(Alignment.TopEnd).padding(4.dp).clip(RoundedCornerShape(4.dp)).background(BrandYellow).padding(horizontal = 4.dp)) {
                     Text("€", color = BrandBlack, style = MaterialTheme.typography.labelSmall)
                 }
+            }
+            if (card.isFavorite) {
+                Icon(
+                    painterResource(DesignR.drawable.ic_favoris_filled),
+                    contentDescription = "Favori",
+                    tint = BrandYellow,
+                    modifier = Modifier.align(Alignment.TopStart).padding(6.dp).size(20.dp),
+                )
             }
             card.badge?.let {
                 Box(Modifier.align(Alignment.BottomStart).padding(4.dp).clip(RoundedCornerShape(4.dp)).background(BrandYellow).padding(horizontal = 4.dp)) {
