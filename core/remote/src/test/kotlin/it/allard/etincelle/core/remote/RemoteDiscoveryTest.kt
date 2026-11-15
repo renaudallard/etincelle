@@ -24,6 +24,18 @@ class RemoteDiscoveryTest {
     }
 
     @Test
+    fun theSubnetIsAskedAddressByAddress() {
+        val hosts = RemoteDiscovery.subnetHosts(byteArrayOf(172.toByte(), 20, 0, 94), 24).map { it.joinToString(".") { b -> (b.toInt() and 0xff).toString() } }
+        assertEquals(253, hosts.size)
+        assertEquals("172.20.0.1", hosts.first())
+        assertEquals("172.20.0.254", hosts.last())
+        assertTrue("172.20.0.180" in hosts)
+        assertFalse("172.20.0.94" in hosts)
+        assertTrue(RemoteDiscovery.subnetHosts(byteArrayOf(10, 0, 0, 1), 16).isEmpty())
+        assertTrue(RemoteDiscovery.subnetHosts(ByteArray(16), 64).isEmpty())
+    }
+
+    @Test
     fun anythingElseIsNoTv() {
         val request = RemoteDiscovery.request()
         assertTrue(RemoteDiscovery.isRequest(request, request.size))

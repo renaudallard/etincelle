@@ -277,7 +277,10 @@ open class CastController(
         for (entry in scannedDevices.values) if (entry.device.id !in foundIds) entry.missed++
         scannedDevices.values.removeAll { it.missed >= MAX_MISSED_SCANS }
         for (device in found) scannedDevices[device.id] = ScannedDevice(device)
-        val tvs = withContext(Dispatchers.IO) { RemoteDiscovery.scan(network) }
+        val hosts = connectivity?.getLinkProperties(network)?.linkAddresses.orEmpty()
+            .firstOrNull { it.address.address.size == 4 }
+            ?.let { RemoteDiscovery.subnetHosts(it.address.address, it.prefixLength) }.orEmpty()
+        val tvs = withContext(Dispatchers.IO) { RemoteDiscovery.scan(network, hosts) }
         val tvIds = tvs.map { it.id }.toSet()
         for (entry in scannedTvs.values) if (entry.tv.id !in tvIds) entry.missed++
         scannedTvs.values.removeAll { it.missed >= MAX_MISSED_SCANS }

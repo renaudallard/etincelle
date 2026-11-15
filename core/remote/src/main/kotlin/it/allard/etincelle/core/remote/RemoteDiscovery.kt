@@ -14,8 +14,10 @@ import java.net.SocketTimeoutException
 data class RemoteTv(val id: String, val name: String, val host: String, val port: Int)
 
 /**
- * Finds the etincelle TV apps open on the local network. The phone broadcasts a request to
- * [PORT]; each TV app answers it directly with its id, name and the port it takes connections on.
+ * Finds the etincelle TV apps open on the local network. The phone sends a request to [PORT], by
+ * broadcast and to each address of its subnet, as some TVs stop receiving broadcast and multicast
+ * altogether (seen on a Google TV Streamer); each TV app answers it directly with its id, name and the
+ * port it takes connections on.
  * Android's own service announcer only answers by multicast, which some phones stop receiving, while a
  * direct answer always arrives (the same reason Chromecasts are also looked for with direct answers).
  * Finding a TV gives nothing away: driving it takes the account handshake of [RemoteLink].
@@ -27,6 +29,8 @@ object RemoteDiscovery {
     private const val LISTEN_MS = 1_200L
     private const val RECEIVE_TIMEOUT_MS = 300
     private const val MAX_PACKET = 1_500
+    // Larger subnets are not asked address by address: a thousand requests is the most worth sending.
+    private const val MIN_PREFIX = 22
 
     /** The request a phone broadcasts. */
     fun request(): ByteArray = REQUEST.toByteArray()
@@ -47,10 +51,26 @@ object RemoteDiscovery {
     }
 
     /**
-     * Asks the network for TV apps and returns those that answer. Blocking for about [LISTEN_MS]; never
-     * throws. [network] is the Wi-Fi network to ask on; null asks on the default.
+     * The other addresses of the IPv4 subnet [address]/[prefix] (network and broadcast addresses left
+     * out), or none for a subnet wider than /[MIN_PREFIX] or an address that is not IPv4.
      */
-    fun scan(network: Network?): List<RemoteTv> {
+    fun subnetHosts(address: ByteArray, prefix: Int): List<ByteArray> {
+        if (address.size != 4 || prefix !in MIN_PREFIX..30) return emptyList()
+        val self = address.fold(0L) { acc, b -> (acc shl 8) or (b.toLong() and 0xff) }
+        val mask = (0xffffffffL shl (32 - prefix)) and 0xffffffffL
+        val first = (self and mask) + 1
+        val last = (self or mask.inv() and 0xffffffffL) - 1
+        return (first..last).filter { it != self }.map { host ->
+            byteArrayOf((host shr 24).toByte(), (host shr 16).toByte(), (host shr 8).toByte(), host.toByte())
+        }
+    }
+
+    /**
+     * Asks the network for TV apps and returns those that answer. Blocking for about [LISTEN_MS]; never
+     * throws. [network] is the Wi-Fi network to ask on, null the default; [hosts] are also asked one by
+     * one (see [subnetHosts]).
+     */
+    fun scan(network: Network?, hosts: List<ByteArray> = emptyList()): List<RemoteTv> {
         val found = LinkedHashMap<String, RemoteTv>()
         runCatching {
             DatagramSocket(InetSocketAddress(InetAddress.getByAddress(byteArrayOf(0, 0, 0, 0)), 0)).use { socket ->
@@ -59,6 +79,7 @@ object RemoteDiscovery {
                 socket.soTimeout = RECEIVE_TIMEOUT_MS
                 val request = request()
                 socket.send(DatagramPacket(request, request.size, InetAddress.getByName("255.255.255.255"), PORT))
+                for (host in hosts) runCatching { socket.send(DatagramPacket(request, request.size, InetAddress.getByAddress(host), PORT)) }
                 val buffer = ByteArray(MAX_PACKET)
                 val end = System.nanoTime() + LISTEN_MS * 1_000_000
                 while (System.nanoTime() < end) {
