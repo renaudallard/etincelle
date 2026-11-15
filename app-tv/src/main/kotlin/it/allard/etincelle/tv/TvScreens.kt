@@ -91,6 +91,7 @@ import it.allard.etincelle.core.designsystem.theme.BackgroundLevel2
 import it.allard.etincelle.core.designsystem.theme.BrandBlack
 import it.allard.etincelle.core.designsystem.theme.BrandYellow
 import it.allard.etincelle.core.model.Avatar
+import it.allard.etincelle.core.model.CardShape
 import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.expandable
@@ -1090,13 +1091,18 @@ private fun TvGridContent(
 
 @Composable
 private fun TvCard(card: ContentCard, onCardClick: (ContentCard) -> Unit, focusModifier: Modifier = Modifier) {
-    val isChannel = card.square
+    val isChannel = card.shape == CardShape.SQUARE
     // A genre/category tile carries no artwork; draw the brand icon instead of a blank box.
     val categoryIcon = if (card.channelId == null && card.vodId == null) categoryIconRes(card.title) else null
     var focused by remember { mutableStateOf(false) }
     val toggleFavorite = LocalFavoriteToggle.current
-    val w = if (isChannel) 112.dp else 208.dp
-    val h = if (isChannel) 112.dp else 117.dp
+    // Artwork keeps its own shape: landscape cards are wider, posters as tall as the official app's.
+    val w = when (card.shape) {
+        CardShape.SQUARE -> 112.dp
+        CardShape.WIDE -> 208.dp
+        CardShape.POSTER, CardShape.POSTER_THIN -> 120.dp
+    }
+    val h = w / card.shape.ratio
     Column(Modifier.width(w)) {
         Box(
             Modifier.size(w, h)

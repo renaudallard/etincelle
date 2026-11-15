@@ -4,6 +4,7 @@
 package it.allard.etincelle.data.fubo
 
 import com.squareup.moshi.Json
+import it.allard.etincelle.core.model.CardShape
 import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.ContentRail
@@ -277,10 +278,19 @@ fun PageResponse.toRails(): List<ContentRail> {
     return sections.mapIndexedNotNull { index, section ->
         // Banners are single promo images, not browsable content; skip them (avoids a title-less 1-card row).
         if (section.componentType == "banner") return@mapIndexedNotNull null
-        val square = section.componentType == "square"
-        val cards = section.components.orEmpty().mapNotNull { it.toCard(square) }
+        val shape = cardShape(section.componentType)
+        val cards = section.components.orEmpty().mapNotNull { it.toCard(shape) }
         if (cards.isEmpty()) null else ContentRail("rail-$index", section.title?.text, cards, section.seeAllUrl())
     }
+}
+
+// The row's component type says how its artwork is cut: posters are portrait images (1000x1314,
+// thin ones 720x1080), channel and app logos are squares, the rest is 16:9.
+private fun cardShape(componentType: String?): CardShape = when (componentType) {
+    "square" -> CardShape.SQUARE
+    "card-poster" -> CardShape.POSTER
+    "card-poster-thin" -> CardShape.POSTER_THIN
+    else -> CardShape.WIDE
 }
 
 // The "see all" target lives in the carousel's aux button as a navigation action.
@@ -293,7 +303,7 @@ private fun trkTitle(url: String): String? =
         ?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrNull() }
         ?.takeIf { it.isNotBlank() }
 
-private fun ComponentDto.toCard(square: Boolean = false): ContentCard? {
+private fun ComponentDto.toCard(shape: CardShape = CardShape.WIDE): ContentCard? {
     val img = picture?.url ?: body?.picture?.url ?: image?.url ?: imageCompact?.url
     // Cards often list a tracking action before the navigation one; prefer the navigation target.
     val actionUrl = (actions?.onClick.orEmpty().firstOrNull { it.type == "navigation" }
@@ -327,7 +337,7 @@ private fun ComponentDto.toCard(square: Boolean = false): ContentCard? {
         recordingAssetId = null,
         // channel_id is a number on live cards but a string on poster cards; accept both.
         liveChannelId = (channelIdRaw as? String) ?: (channelIdRaw as? Number)?.toLong()?.toString(),
-        square = square,
+        shape = shape,
         channelLogoUrl = body?.stationLogo?.url ?: header?.stationLogo?.url,
         favorite = actions?.onFavIconClick?.let { apiCall(it, if (isFavorite == true) "Retirer des favoris" else "Ajouter aux favoris") },
         isFavorite = isFavorite == true,
@@ -400,6 +410,6 @@ fun PageResponse.toChannelDirectory(): Map<String, String> {
 fun PageResponse.toAppsRail(): ContentRail? {
     val section = content?.sections.orEmpty()
         .firstOrNull { it.title?.text == "Apps" || it.title?.text == "Applications" } ?: return null
-    val cards = section.components.orEmpty().mapNotNull { it.toCard(square = true) }
+    val cards = section.components.orEmpty().mapNotNull { it.toCard(CardShape.SQUARE) }
     return if (cards.isEmpty()) null else ContentRail("apps", "Applications", cards)
 }

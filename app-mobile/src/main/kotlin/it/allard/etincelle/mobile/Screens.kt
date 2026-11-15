@@ -90,6 +90,7 @@ import it.allard.etincelle.core.designsystem.theme.BackgroundLevel1
 import it.allard.etincelle.core.designsystem.theme.BrandBlack
 import it.allard.etincelle.core.designsystem.theme.BrandYellow
 import it.allard.etincelle.core.model.Avatar
+import it.allard.etincelle.core.model.CardShape
 import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.FavoriteOrder
@@ -374,12 +375,14 @@ private fun BoxScope.ChannelLogo(url: String) {
 @Composable
 private fun GridCard(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
     val categoryIcon = if (card.channelId == null && card.vodId == null) categoryIconRes(card.title) else null
+    val logo = card.shape == CardShape.SQUARE
     Column(
         modifier = Modifier.fillMaxWidth().clickable { onCardClick(card) },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        // Artwork takes its own shape (posters are portrait); a logo sits on a landscape tile.
         Box(
-            modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)
+            modifier = Modifier.fillMaxWidth().aspectRatio(if (logo) CardShape.WIDE.ratio else card.shape.ratio)
                 .clip(RoundedCornerShape(10.dp)).background(BackgroundLevel1),
             contentAlignment = Alignment.Center,
         ) {
@@ -391,8 +394,8 @@ private fun GridCard(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
                 AsyncImage(
                     model = card.imageUrl,
                     contentDescription = card.title,
-                    modifier = Modifier.fillMaxSize().padding(if (card.square) 12.dp else 0.dp),
-                    contentScale = if (card.square) ContentScale.Fit else ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().padding(if (logo) 12.dp else 0.dp),
+                    contentScale = if (logo) ContentScale.Fit else ContentScale.Crop,
                 )
             }
             if (card.isLocked) {
@@ -1179,18 +1182,22 @@ private fun Rail(
 
 @Composable
 private fun CardItem(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
-    // Only channel-logo cards draw as small squares; program/guide cards stay landscape.
-    val isChannel = card.square
+    // Channel and app logos draw as small squares; artwork keeps its own shape at a common width.
+    val isChannel = card.shape == CardShape.SQUARE
     // A genre tile is a navigation card (no channel/VOD id) whose title names a category; it carries
     // no artwork, so draw the brand icon instead of a blank box.
     val categoryIcon = if (card.channelId == null && card.vodId == null) categoryIconRes(card.title) else null
-    val cardWidth = if (isChannel) 96.dp else 150.dp
+    val cardWidth = when (card.shape) {
+        CardShape.SQUARE -> 96.dp
+        CardShape.WIDE -> 150.dp
+        CardShape.POSTER, CardShape.POSTER_THIN -> 120.dp
+    }
     Column(
         modifier = Modifier.width(cardWidth).clickable { onCardClick(card) },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
-            modifier = (if (isChannel) Modifier.size(96.dp) else Modifier.width(150.dp).height(86.dp))
+            modifier = Modifier.width(cardWidth).aspectRatio(card.shape.ratio)
                 .clip(RoundedCornerShape(if (isChannel) 16.dp else 10.dp))
                 .background(BackgroundLevel1),
             contentAlignment = Alignment.Center,

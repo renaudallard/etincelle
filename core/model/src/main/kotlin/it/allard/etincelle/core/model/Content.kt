@@ -60,8 +60,8 @@ data class ContentCard(
     val liveChannelId: String? = null,
     /** A secondary label under the title, e.g. the channel name on a live card. */
     val subtitle: String? = null,
-    /** A channel-logo card (drawn as a small square); program/guide cards are landscape. */
-    val square: Boolean = false,
+    /** The tile's shape, as the backend lays out the card's row. */
+    val shape: CardShape = CardShape.WIDE,
     /** A small overlay badge on the image, e.g. the episode count on a collapsed recordings card. */
     val badge: String? = null,
     /** The logo of the channel offering this card, drawn small over its image. */
@@ -71,6 +71,18 @@ data class ContentCard(
     /** The channel is one of the user's favourites. */
     val isFavorite: Boolean = false,
 )
+
+/**
+ * The shape of a card's tile, from its row's layout on the backend: programme artwork is either
+ * landscape or a portrait poster, and channel and app logos sit on squares. [ratio] is width over
+ * height, as the official app draws each shape.
+ */
+enum class CardShape(val ratio: Float) {
+    WIDE(16f / 9f),
+    POSTER(3f / 4f),
+    POSTER_THIN(2f / 3f),
+    SQUARE(1f),
+}
 
 /** A favourite channel, in the user's order. */
 data class FavoriteChannel(val id: String, val name: String, val logoUrl: String?)

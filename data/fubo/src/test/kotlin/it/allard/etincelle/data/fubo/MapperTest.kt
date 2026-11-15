@@ -3,6 +3,7 @@
 
 package it.allard.etincelle.data.fubo
 
+import it.allard.etincelle.core.model.CardShape
 import it.allard.etincelle.core.model.DrmSpec
 import it.allard.etincelle.core.model.Recording
 import org.junit.Assert.assertEquals
@@ -132,6 +133,17 @@ class MapperTest {
         assertNull(card.vodId)
         assertEquals("France 2", card.title)
         assertFalse(card.isLocked)
+    }
+
+    @Test
+    fun `a card takes its tile shape from its row`() {
+        val url = "https://api-eu.fubo.tv/papi/v1/program-details/program/VOD_1"
+        fun shape(type: String) = page(componentType = type, title = "X", locked = false, actionUrl = url).toRails()[0].cards[0].shape
+        assertEquals(CardShape.SQUARE, shape("square"))
+        assertEquals(CardShape.POSTER, shape("card-poster"))
+        assertEquals(CardShape.POSTER_THIN, shape("card-poster-thin"))
+        assertEquals(CardShape.WIDE, shape("card-wide"))
+        assertEquals(CardShape.WIDE, shape("list-item-wide"))
     }
 
     @Test

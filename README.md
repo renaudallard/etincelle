@@ -73,7 +73,8 @@ son avatar ou de le supprimer. Les chaînes favorites et l'accueil suivent le pr
 
 Elle ajoute un **sélecteur de saison** sur les séries qui en comptent plusieurs, et des **icônes de
 genre** dans les grilles de catégories. Les vignettes portent le **logo de la chaîne** qui propose le
-programme (directs, résultats de recherche…), comme dans l'application officielle. Sur téléphone, un
+programme (directs, résultats de recherche…), comme dans l'application officielle, et gardent la
+forme de leur image : affiches en portrait, images en paysage, logos de chaînes sur un carré. Sur téléphone, un
 menu **Paramètres**, accessible depuis la
 barre du haut, regroupe les réglages : le **masquage des contenus verrouillés** (cache les programmes
 non inclus dans votre abonnement), le choix d'une **icône monochrome** (logo blanc), l'activation
