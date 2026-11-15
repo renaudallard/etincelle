@@ -302,6 +302,8 @@ class MainActivity : ComponentActivity() {
                 dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
                 dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
             }
+            // The media volume, which Android passes on to the TV set over HDMI-CEC when the device allows
+            // it. A device whose HDMI output has a fixed volume and CEC volume control off leaves it as is.
             RemoteMessages.VOLUME -> {
                 val adjust = when (message.optString(RemoteMessages.DIRECTION)) {
                     "up" -> AudioManager.ADJUST_RAISE
