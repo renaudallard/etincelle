@@ -579,8 +579,9 @@ class MainViewModel(
     /** Plays the show currently shown on the detail page; a live detail plays its channel directly. */
     fun watchDetail() {
         val d = _state.value.detail ?: return
-        // A detail opened from a recording plays that recording, not the (often unavailable) VOD.
-        _state.value.detailRecordingAssetId?.let { watchRecording(it); return }
+        // A detail opened from a recording, or whose page says it is one, plays that recording: its
+        // catch-up stream does not exist.
+        (_state.value.detailRecordingAssetId ?: d.recordingAssetId)?.let { watchRecording(it); return }
         // A series has no stream of its own (its vodId is the series id, not a playable asset); the UI
         // hides the Watch button for it, but guard here too so a stray caller cannot mis-resolve it.
         if (d.isSeries) return

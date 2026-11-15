@@ -16,8 +16,10 @@ import it.allard.etincelle.core.network.ProgressStore
 import it.allard.etincelle.core.network.SessionManager
 import it.allard.etincelle.core.network.SessionStore
 import kotlinx.coroutines.test.runTest
+import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.RecordedRequest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -49,6 +51,27 @@ class FuboRepositoryTest {
 
     @After
     fun tearDown() = server.shutdown()
+
+    @Test
+    fun `a recorded airing plays its recording`() = runTest {
+        session.session = UserSession("AT", "RT", "u1", "p1")
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                val path = request.path.orEmpty()
+                return when {
+                    path.startsWith("/papi/v1/program-details/program/LIVE_9?tabID=id-tab-about") ->
+                        MockResponse().setBody("""{"content":{"metadata":{"id":"m","title":{"text":"Agde"}},"player":{"id":"p"}}}""")
+                    path == "/papi/v1/program-details/program/LIVE_9" -> MockResponse().setBody(
+                        """{"content":{"player":{"actions":{"on_display":[{"type":"play",
+                          "endpoint":{"url":"https://api-eu.fubo.tv/vapi/asset/v1?id=LIVE_9&type=dvr"}}]}}}}""",
+                    )
+                    else -> MockResponse().setResponseCode(404)
+                }
+            }
+        }
+
+        assertEquals("LIVE_9", repo.fetchProgramDetail("LIVE_9", DetailKind.PROGRAM).recordingAssetId)
+    }
 
     @Test
     fun `the guide follows the pages to the last channel`() = runTest {

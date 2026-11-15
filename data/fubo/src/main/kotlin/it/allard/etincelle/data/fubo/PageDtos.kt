@@ -29,6 +29,8 @@ data class PageContentDto(
 // true and title/subtitle carry the backend's own localized reason (e.g. "… en direct dans 4 jours.").
 data class PlayerDto(
     @Json(name = "is_upcoming") val isUpcoming: Boolean? = null,
+    // Its play action names the stream to ask for: type=vod, type=live, or type=dvr for a recording.
+    val actions: ActionsDto? = null,
     val title: TextDto? = null,
     val subtitle: TextDto? = null,
     // Sent only with the auto_play_up_next feature: the slate offering the next episode.
@@ -145,6 +147,7 @@ data class ActionsDto(
     @Json(name = "on_click") val onClick: List<ActionItemDto>?,
     // A channel card's favourite toggle: an api_call to favorite-channel or unfavorite-channel.
     @Json(name = "on_fav_icon_click") val onFavIconClick: List<ActionItemDto>? = null,
+    @Json(name = "on_display") val onDisplay: List<ActionItemDto>? = null,
 )
 data class ActionItemDto(val endpoint: EndpointDto?, val type: String? = null)
 data class EndpointDto(
@@ -251,7 +254,20 @@ fun PageResponse.toProgramDetail(channelId: String?, vodId: String?, isLive: Boo
         upcomingMessage = upcomingMessage,
         upNext = content?.player?.toUpNext(),
         timeLabel = meta?.hatTitle?.text?.takeIf { it.isNotBlank() },
+        recordingAssetId = recordingAssetId(),
     )
+}
+
+/** The recording a programme page's player plays (its play action asks for type=dvr), or null. Only the
+ * page's default tab carries that action. */
+fun PageResponse.recordingAssetId(): String? = content?.player?.actions?.onDisplay.orEmpty()
+    .firstOrNull { it.type == "play" }?.endpoint?.url?.let { recordingIdOf(it) }
+
+// The asset a playback url asks for as a DVR recording (vapi/asset/v1?id=LIVE_…&type=dvr), or null.
+private fun recordingIdOf(url: String): String? {
+    val query = url.substringAfter('?', "").split('&')
+    if ("type=dvr" !in query) return null
+    return query.firstOrNull { it.startsWith("id=") }?.removePrefix("id=")?.takeIf { it.isNotEmpty() }
 }
 
 /** True if the series detail offers a "Regarder maintenant" (catch-up) tab carrying its episodes. */

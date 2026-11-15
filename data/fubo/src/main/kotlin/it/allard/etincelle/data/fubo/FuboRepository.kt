@@ -447,12 +447,16 @@ class FuboRepository(
     override suspend fun fetchProgramDetail(id: String, kind: DetailKind): ProgramDetail = withRefresh {
         var episodes = emptyList<ContentCard>()
         val detail = when (kind) {
-            DetailKind.PROGRAM -> {
+            DetailKind.PROGRAM -> coroutineScope {
+                // An airing (LIVE_) may be a recording, which has no catch-up stream: only the page's
+                // default tab says so, through its player. Best-effort, beside the about tab.
+                val recording = if (id.startsWith("LIVE_")) async { recordingOf(id) } else null
                 // A show opens on one episode/airing; follow its "Détails du programme" series link to
                 // list the series' available episodes so the viewer can pick another.
                 val resp = api.programDetail(id)
                 episodes = resp.seriesLink()?.let { seriesEpisodes(it) }.orEmpty()
-                resp.toProgramDetail(channelId = null, vodId = id, isLive = false)
+                val detail = resp.toProgramDetail(channelId = null, vodId = id, isLive = false)
+                detail.copy(recordingAssetId = detail.recordingAssetId ?: recording?.await())
             }
             DetailKind.SERIES -> {
                 val resp = api.seriesDetail(id)
@@ -492,6 +496,15 @@ class FuboRepository(
             posterUrl = detail.posterUrl ?: matches.firstOrNull()?.imageUrl,
             isSeries = kind == DetailKind.SERIES,
         )
+    }
+
+    // The recording an airing's page plays, or null when it is none or the page cannot be had.
+    private suspend fun recordingOf(id: String): String? = try {
+        api.programDetail(id, tab = null).recordingAssetId()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        null
     }
 
     /**

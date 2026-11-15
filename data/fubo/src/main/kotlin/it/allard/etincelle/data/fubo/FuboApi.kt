@@ -89,11 +89,12 @@ interface FuboApi {
     @GET("papi/v1/search")
     suspend fun search(@Query("query") query: String): PageResponse
 
-    /** A program's detail page; the "À propos" tab carries both the metadata and the cast/credits. */
+    /** A program's detail page; the "À propos" tab carries both the metadata and the cast/credits, the
+     * default tab ([tab] null) the player's play action. */
     @GET("papi/v1/program-details/program/{id}")
     suspend fun programDetail(
         @Path("id") id: String,
-        @Query("tabID") tab: String = "id-tab-about",
+        @Query("tabID") tab: String? = "id-tab-about",
     ): PageResponse
 
     /** A series' detail page; same shape as a program detail. */

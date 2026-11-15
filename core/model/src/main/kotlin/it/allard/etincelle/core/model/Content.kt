@@ -171,6 +171,9 @@ data class ProgramDetail(
     /** The line above the title, in the backend's words: when it aired ("Diffusé: 12 févr.") or how long
      * it stays ("Expire dans 6j"). */
     val timeLabel: String? = null,
+    /** Set when the page plays a recording (its player asks for the DVR stream): Regarder plays this
+     * DVR asset, as its catch-up stream does not exist. */
+    val recordingAssetId: String? = null,
 )
 
 /** A programme for the Android TV home screen: the app's recommendations row, or Continue watching. */

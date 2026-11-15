@@ -134,6 +134,18 @@ class MainViewModelTest {
         assertEquals(listOf("save VOD_1 42000", "report 42000"), repo.saved)
     }
 
+    @Test
+    fun aRecordedProgrammePlaysItsRecording() {
+        val repo = FakeRepo()
+        repo.detail = { _, _ -> DETAIL.copy(vodId = "LIVE_1", recordingAssetId = "LIVE_1") }
+        val vm = viewModel(repo)
+        vm.onCardClick(CARD.copy(vodId = "LIVE_1"))
+        vm.watchDetail()
+
+        assertEquals(listOf("LIVE_1"), repo.resolvedRecordings)
+        assertEquals(SOURCE, vm.state.value.playing)
+    }
+
     private fun viewModel(repo: FakeRepo) = MainViewModel(repo, UpdateChecker("0", "mobile", "http://127.0.0.1:9/")).also {
         assertTrue(it.state.value.loggedIn)
     }
@@ -151,7 +163,11 @@ class MainViewModelTest {
         override suspend fun loadPage(url: String) = page(url)
         override suspend fun fetchProgramDetail(id: String, kind: DetailKind) = detail(id, kind)
         override suspend fun profilesToPick(): Profiles? = null
-        override suspend fun resolveRecording(assetId: String) = SOURCE
+        val resolvedRecordings = mutableListOf<String>()
+        override suspend fun resolveRecording(assetId: String): PlaybackSource {
+            resolvedRecordings += assetId
+            return SOURCE
+        }
         val saved = mutableListOf<String>()
         override suspend fun savePlaybackPosition(key: String, positionMs: Long) {
             saved += "save $key $positionMs"
