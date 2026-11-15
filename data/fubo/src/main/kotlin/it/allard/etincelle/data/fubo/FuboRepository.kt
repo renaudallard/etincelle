@@ -34,12 +34,9 @@ import it.allard.etincelle.core.network.SessionManager
 import it.allard.etincelle.core.network.SessionStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.sync.withPermit
 import retrofit2.HttpException
 import java.io.IOException
 
@@ -54,9 +51,8 @@ private const val PROGRESS_END_MS = 15_000L
 private const val PROGRESS_MIN_MS = 10_000L
 // The official app asks who is watching again once the last choice is two days old.
 private const val PROFILE_PICK_TTL_MS = 2L * 24 * 60 * 60 * 1000
-// See-all target for the injected recordings rail; loadPage routes any selectedTab=recordings url to
-// the genre-grouped recordings page.
-private const val RECORDINGS_PAGE_URL = "etincelle:recordings?selectedTab=recordings"
+// The recordings page of "Mes vidéos", which the Enregistrements tab and the recordings rows open.
+private const val RECORDINGS_PATH = "papi/v1/my-stuff/status/recordings"
 
 // The count closing a search result rail's title, as in "Programmes (8)".
 private val RAIL_COUNT = Regex("""\((\d+)\)\s*$""")
@@ -203,7 +199,6 @@ class FuboRepository(
         progress.clearAll()
         // Drop the cached channel data so the next account does not see the previous one's channels.
         dropAccountCaches()
-        recordingGenres.clear()
     }
 
     override fun currentSession(): UserSession? = session.session
@@ -292,76 +287,19 @@ class FuboRepository(
 
     override suspend fun loadHome(): ContentPage = withRefresh {
         val page = api.homePage().toPage()
-        val apps = appsRail()
-        val recordings = recordingsOrEmpty()
-        val extra = buildList {
-            if (recordings.isNotEmpty()) {
-                // One card per show (collapsed); "tout voir" opens the genre-grouped recordings page.
-                val cards = recordings.collapsedByShow().map { (rec, count) -> rec.toCollapsedCard(count) }
-                add(ContentRail("recordings", "Mes enregistrements", cards, seeAllUrl = RECORDINGS_PAGE_URL))
-            }
-            if (apps != null) add(apps)
-        }
-        if (extra.isEmpty()) page else page.copy(rails = extra + page.rails)
+        // The backend's home already has its "Vos enregistrements" row; add the broadcaster apps.
+        val apps = appsRail() ?: return@withRefresh page
+        page.copy(rails = listOf(apps) + page.rails)
     }
 
     override suspend fun loadPage(url: String): ContentPage = withRefresh {
-        // The "Vos enregistrements" rail's see-all points at the my-stuff page (selectedTab=recordings),
-        // which carries no standard sections; serve the DVR list as a page instead.
+        // "Tout voir" on a recordings row points at the my-stuff landing page, which carries no
+        // sections of its own; its recordings tab is the recordings page.
         if (url.contains("selectedTab=recordings")) {
-            recordingsPage()
+            api.pageByUrl(RECORDINGS_PATH).toPage()
         } else {
             labelChannels(api.pageByUrl(url).toPage())
         }
-    }
-
-    // The genre of each recorded show, fetched once from its detail page and cached for the session.
-    private val recordingGenres = mutableMapOf<String, String?>()
-
-    // Caps how many show-detail fetches run at once when the recordings page is built on a cold cache.
-    private val genreFetchLimit = Semaphore(6)
-
-    private suspend fun recordingGenre(rec: Recording): String? {
-        val seriesId = rec.seriesId
-        val key = seriesId ?: rec.programId ?: return null
-        recordingGenres[key]?.let { return it }
-        if (recordingGenres.containsKey(key)) return null
-        // loadRecordings already refreshed the token, so a failure here is the show's own (e.g. a
-        // missing detail); treat it as no genre rather than failing the whole page.
-        val genre = genreFetchLimit.withPermit {
-            try {
-                if (seriesId != null) {
-                    api.seriesDetail(seriesId).toProgramDetail(channelId = null, vodId = seriesId, isLive = false).genre
-                } else {
-                    api.programDetail(key).toProgramDetail(channelId = null, vodId = key, isLive = false).genre
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                null
-            }
-        }
-        recordingGenres[key] = genre
-        return genre
-    }
-
-    // Recordings as a page separated by genre, each show collapsed to one card. Genres are fetched in
-    // parallel (cached); a show with no known genre falls into "Autres", listed last.
-    private suspend fun recordingsPage(): ContentPage = coroutineScope {
-        val shows = loadRecordings().collapsedByShow()
-        val withGenre = shows.map { (rec, count) ->
-            async { Triple(rec, count, recordingGenre(rec)) }
-        }.awaitAll()
-        val sections = withGenre
-            // Group on the nullable genre so a real backend genre named "Autres" is not merged with the
-            // unknown-genre bucket; unknown (null) is labelled and sorted last only at render time.
-            .groupBy { it.third }
-            .entries
-            .sortedWith(compareBy({ it.key == null }, { it.key?.lowercase() }))
-            .map { (genre, items) ->
-                ContentRail("rec-${genre ?: "__unknown"}", genre ?: "Autres", items.map { (rec, count, _) -> rec.toCollapsedCard(count) })
-            }
-        ContentPage("Vos enregistrements", sections, isGrid = true)
     }
 
     // The channels page, fetched once and cached; it carries both the channel directory and the
@@ -446,6 +384,8 @@ class FuboRepository(
 
     override suspend fun fetchProgramDetail(id: String, kind: DetailKind): ProgramDetail = withRefresh {
         var episodes = emptyList<ContentCard>()
+        // The show an airing belongs to, whose recordings folder lists the recorded episodes.
+        var seriesId: String? = null
         val detail = when (kind) {
             DetailKind.PROGRAM -> coroutineScope {
                 // An airing (LIVE_) may be a recording, which has no catch-up stream: only the page's
@@ -454,7 +394,8 @@ class FuboRepository(
                 // A show opens on one episode/airing; follow its "Détails du programme" series link to
                 // list the series' available episodes so the viewer can pick another.
                 val resp = api.programDetail(id)
-                episodes = resp.seriesLink()?.let { seriesEpisodes(it) }.orEmpty()
+                seriesId = resp.seriesLink()
+                episodes = seriesId?.let { seriesEpisodes(it) }.orEmpty()
                 val detail = resp.toProgramDetail(channelId = null, vodId = id, isLive = false)
                 detail.copy(recordingAssetId = detail.recordingAssetId ?: recording?.await())
             }
@@ -481,9 +422,11 @@ class FuboRepository(
         }
         val detailProgramId = detail.programId
         val matches = when (kind) {
-            DetailKind.PROGRAM ->
-                if (detailProgramId == null) emptyList() else recordingsOrEmpty().filter { it.programId == detailProgramId }
-            DetailKind.SERIES -> recordingsOrEmpty().filter { it.seriesId == id }
+            DetailKind.PROGRAM -> {
+                val show = seriesId
+                if (detailProgramId == null || show == null) emptyList() else recordingsOf(show).filter { it.programId == detailProgramId }
+            }
+            DetailKind.SERIES -> recordingsOf(id)
             DetailKind.CHANNEL -> emptyList()
         }
         // When the show has no real poster, fall back to a recording's own image (a real thumbnail).
@@ -538,22 +481,15 @@ class FuboRepository(
     }
 
     /**
-     * The recordings for a page that only shows them next to its own content (home, details). An account
-     * without the recording option gets a 404 from dvr/v2/list, which must not take the whole page down,
-     * so any failure but a dead session reads as no recordings.
+     * The recordings of a show, from its folder in "Mes vidéos". They only supplement the show's page,
+     * so any failure (a show never recorded has no folder) reads as none.
      */
-    private suspend fun recordingsOrEmpty(): List<Recording> = try {
-        loadRecordings()
-    } catch (e: AppError) {
-        if (e is AppError.Unauthorized) throw e
+    private suspend fun recordingsOf(seriesId: String): List<Recording> = try {
+        api.recordingsFolder(seriesId).toRecordings(seriesId)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
         emptyList()
-    }
-
-    override suspend fun loadRecordings(): List<Recording> = withRefresh {
-        // status=all returns an empty body, so fetch both statuses and merge, deduped by asset id.
-        val recorded = api.dvrList(status = "recorded").toRecordings()
-        val scheduled = api.dvrList(status = "scheduled").toRecordings()
-        (recorded + scheduled).distinctBy { it.assetId }
     }
 
     override suspend fun resolveRecording(assetId: String): PlaybackSource = withRefresh {

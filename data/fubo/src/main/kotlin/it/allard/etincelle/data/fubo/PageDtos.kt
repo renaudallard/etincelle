@@ -12,6 +12,7 @@ import it.allard.etincelle.core.model.FavoriteChannel
 import it.allard.etincelle.core.model.FavoriteOrder
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.RecordAction
+import it.allard.etincelle.core.model.Recording
 import it.allard.etincelle.core.model.UpNext
 
 // --- /papi/v1/page/* server-driven UI ---
@@ -185,15 +186,8 @@ private fun recordActionFrom(text: TextDto?, actions: CtaActionsDto?): RecordAct
 
 fun PageResponse.toPage(): ContentPage {
     val page = ContentPage(title?.text, toRails())
-    if (content?.template?.startsWith("my-stuff") != true) return page
-    // The user's own pages (Enregistrements, a show's folder of recordings) are grids, and a programme
-    // linked from them is a recording: its LIVE_ airing plays from the DVR, not as catch-up.
-    return page.copy(
-        isGrid = true,
-        rails = page.rails.map { rail ->
-            rail.copy(cards = rail.cards.map { if (it.vodId?.startsWith("LIVE_") == true) it.copy(recordingAssetId = it.vodId) else it })
-        },
-    )
+    // The user's own pages (Enregistrements, a show's folder of recordings) are grids.
+    return if (content?.template?.startsWith("my-stuff") == true) page.copy(isGrid = true) else page
 }
 
 /** Maps a `program-details/...` page (its `metadata` + the "À propos" `about` section) to a detail. */
@@ -269,6 +263,26 @@ private fun recordingIdOf(url: String): String? {
     if ("type=dvr" !in query) return null
     return query.firstOrNull { it.startsWith("id=") }?.removePrefix("id=")?.takeIf { it.isNotEmpty() }
 }
+
+/**
+ * The recorded episodes in a show's "Mes vidéos" folder (rows saying when each was recorded), each
+ * played from the DVR by the LIVE_ airing it links to. The row id starts with the programme id.
+ */
+fun PageResponse.toRecordings(seriesId: String): List<Recording> = content?.sections.orEmpty()
+    .flatMap { it.components.orEmpty() }
+    .mapNotNull { row ->
+        val card = row.toCard() ?: return@mapNotNull null
+        val assetId = card.vodId?.takeIf { it.startsWith("LIVE_") } ?: return@mapNotNull null
+        Recording(
+            assetId = assetId,
+            title = card.title,
+            subtitle = card.timeLabel,
+            imageUrl = card.imageUrl,
+            channelName = null,
+            programId = row.id?.substringBefore('-')?.let { PROGRAM_ID_REGEX.find(it)?.groupValues?.get(1) },
+            seriesId = seriesId,
+        )
+    }
 
 /** True if the series detail offers a "Regarder maintenant" (catch-up) tab carrying its episodes. */
 fun PageResponse.hasWatchNowTab(): Boolean = content?.sections.orEmpty()

@@ -139,14 +139,12 @@ class FuboRepositoryTest {
         server.enqueue(MockResponse().setBody("""{"access_token":"NEW","refresh_token":"RT2"}""")) // refresh
         server.enqueue(MockResponse().setBody("""{"title":{"text":"Accueil"},"content":{"template":"catalog","sections":[]}}""")) // retry
         server.enqueue(MockResponse().setBody("""{"content":{"sections":[]}}""")) // loadHome also fetches the channels page (apps)
-        server.enqueue(MockResponse().setBody("""{"response":[]}""")) // loadHome also fetches recorded DVR
-        server.enqueue(MockResponse().setBody("""{"response":[]}""")) // and scheduled DVR
 
         repo.loadHome()
 
         assertEquals("NEW", session.accessToken)
         assertEquals("NEW", store.saved?.accessToken)
-        assertEquals(6, server.requestCount)
+        assertEquals(4, server.requestCount)
         server.takeRequest() // the 401'd home
         val refresh = server.takeRequest()
         assertEquals("/refresh", refresh.path)

@@ -16,7 +16,6 @@ import it.allard.etincelle.core.model.Profiles
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.ProgramWindow
 import it.allard.etincelle.core.model.RecordAction
-import it.allard.etincelle.core.model.Recording
 import it.allard.etincelle.core.model.UserSession
 
 /** Which `program-details/{kind}/{id}` endpoint a detail page comes from. */
@@ -102,9 +101,6 @@ interface MolotovRepository {
 
     /** Saves [channelIds] as the new order of the favourite channels, with the order's [save] action. */
     suspend fun saveFavoriteOrder(save: RecordAction, channelIds: List<String>)
-
-    /** The user's DVR recordings (recorded and scheduled), each with a playable dvr asset. */
-    suspend fun loadRecordings(): List<Recording>
 
     suspend fun resolveLiveChannel(channelId: String): PlaybackSource
     suspend fun resolveVod(vodId: String): PlaybackSource

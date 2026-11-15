@@ -34,30 +34,22 @@ class MyStuffTest {
         val cards = page.rails.single().cards
         assertEquals(listOf("Cauchemar en cuisine", "Grignote-moi"), cards.map { it.title })
         assertEquals("14 épisodes", cards[0].badge)
-        assertNull(cards[0].recordingAssetId)
-        assertEquals("LIVE_4442427", cards[1].recordingAssetId)
         assertNull(cards[1].badge)
     }
 
     @Test
     fun aFolderListsItsRecordedEpisodes() {
-        val page = adapter.fromJson(
+        val recordings = adapter.fromJson(
             """{"content":{"template":"my-stuff-details","sections":[{"component_type":"list-item-wide","components":[
-              {"type":"list-item-wide","id":"e1","title":{"text":"S16 E6 Agde"},"info":{"text":"Enregistré: 30 sept."},
+              {"type":"list-item-wide","id":"12008536_45-0","title":{"text":"S16 E6 Agde"},"info":{"text":"Enregistré: 30 sept."},
                "picture":{"url":"https://img/e.jpg"},"actions":${nav("program-details/program/LIVE_4445433")}}]}]}}""",
-        )!!.toPage()
+        )!!.toRecordings("100001536")
 
-        val episode = page.rails.single().cards.single()
-        assertEquals("LIVE_4445433", episode.recordingAssetId)
-        assertEquals("Enregistré: 30 sept.", episode.timeLabel)
-    }
-
-    @Test
-    fun aProgrammeLinkElsewhereStaysCatchUp() {
-        val page = adapter.fromJson(
-            """{"content":{"template":"catalog","sections":[{"component_type":"card-wide","components":[
-              {"id":"c","picture":{"url":"https://img/c.jpg"},"actions":${nav("program-details/program/LIVE_1")}}]}]}}""",
-        )!!.toPage()
-        assertNull(page.rails.single().cards.single().recordingAssetId)
+        val episode = recordings.single()
+        assertEquals("LIVE_4445433", episode.assetId)
+        assertEquals("S16 E6 Agde", episode.title)
+        assertEquals("Enregistré: 30 sept.", episode.subtitle)
+        assertEquals("12008536_45", episode.programId)
+        assertEquals("100001536", episode.seriesId)
     }
 }

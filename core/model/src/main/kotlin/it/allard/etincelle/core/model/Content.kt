@@ -110,8 +110,6 @@ data class Recording(
     val channelName: String?,
     val programId: String?,
     val seriesId: String?,
-    /** The show name (the program heading), distinct from [title] which is the episode name. */
-    val seriesName: String? = null,
 )
 
 /**

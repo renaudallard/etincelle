@@ -142,15 +142,9 @@ interface FuboApi {
         @Body payload: Map<String, @JvmSuppressWildcards Any?>,
     ): okhttp3.ResponseBody
 
-    /**
-     * DVR recordings. [status] must be "recorded" or "scheduled": status=all returns an empty body,
-     * so the two statuses are fetched separately and merged.
-     */
-    @GET("dvr/v2/list")
-    suspend fun dvrList(
-        @Query("sort") sort: String = "date",
-        @Query("status") status: String,
-    ): DvrListResponse
+    /** A show's folder of recordings in "Mes vidéos": one row per recorded episode. */
+    @GET("papi/v1/my-stuff/folder/seriesId/{id}")
+    suspend fun recordingsFolder(@Path("id") id: String): PageResponse
 
     /** Live guide (EPG): channels with their programs over an RFC3339-UTC time window. */
     @GET("epg")

@@ -5,7 +5,6 @@ package it.allard.etincelle.data.fubo
 
 import it.allard.etincelle.core.model.CardShape
 import it.allard.etincelle.core.model.DrmSpec
-import it.allard.etincelle.core.model.Recording
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -83,29 +82,6 @@ class MapperTest {
         assertNull(AccessRightsV2WindowDto().toProgramWindow())
         assertNull(AccessRightsV2WindowDto(startTimeMs = 5_000L, endTimeMs = 5_000L).toProgramWindow())
         assertNull(AccessRightsV2WindowDto(startTime = "not-a-date", endTime = "2026-06-23T20:15:00Z").toProgramWindow())
-    }
-
-    @Test
-    fun `collapsedByShow groups episodes per show and badges only multi-episode shows`() {
-        val recs = listOf(
-            Recording("a1", "Ep1", null, "img1", "C", "p1", "S1", "Show One"),
-            Recording("a2", "Ep2", null, "img2", "C", "p2", "S1", "Show One"),
-            Recording("a3", "Solo", null, "img3", "C", "p3", "S2", "Show Two"),
-            Recording("a4", "Film", null, "img4", "C", "p4", null, null),
-        )
-        val collapsed = recs.collapsedByShow()
-        assertEquals(3, collapsed.size) // S1 (2 eps), S2 (1), the film (1)
-
-        val s1 = collapsed.first { it.first.seriesId == "S1" }
-        assertEquals(2, s1.second)
-        val s1Card = s1.first.toCollapsedCard(s1.second)
-        assertEquals("2 épisodes", s1Card.badge)
-        assertEquals("Show One", s1Card.title) // the show name, not the episode title "Ep1"
-        assertEquals("S1", s1Card.seriesId) // taps through to the series (episode list)
-        assertEquals("a1", s1Card.recordingAssetId)
-
-        val s2 = collapsed.first { it.first.seriesId == "S2" }
-        assertEquals(null, s2.first.toCollapsedCard(s2.second).badge) // single episode, no badge
     }
 
     @Test

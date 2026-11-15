@@ -400,7 +400,7 @@ class MainViewModel(
             return
         }
         if (tab == Tab.HOME) {
-            // Accueil must go through loadHome (which prepends the recordings rail), not the raw page.
+            // Accueil must go through loadHome (which prepends the broadcaster apps rail), not the raw page.
             if (tab == _state.value.tab && _state.value.backStack.size == 1) return
             reloadHome(silent = false)
             return
