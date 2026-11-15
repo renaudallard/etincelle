@@ -234,10 +234,11 @@ class TvLiveSetupActivity : ComponentActivity() {
         }
         lifecycleScope.launch {
             val repo = (application as EtincelleTvApp).container.repository
-            val ok = withContext(Dispatchers.IO) { runCatching { TvLive.sync(applicationContext, repo) }.isSuccess } &&
-                repo.currentSession() != null
+            val synced = withContext(Dispatchers.IO) { runCatching { TvLive.sync(applicationContext, repo) }.isSuccess }
+            val signedIn = repo.currentSession() != null
+            val ok = synced && signedIn
             if (!ok) {
-                message = "Connectez-vous dans etincelle, puis réessayez."
+                message = if (signedIn) "Ajout des chaînes impossible, réessayez plus tard." else "Connectez-vous dans etincelle, puis réessayez."
                 delay(3000)
             }
             setResult(if (ok) RESULT_OK else RESULT_CANCELED)
