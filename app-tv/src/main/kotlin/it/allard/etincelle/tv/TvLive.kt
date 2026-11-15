@@ -60,6 +60,8 @@ object TvLive {
     private const val REFRESH_MS = 3L * 60 * 60 * 1000
     private const val PREFS = "etincelle"
     private const val SYNCED_AT = "live_guide_synced_at"
+    // The account the guide was written for: another account's channels are rewritten at once.
+    private const val SYNCED_FOR = "live_guide_synced_for"
     private val lock = Mutex()
 
     fun inputId(context: Context): String =
@@ -72,16 +74,18 @@ object TvLive {
         currentCoroutineContext().ensureActive()
         if (repo.currentSession() == null) {
             context.contentResolver.delete(TvContract.buildChannelsUriForInput(inputId(context)), null, null)
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(SYNCED_AT).apply()
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(SYNCED_AT).remove(SYNCED_FOR).apply()
             return@withLock
         }
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()
-        if (now - prefs.getLong(SYNCED_AT, 0) < REFRESH_MS && hasChannels(context)) return@withLock
+        val account = repo.currentSession()?.userId
+        val fresh = now - prefs.getLong(SYNCED_AT, 0) < REFRESH_MS && prefs.getString(SYNCED_FOR, null) == account
+        if (fresh && hasChannels(context)) return@withLock
         val channels = repo.liveChannels(GUIDE_HOURS)
         if (channels.isNotEmpty()) {
             write(context, channels)
-            prefs.edit().putLong(SYNCED_AT, now).apply()
+            prefs.edit().putLong(SYNCED_AT, now).putString(SYNCED_FOR, account).apply()
         }
     }
 
