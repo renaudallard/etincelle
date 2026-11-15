@@ -160,6 +160,11 @@ class MainViewModel(
                                 it.copy(checking = false, loggedIn = true, tab = Tab.HOME, error = "Échec du chargement de l'accueil")
                             }
                         }
+                        // Still signed in: a link that opened the app and the profile question go ahead.
+                        if (!sessionDead) {
+                            consumeDeepLink()
+                            askWhoIsWatching()
+                        }
                     }
             } else {
                 _state.update { it.copy(checking = false) }

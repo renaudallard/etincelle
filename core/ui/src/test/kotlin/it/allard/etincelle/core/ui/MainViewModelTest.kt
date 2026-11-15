@@ -5,6 +5,7 @@ package it.allard.etincelle.core.ui
 
 import it.allard.etincelle.core.domain.DetailKind
 import it.allard.etincelle.core.domain.MolotovRepository
+import it.allard.etincelle.core.model.AppError
 import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.DrmSpec
@@ -103,6 +104,20 @@ class MainViewModelTest {
 
         assertFalse(vm.state.value.loggedIn)
         assertTrue(vm.state.value.hideLocked)
+    }
+
+    @Test
+    fun aLinkStillOpensWhenTheHomePageFailsAtStart() {
+        val repo = FakeRepo()
+        val restore = CompletableDeferred<Boolean>()
+        repo.restore = { restore.await() }
+        repo.home = { throw AppError.Network("offline") }
+        val vm = MainViewModel(repo, UpdateChecker("0", "mobile", "http://127.0.0.1:9/"))
+        vm.onDeepLink("VOD_1", DetailKind.PROGRAM)
+        restore.complete(true)
+
+        assertTrue(vm.state.value.loggedIn)
+        assertEquals("VOD_1", vm.state.value.detailStack.single().id)
     }
 
     private fun viewModel(repo: FakeRepo) = MainViewModel(repo, UpdateChecker("0", "mobile", "http://127.0.0.1:9/")).also {
