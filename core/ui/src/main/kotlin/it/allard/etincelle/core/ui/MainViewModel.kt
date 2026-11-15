@@ -34,6 +34,7 @@ private const val PAIRING_RETRY_MS = 5000L
 // Cap on how many codes the login screen will cycle through before giving up, so a TV left idle on
 // the login screen cannot poll indefinitely.
 private const val PAIRING_MAX_ROUNDS = 12
+private const val UPDATE_INTERVAL_MS = 24 * 60 * 60 * 1000L
 
 enum class Tab(val label: String, val icon: String, val path: String) {
     HOME("Accueil", "🏠", "papi/v1/page/home"),
@@ -644,14 +645,17 @@ class MainViewModel(
     /** Hides or shows locked (unentitled) cards across the content lists; see [UiState.visibleRails]. */
     fun setHideLocked(hide: Boolean) = _state.update { it.copy(hideLocked = hide) }
 
-    private var updateChecked = false
-
-    /** Checks GitHub for a newer release once per process; the app proposes the download if found. */
-    fun checkForUpdate() {
-        if (updateChecked) return
-        updateChecked = true
-        viewModelScope.launch {
-            updates.latestUpdate()?.let { info -> _state.update { it.copy(update = info) } }
+    /**
+     * Checks GitHub for a newer release now, then once a day for as long as the caller runs; the app
+     * proposes it when found. The activity runs this while it is started, so each start checks again.
+     * No check is made while an update is already proposed.
+     */
+    suspend fun watchForUpdates() {
+        while (true) {
+            if (_state.value.update == null) {
+                updates.latestUpdate()?.let { info -> _state.update { it.copy(update = info) } }
+            }
+            delay(UPDATE_INTERVAL_MS)
         }
     }
 

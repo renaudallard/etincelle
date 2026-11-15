@@ -91,9 +91,10 @@ tout fonctionne comme d'habitude, commandes de lecture, barre du programme en co
 direct, volume, passage d'un Chromecast à l'autre et retour sur le téléphone. Si la connexion est
 coupée, etincelle se reconnecte au Chromecast sans interrompre la lecture. Seule la notification
 système de diffusion manque dans ce cas.
-À chaque démarrage, etincelle **vérifie les mises à jour** sur GitHub et propose de télécharger la
-dernière version lorsqu'une plus récente est disponible (l'APK téléphone sur le téléphone, l'APK TV
-sur la TV).
+
+etincelle **vérifie les mises à jour** sur GitHub à chaque démarrage, puis une fois par jour tant
+qu'elle reste ouverte, et propose de télécharger la dernière version lorsqu'une plus récente est
+disponible (l'APK téléphone sur le téléphone, l'APK TV sur la TV).
 
 > ### ⚠️ Avertissement
 >

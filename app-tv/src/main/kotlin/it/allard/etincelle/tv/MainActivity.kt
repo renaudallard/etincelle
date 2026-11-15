@@ -39,6 +39,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.Timeline
@@ -61,6 +63,7 @@ import it.allard.etincelle.core.ui.MainViewModelFactory
 import it.allard.etincelle.core.ui.Tab
 import it.allard.etincelle.core.ui.UpdateChecker
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -95,7 +98,7 @@ class MainActivity : ComponentActivity() {
         player = exo
         // Only on a fresh launch; a process recreation must not replay the original deep link.
         if (savedInstanceState == null) handleDeepLink(intent)
-        viewModel.checkForUpdate()
+        lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.watchForUpdates() } }
         setContent {
             EtincelleTheme {
                 val state by viewModel.state.collectAsStateWithLifecycle()

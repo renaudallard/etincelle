@@ -55,6 +55,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.cast.CastPlayer
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -89,6 +91,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 @UnstableApi
 class MainActivity : ComponentActivity() {
@@ -135,7 +138,7 @@ class MainActivity : ComponentActivity() {
         castController = controller
         // Only on a fresh launch; a process recreation must not replay the original deep link.
         if (savedInstanceState == null) handleDeepLink(intent)
-        viewModel.checkForUpdate()
+        lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.watchForUpdates() } }
         viewModel.setHideLocked(LocalPrefs.hideLocked(this))
 
         val onPlay: (PlaybackSource) -> Unit = { source ->
