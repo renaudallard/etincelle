@@ -240,7 +240,12 @@ class FuboRepository(
     override suspend fun createProfile(name: String, avatarId: Int?): Profile = withRefresh {
         val created = api.createProfile(ProfileRequest(name, avatarId)).profile?.toProfile()
             ?: throw AppError.Unknown("Profil non créé")
-        rememberProfileIds()
+        // The profile exists: failing to note the new list must not report the creation as failed,
+        // or a retry would create it twice. The next start then just asks who is watching.
+        try {
+            rememberProfileIds()
+        } catch (e: AppError) {
+        }
         created
     }
 
@@ -254,8 +259,13 @@ class FuboRepository(
             val response = api.deleteProfile(id)
             if (!response.isSuccessful) throw HttpException(response)
         }
-        val next = profiles().profiles.firstOrNull()
-        if (session.session?.profileId == id && next != null) selectProfile(next.id) else rememberProfileIds()
+        // The profile is gone; what follows only keeps the choice in line, and the next start asks who
+        // is watching if it fails.
+        try {
+            val next = profiles().profiles.firstOrNull()
+            if (session.session?.profileId == id && next != null) selectProfile(next.id) else rememberProfileIds()
+        } catch (e: AppError) {
+        }
     }
 
     // The profiles changed from this device: keep the current choice instead of asking again.

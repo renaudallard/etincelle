@@ -716,13 +716,14 @@ class MainViewModel(
             runCatching {
                 val profile = editor.profile
                 if (profile == null) repo.createProfile(trimmed, avatarId) else repo.updateProfile(profile.id, trimmed, avatarId)
-                repo.profiles()
+                // Saved: a failed refresh of the list must not report the save as failed.
+                runCatching { repo.profiles() }.getOrNull()
             }.onSuccess { list ->
                 _state.update { st ->
                     st.copy(
                         busy = false,
                         profileEditor = null,
-                        profileScreen = st.profileScreen?.copy(list = list),
+                        profileScreen = st.profileScreen?.let { screen -> list?.let { screen.copy(list = it) } ?: screen },
                         info = if (editor.profile == null) "Profil créé" else "Profil modifié",
                     )
                 }
@@ -739,13 +740,17 @@ class MainViewModel(
         viewModelScope.launch {
             runCatching {
                 repo.deleteProfile(profile.id)
-                repo.profiles()
+                // Deleted: when the list cannot be refreshed, drop the profile from the one on screen.
+                runCatching { repo.profiles() }.getOrNull()
             }.onSuccess { list ->
                 _state.update { st ->
                     st.copy(
                         busy = false,
                         profileEditor = null,
-                        profileScreen = st.profileScreen?.copy(list = list, currentId = repo.currentSession()?.profileId),
+                        profileScreen = st.profileScreen?.let { screen ->
+                            val shown = list ?: screen.list.copy(profiles = screen.list.profiles.filterNot { it.id == profile.id })
+                            screen.copy(list = shown, currentId = repo.currentSession()?.profileId)
+                        },
                         info = "Profil supprimé",
                     )
                 }
