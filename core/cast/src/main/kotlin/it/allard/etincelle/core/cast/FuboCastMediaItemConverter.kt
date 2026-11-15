@@ -7,6 +7,7 @@ import android.content.Context
 import androidx.media3.cast.MediaItemConverter
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata as ItemMetadata
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
 import com.google.android.gms.cast.MediaInfo
@@ -43,6 +44,11 @@ class FuboCastMediaItemConverter(
         val customData = info?.customData
         val uri = customData?.optString("stream_url").orEmpty().ifEmpty { info?.contentId.orEmpty() }
         val builder = MediaItem.Builder().setUri(uri).setMimeType(MimeTypes.APPLICATION_MPD)
+        // An item the receiver loaded by itself (reloading a stalled stream) comes back only from here:
+        // keep its title for the notification and the cast controls.
+        info?.metadata?.getString(MediaMetadata.KEY_TITLE)?.let {
+            builder.setMediaMetadata(ItemMetadata.Builder().setTitle(it).build())
+        }
         val licenseUrl = customData?.optString("license_url")
         val token = customData?.optString("drm_token")
         if (!licenseUrl.isNullOrEmpty() && !token.isNullOrEmpty()) {
