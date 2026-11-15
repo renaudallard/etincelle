@@ -63,6 +63,13 @@ internal class DirectCastSession(
     @Volatile
     private var started = false
 
+    // The receiver app was asked to launch, and stop() came before its session id: start() stops it.
+    @Volatile
+    private var launchSent = false
+
+    @Volatile
+    private var stopOnLaunch = false
+
     /** The receiver's volume (0..1) and mute, as last reported. */
     var volumeLevel = 1.0
         private set
@@ -87,17 +94,27 @@ internal class DirectCastSession(
         ch.send(CastChannel.NS_CONNECTION, """{"type":"CONNECT"}""")
         // Join the receiver if another sender already started it; otherwise launch it. Newer firmware
         // first answers a launch with a status that does not list the app yet, so wait for one that does.
-        val app = withTimeout(LAUNCH_TIMEOUT_MS) {
-            requestReceiver(JSONObject().put("type", "GET_STATUS"))
-            runningApp(nextReceiverStatus { true }) ?: run {
-                if (joinOnly) throw IOException("the receiver is not running")
-                requestReceiver(JSONObject().put("type", "LAUNCH").put("appId", appId))
-                nextReceiverStatus { runningApp(it) != null || it.has(LAUNCH_ERROR_KEY) }
-                    .let { runningApp(it) ?: throw IOException("the receiver did not start") }
+        val app = try {
+            withTimeout(LAUNCH_TIMEOUT_MS) {
+                requestReceiver(JSONObject().put("type", "GET_STATUS"))
+                runningApp(nextReceiverStatus { true }) ?: run {
+                    if (joinOnly) throw IOException("the receiver is not running")
+                    launchSent = true
+                    requestReceiver(JSONObject().put("type", "LAUNCH").put("appId", appId))
+                    nextReceiverStatus { runningApp(it) != null || it.has(LAUNCH_ERROR_KEY) }
+                        .let { runningApp(it) ?: throw IOException("the receiver did not start") }
+                }
             }
+        } catch (e: Throwable) {
+            if (stopOnLaunch) close()
+            throw e
         }
         transportId = app.getString("transportId")
         appSessionId = app.optString("sessionId")
+        if (stopOnLaunch) {
+            stop()
+            throw IOException("session closed")
+        }
         ch.send(CastChannel.NS_CONNECTION, """{"type":"CONNECT"}""", source = senderId, destination = app.getString("transportId"))
         if (ended) throw IOException("connection lost")
         started = true
@@ -137,6 +154,12 @@ internal class DirectCastSession(
 
     /** Stops the receiver app (the TV leaves the stream) and closes the session. */
     fun stop() {
+        // Launched but its session id not known yet: stopping now would leave the receiver open on the
+        // TV, so start() stops it once the launch answers (or closes when it never does).
+        if (launchSent && appSessionId == null && !ended) {
+            stopOnLaunch = true
+            return
+        }
         appSessionId?.let { id ->
             channel?.send(CastChannel.NS_RECEIVER, JSONObject().put("type", "STOP").put("sessionId", id).put("requestId", nextRequestId()).toString())
         }
@@ -151,6 +174,8 @@ internal class DirectCastSession(
             ch.close()
         }
         failPending(IOException("session closed"))
+        // Still starting: wake start() up so it fails at once instead of at its timeout.
+        if (!started) receiverStatus.value = JSONObject()
         scope.cancel()
     }
 
