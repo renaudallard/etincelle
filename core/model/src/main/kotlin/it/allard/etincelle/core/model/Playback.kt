@@ -52,4 +52,49 @@ data class PlaybackSource(
      * with its "lastOffset" entry set to the position in seconds. Null for live, which has no resume. */
     val progressUrl: String? = null,
     val progressPayload: Map<String, Any?>? = null,
+    /** The episode that follows, offered at the end of this one; null when nothing follows. */
+    val upNext: UpNext? = null,
 )
+
+/**
+ * This episode with the one that follows it. A resume point past the slate means the episode was
+ * watched to its credits, so it starts over rather than going straight on to the next one.
+ */
+fun PlaybackSource.withUpNext(next: UpNext?): PlaybackSource = copy(
+    upNext = next,
+    startPositionMs = if (next != null && startPositionMs >= next.atSec * 1000) 0L else startPositionMs,
+)
+
+/**
+ * The next episode, as the backend's "up next" slate offers it: shown once playback reaches [atSec]
+ * (from the start of the content), counting down [showSec] seconds before [nextVodId] plays.
+ */
+data class UpNext(
+    val atSec: Long,
+    val showSec: Long,
+    val title: String?,
+    val subtitle: String?,
+    /** The countdown line, with %s standing for the seconds left (e.g. "Commence dans %s"). */
+    val countdown: String,
+    val playLabel: String,
+    val creditsLabel: String,
+    val nextVodId: String,
+) {
+    /**
+     * Seconds left before the next episode starts at [positionMs], or null while the slate is not due.
+     * The countdown follows the position, so a pause holds it and a seek back before [atSec] cancels it.
+     * It also ends a little before the content does (the official app keeps 2.5 s), so the next episode
+     * is chosen before playback stops.
+     */
+    fun secondsLeft(positionMs: Long, durationMs: Long): Long? {
+        val at = atSec * 1000
+        if (positionMs < at) return null
+        var deadline = at + showSec * 1000
+        if (durationMs > 0) deadline = minOf(deadline, durationMs - END_MARGIN_MS).coerceAtLeast(at)
+        return ((deadline - positionMs + 999) / 1000).coerceAtLeast(0)
+    }
+
+    private companion object {
+        const val END_MARGIN_MS = 2_500L
+    }
+}

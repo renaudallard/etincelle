@@ -32,7 +32,10 @@ cours à son commencement (dans la limite de la fenêtre de rembobinage), et un 
 enregistrer soit **l'épisode** en cours, soit **la série** entière. Quand un programme fait partie d'une série en rattrapage, sa fiche
 liste en dessous les **épisodes disponibles** (avec leur vignette) pour en choisir un autre ; pour une
 série **enregistrée**, elle affiche d'abord vos épisodes enregistrés (lus depuis le DVR), puis la même
-liste des **épisodes disponibles** en rattrapage. Un programme **pas encore diffusé** indique quand il
+liste des **épisodes disponibles** en rattrapage. À la fin d'un épisode, l'**épisode suivant**
+s'annonce par un compte à rebours (« Commence dans 9 s ») puis démarre tout seul ; **À suivre** le
+lance aussitôt et **Regarder le générique** laisse l'épisode se terminer. Un épisode regardé jusqu'au
+générique reprend ensuite depuis le début. Un programme **pas encore diffusé** indique quand il
 passera (par exemple « Ce programme sera en direct dans 4 jours. ») au lieu d'un « Regarder » qui
 échouerait. La fiche d'une **série** offre un bouton **Enregistrer la série** (qui devient **Arrêter
 d'enregistrer la série** une fois l'enregistrement programmé) ; vous retrouvez vos

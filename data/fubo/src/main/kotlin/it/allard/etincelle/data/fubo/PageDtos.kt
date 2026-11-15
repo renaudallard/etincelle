@@ -11,6 +11,7 @@ import it.allard.etincelle.core.model.FavoriteChannel
 import it.allard.etincelle.core.model.FavoriteOrder
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.RecordAction
+import it.allard.etincelle.core.model.UpNext
 
 // --- /papi/v1/page/* server-driven UI ---
 
@@ -29,7 +30,49 @@ data class PlayerDto(
     @Json(name = "is_upcoming") val isUpcoming: Boolean? = null,
     val title: TextDto? = null,
     val subtitle: TextDto? = null,
+    // Sent only with the auto_play_up_next feature: the slate offering the next episode.
+    @Json(name = "end_slate") val endSlate: EndSlateDto? = null,
 )
+
+// The end slate: at [position] seconds a show_video_slate action opens an "up-next" slate.
+data class EndSlateDto(val position: Long?, val actions: List<SlateActionDto>?)
+data class SlateActionDto(val type: String?, val content: UpNextDto?)
+data class UpNextDto(
+    val type: String?,
+    val title: TextDto?,
+    val subtitle: TextDto?,
+    @Json(name = "count_down_text") val countDownText: TextDto?,
+    @Json(name = "display_duration") val displayDuration: Long?,
+    // Run when the countdown ends: a refresh_page to the next episode's page (whose player then plays).
+    @Json(name = "auto_dismiss_actions") val autoDismissActions: List<ActionItemDto>?,
+    // The buttons: play the next episode now, or watch the credits.
+    val components: List<SlateButtonDto>?,
+)
+data class SlateButtonDto(val text: TextDto?, val style: String?)
+
+/** The next episode offered by the end slate, or null when nothing follows or the slate is unusable. */
+fun PlayerDto.toUpNext(): UpNext? {
+    val slate = endSlate ?: return null
+    val at = slate.position ?: return null
+    val upNext = slate.actions.orEmpty().firstOrNull { it.type == "show_video_slate" }?.content
+        ?.takeIf { it.type == "up-next" } ?: return null
+    val nextVodId = upNext.autoDismissActions.orEmpty()
+        .firstNotNullOfOrNull { a -> a.endpoint?.url?.substringBefore('?')?.let { VOD_REGEX.find(it)?.groupValues?.get(1) } }
+        ?: return null
+    val buttons = upNext.components.orEmpty()
+    return UpNext(
+        atSec = at,
+        showSec = upNext.displayDuration ?: DEFAULT_SLATE_SEC,
+        title = upNext.title?.text,
+        subtitle = upNext.subtitle?.text,
+        countdown = upNext.countDownText?.text?.takeIf { "%s" in it } ?: "Commence dans %s",
+        playLabel = buttons.firstOrNull { it.style == "primary" }?.text?.text ?: "À suivre",
+        creditsLabel = buttons.firstOrNull { it.style == "secondary" }?.text?.text ?: "Regarder le générique",
+        nextVodId = nextVodId,
+    )
+}
+
+private const val DEFAULT_SLATE_SEC = 10L
 
 data class MetadataDto(
     val id: String?,
@@ -190,6 +233,7 @@ fun PageResponse.toProgramDetail(channelId: String?, vodId: String?, isLive: Boo
         recordActions = recordActions,
         programId = programId,
         upcomingMessage = upcomingMessage,
+        upNext = content?.player?.toUpNext(),
     )
 }
 

@@ -27,6 +27,7 @@ kotlin {
 }
 
 dependencies {
+    implementation(project(":core:model"))
     implementation(platform(libs.androidx.compose.bom))
     api(libs.androidx.compose.foundation)
     api(libs.androidx.compose.ui)

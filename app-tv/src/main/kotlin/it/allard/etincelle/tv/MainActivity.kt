@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -50,6 +51,7 @@ import it.allard.etincelle.core.designsystem.LiveProgramBar
 import it.allard.etincelle.core.designsystem.LiveProgramBarBottomOffset
 import it.allard.etincelle.core.designsystem.ReturnToLiveButton
 import it.allard.etincelle.core.designsystem.theme.EtincelleTheme
+import it.allard.etincelle.core.designsystem.UpNextSlate
 import it.allard.etincelle.core.domain.DetailKind
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramWindow
@@ -127,7 +129,7 @@ class MainActivity : ComponentActivity() {
                             BackHandler { viewModel.stopPlaying() }
                             TvPlayerSurface(
                                 playing, exo, viewModel::savePlaybackPosition, viewModel::reportProgress,
-                                viewModel::liveProgramWindow,
+                                viewModel::liveProgramWindow, viewModel::playUpNext,
                             )
                         }
 
@@ -230,7 +232,7 @@ class MainActivity : ComponentActivity() {
                 // position here, never clear (positionToSave returns 0 near the start/end), so a
                 // background blip cannot wipe a valid resume point; clearing is the dispose path's job.
                 viewModel.state.value.playing?.let { src ->
-                    val pos = PlaybackProgress.positionToSave(it.currentPosition, it.duration)
+                    val pos = PlaybackProgress.positionToSave(src, it.currentPosition, it.duration)
                     if (pos > 0) viewModel.savePlaybackPosition(src.resumeKey, pos)
                 }
                 pausedForBackground = true
@@ -271,6 +273,7 @@ private fun TvPlayerSurface(
     onSavePosition: (String?, Long) -> Unit,
     onReportProgress: (PlaybackSource, Long, Long) -> Unit,
     fetchProgramWindow: suspend (String) -> ProgramWindow?,
+    onPlayNext: () -> Unit = {},
 ) {
     val view = LocalView.current
     DisposableEffect(Unit) {
@@ -290,7 +293,7 @@ private fun TvPlayerSurface(
         onDispose {
             val pos = player.currentPosition
             val dur = player.duration
-            onSavePosition(source.resumeKey, PlaybackProgress.positionToSave(pos, dur))
+            onSavePosition(source.resumeKey, PlaybackProgress.positionToSave(source, pos, dur))
             onReportProgress(source, pos, dur)
             player.stop()
             player.clearMediaItems()
@@ -434,6 +437,18 @@ private fun TvPlayerSurface(
                 onClick = { player.seekToDefaultPosition() },
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 24.dp)
                     .then(if (pillSelected) Modifier.border(3.dp, Color.White, CircleShape) else Modifier),
+            )
+        }
+        // The next episode, near the end of this one; its play button takes the focus.
+        source.upNext?.let { upNext ->
+            UpNextSlate(
+                upNext,
+                position = { player.currentPosition },
+                duration = { player.duration },
+                onPlayNext = onPlayNext,
+                button = { label, primary, onClick, mod -> TvButton(onClick = onClick, modifier = mod, highlighted = primary) { Text(label) } },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(48.dp),
+                takeFocus = true,
             )
         }
     }

@@ -17,6 +17,7 @@ import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.ProgramWindow
 import it.allard.etincelle.core.model.RecordAction
+import it.allard.etincelle.core.model.withUpNext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
@@ -508,13 +509,35 @@ class MainViewModel(
             runCatchingNav {
                 when {
                     d.isLive && channelId != null -> repo.resolveLiveChannel(channelId)
-                    vodId != null -> repo.resolveVod(vodId)
+                    // An episode carries the next one, offered at its end.
+                    vodId != null -> repo.resolveVod(vodId).withUpNext(d.upNext)
                     channelId != null -> repo.resolveLiveChannel(channelId)
                     else -> null
                 }
             }.onSuccess { src ->
                 _state.update { if (src != null) it.copy(busy = false, playing = src) else it.copy(busy = false) }
             }.onFailure { e -> applyFailure(e, "Échec de lecture") }
+        }
+    }
+
+    /**
+     * Plays the episode that follows the one playing (its end slate counted down, or À suivre was
+     * pressed). Its page replaces the current one under the player, as in the official app, so Back
+     * lands on the episode being watched.
+     */
+    fun playUpNext() {
+        val next = _state.value.playing?.upNext ?: return
+        _state.update { it.copy(busy = true, error = null, info = null) }
+        navLaunch {
+            runCatchingNav {
+                val detail = repo.fetchProgramDetail(next.nextVodId, DetailKind.PROGRAM)
+                detail to repo.resolveVod(next.nextVodId).withUpNext(detail.upNext)
+            }.onSuccess { (detail, src) ->
+                _state.update { st ->
+                    val entry = DetailEntry(detail, null, next.nextVodId, DetailKind.PROGRAM)
+                    st.copy(busy = false, playing = src, detailStack = st.detailStack.dropLast(1) + entry)
+                }
+            }.onFailure { e -> applyFailure(e, "Échec de lecture de l'épisode suivant") }
         }
     }
 

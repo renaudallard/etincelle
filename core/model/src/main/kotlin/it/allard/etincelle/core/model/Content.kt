@@ -151,4 +151,6 @@ data class ProgramDetail(
     /** A channel's catalogue carousels (replays, most-viewed, live & upcoming), shown below the live
      * header so a channel detail offers more than just "Regarder en direct". Empty for non-channels. */
     val sections: List<ContentRail> = emptyList(),
+    /** The episode that follows this one, played at its end (see [UpNext]). */
+    val upNext: UpNext? = null,
 )

@@ -127,6 +127,18 @@ follows each component's `actions`.
   `custom_action_data.channel_ids` set to the new order (ids as strings). The entry to that page is
   `reorder_favorites_entry` on `GET /papi/v1/guide`.
 
+## Next episode (end slate) — VALIDATED live (2026-11-15)
+
+- Only with `auto_play_up_next` in `x-supported-features`, an episode's
+  `program-details/program/{VOD_id}` page carries `content.player.end_slate`:
+  `{position: <s from content start>, actions:[{type:"show_video_slate", content:{type:"up-next",
+  title, subtitle, count_down_text:"Commence dans %s", display_duration:<s>, components:[primary
+  "À suivre", secondary "Regarder le générique"], auto_dismiss_actions:[refresh_page to the next
+  episode's program-details, close_video_slate]}}]}`. Nothing follows: no `end_slate`.
+- The official app shows the slate once the playhead passes `position`, counts down
+  `min(display_duration, duration - position - 2.5 s)`, then runs `auto_dismiss_actions`: the next
+  episode's page, whose player plays it.
+
 ## Live guide (EPG) — VALIDATED live
 
 `GET /epg` on `api-eu.fubo.tv` (NOT the dead `services-api-eu.fubo.tv`):
