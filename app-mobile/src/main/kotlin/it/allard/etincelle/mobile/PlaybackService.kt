@@ -7,8 +7,11 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
@@ -34,10 +37,43 @@ class PlaybackService : MediaSessionService() {
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
 
+    private val handler = Handler(Looper.getMainLooper())
+    // The notification update put off while a cast changes item, run once the gap has lasted too long.
+    private var gapEnd: Runnable? = null
+
+    // A cast changing item (the next episode, a fresh stream, the receiver reloading by itself) has no
+    // item for a moment, on which media3 removes the notification and leaves the foreground. From the
+    // background Android refuses to let it back, and the app can then be frozen for the rest of the
+    // cast: nothing starts the next episode or fetches a fresh stream. Keep the notification through
+    // that gap; one lasting longer than ITEM_GAP_MS is not a change of item, so let media3 act on it.
+    override fun onUpdateNotification(session: MediaSession, startInForegroundRequired: Boolean) {
+        val player = session.player
+        if (player !is ExoPlayer && player.currentTimeline.isEmpty) {
+            if (gapEnd == null) {
+                gapEnd = Runnable {
+                    gapEnd = null
+                    super.onUpdateNotification(session, false)
+                }.also { handler.postDelayed(it, ITEM_GAP_MS) }
+            }
+            return
+        }
+        gapEnd?.let(handler::removeCallbacks)
+        gapEnd = null
+        super.onUpdateNotification(session, startInForegroundRequired)
+    }
+
+    override fun onDestroy() {
+        gapEnd?.let(handler::removeCallbacks)
+        gapEnd = null
+        super.onDestroy()
+    }
+
     // The player lives in the activity, which goes away with its task.
     override fun onTaskRemoved(rootIntent: Intent?) = stopSelf()
 
     companion object {
+        private const val ITEM_GAP_MS = 60_000L
+
         /** The activity's session, set before it starts this service and cleared when it ends. */
         var session: MediaSession? = null
 
