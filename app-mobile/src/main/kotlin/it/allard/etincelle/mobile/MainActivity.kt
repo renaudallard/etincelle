@@ -396,6 +396,11 @@ private fun AppRoot(
     LaunchedEffect(castState.isCasting, castState.connecting) {
         if (!castState.isCasting && !castState.connecting) castControlsOpen = false
     }
+    // It also closes once nothing plays: a link opened during a cast clears what plays, and the
+    // next Regarder must stay on its show page as any cast does.
+    LaunchedEffect(playing == null) {
+        if (playing == null) castControlsOpen = false
+    }
     val castControls = playing != null && castState.isCasting && castControlsOpen
     // The cast bar is shown (and the nav bar then drops its bottom inset) when there is a device to
     // name and the full-screen player is not up - except while a connect is in flight, so casting
