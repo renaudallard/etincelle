@@ -257,9 +257,10 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         // What was just watched belongs in Watch Next.
         TvHomeJob.schedule(this)
-        // Pause playback in the background (no decoding/audio); resume on return.
+        // Pause playback in the background (no decoding/audio); resume on return. playWhenReady, not
+        // isPlaying: a player still buffering would otherwise start with sound behind the launcher.
         player?.let {
-            if (it.isPlaying) {
+            if (it.playWhenReady) {
                 // Persist the resume point now too: the player surface only saves on dispose, which a
                 // kill of the backgrounded process skips, losing the position. Only ever save a real
                 // position here, never clear (positionToSave returns 0 near the start/end), so a
