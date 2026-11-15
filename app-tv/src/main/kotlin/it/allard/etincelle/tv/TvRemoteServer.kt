@@ -22,6 +22,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
@@ -46,6 +48,11 @@ class TvRemoteServer(
     @Volatile
     private var link: RemoteLink? = null
 
+    // The account key, worked out once while the server runs (main thread): a connection must cost no
+    // call to the backend, or any device on the network could flood the app's own calls with them.
+    private var key: ByteArray? = null
+    private val keyLock = Mutex()
+
     /** A phone is connected. */
     val connected: Boolean get() = link != null
 
@@ -53,6 +60,8 @@ class TvRemoteServer(
         if (scope != null) return
         writer = Executors.newSingleThreadExecutor()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate).also { scope = it }
+        // Ready before the first phone connects.
+        scope.launch { accountKeyOnce() }
         scope.launch {
             val server = runCatching { withContext(Dispatchers.IO) { ServerSocket(0) } }.getOrNull() ?: return@launch
             this@TvRemoteServer.server = server
@@ -73,6 +82,8 @@ class TvRemoteServer(
         link = null
         scope?.cancel()
         scope = null
+        // Worked out afresh on the next start, should the account or its profiles have changed.
+        key = null
         writer?.shutdown()
         writer = null
     }
@@ -85,7 +96,7 @@ class TvRemoteServer(
 
     // One phone: the handshake, then its commands until it leaves. A newer phone takes over.
     private suspend fun serve(socket: Socket) {
-        val key = runCatching { accountKey() }.getOrNull()
+        val key = accountKeyOnce()
         if (key == null) {
             runCatching { socket.close() }
             return
@@ -104,6 +115,10 @@ class TvRemoteServer(
             phone.close()
             if (link === phone) link = null
         }
+    }
+
+    private suspend fun accountKeyOnce(): ByteArray? = keyLock.withLock {
+        key ?: runCatching { accountKey() }.getOrNull()?.also { key = it }
     }
 
     // Tells each phone looking for TV apps where to connect, until the server stops.
