@@ -580,7 +580,9 @@ fun ProfileEditorScreen(
                 AsyncImage(
                     model = avatar.url,
                     contentDescription = null,
-                    modifier = Modifier.size(72.dp).clip(CircleShape)
+                    // The grid gives the cell's width; a fixed size would only set the height and
+                    // turn the circle into an oval.
+                    modifier = Modifier.aspectRatio(1f).clip(CircleShape)
                         .border(if (selected) 3.dp else 0.dp, if (selected) BrandYellow else Color.Transparent, CircleShape)
                         .clickable { avatarId = avatar.id },
                     contentScale = ContentScale.Crop,
