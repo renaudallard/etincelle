@@ -134,6 +134,9 @@ class CastPlayerController(
     // The TV has played what was last sent to it: its going idle then means it stopped, and its playing
     // something else that it moved on (zapped there, or played the next episode itself).
     private var tvStarted = false
+    // Numbers the play requests sent to the TV app, which says in its status which one failed.
+    private var tvRequests = 0L
+
     // Where playback coming back to the phone resumes (see loadResolved), for a TV app picked before
     // the phone has started it again.
     private var handoffPositionMs = 0L
@@ -432,6 +435,7 @@ class CastPlayerController(
         val (kind, id) = remoteTarget(item) ?: return
         val message = JSONObject().put(RemoteMessages.TYPE, RemoteMessages.PLAY).put(RemoteMessages.KIND, kind).put(RemoteMessages.ID, id)
         if (kind == RemoteMessages.KIND_LIVE) message.put(RemoteMessages.REWIND, rewindMs) else message.put(RemoteMessages.POSITION, positionMs)
+        message.put(RemoteMessages.REQUEST, ++tvRequests)
         currentItem = item
         tvStarted = false
         tvPlayer.setItem(item)
@@ -461,6 +465,15 @@ class CastPlayerController(
                 currentItem = null
                 tvPlayer.showTvContent()
             }
+        }
+        // The TV could not start what was sent: say why, rather than "Connexion à …" for ever.
+        val error = message.optString(RemoteMessages.ERROR)
+        if (!tvStarted && currentItem != null && error.isNotEmpty() && message.optLong(RemoteMessages.REQUEST) == tvRequests) {
+            currentItem = null
+            tvPlayer.showTvContent()
+            clearConnecting()
+            onError?.invoke(error)
+            return
         }
         when (message.optString(RemoteMessages.STATE)) {
             RemoteMessages.STATE_PLAYING -> setReceiverPlaying(true)

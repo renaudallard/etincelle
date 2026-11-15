@@ -36,7 +36,8 @@ JSON objects with a type `t` (see `RemoteMessages`). The phone sends `play` (kin
 recording, id, position, rewind behind live), `pause`, `resume`, `seek`, `stop`, `key` (up, down, left,
 right, ok, back, dispatched through the TV activity as remote presses) and `volume` (up, down, mute).
 The TV sends `status` every second: state, title, position and duration (within the rewind window on a
-live stream), live, and what plays.
+live stream), live, what plays, the number of the last `play` it handled (each `play` carries one) and,
+when nothing plays, the error that stopped it, so the phone can tell a failed request from a stale error.
 
 The TV resolves streams with its own sign-in, so nothing is passed but ids; it shows a programme's page
 under the player and plays the next episode itself, so the phone shows no next-episode slate for it.

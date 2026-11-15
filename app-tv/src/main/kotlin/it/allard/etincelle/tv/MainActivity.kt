@@ -87,6 +87,8 @@ class MainActivity : ComponentActivity() {
     // A phone of the same account driving this app while it is open.
     private lateinit var remote: TvRemoteServer
     private val remoteWindow = Timeline.Window()
+    // The last play request from the phone, echoed in the status (see RemoteMessages.REQUEST).
+    private var remoteRequest = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -287,6 +289,7 @@ class MainActivity : ComponentActivity() {
                     else -> return
                 }
                 val id = message.optString(RemoteMessages.ID).takeIf { it.isNotEmpty() } ?: return
+                remoteRequest = message.optLong(RemoteMessages.REQUEST)
                 viewModel.playFromRemote(kind, id, message.optLong(RemoteMessages.POSITION), message.optLong(RemoteMessages.REWIND))
             }
             RemoteMessages.PAUSE -> player.playWhenReady = false
@@ -328,17 +331,21 @@ class MainActivity : ComponentActivity() {
 
     // What plays and where, for the phone (see RemoteMessages.STATUS).
     private fun remoteStatus(): JSONObject {
-        val status = JSONObject().put(RemoteMessages.TYPE, RemoteMessages.STATUS)
-        val source = viewModel.state.value.playing
+        val status = JSONObject().put(RemoteMessages.TYPE, RemoteMessages.STATUS).put(RemoteMessages.REQUEST, remoteRequest)
+        val state = viewModel.state.value
+        val source = state.playing
         val player = player
-        if (source == null || player == null) return status.put(RemoteMessages.STATE, RemoteMessages.STATE_IDLE)
-        val state = when (player.playbackState) {
+        if (source == null || player == null) {
+            state.error?.let { status.put(RemoteMessages.ERROR, it) }
+            return status.put(RemoteMessages.STATE, RemoteMessages.STATE_IDLE)
+        }
+        val playback = when (player.playbackState) {
             Player.STATE_BUFFERING -> RemoteMessages.STATE_BUFFERING
             Player.STATE_READY -> if (player.playWhenReady) RemoteMessages.STATE_PLAYING else RemoteMessages.STATE_PAUSED
             Player.STATE_ENDED -> RemoteMessages.STATE_ENDED
             else -> RemoteMessages.STATE_IDLE
         }
-        status.put(RemoteMessages.STATE, state)
+        status.put(RemoteMessages.STATE, playback)
             .put(RemoteMessages.TITLE, source.title.orEmpty())
             .put(RemoteMessages.POSITION, player.currentPosition)
             .put(RemoteMessages.DURATION, player.duration.takeIf { it != C.TIME_UNSET } ?: -1L)
