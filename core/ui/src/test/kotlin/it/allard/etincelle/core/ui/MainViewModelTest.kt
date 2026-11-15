@@ -14,6 +14,8 @@ import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.Profiles
 import it.allard.etincelle.core.model.UpNext
 import it.allard.etincelle.core.model.UserSession
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
 import java.lang.reflect.Proxy
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -120,6 +122,18 @@ class MainViewModelTest {
         assertEquals("VOD_1", vm.state.value.detailStack.single().id)
     }
 
+    @Test
+    fun theResumePointIsSavedAfterTheScreenIsGone() {
+        val repo = FakeRepo()
+        val store = ViewModelStore()
+        val vm = ViewModelProvider.create(store, MainViewModelFactory(repo, UpdateChecker("0", "mobile", "http://127.0.0.1:9/")))[MainViewModel::class]
+        store.clear()
+
+        vm.savePlaybackPosition("VOD_1", 42_000)
+        vm.reportProgress(SOURCE, 42_000, 90_000)
+        assertEquals(listOf("save VOD_1 42000", "report 42000"), repo.saved)
+    }
+
     private fun viewModel(repo: FakeRepo) = MainViewModel(repo, UpdateChecker("0", "mobile", "http://127.0.0.1:9/")).also {
         assertTrue(it.state.value.loggedIn)
     }
@@ -138,6 +152,13 @@ class MainViewModelTest {
         override suspend fun fetchProgramDetail(id: String, kind: DetailKind) = detail(id, kind)
         override suspend fun profilesToPick(): Profiles? = null
         override suspend fun resolveRecording(assetId: String) = SOURCE
+        val saved = mutableListOf<String>()
+        override suspend fun savePlaybackPosition(key: String, positionMs: Long) {
+            saved += "save $key $positionMs"
+        }
+        override suspend fun reportProgress(source: PlaybackSource, positionMs: Long, durationMs: Long) {
+            saved += "report $positionMs"
+        }
         override suspend fun logout() {
             session = null
         }

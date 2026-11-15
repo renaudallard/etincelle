@@ -23,7 +23,10 @@ import it.allard.etincelle.core.model.ProgramWindow
 import it.allard.etincelle.core.model.RecordAction
 import it.allard.etincelle.core.model.withUpNext
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -861,17 +864,21 @@ class MainViewModel(
         _state.update { it.copy(playing = null) }
     }
 
+    // Where the player ends up is saved as the activity is destroyed, and by then a finishing
+    // activity has already cancelled viewModelScope, so these short writes run in their own scope.
+    private val saveScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
     /** Persists a VOD/replay resume position; a null [key] (live) is ignored. */
     private var saveJob: Job? = null
 
     fun savePlaybackPosition(key: String?, positionMs: Long) {
         if (key == null) return
-        saveJob = viewModelScope.launch { runCatching { repo.savePlaybackPosition(key, positionMs) } }
+        saveJob = saveScope.launch { runCatching { repo.savePlaybackPosition(key, positionMs) } }
     }
 
     /** Reports progress to the server playhead (continue-watching); best-effort and a no-op for live. */
     fun reportProgress(source: PlaybackSource, positionMs: Long, durationMs: Long) {
-        viewModelScope.launch { runCatching { repo.reportProgress(source, positionMs, durationMs) } }
+        saveScope.launch { runCatching { repo.reportProgress(source, positionMs, durationMs) } }
     }
 
     /** Re-resolves a stream (fresh tokens/URL), used by Cast transfers when a token has expired. */
