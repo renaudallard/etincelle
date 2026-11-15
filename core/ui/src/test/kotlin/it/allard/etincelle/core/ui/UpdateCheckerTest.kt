@@ -3,7 +3,9 @@
 
 package it.allard.etincelle.core.ui
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -39,5 +41,26 @@ class UpdateCheckerTest {
     fun blankCurrentNeverOffersUpdate() {
         // An unknown running version must not make every release look newer.
         assertFalse(isNewer("9.9.9", ""))
+    }
+
+    private val release = listOf(
+        ReleaseAsset("etincelle-0.1.37-mobile.apk", "https://github.com/o/r/releases/download/v0.1.37/etincelle-0.1.37-mobile.apk"),
+        ReleaseAsset("etincelle-0.1.37-tv.apk", "https://github.com/o/r/releases/download/v0.1.37/etincelle-0.1.37-tv.apk"),
+    )
+
+    @Test
+    fun eachAppGetsItsOwnApk() {
+        assertEquals(release[0], apkFor(release, "mobile"))
+        assertEquals(release[1], apkFor(release, "tv"))
+    }
+
+    @Test
+    fun releaseWithoutTheAppsApkOffersNothing() {
+        assertNull(apkFor(release.take(1), "tv"))
+    }
+
+    @Test
+    fun apkServedOutsideGithubIsIgnored() {
+        assertNull(apkFor(listOf(ReleaseAsset("etincelle-0.1.37-tv.apk", "https://example.org/etincelle-0.1.37-tv.apk")), "tv"))
     }
 }

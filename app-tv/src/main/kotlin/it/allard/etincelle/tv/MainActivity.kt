@@ -59,12 +59,13 @@ import it.allard.etincelle.core.player.PlaybackProgress
 import it.allard.etincelle.core.ui.MainViewModel
 import it.allard.etincelle.core.ui.MainViewModelFactory
 import it.allard.etincelle.core.ui.Tab
+import it.allard.etincelle.core.ui.UpdateChecker
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels {
-        MainViewModelFactory((application as EtincelleTvApp).container.repository)
+        MainViewModelFactory((application as EtincelleTvApp).container.repository, UpdateChecker(BuildConfig.VERSION_NAME, "tv"))
     }
     private var player: ExoPlayer? = null
     private var loadControl: AdaptiveLoadControl? = null
@@ -94,7 +95,7 @@ class MainActivity : ComponentActivity() {
         player = exo
         // Only on a fresh launch; a process recreation must not replay the original deep link.
         if (savedInstanceState == null) handleDeepLink(intent)
-        viewModel.checkForUpdate(BuildConfig.VERSION_NAME)
+        viewModel.checkForUpdate()
         setContent {
             EtincelleTheme {
                 val state by viewModel.state.collectAsStateWithLifecycle()

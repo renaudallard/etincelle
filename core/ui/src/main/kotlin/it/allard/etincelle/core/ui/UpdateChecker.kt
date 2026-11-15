@@ -20,12 +20,14 @@ sealed interface UpdateCheck {
 }
 
 /**
- * Checks the project's GitHub releases for a version newer than the running app. Any failure
+ * Checks the project's GitHub releases for a version newer than the running app. [variant] names
+ * the app's APK in a release ("mobile" or "tv", as in etincelle-<version>-<variant>.apk). Any failure
  * (offline, rate limit, malformed payload) resolves to null so a launch check can never disrupt
  * startup or nag the user.
  */
 class UpdateChecker(
     private val currentVersion: String,
+    private val variant: String,
     private val releaseUrl: String = "https://api.github.com/repos/renaudallard/etincelle/releases/latest",
 ) {
     /** Startup path: just the newer release, or null on up-to-date or any failure (never disruptive). */
@@ -43,7 +45,7 @@ class UpdateChecker(
             }
             try {
                 if (conn.responseCode != 200) return@runCatching UpdateCheck.Failed
-                val info = parseUpdate(conn.inputStream.bufferedReader().use { it.readText() }, currentVersion)
+                val info = parseUpdate(conn.inputStream.bufferedReader().use { it.readText() }, currentVersion, variant)
                 if (info != null) UpdateCheck.Available(info) else UpdateCheck.UpToDate
             } finally {
                 conn.disconnect()
@@ -52,22 +54,30 @@ class UpdateChecker(
     }
 }
 
-/** Turns a GitHub "latest release" payload into an [UpdateInfo] when it is newer and ships an APK. */
-internal fun parseUpdate(body: String, currentVersion: String): UpdateInfo? {
+/**
+ * Turns a GitHub "latest release" payload into an [UpdateInfo] when it is newer and ships the APK
+ * of this [variant].
+ */
+internal fun parseUpdate(body: String, currentVersion: String, variant: String): UpdateInfo? {
     val root = runCatching { JSONObject(body) }.getOrNull() ?: return null
     val tag = root.optString("tag_name").takeIf { it.isNotBlank() } ?: return null
     if (!isNewer(tag, currentVersion)) return null
-    val assets = root.optJSONArray("assets") ?: return null
-    for (i in 0 until assets.length()) {
-        val asset = assets.optJSONObject(i) ?: continue
-        val url = asset.optString("browser_download_url")
-        // Release assets are served from github.com; never hand the browser anything else.
-        if (asset.optString("name").endsWith(".apk", true) && url.startsWith("https://github.com/")) {
-            return UpdateInfo(tag.removePrefix("v").removePrefix("V"), url)
-        }
-    }
-    return null
+    val json = root.optJSONArray("assets") ?: return null
+    val assets = (0 until json.length()).mapNotNull { json.optJSONObject(it) }
+        .map { ReleaseAsset(it.optString("name"), it.optString("browser_download_url")) }
+    val apk = apkFor(assets, variant) ?: return null
+    return UpdateInfo(tag.removePrefix("v").removePrefix("V"), apk.url)
 }
+
+internal data class ReleaseAsset(val name: String, val url: String)
+
+/**
+ * The APK of this [variant] among a release's assets. A release ships one APK per app, so taking any
+ * APK would hand the TV the phone's. Release assets are served from github.com; anything else is
+ * ignored.
+ */
+internal fun apkFor(assets: List<ReleaseAsset>, variant: String): ReleaseAsset? =
+    assets.firstOrNull { it.name.endsWith("-$variant.apk", ignoreCase = true) && it.url.startsWith("https://github.com/") }
 
 /** True when [latest] is a strictly higher dotted version than [current]; a leading "v" is ignored. */
 internal fun isNewer(latest: String, current: String): Boolean {

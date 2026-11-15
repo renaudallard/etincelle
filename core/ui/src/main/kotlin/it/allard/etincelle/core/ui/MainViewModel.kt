@@ -103,7 +103,10 @@ data class UiState(
 }
 
 /** Shared presentation logic for both the phone and TV apps. */
-class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
+class MainViewModel(
+    private val repo: MolotovRepository,
+    private val updates: UpdateChecker,
+) : ViewModel() {
 
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
@@ -644,22 +647,22 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
     private var updateChecked = false
 
     /** Checks GitHub for a newer release once per process; the app proposes the download if found. */
-    fun checkForUpdate(currentVersion: String) {
+    fun checkForUpdate() {
         if (updateChecked) return
         updateChecked = true
         viewModelScope.launch {
-            UpdateChecker(currentVersion).latestUpdate()?.let { info -> _state.update { it.copy(update = info) } }
+            updates.latestUpdate()?.let { info -> _state.update { it.copy(update = info) } }
         }
     }
 
     fun dismissUpdate() = _state.update { it.copy(update = null) }
 
     /** Explicit "check for updates" from settings; reports newer / up-to-date / failed to the user. */
-    fun checkForUpdateNow(currentVersion: String) {
+    fun checkForUpdateNow() {
         if (_state.value.checkingUpdate) return
         _state.update { it.copy(checkingUpdate = true, updateStatus = null) }
         viewModelScope.launch {
-            when (val result = UpdateChecker(currentVersion).check()) {
+            when (val result = updates.check()) {
                 is UpdateCheck.Available -> _state.update { it.copy(checkingUpdate = false, update = result.info) }
                 UpdateCheck.UpToDate -> _state.update { it.copy(checkingUpdate = false, updateStatus = "Vous avez la dernière version") }
                 UpdateCheck.Failed -> _state.update { it.copy(checkingUpdate = false, updateStatus = "Vérification impossible, réessayez") }
@@ -683,7 +686,10 @@ class MainViewModel(private val repo: MolotovRepository) : ViewModel() {
     }
 }
 
-class MainViewModelFactory(private val repo: MolotovRepository) : ViewModelProvider.Factory {
+class MainViewModelFactory(
+    private val repo: MolotovRepository,
+    private val updates: UpdateChecker,
+) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T = MainViewModel(repo) as T
+    override fun <T : ViewModel> create(modelClass: Class<T>): T = MainViewModel(repo, updates) as T
 }

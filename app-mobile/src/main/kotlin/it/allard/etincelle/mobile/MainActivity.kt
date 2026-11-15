@@ -84,6 +84,7 @@ import it.allard.etincelle.core.ui.MainViewModel
 import it.allard.etincelle.core.ui.MainViewModelFactory
 import it.allard.etincelle.core.ui.Tab
 import it.allard.etincelle.core.ui.UiState
+import it.allard.etincelle.core.ui.UpdateChecker
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -93,7 +94,7 @@ import kotlinx.coroutines.flow.asStateFlow
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels {
-        MainViewModelFactory((application as EtincelleApp).container.repository)
+        MainViewModelFactory((application as EtincelleApp).container.repository, UpdateChecker(BuildConfig.VERSION_NAME, "mobile"))
     }
     private var player: ExoPlayer? = null
     private var castController: CastPlayerController? = null
@@ -134,7 +135,7 @@ class MainActivity : ComponentActivity() {
         castController = controller
         // Only on a fresh launch; a process recreation must not replay the original deep link.
         if (savedInstanceState == null) handleDeepLink(intent)
-        viewModel.checkForUpdate(BuildConfig.VERSION_NAME)
+        viewModel.checkForUpdate()
         viewModel.setHideLocked(LocalPrefs.hideLocked(this))
 
         val onPlay: (PlaybackSource) -> Unit = { source ->
@@ -464,7 +465,7 @@ private fun AppRoot(
                             appVersion = BuildConfig.VERSION_NAME,
                             checkingUpdate = state.checkingUpdate,
                             updateStatus = state.updateStatus,
-                            onCheckUpdate = { vm.checkForUpdateNow(BuildConfig.VERSION_NAME) },
+                            onCheckUpdate = { vm.checkForUpdateNow() },
                             onConnectTv = { vm.confirmTvCode(it) },
                             onClearTvConnect = { vm.clearTvConnect() },
                             connectInfo = state.tvConnectInfo,
