@@ -53,10 +53,13 @@ fun UpNextSlate(
     var left by remember(upNext) { mutableStateOf<Long?>(null) }
     var hidden by remember(upNext) { mutableStateOf(false) }
     val playNext by rememberUpdatedState(onPlayNext)
+    // The player can change under a running countdown (the cast moving to another device).
+    val positionNow by rememberUpdatedState(position)
+    val durationNow by rememberUpdatedState(duration)
     LaunchedEffect(upNext) {
         var fired = false
         while (true) {
-            val now = upNext.secondsLeft(position(), duration())
+            val now = upNext.secondsLeft(positionNow(), durationNow())
             if (now == null) hidden = false
             left = now
             // Watching the credits (a hidden slate) lets the episode end without going on.

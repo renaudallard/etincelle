@@ -354,6 +354,9 @@ class MainActivity : ComponentActivity() {
 
 private val EMPTY_CAST_FLOW: StateFlow<CastUiState> = MutableStateFlow(CastUiState()).asStateFlow()
 
+// Lifts the next-episode slate on the show page above the bottom bar and the cast bar.
+private val UP_NEXT_ABOVE_BARS = 140.dp
+
 // How long the cast volume overlay stays up after the last volume-key press.
 private const val VOLUME_OVERLAY_MS = 1500L
 
@@ -468,6 +471,7 @@ private fun AppRoot(
                             PlayerSurface(
                                 playing!!, currentPlayer, castState, onCastConnect, onCastDisconnect,
                                 fetchProgramWindow = vm::liveProgramWindow, secure = false,
+                                onPlayNext = vm::playUpNext,
                             )
                         }
 
@@ -693,6 +697,15 @@ private fun AppRoot(
                     )
                 }
             }
+            // Casting from the show page: the next episode is announced here and follows on the TV.
+            if (playing != null && castState.isCasting && !castControls) {
+                UpNextOverlay(
+                    playing,
+                    currentPlayer,
+                    vm::playUpNext,
+                    Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = UP_NEXT_ABOVE_BARS),
+                )
+            }
             if (castState.isCasting && showVolume) {
                 CastVolumeOverlay(
                     level = castState.volumeLevel,
@@ -702,6 +715,29 @@ private fun AppRoot(
             }
         }
     }
+}
+
+/**
+ * The slate announcing [source]'s next episode near its end, counting down on [player]: the phone's or
+ * the Chromecast's, so the next episode also follows on the TV.
+ */
+@Composable
+private fun UpNextOverlay(source: PlaybackSource, player: Player, onPlayNext: () -> Unit, modifier: Modifier) {
+    val upNext = source.upNext ?: return
+    UpNextSlate(
+        upNext,
+        position = { player.currentPosition },
+        duration = { player.duration },
+        onPlayNext = onPlayNext,
+        button = { label, primary, onClick, mod ->
+            if (primary) {
+                Button(onClick = onClick, modifier = mod, colors = ButtonDefaults.buttonColors(containerColor = BrandYellow, contentColor = BrandBlack)) { Text(label) }
+            } else {
+                OutlinedButton(onClick = onClick, modifier = mod) { Text(label, color = Color.White) }
+            }
+        },
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -840,22 +876,7 @@ private fun PlayerSurface(
                 )
             }
         }
-        // The next episode, near the end of this one (local playback only).
-        source.upNext?.takeIf { secure }?.let { upNext ->
-            UpNextSlate(
-                upNext,
-                position = { currentPlayer.currentPosition },
-                duration = { currentPlayer.duration },
-                onPlayNext = onPlayNext,
-                button = { label, primary, onClick, mod ->
-                    if (primary) {
-                        Button(onClick = onClick, modifier = mod, colors = ButtonDefaults.buttonColors(containerColor = BrandYellow, contentColor = BrandBlack)) { Text(label) }
-                    } else {
-                        OutlinedButton(onClick = onClick, modifier = mod) { Text(label, color = Color.White) }
-                    }
-                },
-                modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(16.dp),
-            )
-        }
+        // The next episode, near the end of this one, on the phone or the Chromecast.
+        UpNextOverlay(source, currentPlayer, onPlayNext, Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(16.dp))
     }
 }

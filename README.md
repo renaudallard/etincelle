@@ -39,7 +39,8 @@ enregistrer soit **l'épisode** en cours, soit **la série** entière. Quand un 
 liste en dessous les **épisodes disponibles** (avec leur vignette) pour en choisir un autre ; pour une
 série **enregistrée**, elle affiche d'abord vos épisodes enregistrés (lus depuis le DVR), puis la même
 liste des **épisodes disponibles** en rattrapage. À la fin d'un épisode, l'**épisode suivant**
-s'annonce par un compte à rebours (« Commence dans 9 s ») puis démarre tout seul ; **À suivre** le
+s'annonce par un compte à rebours (« Commence dans 9 s ») puis démarre tout seul, sur le téléphone comme
+sur le Chromecast pendant une diffusion ; **À suivre** le
 lance aussitôt et **Regarder le générique** laisse l'épisode se terminer. Un épisode regardé jusqu'au
 générique reprend ensuite depuis le début. Un programme **pas encore diffusé** indique quand il
 passera (par exemple « Ce programme sera en direct dans 4 jours. ») au lieu d'un « Regarder » qui
