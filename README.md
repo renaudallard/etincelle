@@ -118,6 +118,17 @@ direct, volume, passage d'un Chromecast à l'autre et retour sur le téléphone.
 coupée, etincelle se reconnecte au Chromecast sans interrompre la lecture. La notification de
 lecture d'etincelle (voir plus bas) pilote alors le Chromecast.
 
+Le téléphone peut aussi **piloter l'application TV d'etincelle**, comme un Chromecast mais avec la
+télécommande d'etincelle elle-même : tant que l'application est ouverte sur un téléviseur, elle
+apparaît dans la liste **Lire sur** sous le nom du téléviseur suivi de « (appli TV) », et l'on choisit
+laquelle quand il y en a plusieurs. Le téléviseur lit alors ce que l'on choisit sur le téléphone
+(direct, rattrapage, enregistrement) avec sa propre connexion, enchaîne lui-même l'épisode suivant,
+et se pilote depuis la barre de diffusion, la notification ou les touches de volume du téléphone.
+Toucher la barre de diffusion ouvre une **télécommande** : ce qui passe, lecture/pause, recul de
+10 s, avance de 30 s, et les flèches, OK et Retour pour naviguer dans l'application TV. Seul un
+téléphone connecté au **même compte** Molotov peut piloter le téléviseur, et réciproquement : chacun
+le prouve à l'autre à partir du compte, sans qu'aucun identifiant ne passe sur le réseau local.
+
 Sur téléphone, la **lecture continue en arrière-plan** et écran verrouillé (le son seul, la vidéo
 reprenant au retour dans l'application), avec une **notification de lecture** et des **commandes sur
 l'écran de verrouillage** : lecture/pause, recul de 10 s et avance de 30 s. Elles pilotent le

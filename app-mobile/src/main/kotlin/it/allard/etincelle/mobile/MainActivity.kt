@@ -148,6 +148,7 @@ class MainActivity : ComponentActivity() {
                 onError = { msg -> Toast.makeText(this, msg, Toast.LENGTH_SHORT).show() },
                 onPlaybackStopped = { viewModel.stopPlaying() },
                 sessionProvider = { (application as EtincelleApp).container.repository.currentSession() },
+                remoteKey = { (application as EtincelleApp).container.repository.remoteKey() },
             )
         }
         castController = controller
@@ -243,6 +244,7 @@ class MainActivity : ComponentActivity() {
                         onCastDisconnect = { controller?.returnToThisDevice() },
                         // Active-scan while the cast picker is open so the device list stays fresh.
                         onCastActiveScan = { controller?.setActiveScan(it) },
+                        onTvKey = { controller?.sendTvKey(it) },
                     )
                 }
                 state.update?.let { up ->
@@ -388,6 +390,7 @@ private fun AppRoot(
     onCastConnect: (String) -> Unit,
     onCastDisconnect: () -> Unit,
     onCastActiveScan: (Boolean) -> Unit = {},
+    onTvKey: (String) -> Unit = {},
 ) {
     val playing = state.playing
     val detail = state.detail
@@ -414,6 +417,12 @@ private fun AppRoot(
         if (playing == null) castControlsOpen = false
     }
     val castControls = playing != null && castState.isCasting && castControlsOpen
+    // Driving an etincelle TV app, the cast bar opens its remote control instead, playing or not.
+    var tvRemoteOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(castState.toTvApp) {
+        if (!castState.toTvApp) tvRemoteOpen = false
+    }
+    val tvRemote = castState.toTvApp && tvRemoteOpen
     // The cast bar is shown (and the nav bar then drops its bottom inset) when there is a device to
     // name and the full-screen player is not up - except while a connect is in flight, so casting
     // from the player still shows the "Connexion à …" animation instead of no feedback at all. It is
@@ -421,6 +430,7 @@ private fun AppRoot(
     val showCastBar = castState.showStatus &&
         (!playerFullscreen || castState.connecting) &&
         !castControls &&
+        !tvRemote &&
         castState.statusDeviceName != null
     // Grid density (cards per row on the "tout voir" pages); persisted, set live from the settings.
     var gridColumns by remember { mutableStateOf(LocalPrefs.gridColumns(context)) }
@@ -462,6 +472,11 @@ private fun AppRoot(
                                 fetchProgramWindow = vm::liveProgramWindow,
                                 onPlayNext = vm::playUpNext,
                             )
+                        }
+
+                        tvRemote -> {
+                            BackHandler { tvRemoteOpen = false }
+                            TvRemoteScreen(currentPlayer, castState.connectedDeviceName.orEmpty(), onTvKey, onClose = { tvRemoteOpen = false })
                         }
 
                         // The cast controller: the same player surface bound to the cast player, so its
@@ -693,12 +708,17 @@ private fun AppRoot(
                     // none, so the bar stays plain status there (the system cast notification controls it).
                     CastStatusBar(
                         castState,
-                        onClick = if (playing != null) ({ castControlsOpen = true }) else null,
+                        onClick = when {
+                            castState.toTvApp -> ({ tvRemoteOpen = true })
+                            playing != null -> ({ castControlsOpen = true })
+                            else -> null
+                        },
                     )
                 }
             }
-            // Casting from the show page: the next episode is announced here and follows on the TV.
-            if (playing != null && castState.isCasting && !castControls) {
+            // Casting from the show page: the next episode is announced here and follows on the TV. An
+            // etincelle TV app announces and plays it itself.
+            if (playing != null && castState.isCasting && !castState.toTvApp && !castControls) {
                 UpNextOverlay(
                     playing,
                     currentPlayer,
@@ -876,7 +896,10 @@ private fun PlayerSurface(
                 )
             }
         }
-        // The next episode, near the end of this one, on the phone or the Chromecast.
-        UpNextOverlay(source, currentPlayer, onPlayNext, Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(16.dp))
+        // The next episode, near the end of this one, on the phone or the Chromecast (an etincelle TV
+        // app plays it itself).
+        if (!castState.toTvApp) {
+            UpNextOverlay(source, currentPlayer, onPlayNext, Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(16.dp))
+        }
     }
 }

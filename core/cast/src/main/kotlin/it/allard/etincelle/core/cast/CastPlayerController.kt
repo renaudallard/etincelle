@@ -21,6 +21,8 @@ import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.UserSession
 import it.allard.etincelle.core.player.LivePlayback
 import it.allard.etincelle.core.player.MediaItemFactory
+import it.allard.etincelle.core.remote.RemoteAuthException
+import it.allard.etincelle.core.remote.RemoteMessages
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +38,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 
 // A live DASH DVR window spans at most a few hours; this is comfortably past any of them, so a load
 // at this position clamps to the receiver's live edge.
@@ -52,6 +55,8 @@ private const val CONNECT_TIMEOUT_MS = 30_000L
 
 private const val PLAYBACK_ERROR_MESSAGE = "Lecture impossible, réessayez"
 private const val CONNECT_ERROR_MESSAGE = "Connexion au Chromecast impossible"
+private const val TV_CONNECT_MESSAGE = "Connexion au téléviseur impossible"
+private const val TV_ACCOUNT_MESSAGE = "Ce téléviseur n'utilise pas le même compte"
 
 // Recover a failing cast by re-resolving fresh credentials (the receiver cannot refresh its own
 // short-lived stream/DRM tokens, so reloading them on the receiver loops forever). Retry up to this
@@ -89,6 +94,7 @@ private val REJOIN_DELAYS_MS = longArrayOf(1_000, 3_000, 6_000)
  * @param onError surfaces an unrecoverable playback error message to the user.
  * @param onPlaybackStopped fires when a Cast session ended without an explicit return-to-this-phone,
  *   so the UI can drop its "playing" state instead of re-surfacing the local player over browsing.
+ * @param remoteKey the account key that lets the phone drive an etincelle TV app (see core/remote).
  */
 @UnstableApi
 class CastPlayerController(
@@ -99,6 +105,7 @@ class CastPlayerController(
     private val onError: ((String) -> Unit)? = null,
     private val onPlaybackStopped: (() -> Unit)? = null,
     private val sessionProvider: () -> UserSession? = { null },
+    private val remoteKey: (suspend () -> ByteArray?)? = null,
 ) : CastController(context, castContext) {
 
     private val appContext = context.applicationContext
@@ -121,11 +128,21 @@ class CastPlayerController(
     // Counts the direct loads, so a load overtaken by a newer one leaves the receiver and the UI to it.
     private var directLoads = 0
 
+    // An etincelle TV app driven by etincelle's own remote control, and its player for the UI.
+    private var tvSession: TvRemoteSession? = null
+    private val tvPlayer = TvRemotePlayer()
+    // The TV has played what was last sent to it, so its going idle means it stopped.
+    private var tvStarted = false
+
+    // The TV app is connected (not just connecting).
+    private val tvConnected: Boolean
+        get() = tvSession != null && state.value.toTvApp
+
     // The direct session is connected (not just starting).
     private val directConnected: Boolean
         get() = directSession != null && state.value.connectedRouteId?.startsWith(DIRECT_ROUTE_PREFIX) == true
 
-    override val isCastSessionActive: Boolean get() = super.isCastSessionActive || directConnected
+    override val isCastSessionActive: Boolean get() = super.isCastSessionActive || directConnected || tvConnected
 
     // A Chromecast plays the stream (through Play Services or directly), with its session up.
     private val castingRemotely: Boolean
@@ -164,8 +181,8 @@ class CastPlayerController(
     // stop, logout, failed transfer) stops quietly and clears the UI's playing state instead.
     private var returnToPhoneOnEnd = false
 
-    // A direct device picked while a Play Services cast was up: connected once that cast has ended and
-    // playback is back on the phone (see connectTo).
+    // A direct device or TV app picked while a Play Services cast was up: connected once that cast has
+    // ended and playback is back on the phone (see connectTo).
     private var pendingDirectRoute: String? = null
 
     // Our own scan's entry for the device a cast-out through Play Services is connecting to: used
@@ -289,10 +306,14 @@ class CastPlayerController(
         // alone instead of reloading and restarting it from the original position. A "depuis le début"
         // restart carries an explicit rewind, so it must reload even on the same channel.
         val newSource = item.localConfiguration?.tag as? PlaybackSource
-        if (castingRemotely &&
+        if ((castingRemotely || tvConnected) &&
             sameContent(currentItem, item) &&
             (newSource?.liveRewindOffsetMs ?: 0L) <= 0L
         ) {
+            return
+        }
+        if (tvConnected) {
+            playOnTv(item, startPositionMs, newSource?.liveRewindOffsetMs ?: 0L)
             return
         }
         reResolveJob?.cancel()
@@ -317,16 +338,16 @@ class CastPlayerController(
         // A switch to or from a direct cast goes through the phone: playback comes back to it where the
         // TV was, then it is cast to the new device as usual, which picks up from there. A direct cast
         // still connecting is given up the same way.
-        val toDirect = routeId.startsWith(DIRECT_ROUTE_PREFIX)
+        val toDirect = routeId.startsWith(DIRECT_ROUTE_PREFIX) || routeId.startsWith(TV_ROUTE_PREFIX)
         directFallback = null
-        if (directSession != null) returnToThisDevice()
+        if (directSession != null || tvSession != null) returnToThisDevice()
         if (toDirect && super.isCastSessionActive) {
             // The Play Services cast ends asynchronously; connect once it is back on the phone.
             pendingDirectRoute = routeId
             returnToThisDevice()
             return true
         }
-        if (toDirect) return connectDirect(routeId)
+        if (toDirect) return connectPicked(routeId)
         val willTransfer = _currentPlayer.value === castPlayer && castContext.sessionManager.currentCastSession != null
         val position = if (willTransfer) castPlayer.currentPosition else 0L
         val playWhenReady = if (willTransfer) castPlayer.playWhenReady else true
@@ -349,6 +370,134 @@ class CastPlayerController(
             transferring = true
         }
         return selected
+    }
+
+    // A device from our own scans: a Chromecast, or an etincelle TV app.
+    private fun connectPicked(routeId: String): Boolean =
+        if (routeId.startsWith(TV_ROUTE_PREFIX)) connectTv(routeId) else connectDirect(routeId)
+
+    // Connect to the etincelle TV app [routeId], then have it play what the phone is playing. The TV
+    // fetches the stream with its own sign-in; the two only need to share the account (see core/remote).
+    private fun connectTv(routeId: String): Boolean {
+        val tv = scannedTv(routeId) ?: return false
+        val key = remoteKey ?: return false
+        markConnecting(tv.name)
+        lateinit var session: TvRemoteSession
+        session = TvRemoteSession(
+            tv, wifiNetwork(),
+            onMessage = { message -> if (tvSession === session) onTvMessage(message) },
+            onEnded = { if (tvSession === session) endTvCast() },
+        )
+        tvSession = session
+        scope.launch {
+            val started = runCatching { session.start(key() ?: throw RemoteAuthException("signed out")) }
+            if (tvSession !== session) {
+                session.close()
+                return@launch
+            }
+            if (started.isFailure) {
+                tvSession = null
+                session.close()
+                clearConnecting()
+                onError?.invoke(if (started.exceptionOrNull() is RemoteAuthException) TV_ACCOUNT_MESSAGE else TV_CONNECT_MESSAGE)
+                return@launch
+            }
+            markTvConnected(tv)
+            tvPlayer.attach(session)
+            val item = currentItem
+            val phonePlays = phoneStillPlays
+            // From now on the controls (remote screen, notification) drive the TV, whatever it plays.
+            _currentPlayer.value = tvPlayer
+            if (item != null && phonePlays) {
+                // Casting out a rewound live stream: resume the TV that far behind the edge.
+                val isLive = (item.localConfiguration?.tag as? PlaybackSource)?.isLive == true
+                val rewind = if (isLive) LivePlayback.castRewindOffsetMs(localPlayer, liveWindow) else 0L
+                playOnTv(item, localPlayer.currentPosition, rewind)
+                runCatching { localPlayer.stop() }
+            } else {
+                clearConnecting()
+            }
+        }
+        return true
+    }
+
+    // Has the TV app play [item] from [positionMs] (on demand) or [rewindMs] behind the live edge.
+    private fun playOnTv(item: MediaItem, positionMs: Long, rewindMs: Long) {
+        val session = tvSession ?: return
+        val source = item.localConfiguration?.tag as? PlaybackSource ?: return
+        val channelId = source.originChannelId
+        val recordingId = source.originRecordingAssetId
+        val vodId = source.originVodId
+        val message = JSONObject().put(RemoteMessages.TYPE, RemoteMessages.PLAY)
+        when {
+            channelId != null -> message.put(RemoteMessages.KIND, RemoteMessages.KIND_LIVE).put(RemoteMessages.ID, channelId)
+                .put(RemoteMessages.REWIND, rewindMs)
+            recordingId != null -> message.put(RemoteMessages.KIND, RemoteMessages.KIND_RECORDING).put(RemoteMessages.ID, recordingId)
+                .put(RemoteMessages.POSITION, positionMs)
+            vodId != null -> message.put(RemoteMessages.KIND, RemoteMessages.KIND_VOD).put(RemoteMessages.ID, vodId)
+                .put(RemoteMessages.POSITION, positionMs)
+            else -> return
+        }
+        currentItem = item
+        tvStarted = false
+        tvPlayer.setItem(item)
+        _currentPlayer.value = tvPlayer
+        session.send(message)
+    }
+
+    private fun onTvMessage(message: JSONObject) {
+        if (message.optString(RemoteMessages.TYPE) != RemoteMessages.STATUS) return
+        tvPlayer.onStatus(message)
+        when (message.optString(RemoteMessages.STATE)) {
+            RemoteMessages.STATE_PLAYING -> {
+                tvStarted = true
+                setReceiverPlaying(true)
+            }
+            RemoteMessages.STATE_PAUSED, RemoteMessages.STATE_BUFFERING -> {
+                tvStarted = true
+                setReceiverPlaying(false)
+            }
+            RemoteMessages.STATE_IDLE -> if (tvStarted && currentItem != null) {
+                // Stopped on the TV (Back from its player): the phone drops what it was playing too.
+                tvStarted = false
+                currentItem = null
+                onPlaybackStopped?.invoke()
+            }
+        }
+    }
+
+    /** Sends a remote-control key to the etincelle TV app (up, down, left, right, ok, back). */
+    fun sendTvKey(key: String) {
+        tvSession?.takeIf { tvConnected }?.send(JSONObject().put(RemoteMessages.TYPE, RemoteMessages.KEY).put(RemoteMessages.KEY_NAME, key))
+    }
+
+    // The TV app connection ended on its own (the app closed, the network dropped): the TV keeps what
+    // it plays, and the phone stops showing a cast.
+    private fun endTvCast() {
+        val phonePlays = phoneStillPlays
+        tvSession = null
+        leaveTvPlayer()
+        onSessionDisconnected()
+        if (phonePlays) return
+        currentItem = null
+        onPlaybackStopped?.invoke()
+    }
+
+    // End the TV app session, stopping what it plays when [stopTv]; true when there was one.
+    private fun stopTvSession(stopTv: Boolean): Boolean {
+        val session = tvSession ?: return false
+        tvSession = null
+        if (stopTv) session.send(JSONObject().put(RemoteMessages.TYPE, RemoteMessages.STOP))
+        session.close()
+        leaveTvPlayer()
+        onSessionDisconnected()
+        return true
+    }
+
+    private fun leaveTvPlayer() {
+        tvPlayer.detach()
+        tvStarted = false
+        if (_currentPlayer.value === tvPlayer) _currentPlayer.value = localPlayer
     }
 
     // Connect to a Chromecast from our own scan, then cast what the phone is playing onto it.
@@ -595,6 +744,14 @@ class CastPlayerController(
      * locally at the cast position, re-surfacing the player. Distinct from [disconnect], which stops.
      */
     fun returnToThisDevice() {
+        // TV app: stop it and play on the phone again, where the TV was.
+        if (tvSession != null) {
+            val playsOnTv = _currentPlayer.value === tvPlayer
+            val position = tvPlayer.currentPosition
+            stopTvSession(stopTv = playsOnTv)
+            if (playsOnTv) currentItem?.let { loadResolved(localPlayer, it, position, true) }
+            return
+        }
         // Direct session: stop the TV and play on the phone again, where the TV was (or where the phone
         // still is, when the TV has not taken over yet).
         if (directSession != null) {
@@ -619,7 +776,7 @@ class CastPlayerController(
     }
 
     override fun disconnect() {
-        if (stopDirect()) return
+        if (stopTvSession(stopTv = true) || stopDirect()) return
         // A plain disconnect (e.g. logout) stops casting without resuming on the phone; the session
         // end takes the quiet-stop path. Clear transfer/re-resolve so nothing ejects after teardown.
         returnToPhoneOnEnd = false
@@ -657,7 +814,7 @@ class CastPlayerController(
      */
     fun stopPlayback(): Pair<Long, Long>? {
         // Casting: leaving or switching the player keeps the TV stream running, nothing to save here.
-        if (_currentPlayer.value === castPlayer || (directSession != null && state.value.isCasting)) return null
+        if (_currentPlayer.value === castPlayer || ((directSession != null || tvSession != null) && state.value.isCasting)) return null
         // Nothing is loaded locally (e.g. a cast session was just stopped quietly): nothing to save.
         if (currentItem == null) return null
         reResolveJob?.cancel()
@@ -676,6 +833,10 @@ class CastPlayerController(
      * when no session is active. Publishes the new level so the UI can flash a brief overlay.
      */
     fun adjustCastVolume(up: Boolean) {
+        if (tvConnected) {
+            tvSession?.send(JSONObject().put(RemoteMessages.TYPE, RemoteMessages.VOLUME).put(RemoteMessages.DIRECTION, if (up) "up" else "down"))
+            return
+        }
         directSession?.takeIf { directConnected }?.let { direct ->
             val next = ((castVolume ?: direct.volumeLevel) + if (up) VOLUME_STEP else -VOLUME_STEP).coerceIn(0.0, 1.0)
             castVolume = next
@@ -702,6 +863,10 @@ class CastPlayerController(
 
     /** Toggle mute on the cast device (the phone's mute key routes here while casting). */
     fun toggleCastMute() {
+        if (tvConnected) {
+            tvSession?.send(JSONObject().put(RemoteMessages.TYPE, RemoteMessages.VOLUME).put(RemoteMessages.DIRECTION, "mute"))
+            return
+        }
         directSession?.takeIf { directConnected }?.let { direct ->
             val muted = direct.muted
             direct.setMuted(!muted)
@@ -716,6 +881,9 @@ class CastPlayerController(
     }
 
     fun release() {
+        tvSession?.close()
+        tvSession = null
+        tvPlayer.release()
         rejoinJob?.cancel()
         directSession?.close()
         directSession = null
@@ -800,10 +968,10 @@ class CastPlayerController(
     }
 
     override fun onSessionDisconnected() {
-        // "No Play Services session" says nothing about a direct cast, which ends through its own path
-        // (that clears directSession first). Without this, coming back to the foreground, where start()
-        // reports no Play Services session, would wipe the state of a direct cast still playing.
-        if (directConnected) return
+        // "No Play Services session" says nothing about a direct cast or a TV app, which end through their
+        // own paths (that clear their session first). Without this, coming back to the foreground, where
+        // start() reports no Play Services session, would wipe the state of one still playing.
+        if (directConnected || tvConnected) return
         watchReceiver(null)
         // Capture the in-flight transfer target name before super clears it, so the bar can keep
         // animating the connect toward the incoming device across the hand-off gap.
@@ -823,7 +991,7 @@ class CastPlayerController(
             // A direct device picked meanwhile: the phone already plays, connect it now.
             pendingDirectRoute?.takeIf { !super.isCastSessionActive }?.let {
                 pendingDirectRoute = null
-                connectDirect(it)
+                connectPicked(it)
             }
             return
         }
@@ -861,7 +1029,7 @@ class CastPlayerController(
             swapTo(localPlayer, endingPosition, endingPlayWhenReady)
             pendingDirectRoute?.let {
                 pendingDirectRoute = null
-                connectDirect(it)
+                connectPicked(it)
             }
             return
         }

@@ -13,6 +13,8 @@ import com.google.android.gms.cast.CastDevice as PlayServicesCastDevice
 import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.CastSession
 import com.google.android.gms.cast.framework.SessionManagerListener
+import it.allard.etincelle.core.remote.RemoteDiscovery
+import it.allard.etincelle.core.remote.RemoteTv
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -24,7 +26,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** A reachable Cast device (a Chromecast / Cast-enabled TV). */
+/** Route id prefix of an etincelle TV app found on the local network (see core/remote). */
+const val TV_ROUTE_PREFIX = "tv:"
+
+/** A reachable Cast device (a Chromecast / Cast-enabled TV, or an etincelle TV app). */
 data class CastDevice(val routeId: String, val name: String)
 
 /** What the UI needs to know about casting: discovered devices and the connected one (if any). */
@@ -46,6 +51,9 @@ data class CastUiState(
     val volumeNonce: Int = 0,
 ) {
     val isCasting: Boolean get() = connectedDeviceName != null
+    // The connected device is an etincelle TV app (driven by etincelle's own remote control), which
+    // plays the next episode itself and can be navigated from the phone.
+    val toTvApp: Boolean get() = connectedRouteId?.startsWith(TV_ROUTE_PREFIX) == true
     val available: Boolean get() = devices.isNotEmpty() || isCasting
     // Whether to show the persistent cast bar: a session is up, or one is being established.
     val showStatus: Boolean get() = isCasting || connecting
@@ -72,6 +80,10 @@ open class CastController(
     // a row that missed them. They are listed only when Play Services does not see them itself.
     private class ScannedDevice(val device: DirectCastDevice, var missed: Int = 0)
     private val scannedDevices = LinkedHashMap<String, ScannedDevice>()
+
+    // etincelle TV apps open on the local network (see RemoteDiscovery), by id, likewise counted.
+    private class ScannedTv(val tv: RemoteTv, var missed: Int = 0)
+    private val scannedTvs = LinkedHashMap<String, ScannedTv>()
 
     private val _state = MutableStateFlow(CastUiState())
     val state: StateFlow<CastUiState> = _state.asStateFlow()
@@ -224,7 +236,9 @@ open class CastController(
         val scanned = scannedDevices.values.map { it.device }
             .filter { device -> routes.none { device.isBehind(it) } }
             .map { CastDevice(DIRECT_ROUTE_PREFIX + it.id, it.name) }
-        _state.value = _state.value.copy(devices = routes.map { CastDevice(it.id, it.name) } + scanned)
+        // A TV app is named after its TV, which may also be a Chromecast of the same name: say which.
+        val tvs = scannedTvs.values.map { CastDevice(TV_ROUTE_PREFIX + it.tv.id, "${it.tv.name} (appli TV)") }
+        _state.value = _state.value.copy(devices = routes.map { CastDevice(it.id, it.name) } + scanned + tvs)
     }
 
     // Matched by Cast device id, or by name in case the two ids differ.
@@ -241,6 +255,15 @@ open class CastController(
     protected fun scannedDevice(routeId: String): DirectCastDevice? =
         routeId.takeIf { it.startsWith(DIRECT_ROUTE_PREFIX) }?.let { scannedDevices[it.removePrefix(DIRECT_ROUTE_PREFIX)]?.device }
 
+    /** The etincelle TV app found under [routeId] (see [TV_ROUTE_PREFIX]), if any. */
+    protected fun scannedTv(routeId: String): RemoteTv? =
+        routeId.takeIf { it.startsWith(TV_ROUTE_PREFIX) }?.let { scannedTvs[it.removePrefix(TV_ROUTE_PREFIX)]?.tv }
+
+    /** The phone now drives the etincelle TV app [tv]. */
+    protected fun markTvConnected(tv: RemoteTv) {
+        _state.value = _state.value.copy(connectedDeviceName = tv.name, connectedRouteId = TV_ROUTE_PREFIX + tv.id)
+    }
+
     /** A session with a Chromecast from our own scan is up (it does not go through Play Services). */
     protected fun markDirectConnected(device: DirectCastDevice) {
         _state.value = _state.value.copy(connectedDeviceName = device.name, connectedRouteId = DIRECT_ROUTE_PREFIX + device.id)
@@ -254,6 +277,11 @@ open class CastController(
         for (entry in scannedDevices.values) if (entry.device.id !in foundIds) entry.missed++
         scannedDevices.values.removeAll { it.missed >= MAX_MISSED_SCANS }
         for (device in found) scannedDevices[device.id] = ScannedDevice(device)
+        val tvs = withContext(Dispatchers.IO) { RemoteDiscovery.scan(network) }
+        val tvIds = tvs.map { it.id }.toSet()
+        for (entry in scannedTvs.values) if (entry.tv.id !in tvIds) entry.missed++
+        scannedTvs.values.removeAll { it.missed >= MAX_MISSED_SCANS }
+        for (tv in tvs) scannedTvs[tv.id] = ScannedTv(tv)
     }
 
     // The Wi-Fi network, so the scan never goes out over mobile data or into a VPN. allNetworks is the

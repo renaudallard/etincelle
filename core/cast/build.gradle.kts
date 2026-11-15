@@ -27,6 +27,7 @@ kotlin {
 dependencies {
     api(project(":core:model"))
     api(project(":core:player"))
+    api(project(":core:remote"))
     api(libs.androidx.media3.cast)
     api(libs.play.services.cast.framework)
     api(libs.androidx.mediarouter)
