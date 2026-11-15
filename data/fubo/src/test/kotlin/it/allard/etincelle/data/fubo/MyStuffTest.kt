@@ -6,7 +6,6 @@ package it.allard.etincelle.data.fubo
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -33,8 +32,8 @@ class MyStuffTest {
         assertTrue(page.isGrid)
         val cards = page.rails.single().cards
         assertEquals(listOf("Cauchemar en cuisine", "Grignote-moi"), cards.map { it.title })
-        assertEquals("14 épisodes", cards[0].badge)
-        assertNull(cards[1].badge)
+        assertEquals("14 épisodes", cards[0].caption)
+        assertEquals("52m • 2026", cards[1].caption)
     }
 
     @Test

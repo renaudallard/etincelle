@@ -83,6 +83,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import coil.compose.AsyncImage
+import it.allard.etincelle.core.designsystem.CardTagPill
 import it.allard.etincelle.core.cast.CastReceiver
 import it.allard.etincelle.core.designsystem.categoryIconRes
 import it.allard.etincelle.core.designsystem.R as DesignR
@@ -331,17 +332,6 @@ fun GridContent(
     }
 }
 
-/** A small badge over a card's image, e.g. "4 épisodes" on a collapsed recordings card. */
-@Composable
-private fun BoxScope.EpisodeCountBadge(text: String) {
-    Box(
-        modifier = Modifier.align(Alignment.BottomStart).padding(4.dp)
-            .clip(RoundedCornerShape(4.dp)).background(BrandYellow).padding(horizontal = 4.dp),
-    ) {
-        Text(text, style = MaterialTheme.typography.labelSmall, color = BrandBlack)
-    }
-}
-
 /** Toggles a channel card's favourite; provided by the activity, absent where cards cannot toggle. */
 val LocalFavoriteToggle = staticCompositionLocalOf<((ContentCard) -> Unit)?> { null }
 
@@ -407,7 +397,7 @@ private fun GridCard(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
                 }
             }
             FavoriteStar(card)
-            card.badge?.let { EpisodeCountBadge(it) }
+            card.tag?.let { CardTagPill(it) }
             card.channelLogoUrl?.let { ChannelLogo(it) }
         }
         card.title?.let {
@@ -432,7 +422,7 @@ private fun GridCard(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        card.timeLabel?.let {
+        card.caption?.let {
             Text(
                 it,
                 style = MaterialTheme.typography.labelSmall,
@@ -1113,7 +1103,7 @@ private fun EpisodeRow(card: ContentCard, enabled: Boolean, onClick: () -> Unit)
         Column(Modifier.weight(1f)) {
             Text(card.title ?: "Épisode", style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
             // When it aired, as the official app lists it.
-            card.timeLabel?.let {
+            card.caption?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             }
         }
@@ -1242,7 +1232,7 @@ private fun CardItem(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
                 }
             }
             FavoriteStar(card)
-            card.badge?.let { EpisodeCountBadge(it) }
+            card.tag?.let { CardTagPill(it) }
             card.channelLogoUrl?.let { ChannelLogo(it) }
         }
         card.title?.let {
@@ -1256,7 +1246,7 @@ private fun CardItem(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
                 modifier = Modifier.width(cardWidth),
             )
         }
-        card.timeLabel?.let {
+        card.caption?.let {
             Text(
                 it,
                 style = MaterialTheme.typography.labelSmall,

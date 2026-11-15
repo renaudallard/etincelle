@@ -87,6 +87,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import it.allard.etincelle.core.designsystem.CardTagPill
 import it.allard.etincelle.core.designsystem.categoryIconRes
 import it.allard.etincelle.core.designsystem.R as DesignR
 import it.allard.etincelle.core.designsystem.theme.BackgroundLevel1
@@ -1011,7 +1012,7 @@ private fun TvEpisodeRow(card: ContentCard, enabled: Boolean, onClick: () -> Uni
         Column {
             Text(card.title ?: "Épisode", color = Color.White, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
             // When it aired, as the official app lists it.
-            card.timeLabel?.let {
+            card.caption?.let {
                 Text(it, color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.bodySmall, maxLines = 1)
             }
         }
@@ -1164,12 +1165,7 @@ private fun TvCard(card: ContentCard, onCardClick: (ContentCard) -> Unit, focusM
                     modifier = Modifier.align(Alignment.TopStart).padding(6.dp).size(20.dp),
                 )
             }
-            // At the top: a narrow poster has no room for it beside the channel logo below.
-            card.badge?.let {
-                Box(Modifier.align(Alignment.TopStart).padding(4.dp).clip(RoundedCornerShape(4.dp)).background(BrandYellow).padding(horizontal = 4.dp)) {
-                    Text(it, color = BrandBlack, style = MaterialTheme.typography.labelSmall)
-                }
-            }
+            card.tag?.let { CardTagPill(it) }
             // The logo of the channel offering the card, as the official app shows it.
             card.channelLogoUrl?.let {
                 AsyncImage(
@@ -1188,7 +1184,7 @@ private fun TvCard(card: ContentCard, onCardClick: (ContentCard) -> Unit, focusM
         card.subtitle?.let {
             Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis, color = BrandYellow, style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(w))
         }
-        card.timeLabel?.let {
+        card.caption?.let {
             Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(w))
         }
     }

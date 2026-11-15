@@ -62,18 +62,22 @@ data class ContentCard(
     val subtitle: String? = null,
     /** The tile's shape, as the backend lays out the card's row. */
     val shape: CardShape = CardShape.WIDE,
-    /** A small overlay badge on the image, e.g. the episode count on a collapsed recordings card. */
-    val badge: String? = null,
+    /** The tag the backend puts on the image ("REC" on a recording, "DIRECT" on a live show). */
+    val tag: CardTag? = null,
     /** The logo of the channel offering this card, drawn small over its image. */
     val channelLogoUrl: String? = null,
     /** A channel card's favourite toggle (add or remove, as the backend offers it), or null. */
     val favorite: RecordAction? = null,
     /** The channel is one of the user's favourites. */
     val isFavorite: Boolean = false,
-    /** When it aired, or how long it stays, in the backend's words ("07 juin à 13h25", "Diffusé: 12
-     * févr.", "Encore 32min"). */
-    val timeLabel: String? = null,
+    /** The line under the title, in the backend's words: the episode ("S16 E6 Agde"), the length and
+     * year ("52m • 2026"), a show's recorded episodes ("14 épisodes"), or on an episode row when it
+     * aired or was recorded ("07 juin à 13h25", "Enregistré: 30 sept."). */
+    val caption: String? = null,
 )
+
+/** A card's tag: its [label] and the small icon drawn before it. */
+data class CardTag(val label: String, val iconUrl: String?)
 
 /**
  * The shape of a card's tile, from its row's layout on the backend: programme artwork is either

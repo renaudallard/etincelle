@@ -5,6 +5,7 @@ package it.allard.etincelle.data.fubo
 
 import com.squareup.moshi.Json
 import it.allard.etincelle.core.model.CardShape
+import it.allard.etincelle.core.model.CardTag
 import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.ContentRail
@@ -100,7 +101,8 @@ data class CtaOnClickDto(val type: String? = null, val content: CtaContentDto? =
 data class CtaContentDto(@Json(name = "menu_items") val menuItems: List<MenuItemDto>?)
 data class MenuItemDto(val text: TextDto? = null, val actions: CtaActionsDto? = null)
 
-data class TagDto(val label: String?)
+// On a card, a tag sits on the image with its icon ("REC" on a recording, "DIRECT" on a live show).
+data class TagDto(val label: String?, @Json(name = "leading_icon") val leadingIcon: PictureDto? = null)
 data class AboutFieldDto(val label: TextDto?, val value: TextDto?)
 
 data class SectionDto(
@@ -137,11 +139,14 @@ data class ComponentDto(
 )
 
 // Live ("En direct à la TV") cards carry their show title in a footer rather than in title/heading.
-// Its time label says when the programme aired or how long it stays ("Diffusé: 12 févr.", "Encore 32min").
-data class FooterDto(val title: TextDto?, val subtitle: TextDto?, @Json(name = "time_label") val timeLabel: TextDto? = null)
+data class FooterDto(val title: TextDto?, val subtitle: TextDto?)
 
 // A poster card names the channel offering it with a logo, in its body or its header.
-data class BodyDto(val picture: PictureDto?, @Json(name = "station_logo") val stationLogo: PictureDto? = null)
+data class BodyDto(
+    val picture: PictureDto?,
+    @Json(name = "station_logo") val stationLogo: PictureDto? = null,
+    val tags: List<TagDto>? = null,
+)
 data class HeaderDto(@Json(name = "station_logo") val stationLogo: PictureDto? = null)
 data class StateDto(@Json(name = "is_locked") val isLocked: Boolean?)
 data class ActionsDto(
@@ -276,7 +281,7 @@ fun PageResponse.toRecordings(seriesId: String): List<Recording> = content?.sect
         Recording(
             assetId = assetId,
             title = card.title,
-            subtitle = card.timeLabel,
+            subtitle = card.caption,
             imageUrl = card.imageUrl,
             channelName = null,
             programId = row.id?.substringBefore('-')?.let { PROGRAM_ID_REGEX.find(it)?.groupValues?.get(1) },
@@ -388,9 +393,11 @@ private fun ComponentDto.toCard(shape: CardShape = CardShape.WIDE): ContentCard?
         channelLogoUrl = body?.stationLogo?.url ?: header?.stationLogo?.url,
         favorite = actions?.onFavIconClick?.let { apiCall(it, if (isFavorite == true) "Retirer des favoris" else "Ajouter aux favoris") },
         isFavorite = isFavorite == true,
-        // A folder of recordings says how many episodes it holds ("14 épisodes").
-        badge = footer?.subtitle?.text?.takeIf { path?.contains("my-stuff/folder/") == true },
-        timeLabel = (footer?.timeLabel?.text ?: info?.text)?.takeIf { it.isNotBlank() },
+        tag = body?.tags.orEmpty().firstNotNullOfOrNull { t ->
+            t.label?.takeIf { it.isNotBlank() }?.let { CardTag(it, t.leadingIcon?.url) }
+        },
+        // The official app shows the footer's subtitle under the title, or an episode row's info.
+        caption = (footer?.subtitle?.text ?: info?.text)?.takeIf { it.isNotBlank() },
     )
 }
 

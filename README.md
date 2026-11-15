@@ -28,8 +28,10 @@ avec les commandes du lecteur et s'atteint avec la flèche **Haut**). Cliquer su
 (synopsis, casting, année, classification) plutôt que de le lire aussitôt, et la fiche regroupe ses
 autres diffusions disponibles. Comme dans l'application officielle, la fiche indique au-dessus du titre
 quand le programme a été **diffusé** (« Diffusé: 12 févr. ») ou jusqu'à quand il reste disponible
-(« Expire dans 6j »), les vignettes affichent la même mention (ou « Encore 32min » pour un direct) et
-chaque épisode de la liste sa date de diffusion (« 07 juin à 13h25 ») ; sur le téléviseur, l'image du programme en occupe le fond, comme dans
+(« Expire dans 6j ») et chaque épisode de la liste sa date de diffusion (« 07 juin à 13h25 »). Les
+vignettes portent les mêmes indications que dans l'application officielle : sous le titre, l'épisode
+(« S16 E6 Agde »), la durée et l'année (« 52m • 2026 ») ou le nombre d'épisodes enregistrés, et sur
+l'image l'étiquette du programme (**REC** pour un enregistrement, l'heure de diffusion pour *Ce soir*) ; sur le téléviseur, l'image du programme en occupe le fond, comme dans
 l'application officielle. Pour une chaîne en **direct**, la fiche propose, à côté de **Regarder
 en direct**, un bouton **Regarder depuis le début** qui reprend le programme en
 cours à son commencement (dans la limite de la fenêtre de rembobinage), et un menu **Enregistrer** pour
@@ -45,7 +47,9 @@ passera (par exemple « Ce programme sera en direct dans 4 jours. ») au lieu d'
 d'enregistrer la série** une fois l'enregistrement programmé) ; vous retrouvez vos
 **enregistrements** (DVR) dans l'onglet **Enregistrements** (« Enregistrés » sur téléphone), en grille
 comme dans l'application officielle : une vignette par série indique son nombre d'épisodes et ouvre la
-liste des épisodes enregistrés, avec leur date d'enregistrement. Les contenus à la demande
+liste des épisodes enregistrés, avec leur date d'enregistrement. Un enregistrement se lit depuis le
+DVR où qu'on l'ouvre (onglet, rangées *Vos enregistrements* de l'accueil, des films et des séries, fiche
+d'une série). Les contenus à la demande
 (rattrapage, VOD, enregistrements) sont mis en **mémoire tampon** plus loin à l'avance, selon la
 mémoire de l'appareil, pour qu'une brève coupure réseau n'interrompe pas la lecture. L'accueil réunit aussi les
 **applications des diffuseurs** (france.tv, MyTF1, M6+…) : ouvrez l'une d'elles pour parcourir son
