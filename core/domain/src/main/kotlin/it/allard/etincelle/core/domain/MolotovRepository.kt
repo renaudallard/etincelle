@@ -77,6 +77,10 @@ interface MolotovRepository {
     /** The account's profiles, with the avatars to choose from and the profile limit. */
     suspend fun profiles(): Profiles
 
+    /** The key the phone and the TV app of this account share to control one another on the local
+     * network, derived from the account (see core/remote); null when signed out. */
+    suspend fun remoteKey(): ByteArray?
+
     /**
      * The profiles when the viewer should say who is watching, as the official app asks: with several
      * profiles, when the current one is gone, the profiles changed, or the choice is over two days old.

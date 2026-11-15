@@ -15,6 +15,7 @@ import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.FavoriteOrder
 import it.allard.etincelle.core.model.LoginResult
 import it.allard.etincelle.core.model.MfaChallenge
+import it.allard.etincelle.core.model.PlayKind
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.Profile
 import it.allard.etincelle.core.model.Profiles
@@ -623,6 +624,34 @@ class MainViewModel(
             }.onFailure { e -> applyFailure(e, "Échec de lecture de l'épisode suivant") }
         }
     }
+
+    /**
+     * Plays what a phone of this account sent to this TV (see core/remote): [id] as [kind], from
+     * [positionMs] on demand or [rewindMs] behind the live edge. A programme opens its page under the
+     * player, as when it is chosen here, so Back lands on it and its next episode follows.
+     */
+    fun playFromRemote(kind: PlayKind, id: String, positionMs: Long, rewindMs: Long) {
+        _state.update { it.copy(busy = true, error = null, info = null, settings = false, favoriteOrder = null, profileScreen = null) }
+        navLaunch {
+            runCatchingNav {
+                when (kind) {
+                    PlayKind.LIVE -> null to repo.resolveLiveChannel(id).copy(liveRewindOffsetMs = rewindMs.coerceAtLeast(0))
+                    PlayKind.RECORDING -> null to repo.resolveRecording(id).startingAt(positionMs)
+                    PlayKind.VOD -> {
+                        val detail = repo.fetchProgramDetail(id, DetailKind.PROGRAM)
+                        DetailEntry(detail, null, id, DetailKind.PROGRAM) to repo.resolveVod(id).startingAt(positionMs).withUpNext(detail.upNext)
+                    }
+                }
+            }.onSuccess { (entry, src) ->
+                _state.update { st ->
+                    st.copy(busy = false, playing = src, detailStack = if (entry != null) listOf(entry) else st.detailStack)
+                }
+            }.onFailure { e -> applyFailure(e, "Échec de lecture") }
+        }
+    }
+
+    // Where the phone was, rather than this TV's own resume point.
+    private fun PlaybackSource.startingAt(positionMs: Long) = if (positionMs > 0) copy(startPositionMs = positionMs) else this
 
     /** Plays the live show on the detail page from the beginning of the current programme: resolves
      * the channel, then asks playback to start that far behind the live edge (within the DVR window)

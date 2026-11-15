@@ -25,6 +25,7 @@ dependencies {
     api(project(":core:model"))
     api(project(":core:domain"))
     implementation(project(":core:network"))
+    implementation(project(":core:remote"))
     implementation(libs.retrofit)
     implementation(libs.moshi)
     implementation(libs.kotlinx.coroutines.android)

@@ -32,6 +32,7 @@ import it.allard.etincelle.core.network.ProfilePick
 import it.allard.etincelle.core.network.ProgressStore
 import it.allard.etincelle.core.network.SessionManager
 import it.allard.etincelle.core.network.SessionStore
+import it.allard.etincelle.core.remote.RemoteProtocol
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -210,6 +211,11 @@ class FuboRepository(
     override suspend fun continueWatching(): List<HomeProgram> = withRefresh { api.continueWatching().toHomePrograms() }
 
     override suspend fun profiles(): Profiles = withRefresh { api.profiles().toProfiles() }
+
+    override suspend fun remoteKey(): ByteArray? {
+        val userId = session.session?.userId ?: return null
+        return RemoteProtocol.accountKey(userId, profiles().profiles.map { it.id })
+    }
 
     override suspend fun profilesToPick(): Profiles? {
         val list = profiles()

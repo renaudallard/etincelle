@@ -71,6 +71,7 @@ dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":core:model"))
     implementation(project(":core:player"))
+    implementation(project(":core:remote"))
     implementation(project(":core:ui"))
     implementation(project(":data:fubo"))
     implementation(libs.androidx.core.ktx)

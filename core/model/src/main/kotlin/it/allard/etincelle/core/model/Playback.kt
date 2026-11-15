@@ -21,6 +21,10 @@ sealed interface DrmSpec {
  * the live seek bar to the show. [startMs] is its scheduled start, [endMs] its scheduled end. */
 data class ProgramWindow(val startMs: Long, val endMs: Long)
 
+/** What a phone asks the TV app to play when it controls it: a live channel, a catch-up programme or a
+ * recording, each named by its id. */
+enum class PlayKind { LIVE, VOD, RECORDING }
+
 /** Everything the player needs to start a stream, mapped from the backend playback response. */
 data class PlaybackSource(
     val manifestUrl: String,

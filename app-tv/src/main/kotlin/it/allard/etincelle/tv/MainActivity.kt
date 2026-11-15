@@ -5,6 +5,7 @@ package it.allard.etincelle.tv
 
 import android.app.Activity
 import android.content.Intent
+import android.media.AudioManager
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
@@ -44,6 +45,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
@@ -53,6 +55,7 @@ import it.allard.etincelle.core.designsystem.ReturnToLiveButton
 import it.allard.etincelle.core.designsystem.theme.EtincelleTheme
 import it.allard.etincelle.core.designsystem.UpNextSlate
 import it.allard.etincelle.core.domain.DetailKind
+import it.allard.etincelle.core.model.PlayKind
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramWindow
 import it.allard.etincelle.core.player.AdaptiveLoadControl
@@ -60,6 +63,7 @@ import it.allard.etincelle.core.player.LiveBarGeometry
 import it.allard.etincelle.core.player.LivePlayback
 import it.allard.etincelle.core.player.MediaItemFactory
 import it.allard.etincelle.core.player.PlaybackProgress
+import it.allard.etincelle.core.remote.RemoteMessages
 import it.allard.etincelle.core.ui.installUpdate
 import it.allard.etincelle.core.ui.MainViewModel
 import it.allard.etincelle.core.ui.MainViewModelFactory
@@ -67,6 +71,10 @@ import it.allard.etincelle.core.ui.Tab
 import it.allard.etincelle.core.ui.UpdateChecker
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.json.JSONObject
+
+// How often the phone driving this app hears how playback goes.
+private const val REMOTE_STATUS_MS = 1_000L
 
 class MainActivity : ComponentActivity() {
 
@@ -76,6 +84,9 @@ class MainActivity : ComponentActivity() {
     private var player: ExoPlayer? = null
     private var loadControl: AdaptiveLoadControl? = null
     private var pausedForBackground = false
+    // A phone of the same account driving this app while it is open.
+    private lateinit var remote: TvRemoteServer
+    private val remoteWindow = Timeline.Window()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -99,6 +110,16 @@ class MainActivity : ComponentActivity() {
             .setSeekForwardIncrementMs(LivePlayback.SEEK_FORWARD_MS)
             .build()
         player = exo
+        remote = TvRemoteServer(this, { (application as EtincelleTvApp).container.repository.remoteKey() }, ::onRemoteCommand)
+        // Tell the phone how playback goes, while one is connected.
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                while (true) {
+                    if (remote.connected) remote.send(remoteStatus())
+                    delay(REMOTE_STATUS_MS)
+                }
+            }
+        }
         // Only on a fresh launch; a process recreation must not replay the original deep link.
         if (savedInstanceState == null) handleDeepLink(intent)
         lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.watchForUpdates() } }
@@ -254,7 +275,90 @@ class MainActivity : ComponentActivity() {
         viewModel.onDeepLink(id, kind)
     }
 
+    // A command from the phone driving this app (see TvRemoteServer).
+    private fun onRemoteCommand(message: JSONObject) {
+        val player = player ?: return
+        when (message.optString(RemoteMessages.TYPE)) {
+            RemoteMessages.PLAY -> {
+                val kind = when (message.optString(RemoteMessages.KIND)) {
+                    RemoteMessages.KIND_LIVE -> PlayKind.LIVE
+                    RemoteMessages.KIND_VOD -> PlayKind.VOD
+                    RemoteMessages.KIND_RECORDING -> PlayKind.RECORDING
+                    else -> return
+                }
+                val id = message.optString(RemoteMessages.ID).takeIf { it.isNotEmpty() } ?: return
+                viewModel.playFromRemote(kind, id, message.optLong(RemoteMessages.POSITION), message.optLong(RemoteMessages.REWIND))
+            }
+            RemoteMessages.PAUSE -> player.playWhenReady = false
+            RemoteMessages.RESUME -> player.playWhenReady = true
+            RemoteMessages.SEEK -> {
+                val position = message.optLong(RemoteMessages.POSITION, -1)
+                if (position < 0) player.seekToDefaultPosition() else player.seekTo(position)
+            }
+            RemoteMessages.STOP -> viewModel.stopPlaying()
+            RemoteMessages.KEY -> remoteKeyCode(message.optString(RemoteMessages.KEY_NAME))?.let { code ->
+                // Through the activity, as a remote press would come, so the screens and the player
+                // see it the same way.
+                dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
+                dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
+            }
+            RemoteMessages.VOLUME -> {
+                val adjust = when (message.optString(RemoteMessages.DIRECTION)) {
+                    "up" -> AudioManager.ADJUST_RAISE
+                    "down" -> AudioManager.ADJUST_LOWER
+                    "mute" -> AudioManager.ADJUST_TOGGLE_MUTE
+                    else -> return
+                }
+                getSystemService(AudioManager::class.java)?.adjustStreamVolume(AudioManager.STREAM_MUSIC, adjust, AudioManager.FLAG_SHOW_UI)
+            }
+        }
+    }
+
+    private fun remoteKeyCode(name: String): Int? = when (name) {
+        "up" -> KeyEvent.KEYCODE_DPAD_UP
+        "down" -> KeyEvent.KEYCODE_DPAD_DOWN
+        "left" -> KeyEvent.KEYCODE_DPAD_LEFT
+        "right" -> KeyEvent.KEYCODE_DPAD_RIGHT
+        "ok" -> KeyEvent.KEYCODE_DPAD_CENTER
+        "back" -> KeyEvent.KEYCODE_BACK
+        else -> null
+    }
+
+    // What plays and where, for the phone (see RemoteMessages.STATUS).
+    private fun remoteStatus(): JSONObject {
+        val status = JSONObject().put(RemoteMessages.TYPE, RemoteMessages.STATUS)
+        val source = viewModel.state.value.playing
+        val player = player
+        if (source == null || player == null) return status.put(RemoteMessages.STATE, RemoteMessages.STATE_IDLE)
+        val state = when (player.playbackState) {
+            Player.STATE_BUFFERING -> RemoteMessages.STATE_BUFFERING
+            Player.STATE_READY -> if (player.playWhenReady) RemoteMessages.STATE_PLAYING else RemoteMessages.STATE_PAUSED
+            Player.STATE_ENDED -> RemoteMessages.STATE_ENDED
+            else -> RemoteMessages.STATE_IDLE
+        }
+        status.put(RemoteMessages.STATE, state)
+            .put(RemoteMessages.TITLE, source.title.orEmpty())
+            .put(RemoteMessages.POSITION, player.currentPosition)
+            .put(RemoteMessages.DURATION, player.duration.takeIf { it != C.TIME_UNSET } ?: -1L)
+            .put(RemoteMessages.LIVE, source.isLive)
+        val timeline = player.currentTimeline
+        if (source.isLive && !timeline.isEmpty) {
+            timeline.getWindow(player.currentMediaItemIndex, remoteWindow)
+            if (remoteWindow.windowStartTimeMs != C.TIME_UNSET) status.put(RemoteMessages.WINDOW_START, remoteWindow.windowStartTimeMs)
+        }
+        val channelId = source.originChannelId
+        val vodId = source.originVodId
+        val recordingId = source.originRecordingAssetId
+        when {
+            channelId != null -> status.put(RemoteMessages.KIND, RemoteMessages.KIND_LIVE).put(RemoteMessages.ID, channelId)
+            recordingId != null -> status.put(RemoteMessages.KIND, RemoteMessages.KIND_RECORDING).put(RemoteMessages.ID, recordingId)
+            vodId != null -> status.put(RemoteMessages.KIND, RemoteMessages.KIND_VOD).put(RemoteMessages.ID, vodId)
+        }
+        return status
+    }
+
     override fun onStop() {
+        remote.stop()
         // What was just watched belongs in Watch Next.
         TvHomeJob.schedule(this)
         // Pause playback in the background (no decoding/audio); resume on return. playWhenReady, not
@@ -278,6 +382,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        remote.start()
         // Back in the foreground: any memory pressure that shrank the buffer has passed.
         loadControl?.restoreFullBuffer()
         // Refresh the home screen row and Watch Next (and make sure their periodic sync is scheduled).
