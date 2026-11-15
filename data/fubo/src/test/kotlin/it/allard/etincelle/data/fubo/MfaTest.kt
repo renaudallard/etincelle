@@ -121,6 +121,15 @@ class MfaTest {
     }
 
     @Test
+    fun anOutageOrABlockIsNotARefusedCode() = runTest {
+        val c = challenge()
+        server.enqueue(MockResponse().setResponseCode(503))
+        assertEquals("Service indisponible, réessayez", runCatching { repo.verifyCode(c, "1") }.exceptionOrNull()?.message)
+        server.enqueue(MockResponse().setResponseCode(451).setBody("""{"error":{"code":"VPN_NETWORK","message":"vpn"}}"""))
+        assertEquals("Désactivez votre VPN pour accéder au service", runCatching { repo.verifyCode(c, "1") }.exceptionOrNull()?.message)
+    }
+
+    @Test
     fun anAccountWithoutTwoFactorSignsInAsBefore() = runTest {
         server.enqueue(MockResponse().setBody("""{"type":"TOKEN","payload":{"access_token":"AT","refresh_token":"RT"}}"""))
         server.enqueue(MockResponse().setBody("""{"data":{"id":"u1","profiles":[{"id":"p1"}]}}"""))

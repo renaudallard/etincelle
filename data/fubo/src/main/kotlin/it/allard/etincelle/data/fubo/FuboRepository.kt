@@ -143,11 +143,17 @@ class FuboRepository(
 
     // A two-factor call: a code the backend refuses gets its own message, and an expired MFA token
     // means signing in again (Unauthorized with no session takes the app back to the sign-in screen).
+    // A block or an outage is no verdict on the code, so it keeps the message it has elsewhere.
     private suspend fun <T> mfaCall(block: suspend () -> T): T = try {
         block()
     } catch (e: HttpException) {
         val error = e.backendError()
-        throw if (error?.code == "MFA_TOKEN_EXPIRED") AppError.Unauthorized else AppError.Unknown(codeMessage(error))
+        throw when {
+            error?.code == "MFA_TOKEN_EXPIRED" -> AppError.Unauthorized
+            e.code() == 451 -> blockedError(error)
+            e.code() in 500..599 -> e.toAppError()
+            else -> AppError.Unknown(codeMessage(error))
+        }
     } catch (e: IOException) {
         throw AppError.Network("Pas de connexion, vérifiez votre réseau")
     }
