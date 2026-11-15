@@ -133,6 +133,9 @@ class CastPlayerController(
     private val tvPlayer = TvRemotePlayer()
     // The TV has played what was last sent to it, so its going idle means it stopped.
     private var tvStarted = false
+    // Where playback coming back to the phone resumes (see loadResolved), for a TV app picked before
+    // the phone has started it again.
+    private var handoffPositionMs = 0L
 
     // The TV app is connected (not just connecting).
     private val tvConnected: Boolean
@@ -407,12 +410,13 @@ class CastPlayerController(
             val item = currentItem
             val phonePlays = phoneStillPlays
             // From now on the controls (remote screen, notification) drive the TV, whatever it plays.
+            // A hand-off to the phone still resolving (a switch from a Chromecast) gives up seeing it.
             _currentPlayer.value = tvPlayer
-            if (item != null && phonePlays) {
+            if (item != null) {
                 // Casting out a rewound live stream: resume the TV that far behind the edge.
                 val isLive = (item.localConfiguration?.tag as? PlaybackSource)?.isLive == true
-                val rewind = if (isLive) LivePlayback.castRewindOffsetMs(localPlayer, liveWindow) else 0L
-                playOnTv(item, localPlayer.currentPosition, rewind)
+                val rewind = if (isLive && phonePlays) LivePlayback.castRewindOffsetMs(localPlayer, liveWindow) else 0L
+                playOnTv(item, if (phonePlays) localPlayer.currentPosition else handoffPositionMs, rewind)
                 runCatching { localPlayer.stop() }
             } else {
                 clearConnecting()
@@ -1071,6 +1075,7 @@ class CastPlayerController(
     ) {
         val source = item.localConfiguration?.tag as? PlaybackSource
         val position = if (source?.isLive == true) 0 else fromPosition
+        if (target === localPlayer) handoffPositionMs = position
         val resolver = reResolve
         if (source != null && resolver != null) {
             reResolveJob = scope.launch {
