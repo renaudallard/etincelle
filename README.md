@@ -157,6 +157,13 @@ ouvrez etincelle, allez dans **Paramètres > Connecter une TV** (ou sur molotov.
 et saisissez le code : le téléviseur se connecte automatiquement. La connexion par email reste
 disponible en secours.
 
+Sur Android TV, etincelle publie aussi une rangée **etincelle** de programmes recommandés sur
+l'écran d'accueil et place les programmes commencés dans **Continuer à regarder** (Watch Next), à
+partir des listes de Molotov. Elles se mettent à jour toutes les trois heures, et à chaque ouverture
+ou fermeture de l'application ; choisir un programme ouvre sa fiche. L'écran d'accueil Android TV
+classique les affiche ; le lanceur Google TV n'affiche pas les rangées des applications et, sur le
+Chromecast avec Google TV essayé, refuse les entrées de Watch Next.
+
 Un compte protégé par la **validation en deux étapes** se connecte comme dans l'application
 officielle : après l'email et le mot de passe, etincelle demande le **code** envoyé par Molotov,
 avec **Renvoyer le code** s'il n'arrive pas.

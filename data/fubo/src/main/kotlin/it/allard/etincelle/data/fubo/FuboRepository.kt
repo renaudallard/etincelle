@@ -13,6 +13,7 @@ import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.DrmSpec
 import it.allard.etincelle.core.model.FavoriteOrder
+import it.allard.etincelle.core.model.HomeProgram
 import it.allard.etincelle.core.model.LoginResult
 import it.allard.etincelle.core.model.MfaChallenge
 import it.allard.etincelle.core.model.PlaybackSource
@@ -196,6 +197,10 @@ class FuboRepository(
     }
 
     override fun currentSession(): UserSession? = session.session
+
+    override suspend fun homeRecommendations(): List<HomeProgram> = withRefresh { api.homeRecommendations().toHomePrograms() }
+
+    override suspend fun continueWatching(): List<HomeProgram> = withRefresh { api.continueWatching().toHomePrograms() }
 
     override suspend fun profiles(): Profiles = withRefresh { api.profiles().toProfiles() }
 

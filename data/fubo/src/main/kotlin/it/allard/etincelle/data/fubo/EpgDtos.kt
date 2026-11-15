@@ -6,6 +6,7 @@ package it.allard.etincelle.data.fubo
 import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.ContentRail
+import it.allard.etincelle.core.model.HomeProgram
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -42,6 +43,9 @@ data class EpgProgramDto(
     val verticalImage: String? = null,
     val programId: String? = null,
     val metadata: EpgProgramMetadataDto? = null,
+    val shortDescription: String? = null,
+    // "movie", "episode", "match"…
+    val type: String? = null,
 )
 
 data class EpgProgramMetadataDto(val seriesId: String?)
@@ -51,7 +55,17 @@ data class EpgAssetDto(
     val assetId: String? = null,
     val type: String? = null,
     val channel: EpgChannelDto? = null,
+    val playbackDurationSec: Long? = null,
+    // Where the user stopped watching (continue watching), in seconds.
+    val userProperties: EpgUserPropertiesDto? = null,
 )
+
+data class EpgUserPropertiesDto(val lastOffset: Long?, val lastOffsetTimeStamp: String?)
+
+// The Android TV home feeds (/recommendations/topshelf/v1, /continue-watching/topshelf/v1): the
+// same programme-with-assets entries as the guide, one per programme.
+data class TopshelfResponse(val response: List<TopshelfEntryDto>?)
+data class TopshelfEntryDto(val type: String?, val data: EpgProgramWithAssetsDto?)
 
 data class EpgAccessRightsDto(val startTime: String?, val endTime: String?)
 
@@ -109,5 +123,33 @@ private fun EpgProgramWithAssetsDto.toCard(channelId: String, channelLogo: Strin
         seriesId = null,
         actionUrl = null,
         recordingAssetId = null,
+    )
+}
+
+/** The programmes of a home feed, each with its first playable asset. */
+fun TopshelfResponse.toHomePrograms(): List<HomeProgram> = response.orEmpty().mapNotNull { entry ->
+    val program = entry.data?.program ?: return@mapNotNull null
+    val asset = entry.data.assets.orEmpty().firstOrNull { !it.assetId.isNullOrBlank() } ?: return@mapNotNull null
+    val start = rfc3339UtcToEpochMillis(asset.accessRights?.startTime)
+    val end = rfc3339UtcToEpochMillis(asset.accessRights?.endTime)
+    HomeProgram(
+        assetId = asset.assetId ?: return@mapNotNull null,
+        title = program.heading ?: program.title ?: return@mapNotNull null,
+        episodeTitle = program.title?.takeIf { program.heading != null && it != program.heading },
+        subtitle = program.subheading,
+        description = program.shortDescription,
+        imageUrl = program.horizontalImage,
+        posterUrl = program.verticalImage,
+        kind = when (program.type) {
+            "movie" -> HomeProgram.Kind.MOVIE
+            "episode" -> HomeProgram.Kind.EPISODE
+            else -> HomeProgram.Kind.OTHER
+        },
+        durationSec = asset.playbackDurationSec,
+        positionSec = asset.userProperties?.lastOffset?.takeIf { it > 0 },
+        watchedAtMs = rfc3339UtcToEpochMillis(asset.userProperties?.lastOffsetTimeStamp),
+        // A live airing carries its air times; a replay or VOD carries its availability window.
+        liveStartMs = start.takeIf { asset.assetId.startsWith("LIVE_") },
+        liveEndMs = end.takeIf { asset.assetId.startsWith("LIVE_") },
     )
 }

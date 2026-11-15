@@ -255,6 +255,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onStop() {
+        // What was just watched belongs in Watch Next.
+        TvHomeJob.schedule(this)
         // Pause playback in the background (no decoding/audio); resume on return.
         player?.let {
             if (it.isPlaying) {
@@ -277,6 +279,8 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         // Back in the foreground: any memory pressure that shrank the buffer has passed.
         loadControl?.restoreFullBuffer()
+        // Refresh the home screen row and Watch Next (and make sure their periodic sync is scheduled).
+        TvHomeJob.schedule(this)
         if (pausedForBackground) {
             pausedForBackground = false
             player?.playWhenReady = true

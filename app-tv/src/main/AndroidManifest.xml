@@ -3,6 +3,9 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- The home screen row and Watch Next (TvHome), kept fresh by a job that survives reboots. -->
+    <uses-permission android:name="com.android.providers.tv.permission.WRITE_EPG_DATA" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <uses-feature
         android:name="android.software.leanback"
@@ -40,5 +43,18 @@
                 <data android:scheme="etincelle" android:host="channel" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".TvHomeJob"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <receiver
+            android:name=".TvHomeReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.media.tv.action.INITIALIZE_PROGRAMS" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

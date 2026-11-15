@@ -5,6 +5,7 @@ package it.allard.etincelle.core.domain
 
 import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.FavoriteOrder
+import it.allard.etincelle.core.model.HomeProgram
 import it.allard.etincelle.core.model.LoginResult
 import it.allard.etincelle.core.model.MfaChallenge
 import it.allard.etincelle.core.model.PairingCode
@@ -63,6 +64,12 @@ interface MolotovRepository {
 
     /** Schedules a recording by replaying the backend's own record [action] (episode or whole series). */
     suspend fun record(action: RecordAction)
+
+    /** Programmes recommended for the Android TV home screen. */
+    suspend fun homeRecommendations(): List<HomeProgram>
+
+    /** Programmes to continue watching, with where the user stopped. */
+    suspend fun continueWatching(): List<HomeProgram>
 
     /** The account's profiles, with the avatars to choose from and the profile limit. */
     suspend fun profiles(): Profiles

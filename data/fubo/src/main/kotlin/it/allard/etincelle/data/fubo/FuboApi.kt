@@ -110,6 +110,14 @@ interface FuboApi {
         @Query("tabID") tab: String = "id-tab-about",
     ): PageResponse
 
+    /** Programmes recommended for the Android TV home screen row. */
+    @GET("recommendations/topshelf/v1")
+    suspend fun homeRecommendations(): TopshelfResponse
+
+    /** Programmes to continue watching, with where the user stopped (Android TV Watch Next). */
+    @GET("continue-watching/topshelf/v1")
+    suspend fun continueWatching(): TopshelfResponse
+
     /** The favourite channels in their order, with the action that saves a new order. */
     @GET("papi/v1/favorite/channels")
     suspend fun favoriteChannels(): FavoriteOrderResponse

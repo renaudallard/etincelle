@@ -85,6 +85,7 @@ dependencies {
     implementation(libs.androidx.tv.material)
     implementation(libs.coil.compose)
     implementation(libs.zxing.core)
+    implementation(libs.androidx.tvprovider)
     implementation(libs.androidx.compose.ui.tooling.preview)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

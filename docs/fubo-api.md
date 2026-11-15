@@ -161,6 +161,15 @@ follows each component's `actions`.
   `min(display_duration, duration - position - 2.5 s)`, then runs `auto_dismiss_actions`: the next
   episode's page, whose player plays it.
 
+## Android TV home feeds — VALIDATED live (2026-11-15)
+
+- `GET /recommendations/topshelf/v1` (20 entries) and `GET /continue-watching/topshelf/v1` (19):
+  `{response:[{type:"programWithAssets", data:{program, assets}}], metadata:null}`, the guide's
+  programme shape plus `program.type` ("episode", "movie"…), `program.shortDescription` and, for
+  continue watching, `assets[].userProperties{lastOffset (s), lastOffsetTimeStamp}`.
+- The official app fills a preview channel and Watch Next from them. On the Chromecast with Google
+  TV tested, the provider took the channel but answered every Watch Next insert with SQLITE_FULL.
+
 ## Live guide (EPG) — VALIDATED live
 
 `GET /epg` on `api-eu.fubo.tv` (NOT the dead `services-api-eu.fubo.tv`):

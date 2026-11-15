@@ -154,3 +154,24 @@ data class ProgramDetail(
     /** The episode that follows this one, played at its end (see [UpNext]). */
     val upNext: UpNext? = null,
 )
+
+/** A programme for the Android TV home screen: the app's recommendations row, or Continue watching. */
+data class HomeProgram(
+    val assetId: String,
+    val title: String,
+    val episodeTitle: String?,
+    val subtitle: String?,
+    val description: String?,
+    val imageUrl: String?,
+    val posterUrl: String?,
+    val kind: Kind,
+    val durationSec: Long?,
+    /** Where the user stopped watching, in seconds; null when not started. */
+    val positionSec: Long?,
+    val watchedAtMs: Long?,
+    /** A live airing's start and end; null for a replay or VOD. */
+    val liveStartMs: Long?,
+    val liveEndMs: Long?,
+) {
+    enum class Kind { MOVIE, EPISODE, OTHER }
+}
