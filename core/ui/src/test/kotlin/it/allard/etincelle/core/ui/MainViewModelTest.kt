@@ -67,6 +67,20 @@ class MainViewModelTest {
         assertFalse(vm.state.value.refreshing)
     }
 
+    @Test
+    fun stoppingWhileTheNextEpisodeLoadsLeavesNoSpinner() {
+        val repo = FakeRepo()
+        val vm = viewModel(repo)
+        vm.watchRecording("REC_1")
+        repo.detail = { _, _ -> CompletableDeferred<ProgramDetail>().await() }
+        vm.playUpNext()
+        assertTrue(vm.state.value.busy)
+
+        vm.stopPlaying()
+        assertFalse(vm.state.value.busy)
+        assertEquals(null, vm.state.value.playing)
+    }
+
     private fun viewModel(repo: FakeRepo) = MainViewModel(repo, UpdateChecker("0", "mobile", "http://127.0.0.1:9/")).also {
         assertTrue(it.state.value.loggedIn)
     }

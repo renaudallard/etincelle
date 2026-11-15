@@ -850,7 +850,7 @@ class MainViewModel(
     }
 
     fun stopPlaying() {
-        navJob?.cancel()
+        cancelNav()
         _state.update { it.copy(playing = null) }
     }
 
