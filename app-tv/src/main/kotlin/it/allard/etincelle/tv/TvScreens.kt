@@ -988,11 +988,17 @@ private fun TvEpisodesSection(
 
 /** One catch-up episode on the TV detail: a thumbnail and label, focusable and clickable. */
 @Composable
-private fun TvEpisodeRow(card: ContentCard, enabled: Boolean, onClick: () -> Unit, focus: FocusRequester? = null) {
+private fun TvEpisodeRow(
+    card: ContentCard,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    focus: FocusRequester? = null,
+    modifier: Modifier = Modifier,
+) {
     var focused by remember { mutableStateOf(false) }
     if (focus != null) LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     Row(
-        Modifier.fillMaxWidth()
+        modifier.fillMaxWidth()
             .then(if (focus != null) Modifier.focusRequester(focus) else Modifier)
             .onFocusChanged { focused = it.isFocused }
             .clip(RoundedCornerShape(8.dp))
@@ -1002,12 +1008,23 @@ private fun TvEpisodeRow(card: ContentCard, enabled: Boolean, onClick: () -> Uni
             .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AsyncImage(
-            model = card.imageUrl,
-            contentDescription = card.title,
-            modifier = Modifier.width(120.dp).height(68.dp).clip(RoundedCornerShape(6.dp)).background(BackgroundLevel1),
-            contentScale = ContentScale.Crop,
-        )
+        Box(Modifier.width(120.dp).height(68.dp).clip(RoundedCornerShape(6.dp)).background(BackgroundLevel1)) {
+            AsyncImage(
+                model = card.imageUrl,
+                contentDescription = card.title,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+            card.tag?.let { CardTagPill(it) }
+            card.channelLogoUrl?.let {
+                AsyncImage(
+                    model = it,
+                    contentDescription = null,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp).width(36.dp).height(14.dp),
+                    contentScale = ContentScale.Fit,
+                )
+            }
+        }
         Spacer(Modifier.width(12.dp))
         Column {
             Text(card.title ?: "Épisode", color = Color.White, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -1105,9 +1122,16 @@ private fun TvGridContent(
                 }
             }
             // Index in the key too: a card id can repeat within a rail, and a duplicate key crashes the grid.
-            itemsIndexed(rail.cards, key = { i, c -> "${rail.id}-${c.id}#$i" }) { _, card ->
+            // Rows of a list (a show's recorded episodes) take the whole width, as in the official app.
+            rail.cards.forEachIndexed { i, card ->
                 val key = "${rail.id}|${card.id}"
-                TvCard(card, { returnFocus.save(key); onCardClick(it) }, returnFocus.target(key))
+                if (card.shape == CardShape.ROW) {
+                    item(span = { GridItemSpan(maxLineSpan) }, key = "${rail.id}-${card.id}#$i") {
+                        TvEpisodeRow(card, enabled = true, onClick = { returnFocus.save(key); onCardClick(card) }, modifier = returnFocus.target(key))
+                    }
+                } else {
+                    item(key = "${rail.id}-${card.id}#$i") { TvCard(card, { returnFocus.save(key); onCardClick(it) }, returnFocus.target(key)) }
+                }
             }
         }
     }
@@ -1123,7 +1147,7 @@ private fun TvCard(card: ContentCard, onCardClick: (ContentCard) -> Unit, focusM
     // Artwork keeps its own shape: landscape cards are wider, posters as tall as the official app's.
     val w = when (card.shape) {
         CardShape.SQUARE -> 112.dp
-        CardShape.WIDE -> 208.dp
+        CardShape.WIDE, CardShape.ROW -> 208.dp
         CardShape.POSTER, CardShape.POSTER_THIN -> 120.dp
     }
     val h = w / card.shape.ratio

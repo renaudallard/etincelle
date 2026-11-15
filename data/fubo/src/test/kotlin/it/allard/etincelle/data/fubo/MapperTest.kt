@@ -119,7 +119,7 @@ class MapperTest {
         assertEquals(CardShape.POSTER, shape("card-poster"))
         assertEquals(CardShape.POSTER_THIN, shape("card-poster-thin"))
         assertEquals(CardShape.WIDE, shape("card-wide"))
-        assertEquals(CardShape.WIDE, shape("list-item-wide"))
+        assertEquals(CardShape.ROW, shape("list-item-wide"))
     }
 
     @Test

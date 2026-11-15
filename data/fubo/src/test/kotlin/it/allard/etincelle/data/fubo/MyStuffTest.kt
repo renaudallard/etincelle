@@ -5,6 +5,8 @@ package it.allard.etincelle.data.fubo
 
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import it.allard.etincelle.core.model.CardShape
+import it.allard.etincelle.core.model.CardTag
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -34,6 +36,21 @@ class MyStuffTest {
         assertEquals(listOf("Cauchemar en cuisine", "Grignote-moi"), cards.map { it.title })
         assertEquals("14 épisodes", cards[0].caption)
         assertEquals("52m • 2026", cards[1].caption)
+    }
+
+    @Test
+    fun aFolderPageIsAListOfRecordedRows() {
+        val row = adapter.fromJson(
+            """{"content":{"template":"my-stuff-details","sections":[{"component_type":"list-item-wide","components":[
+              {"type":"list-item-wide","id":"12008536_45-0","title":{"text":"S16 E6 Agde"},"info":{"text":"Enregistré: 30 sept."},
+               "tags":[{"label":"REC","leading_icon":{"url":"https://img/rec.png"}}],"channel_picture":{"url":"https://img/m6.png"},
+               "picture":{"url":"https://img/e.jpg"},"actions":${nav("program-details/program/LIVE_4445433")}}]}]}}""",
+        )!!.toPage().rails.single().cards.single()
+
+        assertEquals(CardShape.ROW, row.shape)
+        assertEquals("Enregistré: 30 sept.", row.caption)
+        assertEquals(CardTag("REC", "https://img/rec.png"), row.tag)
+        assertEquals("https://img/m6.png", row.channelLogoUrl)
     }
 
     @Test

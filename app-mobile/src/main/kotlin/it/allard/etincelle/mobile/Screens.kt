@@ -37,7 +37,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
@@ -315,8 +314,16 @@ fun GridContent(
                     }
                 }
                 // Index in the key too: a card id falls back to its label/image, which can repeat
-                // within a rail, and a duplicate lazy-list key crashes the list.
-                itemsIndexed(rail.cards, key = { i, c -> "${rail.id}-${c.id}#$i" }) { _, card -> GridCard(card, onCardClick) }
+                // within a rail, and a duplicate lazy-list key crashes the list. Rows of a list (a
+                // show's recorded episodes) take the whole width, as in the official app.
+                rail.cards.forEachIndexed { i, card ->
+                    val key = "${rail.id}-${card.id}#$i"
+                    if (card.shape == CardShape.ROW) {
+                        item(span = { GridItemSpan(maxLineSpan) }, key = key) { EpisodeRow(card, enabled = true) { onCardClick(card) } }
+                    } else {
+                        item(key = key) { GridCard(card, onCardClick) }
+                    }
+                }
             }
         }
         if (busy) CircularProgressIndicator(Modifier.align(Alignment.Center))
@@ -1093,12 +1100,16 @@ private fun EpisodeRow(card: ContentCard, enabled: Boolean, onClick: () -> Unit)
         modifier = Modifier.fillMaxWidth().clickable(enabled = enabled) { onClick() }.padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AsyncImage(
-            model = card.imageUrl,
-            contentDescription = card.title,
-            modifier = Modifier.width(120.dp).height(68.dp).clip(RoundedCornerShape(8.dp)).background(BackgroundLevel1),
-            contentScale = ContentScale.Crop,
-        )
+        Box(Modifier.width(120.dp).height(68.dp).clip(RoundedCornerShape(8.dp)).background(BackgroundLevel1)) {
+            AsyncImage(
+                model = card.imageUrl,
+                contentDescription = card.title,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+            card.tag?.let { CardTagPill(it) }
+            card.channelLogoUrl?.let { ChannelLogo(it) }
+        }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(card.title ?: "Épisode", style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -1195,7 +1206,7 @@ private fun CardItem(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
     val categoryIcon = if (card.channelId == null && card.vodId == null) categoryIconRes(card.title) else null
     val cardWidth = when (card.shape) {
         CardShape.SQUARE -> 96.dp
-        CardShape.WIDE -> 150.dp
+        CardShape.WIDE, CardShape.ROW -> 150.dp
         CardShape.POSTER, CardShape.POSTER_THIN -> 120.dp
     }
     Column(

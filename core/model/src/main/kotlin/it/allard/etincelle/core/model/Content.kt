@@ -89,6 +89,8 @@ enum class CardShape(val ratio: Float) {
     POSTER(3f / 4f),
     POSTER_THIN(2f / 3f),
     SQUARE(1f),
+    /** A row of a list (a show's recorded episodes): a 16:9 thumbnail with its text beside it. */
+    ROW(16f / 9f),
 }
 
 /** A favourite channel, in the user's order. */

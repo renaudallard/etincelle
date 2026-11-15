@@ -134,8 +134,11 @@ data class ComponentDto(
     val slug: String? = null,
     val header: HeaderDto? = null,
     @Json(name = "is_favorite") val isFavorite: Boolean? = null,
-    // An episode row says when it aired here ("07 juin à 13h25").
+    // An episode row says when it aired here ("07 juin à 13h25"), and carries its tags and channel logo
+    // itself rather than in a body.
     val info: TextDto? = null,
+    val tags: List<TagDto>? = null,
+    @Json(name = "channel_picture") val channelPicture: PictureDto? = null,
 )
 
 // Live ("En direct à la TV") cards carry their show title in a footer rather than in title/heading.
@@ -342,6 +345,7 @@ private fun cardShape(componentType: String?): CardShape = when (componentType) 
     "square" -> CardShape.SQUARE
     "card-poster" -> CardShape.POSTER
     "card-poster-thin" -> CardShape.POSTER_THIN
+    "list-item-wide" -> CardShape.ROW
     else -> CardShape.WIDE
 }
 
@@ -390,10 +394,10 @@ private fun ComponentDto.toCard(shape: CardShape = CardShape.WIDE): ContentCard?
         // channel_id is a number on live cards but a string on poster cards; accept both.
         liveChannelId = (channelIdRaw as? String) ?: (channelIdRaw as? Number)?.toLong()?.toString(),
         shape = shape,
-        channelLogoUrl = body?.stationLogo?.url ?: header?.stationLogo?.url,
+        channelLogoUrl = body?.stationLogo?.url ?: header?.stationLogo?.url ?: channelPicture?.url,
         favorite = actions?.onFavIconClick?.let { apiCall(it, if (isFavorite == true) "Retirer des favoris" else "Ajouter aux favoris") },
         isFavorite = isFavorite == true,
-        tag = body?.tags.orEmpty().firstNotNullOfOrNull { t ->
+        tag = (body?.tags ?: tags).orEmpty().firstNotNullOfOrNull { t ->
             t.label?.takeIf { it.isNotBlank() }?.let { CardTag(it, t.leadingIcon?.url) }
         },
         // The official app shows the footer's subtitle under the title, or an episode row's info.
