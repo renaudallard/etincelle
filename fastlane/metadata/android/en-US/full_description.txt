@@ -1,0 +1,26 @@
+etincelle is an unofficial, open source client for the Molotov TV service. It gives your Molotov account another player, with the look of the former Molotov interface. It is not affiliated with Molotov or Fubo.
+
+You need your own Molotov account with the Molotov Extra option. etincelle gives no free access, shares no account and removes no protection: it plays what your subscription includes, with Widevine DRM, where the service is available (the European Union).
+
+WHAT IT DOES
+• Live TV that rewinds: the progress bar follows the programme on air, and a button brings you back to live
+• Start a programme from its beginning while it is still on air
+• Programme guide over 24 hours for all your channels
+• Replay, films and series, with a page for each programme and its episodes
+• Recordings: record an episode or a whole series, and watch what you recorded
+• Search
+• Favourite channels, in the order you choose
+• Profiles
+• The next episode offered at the end of an episode
+• Resume where you stopped
+• Background playback, with a notification and lock screen controls
+
+ON YOUR TV
+• Cast to a Chromecast and keep the controls, the volume and the next episode on the phone
+• Drive the etincelle app for Android TV from the phone, like a remote control
+• Sign in to the TV app by typing on the phone the code the TV shows
+
+PRIVACY
+No ads and no tracking of its own. etincelle talks to the Molotov service with your account, and to no server of its developer. Details: https://github.com/renaudallard/etincelle/blob/master/PRIVACY.md
+
+Source code and issues: https://github.com/renaudallard/etincelle

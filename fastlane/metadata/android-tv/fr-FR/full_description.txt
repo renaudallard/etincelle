@@ -1,0 +1,26 @@
+etincelle est un client non officiel et open source du service de télévision Molotov, ici pour Android TV et Google TV. Il donne à votre compte Molotov un autre lecteur, pensé pour la télécommande, avec l'apparence de l'ancienne interface Molotov. Il n'a aucun lien avec Molotov ni Fubo.
+
+Il vous faut votre propre compte Molotov avec l'option Molotov Extra. etincelle n'offre aucun accès gratuit, ne partage aucun compte et ne contourne aucune protection : il lit ce que comprend votre abonnement, avec le DRM Widevine, là où le service est disponible (l'Union européenne).
+
+CE QU'IL FAIT
+• Le direct qui se rembobine : la barre de progression suit le programme en cours, et un bouton ramène au direct
+• Reprendre un programme depuis son début pendant sa diffusion
+• Le guide des programmes sur 24 heures pour toutes vos chaînes
+• Le replay, les films et les séries, avec une fiche pour chaque programme et ses épisodes
+• Les enregistrements : enregistrer un épisode ou une série entière, et regarder ce que vous avez enregistré
+• La recherche
+• Les chaînes favorites, dans l'ordre que vous choisissez
+• Les profils
+• L'épisode suivant proposé à la fin d'un épisode
+• La reprise là où vous vous étiez arrêté
+
+AVEC VOTRE TÉLÉVISEUR
+• Se connecter sans taper de mot de passe : le téléviseur affiche un QR code et un code à six chiffres à saisir sur votre téléphone
+• Vos chaînes Molotov dans le guide des chaînes du téléviseur, là où il en a un
+• Des programmes sur l'écran d'accueil Android TV, là où le lanceur les affiche
+• Piloter l'application depuis l'application etincelle du téléphone, comme une télécommande, même derrière l'économiseur d'écran
+
+CONFIDENTIALITÉ
+Ni publicité ni pistage de son fait. etincelle parle au service Molotov avec votre compte, et à aucun serveur de son développeur. Détails : https://github.com/renaudallard/etincelle/blob/master/PRIVACY.md
+
+Code source et signalements : https://github.com/renaudallard/etincelle
