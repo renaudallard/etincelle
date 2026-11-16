@@ -24,6 +24,14 @@ class RemoteDiscoveryTest {
     }
 
     @Test
+    fun anOversizedAnswerIsCutDownOrDropped() {
+        val longName = RemoteDiscovery.answer(1, "id", "n".repeat(500))
+        assertEquals(64, RemoteDiscovery.parseAnswer(longName, longName.size, "h")?.name?.length)
+        val longId = RemoteDiscovery.answer(1, "i".repeat(65), "tv")
+        assertNull(RemoteDiscovery.parseAnswer(longId, longId.size, "h"))
+    }
+
+    @Test
     fun theSubnetIsAskedAddressByAddress() {
         val hosts = RemoteDiscovery.subnetHosts(byteArrayOf(172.toByte(), 20, 0, 94), 24).map { it.joinToString(".") { b -> (b.toInt() and 0xff).toString() } }
         assertEquals(253, hosts.size)

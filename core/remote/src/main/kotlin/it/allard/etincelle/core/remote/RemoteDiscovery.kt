@@ -32,6 +32,12 @@ object RemoteDiscovery {
     private const val MAX_PACKET = 1_500
     // Larger subnets are not asked address by address: a thousand requests is the most worth sending.
     private const val MIN_PREFIX = 22
+    // Anything on the network can send answers: what one may hold, and how many are kept, is bounded.
+    private const val MAX_ID = 64
+    private const val MAX_NAME = 64
+
+    /** The most TV apps kept at a time; answers beyond them are dropped. */
+    const val MAX_TVS = 16
 
     /** The request a phone broadcasts. */
     fun request(): ByteArray = REQUEST.toByteArray()
@@ -47,8 +53,8 @@ object RemoteDiscovery {
         val parts = String(data, 0, length, Charsets.UTF_8).split('\n', limit = 5)
         if (parts.size != 5 || parts[0] != ANSWER || parts[1] != RemoteProtocol.VERSION.toString()) return null
         val port = parts[2].toIntOrNull()?.takeIf { it in 1..65_535 } ?: return null
-        val id = parts[3].takeIf { it.isNotBlank() } ?: return null
-        return RemoteTv(id, parts[4].ifBlank { id }, host, port)
+        val id = parts[3].takeIf { it.isNotBlank() && it.length <= MAX_ID } ?: return null
+        return RemoteTv(id, parts[4].take(MAX_NAME).ifBlank { id }, host, port)
     }
 
     /** Tells the phones listening on [PORT] that a TV app just opened, with its [answer], from [socket]. */
@@ -115,7 +121,7 @@ object RemoteDiscovery {
                         continue
                     }
                     val host = packet.address?.hostAddress ?: continue
-                    parseAnswer(packet.data, packet.length, host)?.let { found[it.id] = it }
+                    parseAnswer(packet.data, packet.length, host)?.let { if (found.size < MAX_TVS || it.id in found) found[it.id] = it }
                 }
             }
         }

@@ -317,8 +317,11 @@ open class CastController(
         withContext(Dispatchers.IO) {
             RemoteDiscovery.listen(socket) { tv ->
                 launch(Dispatchers.Main) {
-                    scannedTvs[tv.id] = ScannedTv(tv)
-                    refreshDevices()
+                    // Nothing ages these out while this phone is connected and not scanning.
+                    if (scannedTvs.size < RemoteDiscovery.MAX_TVS || tv.id in scannedTvs) {
+                        scannedTvs[tv.id] = ScannedTv(tv)
+                        refreshDevices()
+                    }
                 }
             }
         }
