@@ -17,7 +17,8 @@ data class RemoteTv(val id: String, val name: String, val host: String, val port
  * Finds the etincelle TV apps open on the local network. The phone sends a request to [PORT], by
  * broadcast and to each address of its subnet, as some TVs stop receiving broadcast and multicast
  * altogether (seen on a Google TV Streamer); each TV app answers it directly with its id, name and the
- * port it takes connections on.
+ * port it takes connections on. A TV app also sends that answer unasked by broadcast as it opens
+ * ([announce]), which a phone listening on [PORT] ([listen]) picks up without waiting for its next scan.
  * Android's own service announcer only answers by multicast, which some phones stop receiving, while a
  * direct answer always arrives (the same reason Chromecasts are also looked for with direct answers).
  * Finding a TV gives nothing away: driving it takes the account handshake of [RemoteLink].
@@ -48,6 +49,30 @@ object RemoteDiscovery {
         val port = parts[2].toIntOrNull()?.takeIf { it in 1..65_535 } ?: return null
         val id = parts[3].takeIf { it.isNotBlank() } ?: return null
         return RemoteTv(id, parts[4].ifBlank { id }, host, port)
+    }
+
+    /** Tells the phones listening on [PORT] that a TV app just opened, with its [answer], from [socket]. */
+    fun announce(socket: DatagramSocket, answer: ByteArray) {
+        runCatching {
+            socket.broadcast = true
+            socket.send(DatagramPacket(answer, answer.size, InetAddress.getByName("255.255.255.255"), PORT))
+        }
+    }
+
+    /**
+     * Passes each TV app announcing itself on [socket], bound to [PORT], to [onTv], until the socket is
+     * closed. Requests from other phones arrive there too and are ignored.
+     */
+    fun listen(socket: DatagramSocket, onTv: (RemoteTv) -> Unit) {
+        val buffer = ByteArray(MAX_PACKET)
+        runCatching {
+            while (true) {
+                val packet = DatagramPacket(buffer, buffer.size)
+                socket.receive(packet)
+                val host = packet.address?.hostAddress ?: continue
+                parseAnswer(packet.data, packet.length, host)?.let(onTv)
+            }
+        }
     }
 
     /**

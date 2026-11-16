@@ -15,14 +15,18 @@ import com.google.android.gms.cast.framework.CastSession
 import com.google.android.gms.cast.framework.SessionManagerListener
 import it.allard.etincelle.core.remote.RemoteDiscovery
 import it.allard.etincelle.core.remote.RemoteTv
+import java.net.DatagramSocket
+import java.net.InetSocketAddress
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -138,6 +142,7 @@ open class CastController(
         discoveryScope?.cancel()
         discoveryScope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob()).also { scope ->
             scope.launch { rediscoverWhileIdle() }
+            scope.launch { listenForTvs() }
         }
     }
 
@@ -297,6 +302,27 @@ open class CastController(
         for (entry in scannedTvs.values) if (entry.tv.id !in tvIds) entry.missed++
         scannedTvs.values.removeAll { it.missed >= MAX_MISSED_SCANS }
         for (tv in tvs) scannedTvs[tv.id] = ScannedTv(tv)
+    }
+
+    // A TV app announcing itself as it opens joins the list at once, even while this phone is connected and
+    // so not scanning. Until the discovery stops, while the app is in the foreground.
+    private suspend fun listenForTvs() {
+        val socket = runCatching {
+            DatagramSocket(null).apply {
+                reuseAddress = true
+                bind(InetSocketAddress(RemoteDiscovery.PORT))
+            }
+        }.getOrNull() ?: return
+        currentCoroutineContext().job.invokeOnCompletion { socket.close() }
+        withContext(Dispatchers.IO) {
+            RemoteDiscovery.listen(socket) { tv ->
+                launch(Dispatchers.Main) {
+                    scannedTvs[tv.id] = ScannedTv(tv)
+                    refreshDevices()
+                }
+            }
+        }
+        socket.close()
     }
 
     // The Wi-Fi network, so the scan never goes out over mobile data or into a VPN. allNetworks is the

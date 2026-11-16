@@ -32,8 +32,9 @@ import org.json.JSONObject
 
 /**
  * Lets a phone signed in to the same account drive this TV app while it is open (see
- * docs/tv-remote-design.md). It takes connections on a free port, answers the phones looking for TV apps
- * (see [RemoteDiscovery]) with the TV's name, and keeps the latest phone that proves the account key: its
+ * docs/tv-remote-design.md). It takes connections on a free port, announces itself as it starts and
+ * answers the phones looking for TV apps (see [RemoteDiscovery]) with the TV's name, and keeps the latest
+ * phone that proves the account key: its
  * commands reach [onCommand] on the main thread, and [send] tells it how playback goes. [start], [stop]
  * and [send] are main-thread calls.
  */
@@ -155,9 +156,11 @@ class TvRemoteServer(
         key ?: runCatching { accountKey() }.getOrNull()?.also { key = it }
     }
 
-    // Tells each phone looking for TV apps where to connect, on [socket], until the server stops.
+    // Tells the phones already listening that this TV app opened, then each phone looking for TV apps where
+    // to connect, on [socket], until the server stops.
     private fun answerDiscovery(socket: DatagramSocket, port: Int) {
         val answer = RemoteDiscovery.answer(port, installId(), deviceName())
+        RemoteDiscovery.announce(socket, answer)
         val buffer = ByteArray(512)
         runCatching {
             while (true) {

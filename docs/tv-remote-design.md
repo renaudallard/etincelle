@@ -6,8 +6,13 @@ protocol of our own (module `core:remote`) so that every part of it is under our
 ## Discovery
 
 While its activity is started, the TV app listens on UDP port 47811. The phone broadcasts
-`etincelle-discover\n1` there from an ephemeral port, during each of its scans for Chromecasts, and each
-TV app answers directly with `etincelle-tv\n1\n<port>\n<install id>\n<TV name>`. Android's own service
+`etincelle-discover\n1` there from an ephemeral port, during each of its scans for Chromecasts, and also
+sends it to each address of its subnet (up to a /22), as some TVs receive no broadcast or multicast at
+all (seen on a Google TV Streamer). Each TV app answers directly with
+`etincelle-tv\n1\n<port>\n<install id>\n<TV name>`. As it starts, the TV app also broadcasts that answer
+once, unasked, to port 47811, where the phone listens while it is in the foreground: a TV app opened
+meanwhile joins the list at once, even while the phone is connected and so not scanning (a Streamer can
+send broadcasts, it only fails to receive them). Android's own service
 announcer (NSD) was tried first: on Android 14 it only answers by multicast, which some phones stop
 receiving, and it wants service names unique across all types, which the TV's own remote service
 already takes. A direct answer always arrives, as with the legacy unicast queries used for Chromecasts.
