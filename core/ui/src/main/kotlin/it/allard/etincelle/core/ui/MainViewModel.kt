@@ -28,6 +28,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
@@ -36,6 +37,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 // TV pairing poll cadence: poll every few seconds, and regenerate the code a little before its
@@ -143,6 +145,7 @@ data class ProfileEditor(val profile: Profile?)
 class MainViewModel(
     private val repo: MolotovRepository,
     private val updates: UpdateChecker,
+    private val auto: AutoUpdateStore? = null,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(UiState())
@@ -971,15 +974,71 @@ class MainViewModel(
 
     /**
      * Checks GitHub for a newer release now, then once a day for as long as the caller runs; the app
-     * proposes it when found. The activity runs this while it is started, so each start checks again.
-     * No check is made while an update is already proposed.
+     * proposes it when found, or takes it for an automatic install. The activity runs this while it is
+     * started, so each start checks again. No check is made while an update is already known.
      */
     suspend fun watchForUpdates() {
         while (true) {
-            if (_state.value.update == null) {
-                updates.latestUpdate()?.let { info -> _state.update { it.copy(update = info) } }
+            val known = _state.value.update
+            if (known == null) {
+                updates.latestUpdate()?.let(::take)
+            } else if (known.quiet) {
+                // An automatic install that has not happened: fetch it again, or propose it if it needed someone.
+                take(known)
             }
             delay(UPDATE_INTERVAL_MS)
+        }
+    }
+
+    private val _autoUpdate = MutableStateFlow(auto?.enabled == true)
+
+    /** The automatic updates setting (see [AutoUpdate]). */
+    val autoUpdate: StateFlow<Boolean> = _autoUpdate.asStateFlow()
+
+    fun setAutoUpdate(on: Boolean) {
+        auto?.enabled = on
+        _autoUpdate.value = on
+        // A version already known follows the setting too.
+        _state.value.update?.let(::take)
+    }
+
+    // The version downloaded for an automatic install, waiting in the store's file.
+    private var fetched: String? = null
+    private var fetchJob: Job? = null
+
+    // Takes [info] as the update: installed by itself once the app is left when automatic updates are on
+    // and Android allows them for this version, proposed to the user otherwise.
+    internal fun take(info: UpdateInfo) {
+        val store = auto
+        val quiet = store != null && _autoUpdate.value && store.possible && store.byHand != info.version
+        _state.update { it.copy(update = info.copy(quiet = quiet)) }
+        if (store == null || !quiet || fetched == info.version || fetchJob?.isActive == true) return
+        fetchJob = viewModelScope.launch {
+            if (downloadUpdate(info, store.file) {}) fetched = info.version
+        }
+    }
+
+    /**
+     * The app is left with nothing playing: hands the update downloaded for an automatic install to
+     * [install] with its version. Android then replaces this process, or [InstallResultReceiver] notes
+     * that this version needs someone.
+     */
+    fun installFetchedUpdate(install: suspend (File, String) -> Unit) {
+        val store = auto ?: return
+        val info = _state.value.update?.takeIf { it.quiet && it.version == fetched } ?: return
+        fetched = null
+        viewModelScope.launch {
+            // The activity may be going away with its view model: see the hand-over through.
+            withContext(NonCancellable) {
+                try {
+                    install(store.file, info.version)
+                } catch (e: Exception) {
+                    store.byHand = info.version
+                } finally {
+                    // The installer keeps its own copy.
+                    store.file.delete()
+                }
+            }
         }
     }
 
@@ -1058,7 +1117,8 @@ class MainViewModel(
 class MainViewModelFactory(
     private val repo: MolotovRepository,
     private val updates: UpdateChecker,
+    private val auto: AutoUpdateStore? = null,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T = MainViewModel(repo, updates) as T
+    override fun <T : ViewModel> create(modelClass: Class<T>): T = MainViewModel(repo, updates, auto) as T
 }

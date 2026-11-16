@@ -163,6 +163,16 @@ téléviseur qui n'a pas cette page, etincelle ouvre ses paramètres et indique 
 > Sécurité et restrictions > Sources inconnues**, puis etincelle. Sur le téléviseur, Android ferme
 etincelle une fois la mise à jour installée : rouvrez-la depuis l'écran d'accueil.
 
+Avec le réglage **Mises à jour automatiques** (dans **Paramètres**, désactivé par défaut, proposé à
+partir d'Android 12), etincelle ne demande plus rien : elle télécharge la nouvelle version en silence et
+l'installe quand on quitte l'application alors que rien n'est lu ni diffusé, puisque l'installation
+ferme l'application. Sur le téléviseur, l'économiseur d'écran ne compte pas comme quitter
+l'application : le téléphone peut toujours la piloter. etincelle doit déjà être autorisée à installer
+des applications, ce dont une première mise à jour à la main se charge. Google Play Protect peut
+encore afficher sa propre demande pour une version qu'il ne connaît pas ; et si Android réclame
+malgré tout une confirmation, ou si l'installation échoue, la version est proposée comme d'habitude
+à l'ouverture suivante. **Vérifier les mises à jour** propose toujours l'installation immédiate.
+
 > ### ⚠️ Avertissement
 >
 > Projet non officiel, sans aucune affiliation avec Molotov ni Fubo. **etincelle** n'est qu'un

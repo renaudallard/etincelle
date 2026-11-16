@@ -510,6 +510,9 @@ fun TvSettingsScreen(
     gridColumns: Int,
     onGridColumns: (Int) -> Unit,
     onProfiles: () -> Unit = {},
+    // Null where Android cannot install an update without asking: the setting is not shown.
+    autoUpdate: Boolean? = null,
+    onAutoUpdate: (Boolean) -> Unit = {},
 ) {
     var confirm by remember { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
@@ -536,6 +539,12 @@ fun TvSettingsScreen(
         } else {
             TvButton(onClick = { openOverlaySettings(context) }, highlighted = false) {
                 Text("Laisser le téléphone réveiller ce téléviseur")
+            }
+        }
+        // Installed once the app is left with nothing playing, since installing closes it.
+        if (autoUpdate != null) {
+            TvButton(onClick = { onAutoUpdate(!autoUpdate) }, highlighted = false) {
+                Text(if (autoUpdate) "Mises à jour automatiques : oui" else "Mises à jour automatiques : non")
             }
         }
         Text("Vignettes par ligne : $gridColumns", style = MaterialTheme.typography.titleMedium)

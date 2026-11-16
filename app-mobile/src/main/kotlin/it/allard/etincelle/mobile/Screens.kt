@@ -685,6 +685,9 @@ fun SettingsScreen(
     checkingUpdate: Boolean = false,
     updateStatus: String? = null,
     onCheckUpdate: () -> Unit = {},
+    // Null where Android cannot install an update without asking: the setting is not shown.
+    autoUpdate: Boolean? = null,
+    onAutoUpdate: (Boolean) -> Unit = {},
     onConnectTv: (String) -> Unit = {},
     onClearTvConnect: () -> Unit = {},
     connectInfo: String? = null,
@@ -699,8 +702,9 @@ fun SettingsScreen(
     val context = LocalContext.current
     var mono by remember { mutableStateOf(AppIcon.isMono(context)) }
     var officialReceiver by remember { mutableStateOf(CastReceiver.isOfficial(context)) }
-    // statusBarsPadding keeps the Retour button below the status bar so it stays tappable.
-    Column(modifier.fillMaxSize().statusBarsPadding()) {
+    // statusBarsPadding keeps the Retour button below the status bar so it stays tappable. The page
+    // scrolls: it is longer than a small screen.
+    Column(modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState())) {
         Row(
             Modifier.fillMaxWidth().padding(start = 4.dp, end = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -791,6 +795,15 @@ fun SettingsScreen(
             if (checkingUpdate) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
         }
         HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+        if (autoUpdate != null) {
+            SettingToggle(
+                title = "Mises à jour automatiques",
+                subtitle = "Installées quand vous quittez l'application, sans rien lire ni diffuser",
+                checked = autoUpdate,
+                onCheckedChange = onAutoUpdate,
+            )
+            HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+        }
         Text(
             "Déconnexion",
             style = MaterialTheme.typography.bodyLarge,

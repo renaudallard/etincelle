@@ -71,8 +71,10 @@ import it.allard.etincelle.core.player.LivePlayback
 import it.allard.etincelle.core.player.MediaItemFactory
 import it.allard.etincelle.core.player.PlaybackProgress
 import it.allard.etincelle.core.remote.RemoteMessages
+import it.allard.etincelle.core.ui.installFetchedUpdate
 import it.allard.etincelle.core.ui.installUpdate
 import it.allard.etincelle.core.ui.MainViewModel
+import it.allard.etincelle.core.ui.AutoUpdate
 import it.allard.etincelle.core.ui.MainViewModelFactory
 import it.allard.etincelle.core.ui.Tab
 import it.allard.etincelle.core.ui.UpdateChecker
@@ -89,7 +91,7 @@ private const val DREAM_GRACE_MS = 3_000L
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels {
-        MainViewModelFactory((application as EtincelleTvApp).container.repository, UpdateChecker(BuildConfig.VERSION_NAME, "tv"))
+        MainViewModelFactory((application as EtincelleTvApp).container.repository, UpdateChecker(BuildConfig.VERSION_NAME, "tv"), AutoUpdate(this))
     }
     private var player: ExoPlayer? = null
     private var loadControl: AdaptiveLoadControl? = null
@@ -103,7 +105,7 @@ class MainActivity : ComponentActivity() {
     // wake the TV with a command. Leaving the app or the TV going to sleep stop it as before.
     private var dreaming = false
     private val handler = Handler(Looper.getMainLooper())
-    private val stopRemoteUnlessDreaming = Runnable { if (!dreaming) stopRemote() }
+    private val stopRemoteUnlessDreaming = Runnable { if (!dreaming) leave() }
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
@@ -111,7 +113,7 @@ class MainActivity : ComponentActivity() {
                 Intent.ACTION_DREAMING_STOPPED -> dreaming = false
                 Intent.ACTION_SCREEN_OFF -> {
                     dreaming = false
-                    if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) stopRemote()
+                    if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) leave()
                 }
             }
         }
@@ -160,6 +162,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             EtincelleTheme {
                 val state by viewModel.state.collectAsStateWithLifecycle()
+                val autoUpdate by viewModel.autoUpdate.collectAsStateWithLifecycle()
                 // Returning to the foreground refreshes the guide, which goes stale over time.
                 LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshOnResume() }
                 Surface(modifier = Modifier.fillMaxSize()) {
@@ -239,6 +242,8 @@ class MainActivity : ComponentActivity() {
                                 onProfiles = viewModel::openProfiles,
                                 gridColumns = gridColumns,
                                 onGridColumns = { gridColumns = it },
+                                autoUpdate = autoUpdate.takeIf { AutoUpdate.SUPPORTED },
+                                onAutoUpdate = viewModel::setAutoUpdate,
                             )
                         }
 
@@ -273,7 +278,7 @@ class MainActivity : ComponentActivity() {
                             viewModel::loginWithCode, viewModel::stopPairingPoll, viewModel::cancelCodeLogin, viewModel::login,
                         )
                     }
-                    state.update?.let { up ->
+                    state.update?.takeIf { !it.quiet }?.let { up ->
                         TvUpdateDialog(
                             up, state.updateProgress, state.updateError,
                             onInstall = { installUpdate(viewModel) },
@@ -455,6 +460,14 @@ class MainActivity : ComponentActivity() {
     private fun stopRemote() {
         remote.stop()
         RemoteKeepAliveService.stop(this)
+    }
+
+    // The app is left for good, not just behind the screensaver where a phone may still call it: the
+    // remote control stops, and with nothing playing it is the moment for an automatic update, which
+    // closes the app.
+    private fun leave() {
+        stopRemote()
+        if (viewModel.state.value.playing == null) installFetchedUpdate(viewModel)
     }
 
     // Ends the screensaver: brought back to the front with the screen to be turned on, this activity wakes

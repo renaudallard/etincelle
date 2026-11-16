@@ -50,11 +50,26 @@ fun Activity.installUpdate(viewModel: MainViewModel) {
     viewModel.installUpdate(File(cacheDir, "update.apk")) { installApk(app, it) }
 }
 
-/** Writes [apk] into a PackageInstaller session and commits it; [InstallResultReceiver] gets the outcome. */
-private suspend fun installApk(context: Context, apk: File) = withContext(Dispatchers.IO) {
+/**
+ * Installs the update downloaded for an automatic install, if there is one: called as the app is left
+ * with nothing playing, since Android closes the app to install it. Nothing is shown or asked.
+ */
+fun Activity.installFetchedUpdate(viewModel: MainViewModel) {
+    val app = applicationContext
+    viewModel.installFetchedUpdate { apk, version -> installApk(app, apk, version) }
+}
+
+/**
+ * Writes [apk] into a PackageInstaller session and commits it; [InstallResultReceiver] gets the outcome.
+ * With [quietVersion], the version of an automatic install, Android is asked not to ask the user.
+ */
+private suspend fun installApk(context: Context, apk: File, quietVersion: String? = null) = withContext(Dispatchers.IO) {
     val installer = context.packageManager.packageInstaller
     val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
     params.setAppPackageName(context.packageName)
+    if (quietVersion != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
+    }
     val id = installer.createSession(params)
     try {
         installer.openSession(id).use { session ->
@@ -67,7 +82,8 @@ private suspend fun installApk(context: Context, apk: File) = withContext(Dispat
             // The installer fills in the outcome, so the intent must stay mutable; it is explicit.
             val flags = PendingIntent.FLAG_UPDATE_CURRENT or
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
-            val result = PendingIntent.getBroadcast(context, id, Intent(context, InstallResultReceiver::class.java), flags)
+            val outcome = Intent(context, InstallResultReceiver::class.java).putExtra(InstallResultReceiver.QUIET_VERSION, quietVersion)
+            val result = PendingIntent.getBroadcast(context, id, outcome, flags)
             session.commit(result.intentSender)
         }
     } catch (e: Exception) {
@@ -76,10 +92,25 @@ private suspend fun installApk(context: Context, apk: File) = withContext(Dispat
     }
 }
 
-/** Shows the system confirmation for an update install, and says so when the install fails. */
+/**
+ * Shows the system confirmation for an update install, and says so when the install fails. An automatic
+ * install shows nothing: when it needs someone or fails, its version is noted to be proposed instead.
+ */
 class InstallResultReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        when (intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
+        val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
+        val quietVersion = intent.getStringExtra(QUIET_VERSION)
+        if (quietVersion != null) {
+            if (status == PackageInstaller.STATUS_SUCCESS) return
+            // Android wants a confirmation after all: nobody is there to give it, so drop this attempt.
+            if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
+                val session = intent.getIntExtra(PackageInstaller.EXTRA_SESSION_ID, -1)
+                runCatching { context.packageManager.packageInstaller.abandonSession(session) }
+            }
+            AutoUpdate(context).byHand = quietVersion
+            return
+        }
+        when (status) {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
                 val confirm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
@@ -98,4 +129,9 @@ class InstallResultReceiver : BroadcastReceiver() {
 
     private fun failed(context: Context) =
         Toast.makeText(context, "Installation de la mise à jour impossible", Toast.LENGTH_LONG).show()
+
+    companion object {
+        /** Intent extra: the version of an automatic install. */
+        const val QUIET_VERSION = "quiet_version"
+    }
 }

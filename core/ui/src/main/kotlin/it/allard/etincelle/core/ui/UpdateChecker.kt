@@ -10,7 +10,14 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /** A newer release found on GitHub: the direct link to its APK asset, with the size and sha256 GitHub published. */
-data class UpdateInfo(val version: String, val apkUrl: String, val size: Long, val sha256: String)
+data class UpdateInfo(
+    val version: String,
+    val apkUrl: String,
+    val size: Long,
+    val sha256: String,
+    // Installed by itself once the app is left (see AutoUpdate), so not proposed to the user.
+    val quiet: Boolean = false,
+)
 
 /** Outcome of an explicit "check for updates", so the UI can tell up-to-date apart from a failure. */
 sealed interface UpdateCheck {

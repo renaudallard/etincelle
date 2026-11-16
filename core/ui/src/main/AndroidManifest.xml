@@ -3,6 +3,8 @@
 
     <!-- Updates are downloaded from GitHub and handed to the system installer. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Automatic updates (off by default): lets Android 12 and later install one without asking. -->
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
 
     <!-- The settings pages that let it install apps, so it can tell which ones the device has. -->
     <queries>

@@ -16,16 +16,25 @@ import it.allard.etincelle.core.model.UpNext
 import it.allard.etincelle.core.model.UserSession
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
+import java.io.File
 import java.lang.reflect.Proxy
+import java.nio.file.Files
+import java.security.MessageDigest
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
+import okhttp3.mockwebserver.Dispatcher
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.RecordedRequest
+import okio.Buffer
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -129,7 +138,7 @@ class MainViewModelTest {
         val restore = CompletableDeferred<Boolean>()
         repo.restore = { restore.await() }
         repo.home = { throw AppError.Network("offline") }
-        val vm = MainViewModel(repo, UpdateChecker("0", "mobile", "http://127.0.0.1:9/"))
+        val vm = MainViewModel(repo, CHECKER)
         vm.onDeepLink("VOD_1", DetailKind.PROGRAM)
         restore.complete(true)
 
@@ -173,7 +182,99 @@ class MainViewModelTest {
         assertEquals(next, vm.state.value.playing?.upNext)
     }
 
-    private fun viewModel(repo: FakeRepo) = MainViewModel(repo, UpdateChecker("0", "mobile", "http://127.0.0.1:9/")).also {
+    @Test
+    fun anUpdateIsFetchedAndInstalledWithoutAWordWhenAutomaticUpdatesAreOn() = withUpdate { store, info ->
+        val vm = MainViewModel(FakeRepo(), CHECKER, store)
+        vm.take(info)
+        assertTrue(vm.state.value.update!!.quiet)
+
+        // Nothing is handed over before the download is complete.
+        val installed = mutableListOf<Pair<String, Int>>()
+        waitFor {
+            vm.installFetchedUpdate { apk, version -> installed += version to apk.readBytes().size }
+            installed.isNotEmpty()
+        }
+        assertEquals(listOf(info.version to APK.size), installed)
+        assertFalse(store.file.exists())
+        assertNull(store.byHand)
+
+        // Once only.
+        vm.installFetchedUpdate { _, _ -> error("installed twice") }
+    }
+
+    @Test
+    fun anUpdateIsProposedWhenAutomaticUpdatesAreOffOrNotPossible() = withUpdate { store, info ->
+        store.enabled = false
+        val vm = MainViewModel(FakeRepo(), CHECKER, store)
+        vm.take(info)
+        assertFalse(vm.state.value.update!!.quiet)
+
+        // Turning the setting on takes the known version along, and off again proposes it.
+        vm.setAutoUpdate(true)
+        assertTrue(store.enabled)
+        assertTrue(vm.state.value.update!!.quiet)
+        vm.setAutoUpdate(false)
+        assertFalse(vm.state.value.update!!.quiet)
+
+        store.possible = false
+        vm.setAutoUpdate(true)
+        assertFalse(vm.state.value.update!!.quiet)
+    }
+
+    @Test
+    fun aVersionWhoseAutomaticInstallNeededSomeoneIsProposed() = withUpdate { store, info ->
+        val vm = MainViewModel(FakeRepo(), CHECKER, store)
+        vm.take(info)
+        waitFor {
+            vm.installFetchedUpdate { _, _ -> throw IllegalStateException("refused") }
+            store.byHand != null
+        }
+        assertEquals(info.version, store.byHand)
+        assertFalse(store.file.exists())
+
+        vm.take(info)
+        assertFalse(vm.state.value.update!!.quiet)
+        // A later version is automatic again.
+        vm.take(info.copy(version = "9.9.10"))
+        assertTrue(vm.state.value.update!!.quiet)
+    }
+
+    // Runs [test] with a store in a scratch directory and an update whose APK a local server hands out.
+    private fun withUpdate(test: (FakeStore, UpdateInfo) -> Unit) {
+        val server = MockWebServer()
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest) = MockResponse().setBody(Buffer().write(APK))
+        }
+        server.start()
+        val dir = Files.createTempDirectory("auto-update").toFile()
+        val store = FakeStore(File(dir, "update-auto.apk"))
+        try {
+            val sha = MessageDigest.getInstance("SHA-256").digest(APK).joinToString("") { "%02x".format(it) }
+            test(store, UpdateInfo("9.9.9", server.url("/etincelle-9.9.9-mobile.apk").toString(), APK.size.toLong(), sha))
+        } finally {
+            server.shutdown()
+            // Only the two files a download may leave; no tree walk.
+            File(store.file.path + ".part").delete()
+            store.file.delete()
+            dir.delete()
+        }
+    }
+
+    private fun waitFor(done: () -> Boolean) {
+        val deadline = System.nanoTime() + 10_000_000_000L
+        while (!done()) {
+            check(System.nanoTime() < deadline) { "timed out" }
+            Thread.sleep(20)
+        }
+    }
+
+    private class FakeStore(override val file: File) : AutoUpdateStore {
+        override var enabled = true
+        override var byHand: String? = null
+        override var possible = true
+    }
+
+    private fun viewModel(repo: FakeRepo) = MainViewModel(repo, CHECKER).also {
         assertTrue(it.state.value.loggedIn)
     }
 
@@ -209,6 +310,9 @@ class MainViewModelTest {
     }
 
     private companion object {
+        // Never reached by these tests: nothing listens there.
+        val CHECKER = UpdateChecker("0", "mobile", "http://127.0.0.1:9/")
+        val APK = ByteArray(50_000) { (it * 31).toByte() }
         // Any repository call a test did not plan for fails it.
         val UNEXPECTED = Proxy.newProxyInstance(
             MolotovRepository::class.java.classLoader,

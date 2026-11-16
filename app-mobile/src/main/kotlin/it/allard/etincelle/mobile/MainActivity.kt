@@ -95,7 +95,9 @@ import it.allard.etincelle.core.player.LiveBarGeometry
 import it.allard.etincelle.core.player.LivePlayback
 import it.allard.etincelle.core.player.MediaItemFactory
 import it.allard.etincelle.core.player.PlaybackProgress
+import it.allard.etincelle.core.ui.installFetchedUpdate
 import it.allard.etincelle.core.ui.installUpdate
+import it.allard.etincelle.core.ui.AutoUpdate
 import it.allard.etincelle.core.ui.MainViewModel
 import it.allard.etincelle.core.ui.MainViewModelFactory
 import it.allard.etincelle.core.ui.Tab
@@ -113,7 +115,7 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels {
-        MainViewModelFactory((application as EtincelleApp).container.repository, UpdateChecker(BuildConfig.VERSION_NAME, "mobile"))
+        MainViewModelFactory((application as EtincelleApp).container.repository, UpdateChecker(BuildConfig.VERSION_NAME, "mobile"), AutoUpdate(this))
     }
     private var player: ExoPlayer? = null
     private var castController: CastPlayerController? = null
@@ -276,7 +278,7 @@ class MainActivity : ComponentActivity() {
                         onTvKey = { controller?.sendTvKey(it) },
                     )
                 }
-                state.update?.let { up ->
+                state.update?.takeIf { !it.quiet }?.let { up ->
                     UpdateDialog(
                         up, state.updateProgress, state.updateError,
                         onInstall = { installUpdate(viewModel) },
@@ -359,6 +361,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
             it.trackSelectionParameters = it.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, true).build()
+        }
+        // Left with nothing playing, here or on a TV: the moment for an automatic update, which closes the app.
+        val cast = castController?.state?.value
+        if (!isChangingConfigurations && viewModel.state.value.playing == null && cast?.isCasting != true && cast?.connecting != true) {
+            installFetchedUpdate(viewModel)
         }
         super.onStop()
     }
@@ -474,6 +481,7 @@ private fun AppRoot(
         castState.statusDeviceName != null
     // Grid density (cards per row on the "tout voir" pages); persisted, set live from the settings.
     var gridColumns by remember { mutableStateOf(LocalPrefs.gridColumns(context)) }
+    val autoUpdate by vm.autoUpdate.collectAsStateWithLifecycle()
 
 
     // Flash a brief volume overlay on each cast volume-key press (the system bar is suppressed).
@@ -598,6 +606,8 @@ private fun AppRoot(
                                 checkingUpdate = state.checkingUpdate,
                                 updateStatus = state.updateStatus,
                                 onCheckUpdate = { vm.checkForUpdateNow() },
+                                autoUpdate = autoUpdate.takeIf { AutoUpdate.SUPPORTED },
+                                onAutoUpdate = vm::setAutoUpdate,
                                 onConnectTv = { vm.confirmTvCode(it) },
                                 onClearTvConnect = { vm.clearTvConnect() },
                                 connectInfo = state.tvConnectInfo,
