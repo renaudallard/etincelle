@@ -207,7 +207,8 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                             BackHandler { viewModel.closeDetail() }
                             TvProgramDetailScreen(
                                 detail, state.busy, state.error, state.info,
-                                viewModel::watchDetail, viewModel::startOverDetail, viewModel::recordDetail, viewModel::watchRecording,
+                                viewModel::watchDetail, viewModel::startOverDetail, viewModel::watchReplay, viewModel::recordDetail,
+                                viewModel::watchRecording,
                                 viewModel::onCardClick,
                                 isRecording = state.detailRecordingAssetId != null,
                             )

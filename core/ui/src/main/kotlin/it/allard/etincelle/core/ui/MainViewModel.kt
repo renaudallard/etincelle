@@ -730,6 +730,25 @@ class MainViewModel(
     // Where the phone was, rather than this TV's own resume point.
     private fun PlaybackSource.startingAt(positionMs: Long) = if (positionMs > 0) copy(startPositionMs = positionMs) else this
 
+    /**
+     * Plays the on-demand copy of the live programme on the detail page ([ProgramDetail.replay]) from
+     * its beginning, wherever it was left. Its own page opens under the player, as when it is chosen in
+     * the list of episodes, so Back lands on it and its next episode follows.
+     */
+    fun watchReplay() {
+        val vodId = _state.value.detail?.replay?.vodId ?: return
+        _state.update { it.copy(busy = true, error = null) }
+        navLaunch {
+            runCatchingNav {
+                val detail = repo.fetchProgramDetail(vodId, DetailKind.PROGRAM)
+                val source = resolveProgramme(vodId, detail).copy(startPositionMs = 0L).withUpNext(detail.upNext)
+                DetailEntry(detail, null, vodId, DetailKind.PROGRAM) to source
+            }.onSuccess { (entry, src) ->
+                _state.update { it.copy(busy = false, playing = src, detailStack = it.detailStack + entry) }
+            }.onFailure { e -> applyFailure(e, "Échec de lecture") }
+        }
+    }
+
     /** Plays the live show on the detail page from the beginning of the current programme: resolves
      * the channel, then asks playback to start that far behind the live edge (within the DVR window)
      * instead of at the edge. Falls back to a normal live start when the programme times are unknown. */

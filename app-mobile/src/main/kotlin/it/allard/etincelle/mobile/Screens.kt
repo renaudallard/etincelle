@@ -975,6 +975,7 @@ fun ProgramDetailScreen(
     info: String?,
     onWatch: () -> Unit,
     onStartOver: () -> Unit,
+    onWatchReplay: () -> Unit,
     onRecord: (RecordAction) -> Unit,
     onWatchRecording: (String) -> Unit,
     onBack: () -> Unit,
@@ -1053,6 +1054,11 @@ fun ProgramDetailScreen(
                     }
                     if (showWatch && detail.isLive) {
                         Button(onClick = onStartOver, enabled = !busy) { Text("Regarder depuis le début") }
+                    }
+                    // The same programme on demand: whole from its first minute, where the live stream
+                    // only goes back as far as its rewind window.
+                    if (showWatch && detail.replay != null) {
+                        Button(onClick = onWatchReplay, enabled = !busy) { Text("Regarder le replay") }
                     }
                     if (detail.recordActions.isNotEmpty()) {
                         RecordButton(detail.recordActions, enabled = !busy, onRecord = onRecord)

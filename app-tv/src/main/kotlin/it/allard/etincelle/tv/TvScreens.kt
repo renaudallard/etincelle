@@ -863,6 +863,7 @@ fun TvProgramDetailScreen(
     info: String?,
     onWatch: () -> Unit,
     onStartOver: () -> Unit,
+    onWatchReplay: () -> Unit,
     onRecord: (RecordAction) -> Unit,
     onWatchRecording: (String) -> Unit,
     onEpisode: (ContentCard) -> Unit,
@@ -946,6 +947,11 @@ fun TvProgramDetailScreen(
                         }
                         if (showWatch && detail.isLive) {
                             TvButton(onClick = onStartOver, enabled = !busy) { Text("Regarder depuis le début") }
+                        }
+                        // The same programme on demand: whole from its first minute, where the live
+                        // stream only goes back as far as its rewind window.
+                        if (showWatch && detail.replay != null) {
+                            TvButton(onClick = onWatchReplay, enabled = !busy) { Text("Regarder le replay") }
                         }
                         // Each record option (the episode and/or the whole series) is its own D-pad button,
                         // using the backend's own label. When there is no Regarder and no recording/episode to

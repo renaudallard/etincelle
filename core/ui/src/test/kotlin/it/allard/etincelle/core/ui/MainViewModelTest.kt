@@ -185,6 +185,40 @@ class MainViewModelTest {
     }
 
     @Test
+    fun aLiveProgrammeOffersTheEpisodeOnDemandThatGoesByItsName() {
+        val episode = CARD.copy(id = "e16", title = "S26 E16 Dans le coma", vodId = "VOD_16")
+        val other = CARD.copy(id = "e9", title = "S13 E9 Perdu en chemin", vodId = "VOD_9")
+        val live = DETAIL.copy(
+            channelId = "46", vodId = null, isLive = true, subtitle = "S26 E16 Dans le coma", episodes = listOf(other, episode),
+        )
+
+        assertEquals(episode, live.replay)
+        // A programme that is no episode goes by its title.
+        val film = episode.copy(title = "Show")
+        assertEquals(film, live.copy(subtitle = null, episodes = listOf(other, film)).replay)
+        // No episode by that name, or not a live page: none.
+        assertNull(live.copy(episodes = listOf(other)).replay)
+        assertNull(live.copy(isLive = false).replay)
+    }
+
+    @Test
+    fun theReplayOfALiveProgrammePlaysFromItsBeginningOverItsOwnPage() {
+        val episode = CARD.copy(id = "e16", title = "S26 E16", vodId = "VOD_16")
+        val live = DETAIL.copy(channelId = "46", vodId = null, isLive = true, subtitle = "S26 E16", episodes = listOf(episode))
+        val repo = FakeRepo()
+        repo.detail = { _, kind -> if (kind == DetailKind.CHANNEL) live else DETAIL.copy(vodId = "VOD_16") }
+        // Left in the middle earlier.
+        repo.vod = { NEXT.copy(originVodId = it, startPositionMs = 42_000) }
+        val vm = viewModel(repo)
+        vm.onCardClick(CARD.copy(vodId = null, channelId = "46"))
+        vm.watchReplay()
+
+        assertEquals("VOD_16", vm.state.value.playing?.originVodId)
+        assertEquals(0L, vm.state.value.playing?.startPositionMs)
+        assertEquals(listOf("46", "VOD_16"), vm.state.value.detailStack.map { it.id })
+    }
+
+    @Test
     fun anUpdateIsFetchedAndInstalledWithoutAWordWhenAutomaticUpdatesAreOn() = withUpdate { store, info ->
         val vm = MainViewModel(FakeRepo(), CHECKER, store)
         vm.take(info)
@@ -356,7 +390,8 @@ class MainViewModelTest {
         override suspend fun fetchProgramDetail(id: String, kind: DetailKind) = detail(id, kind)
         override suspend fun profilesToPick(): Profiles? = null
         val resolvedRecordings = mutableListOf<String>()
-        override suspend fun resolveVod(vodId: String) = NEXT
+        var vod: suspend (String) -> PlaybackSource = { NEXT }
+        override suspend fun resolveVod(vodId: String) = vod(vodId)
         override suspend fun resolveRecording(assetId: String): PlaybackSource {
             resolvedRecordings += assetId
             return SOURCE

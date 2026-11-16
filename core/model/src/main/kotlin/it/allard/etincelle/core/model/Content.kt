@@ -178,7 +178,19 @@ data class ProgramDetail(
     /** Set when the page plays a recording (its player asks for the DVR stream): Regarder plays this
      * DVR asset, as its catch-up stream does not exist. */
     val recordingAssetId: String? = null,
-)
+) {
+    /**
+     * The on-demand copy of the programme now on air, when the series it belongs to offers one: the
+     * episode of [episodes] that goes by the same name as the programme, which is its episode ("S26 E16
+     * Dans le coma") or, for a programme that is no episode, its title. Null off a live page.
+     */
+    val replay: ContentCard?
+        get() {
+            if (!isLive) return null
+            val name = subtitle?.takeIf { it.isNotBlank() } ?: title ?: return null
+            return episodes.firstOrNull { it.vodId != null && it.title == name }
+        }
+}
 
 /** A programme for the Android TV home screen: the app's recommendations row, or Continue watching. */
 data class HomeProgram(
