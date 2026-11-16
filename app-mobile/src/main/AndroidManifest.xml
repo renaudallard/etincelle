@@ -41,9 +41,11 @@
             </intent-filter>
         </activity>
 
+        <!-- Not exported: only the app binds to it. The system's media controls (notification, lock
+             screen, media keys) go through the session itself, not through this service. -->
         <service
             android:name=".PlaybackService"
-            android:exported="true"
+            android:exported="false"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService" />
