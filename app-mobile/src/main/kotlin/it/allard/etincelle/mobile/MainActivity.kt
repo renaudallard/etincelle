@@ -85,6 +85,7 @@ import it.allard.etincelle.core.designsystem.theme.BrandYellow
 import it.allard.etincelle.core.designsystem.theme.EtincelleTheme
 import it.allard.etincelle.core.designsystem.UpNextSlate
 import it.allard.etincelle.core.designsystem.UpNextSlateState
+import it.allard.etincelle.core.designsystem.UpNextSlates
 import it.allard.etincelle.core.domain.DetailKind
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramWindow
@@ -115,6 +116,8 @@ class MainActivity : ComponentActivity() {
     }
     private var player: ExoPlayer? = null
     private var castController: CastPlayerController? = null
+    // The next-episode countdown of what plays, shared by the loop that runs it and the slate on screen.
+    private val upNextSlates = UpNextSlates()
     private var loadControl: AdaptiveLoadControl? = null
     private var mediaSession: MediaSession? = null
     // Stops what plays and saves its resume point; set in onCreate, run when the activity ends.
@@ -207,6 +210,18 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        // The next episode follows from here, not from the slate on screen: the UI stops updating while
+        // the app is away, so the slate would go on counting down the episode it last showed and the
+        // second episode in the background would never follow. An etincelle TV app plays it itself.
+        lifecycleScope.launch {
+            while (true) {
+                delay(UP_NEXT_TICK_MS)
+                val upNext = viewModel.state.value.playing?.upNext ?: continue
+                if (controller?.state?.value?.toTvApp == true) continue
+                val p = playerFlow.value
+                if (upNextSlates.of(upNext).tick(upNext, p.currentPosition, p.duration)) viewModel.playUpNext()
+            }
+        }
 
         // Playback follows `playing`, not the player screen: while casting the show page stays up and
         // the stream keeps running, and in the background the next episode starts on its own. The UI
@@ -243,6 +258,7 @@ class MainActivity : ComponentActivity() {
                         currentPlayer = currentPlayer,
                         onLocalPlayer = currentPlayer === exo,
                         vm = viewModel,
+                        upNextSlates = upNextSlates,
                         castState = castState,
                         // connectTo returns false when the tapped route is already gone (a Chromecast
                         // that dropped between opening the picker and tapping); tell the user instead
@@ -377,6 +393,9 @@ private const val VOLUME_OVERLAY_MS = 1500L
 // How often the position of a cast is kept as its resume point.
 private const val CAST_PROGRESS_MS = 15_000L
 
+// How often the next-episode countdown moves.
+private const val UP_NEXT_TICK_MS = 250L
+
 /** Brand-pack vector icon for the tabs it covers; the rest keep their emoji glyph. */
 @DrawableRes
 private fun tabIconRes(tab: Tab): Int? = when (tab) {
@@ -401,6 +420,7 @@ private fun AppRoot(
     currentPlayer: Player,
     onLocalPlayer: Boolean,
     vm: MainViewModel,
+    upNextSlates: UpNextSlates,
     castState: CastUiState,
     onCastConnect: (String) -> Unit,
     onCastDisconnect: () -> Unit,
@@ -439,8 +459,9 @@ private fun AppRoot(
     }
     val tvRemote = castState.toTvApp && tvRemoteOpen
     // The next-episode slate shows in the player, the cast controller or over the show page as the
-    // viewer moves between them: one state per episode keeps its credits choice and countdown.
-    val upNextSlate = remember(playing?.upNext) { UpNextSlateState() }
+    // viewer moves between them, each on the countdown the activity runs for the episode (with its
+    // credits choice).
+    val upNextSlate = upNextSlates.shown(playing?.upNext)
     // The cast bar is shown (and the nav bar then drops its bottom inset) when there is a device to
     // name and the full-screen player is not up - except while a connect is in flight, so casting
     // from the player still shows the "Connexion à …" animation instead of no feedback at all. It is
@@ -763,13 +784,15 @@ private fun AppRoot(
  * the Chromecast's, so the next episode also follows on the TV.
  */
 @Composable
-private fun UpNextOverlay(source: PlaybackSource, player: Player, onPlayNext: () -> Unit, slate: UpNextSlateState, modifier: Modifier) {
+private fun UpNextOverlay(source: PlaybackSource, player: Player, onPlayNext: () -> Unit, slate: UpNextSlateState?, modifier: Modifier) {
     val upNext = source.upNext ?: return
+    slate ?: return
     UpNextSlate(
         upNext,
         position = { player.currentPosition },
         duration = { player.duration },
         onPlayNext = onPlayNext,
+        drive = false,
         button = { label, primary, onClick, mod ->
             if (primary) {
                 Button(onClick = onClick, modifier = mod, colors = ButtonDefaults.buttonColors(containerColor = BrandYellow, contentColor = BrandBlack)) { Text(label) }
@@ -792,7 +815,7 @@ private fun PlayerSurface(
     fetchProgramWindow: suspend (String) -> ProgramWindow?,
     secure: Boolean = true,
     onPlayNext: () -> Unit = {},
-    upNextSlate: UpNextSlateState = remember(source.upNext) { UpNextSlateState() },
+    upNextSlate: UpNextSlateState? = null,
 ) {
     val view = LocalView.current
     DisposableEffect(secure) {

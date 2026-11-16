@@ -33,24 +33,63 @@ import it.allard.etincelle.core.model.UpNext
 import kotlinx.coroutines.delay
 
 /**
- * The slate offering the next episode near the end of the current one: its title, a countdown, then
- * [UpNext.playLabel] (play it now) and [UpNext.creditsLabel] (hide the slate and watch the end). When
- * the countdown reaches zero, [onPlayNext] runs once. The countdown follows [position] (pausing holds
- * it); a hidden slate comes back only after a seek before it. [button] draws a button in the app's own
- * style; with [takeFocus] (TV) the play button gets the focus when the slate appears, and [onLeave]
- * runs when the slate goes away, so the caller can hand the focus back.
- */
-/**
- * What the viewer did with the slate of one episode: watching its credits ([hidden]) or past the
- * countdown ([fired]). Kept by the caller when the slate may move between screens (the show page and
- * the cast controller), so neither choice is forgotten on the way.
+ * What the viewer did with the slate of one episode, and its countdown: watching its credits
+ * ([hidden]), past the countdown ([fired]), and the seconds [left]. Kept by the caller when the slate
+ * may move between screens (the show page and the cast controller), or when the countdown runs where
+ * the slate is not drawn, so neither choice is forgotten on the way.
  */
 @Stable
 class UpNextSlateState {
     var hidden by mutableStateOf(false)
     var fired = false
+    var left by mutableStateOf<Long?>(null)
+        private set
+
+    /**
+     * Moves the countdown of [upNext] to [positionMs] of [durationMs]; true once, when it runs out and
+     * the next episode should start.
+     */
+    fun tick(upNext: UpNext, positionMs: Long, durationMs: Long): Boolean {
+        val now = upNext.secondsLeft(positionMs, durationMs)
+        if (now == null) hidden = false
+        left = now
+        // Watching the credits (a hidden slate) lets the episode end without going on.
+        if (now != 0L || fired || hidden) return false
+        fired = true
+        return true
+    }
 }
 
+/**
+ * One [UpNextSlateState] per episode, started by what runs the countdown ([of]) and read by what shows
+ * the slate ([shown]), which follows the episode it is on.
+ */
+class UpNextSlates {
+    private var key by mutableStateOf<UpNext?>(null)
+    private var state = UpNextSlateState()
+
+    /** The countdown of [upNext], started anew for another episode. */
+    fun of(upNext: UpNext): UpNextSlateState {
+        if (upNext != key) {
+            state = UpNextSlateState()
+            key = upNext
+        }
+        return state
+    }
+
+    /** The countdown of [upNext] if it is the one running; it never starts one. */
+    fun shown(upNext: UpNext?): UpNextSlateState? = if (upNext != null && upNext == key) state else null
+}
+
+/**
+ * The slate offering the next episode near the end of the current one: its title, a countdown, then
+ * [UpNext.playLabel] (play it now) and [UpNext.creditsLabel] (hide the slate and watch the end). When
+ * the countdown reaches zero, [onPlayNext] runs once. The countdown follows [position] (pausing holds
+ * it); a hidden slate comes back only after a seek before it. With [drive] false the countdown runs
+ * elsewhere, through [UpNextSlateState.tick], and the slate only shows [state]. [button] draws a button
+ * in the app's own style; with [takeFocus] (TV) the play button gets the focus when the slate appears,
+ * and [onLeave] runs when the slate goes away, so the caller can hand the focus back.
+ */
 @Composable
 fun UpNextSlate(
     upNext: UpNext,
@@ -61,27 +100,22 @@ fun UpNextSlate(
     modifier: Modifier = Modifier,
     takeFocus: Boolean = false,
     onLeave: () -> Unit = {},
+    drive: Boolean = true,
     state: UpNextSlateState = remember(upNext) { UpNextSlateState() },
 ) {
-    var left by remember(upNext) { mutableStateOf<Long?>(null) }
     val playNext by rememberUpdatedState(onPlayNext)
     // The player can change under a running countdown (the cast moving to another device).
     val positionNow by rememberUpdatedState(position)
     val durationNow by rememberUpdatedState(duration)
-    LaunchedEffect(upNext, state) {
-        while (true) {
-            val now = upNext.secondsLeft(positionNow(), durationNow())
-            if (now == null) state.hidden = false
-            left = now
-            // Watching the credits (a hidden slate) lets the episode end without going on.
-            if (now == 0L && !state.fired && !state.hidden) {
-                state.fired = true
-                playNext()
+    if (drive) {
+        LaunchedEffect(upNext, state) {
+            while (true) {
+                if (state.tick(upNext, positionNow(), durationNow())) playNext()
+                delay(TICK_MS)
             }
-            delay(TICK_MS)
         }
     }
-    val seconds = left
+    val seconds = state.left
     if (seconds == null || state.hidden) return
     val focus = remember { FocusRequester() }
     if (takeFocus) LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }

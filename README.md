@@ -40,7 +40,7 @@ liste en dessous les **épisodes disponibles** (avec leur vignette) pour en choi
 série **enregistrée**, elle affiche d'abord vos épisodes enregistrés (lus depuis le DVR), puis la même
 liste des **épisodes disponibles** en rattrapage. À la fin d'un épisode, l'**épisode suivant**
 s'annonce par un compte à rebours (« Commence dans 9 s ») puis démarre tout seul, sur le téléphone comme
-sur le Chromecast pendant une diffusion ; **À suivre** le
+sur le Chromecast pendant une diffusion, y compris l'application en arrière-plan ; **À suivre** le
 lance aussitôt et **Regarder le générique** laisse l'épisode se terminer. Un épisode regardé jusqu'au
 générique reprend ensuite depuis le début. Un programme **pas encore diffusé** indique quand il
 passera (par exemple « Ce programme sera en direct dans 4 jours. ») au lieu d'un « Regarder » qui
