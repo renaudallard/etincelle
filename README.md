@@ -147,7 +147,9 @@ reprenant au retour dans l'application), avec une **notification de lecture** et
 l'écran de verrouillage** : lecture/pause, recul de 10 s et avance de 30 s. Elles pilotent le
 téléphone, ou le Chromecast pendant une diffusion, direct compris (dans la limite de la fenêtre de
 rembobinage), comme les boutons de la télécommande plein écran qui s'ouvre en touchant la barre de
-diffusion. Toucher la notification ramène dans l'application.
+diffusion. Toucher la notification ramène dans l'application. Si l'application est relancée pendant
+une diffusion passant par les services Google, elle la retrouve et la notification en reprend aussitôt
+le titre.
 
 etincelle **vérifie les mises à jour** sur GitHub à chaque démarrage, puis une fois par jour tant
 qu'elle reste ouverte, et propose d'installer la dernière version lorsqu'une plus récente est

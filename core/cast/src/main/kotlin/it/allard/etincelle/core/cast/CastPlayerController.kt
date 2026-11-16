@@ -16,6 +16,7 @@ import com.google.android.gms.cast.MediaSeekOptions
 import com.google.android.gms.cast.MediaStatus
 import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.CastSession
+import com.google.android.gms.cast.framework.media.MediaQueue
 import com.google.android.gms.cast.framework.media.RemoteMediaClient
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.UserSession
@@ -286,11 +287,29 @@ class CastPlayerController(
         if (client === watchedClient) return
         watchedClient?.unregisterCallback(receiverStatusCallback)
         watchedClient?.removeProgressListener(receiverProgressListener)
+        watchedClient?.mediaQueue?.unregisterCallback(queueCallback)
         watchedClient = client
         receiverFailed = false
         receiverPositionMs = 0L
         client?.registerCallback(receiverStatusCallback)
         client?.addProgressListener(receiverProgressListener, RECEIVER_PROGRESS_MS)
+        queueStatusAsked = false
+        client?.mediaQueue?.registerCallback(queueCallback)
+    }
+
+    // Media3's CastPlayer rebuilds its playlist from the queue's item ids when a status arrives. A
+    // session joined while the receiver plays (the app restarted during a cast) gets its first status
+    // before those ids and no other while playback just goes on: what plays, with its title for the
+    // notification, stayed unknown until the next pause or seek. Ask for a status once the ids are in,
+    // once per session.
+    private var queueStatusAsked = false
+    private val queueCallback = object : MediaQueue.Callback() {
+        override fun mediaQueueChanged() {
+            val client = watchedClient ?: return
+            if (queueStatusAsked || !castPlayer.currentTimeline.isEmpty || client.mediaQueue.itemCount == 0) return
+            queueStatusAsked = true
+            client.requestStatus()
+        }
     }
 
     // Drives the connect animation: the bar fills while connecting and snaps full once the receiver
