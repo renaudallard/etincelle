@@ -73,6 +73,17 @@ class InterceptorTest {
     }
 
     @Test
+    fun `omits the two-factor token for an untrusted host`() {
+        val guarded = OkHttpClient.Builder().addInterceptor(AuthInterceptor(session)).build()
+        server.enqueue(MockResponse().setBody("{}"))
+        guarded.newCall(Request.Builder().url(server.url("/x")).header("X-MFA-Token", "MT").build()).execute().close()
+        assertEquals(null, server.takeRequest().getHeader("X-MFA-Token"))
+        // A trusted host still gets it.
+        call { header("X-MFA-Token", "MT") }
+        assertEquals("MT", server.takeRequest().getHeader("X-MFA-Token"))
+    }
+
+    @Test
     fun `leaves an explicit authorization header alone for refresh`() {
         session.session = UserSession("AT", "RT", "user1", "profile1")
         call { header("authorization", "Bearer RT") }

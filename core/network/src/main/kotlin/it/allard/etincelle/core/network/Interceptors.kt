@@ -47,7 +47,10 @@ class AuthInterceptor(
         if (request.header("authorization") != null) return chain.proceed(request)
         // pageByUrl/pingProgress follow backend-supplied absolute URLs, so only attach the account
         // credentials to Fubo's own hosts; a tampered or hostile URL must never receive the bearer token.
-        if (!isTrustedHost(request.url.host)) return chain.proceed(request)
+        if (!isTrustedHost(request.url.host)) {
+            // Nor the two-factor token, which the sign-in calls carry to urls the backend names.
+            return chain.proceed(request.newBuilder().removeHeader(MFA_TOKEN_HEADER).build())
+        }
 
         val builder = request.newBuilder()
         session.accessToken?.let { builder.header("authorization", "Bearer $it") }
@@ -56,6 +59,8 @@ class AuthInterceptor(
         return chain.proceed(builder.build())
     }
 }
+
+private const val MFA_TOKEN_HEADER = "X-MFA-Token"
 
 // The app's own backend domains (Fubo's api-eu.fubo.tv plus the molotov.tv tenant) and any subdomain
 // the backend hands back in page/playhead/heartbeat URLs. Credentials are attached only to these.
