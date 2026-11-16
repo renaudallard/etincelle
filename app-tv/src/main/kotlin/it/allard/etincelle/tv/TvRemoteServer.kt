@@ -83,9 +83,10 @@ class TvRemoteServer(
         scope.launch { accountKeyOnce() }
         discovery?.let { socket -> scope.launch(Dispatchers.IO) { answerDiscovery(socket, server.localPort) } }
         scope.launch {
-            while (isActive) {
-                val socket = runCatching { withContext(Dispatchers.IO) { server.accept() } }.getOrNull() ?: break
-                launch { serve(socket) }
+            // A connection that fails as it comes in must not be the last one taken.
+            while (isActive && !server.isClosed) {
+                val socket = runCatching { withContext(Dispatchers.IO) { server.accept() } }.getOrNull()
+                if (socket != null) launch { serve(socket) } else delay(RETRY_MS)
             }
         }
     }
@@ -159,21 +160,22 @@ class TvRemoteServer(
     }
 
     // Tells the phones already listening that this TV app opened, then each phone looking for TV apps where
-    // to connect, on [socket], until the server stops.
+    // to connect, on [socket], until the server stops: a request that cannot be answered, as the network
+    // drops, must not be the last one heard.
     private fun answerDiscovery(socket: DatagramSocket, port: Int) {
         val answer = RemoteDiscovery.answer(port, installId(), deviceName())
         RemoteDiscovery.announce(socket, answer)
         val buffer = ByteArray(512)
-        runCatching {
-            while (true) {
+        while (!socket.isClosed) {
+            val served = runCatching {
                 val packet = DatagramPacket(buffer, buffer.size)
                 socket.receive(packet)
                 if (RemoteDiscovery.isRequest(packet.data, packet.length)) {
                     socket.send(DatagramPacket(answer, answer.size, packet.socketAddress))
                 }
             }
+            if (served.isFailure && !socket.isClosed) Thread.sleep(RETRY_MS)
         }
-        socket.close()
     }
 
     // The name the TV goes by in its settings, else its model.
@@ -191,5 +193,7 @@ class TvRemoteServer(
         const val KEY_ID = "install_id"
         const val MAX_HANDSHAKES = 4
         const val HANDSHAKE_DEADLINE_MS = 5_000L
+        // Before taking the next connection or discovery request after one that failed.
+        const val RETRY_MS = 1_000L
     }
 }
