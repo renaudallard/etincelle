@@ -68,6 +68,8 @@ internal class AuthResponse(
     val signatureAlgorithm: Int,
     val senderNonce: ByteArray,
     val hashAlgorithm: Int,
+    /** The device's revocation list (`CrlBundle`), empty when it sent none. */
+    val crl: ByteArray = ByteArray(0),
 )
 
 /** The device authentication messages (`DeviceAuthMessage` in cast_channel.proto). */
@@ -98,6 +100,7 @@ internal object DeviceAuthMessages {
         var signatureAlgorithm = SIGNATURE_RSASSA_PKCS1V15
         var nonce = ByteArray(0)
         var hashAlgorithm = HASH_SHA1
+        var crl = ByteArray(0)
         val ok = ProtoReader(body).forEachField { number, value ->
             when (number) {
                 1 -> signature = value.bytes()
@@ -106,6 +109,7 @@ internal object DeviceAuthMessages {
                 4 -> signatureAlgorithm = value.int()
                 5 -> nonce = value.bytes()
                 6 -> hashAlgorithm = value.int()
+                7 -> crl = value.bytes()
             }
         }
         if (!ok) return null
@@ -116,6 +120,7 @@ internal object DeviceAuthMessages {
             signatureAlgorithm,
             nonce,
             hashAlgorithm,
+            crl,
         )
     }
 }
@@ -152,6 +157,7 @@ internal class ProtoWriter {
 /** A field value read by [ProtoReader]: a varint, or the bytes of a length-delimited field. */
 internal class ProtoValue(private val number: Long, private val data: ByteArray?) {
     fun int(): Int = number.toInt()
+    fun long(): Long = number
     fun bytes(): ByteArray = data ?: ByteArray(0)
     fun string(): String = String(bytes(), Charsets.UTF_8)
 }

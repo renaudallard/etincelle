@@ -11,6 +11,7 @@ import org.junit.Assert.fail
 import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.security.KeyFactory
+import java.security.MessageDigest
 import java.security.Signature
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
@@ -47,11 +48,51 @@ class CastDeviceAuthTest {
         intermediates: List<ByteArray> = listOf(TestPki.ICA),
         hash: Int = DeviceAuthMessages.HASH_SHA256,
         signature: ByteArray = sign(signedNonce + peer, if (hash == DeviceAuthMessages.HASH_SHA1) "SHA1withRSA" else "SHA256withRSA"),
-    ) = AuthResponse(signature, device, intermediates, DeviceAuthMessages.SIGNATURE_RSASSA_PKCS1V15, signedNonce, hash)
+        crl: ByteArray = crl(),
+    ) = AuthResponse(signature, device, intermediates, DeviceAuthMessages.SIGNATURE_RSASSA_PKCS1V15, signedNonce, hash, crl)
 
-    private fun assertRefused(response: AuthResponse, peer: ByteArray = TestPki.PEER, at: Date = now, trusted: List<X509Certificate> = roots) {
+    // The revocation lists here are signed with the test device key, whose certificate the test
+    // intermediate issued: that intermediate stands for the Cast CRL root.
+    private val crlRoots = listOf(cert(TestPki.ICA))
+
+    private fun spkiHash(der: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(cert(der).publicKey.encoded)
+
+    // A `CrlBundle` holding one list valid from [from] to [until], signed over [signed].
+    private fun crl(
+        from: String = "2026-01-01",
+        until: String = "2026-01-08",
+        revokedKeys: List<ByteArray> = emptyList(),
+        // Issuer key hash, first and last serial number.
+        revokedSerials: List<Triple<ByteArray, Long, Long>> = emptyList(),
+        version: Long = 0,
+        tamper: Boolean = false,
+    ): ByteArray {
+        val tbs = ProtoWriter().apply {
+            if (version != 0L) varint(1, version)
+            varint(2, date(from).time / 1000)
+            varint(3, date(until).time / 1000)
+            revokedKeys.forEach { bytes(4, it) }
+            revokedSerials.forEach { (issuer, first, last) ->
+                bytes(5, ProtoWriter().apply { bytes(1, issuer); varint(2, first); varint(3, last) }.toByteArray())
+            }
+        }.toByteArray()
+        val signature = sign(tbs).also { if (tamper) it[0] = (it[0] + 1).toByte() }
+        val list = ProtoWriter().apply { bytes(1, tbs); bytes(2, TestPki.DEVICE); bytes(3, signature) }.toByteArray()
+        return ProtoWriter().apply { bytes(1, list) }.toByteArray()
+    }
+
+    private fun verify(response: AuthResponse, peer: ByteArray = TestPki.PEER, at: Date = now, trusted: List<X509Certificate> = roots, crlTrusted: List<X509Certificate> = crlRoots) =
+        CastDeviceAuth.verify(response, peer, nonce, trusted, at, crlTrusted)
+
+    private fun assertRefused(
+        response: AuthResponse,
+        peer: ByteArray = TestPki.PEER,
+        at: Date = now,
+        trusted: List<X509Certificate> = roots,
+        crlTrusted: List<X509Certificate> = crlRoots,
+    ) {
         try {
-            CastDeviceAuth.verify(response, peer, nonce, trusted, at)
+            verify(response, peer, at, trusted, crlTrusted)
             fail("accepted")
         } catch (e: CastDeviceAuth.Failure) {
             // Expected.
@@ -60,12 +101,51 @@ class CastDeviceAuthTest {
 
     @Test
     fun aGenuineDeviceIsAccepted() {
-        CastDeviceAuth.verify(response(), TestPki.PEER, nonce, roots, now)
+        verify(response())
     }
 
     @Test
     fun aSha1SignatureIsAccepted() {
-        CastDeviceAuth.verify(response(hash = DeviceAuthMessages.HASH_SHA1), TestPki.PEER, nonce, roots, now)
+        verify(response(hash = DeviceAuthMessages.HASH_SHA1))
+    }
+
+    @Test
+    fun aDeviceWithoutARevocationListIsRefused() = assertRefused(response(crl = ByteArray(0)))
+
+    @Test
+    fun aRevocationListOutOfDateIsRefused() {
+        assertRefused(response(crl = crl(until = "2026-01-01")))
+        assertRefused(response(crl = crl(from = "2026-01-03")))
+    }
+
+    @Test
+    fun aRevocationListNotSignedUnderTheCrlRootIsRefused() {
+        assertRefused(response(), crlTrusted = listOf(cert(TestPki.FAKE_ROOT)))
+        assertRefused(response(crl = crl(tamper = true)))
+    }
+
+    @Test
+    fun aRevocationListOfAnUnknownVersionIsRefused() = assertRefused(response(crl = crl(version = 1)))
+
+    @Test
+    fun aRevokedKeyIsRefused() {
+        assertRefused(response(crl = crl(revokedKeys = listOf(spkiHash(TestPki.DEVICE)))))
+        assertRefused(response(crl = crl(revokedKeys = listOf(spkiHash(TestPki.ICA)))))
+        // Another key revoked changes nothing.
+        verify(response(crl = crl(revokedKeys = listOf(spkiHash(TestPki.PEER)))))
+    }
+
+    @Test
+    fun aRevokedSerialNumberIsRefused() {
+        val intermediateSerial = cert(TestPki.ICA).serialNumber.toLong()
+        val rootKey = spkiHash(TestPki.ROOT)
+        assertRefused(response(crl = crl(revokedSerials = listOf(Triple(rootKey, intermediateSerial, intermediateSerial)))))
+        assertRefused(response(crl = crl(revokedSerials = listOf(Triple(rootKey, 0L, -1L)))))
+        // The same number issued by another key, or a range beside it, revokes nothing.
+        verify(response(crl = crl(revokedSerials = listOf(Triple(spkiHash(TestPki.PEER), 0L, -1L)))))
+        verify(response(crl = crl(revokedSerials = listOf(Triple(rootKey, intermediateSerial + 1, intermediateSerial + 9)))))
+        // A range running backwards voids the list.
+        assertRefused(response(crl = crl(revokedSerials = listOf(Triple(rootKey, 9L, 3L)))))
     }
 
     @Test
@@ -105,6 +185,7 @@ class CastDeviceAuthTest {
             listOf("CN=Cast Root CA", "CN=Eureka Root CA"),
             CastRootCertificates.all.map { it.subjectX500Principal.name.substringBefore(',') },
         )
+        assertEquals(listOf("CN=Cast CRL Root CA"), CastRootCertificates.crl.map { it.subjectX500Principal.name.substringBefore(',') })
     }
 
     @Test
@@ -141,6 +222,7 @@ class CastDeviceAuthTest {
             bytes(3, byteArrayOf(6))
             bytes(5, nonce)
             varint(6, 1)
+            bytes(7, byteArrayOf(5))
         }.toByteArray()
         val parsed = DeviceAuthMessages.response(ProtoWriter().apply { bytes(2, auth) }.toByteArray())!!
         assertArrayEquals(byteArrayOf(9), parsed.signature)
@@ -148,6 +230,7 @@ class CastDeviceAuthTest {
         assertEquals(2, parsed.intermediateCertificates.size)
         assertArrayEquals(nonce, parsed.senderNonce)
         assertEquals(DeviceAuthMessages.HASH_SHA256, parsed.hashAlgorithm)
+        assertArrayEquals(byteArrayOf(5), parsed.crl)
         assertEquals(DeviceAuthMessages.SIGNATURE_RSASSA_PKCS1V15, parsed.signatureAlgorithm)
     }
 }

@@ -117,7 +117,7 @@ réseau Wi-Fi et ajoute ceux que les services Google ne voient pas à la liste ;
 Google affichent un Chromecast sans parvenir à s'y connecter, etincelle s'y connecte lui-même. La
 diffusion vers un tel Chromecast passe par une **connexion directe** : le Chromecast doit d'abord
 prouver qu'il est un
-appareil Cast authentique (certificat signé par Google) avant de recevoir quoi que ce soit, puis
+appareil Cast authentique (certificat signé par Google, et non révoqué) avant de recevoir quoi que ce soit, puis
 tout fonctionne comme d'habitude, commandes de lecture, barre du programme en cours, retour au
 direct, volume, passage d'un Chromecast à l'autre et retour sur le téléphone. Si la connexion est
 coupée, etincelle se reconnecte au Chromecast sans interrompre la lecture. La notification de

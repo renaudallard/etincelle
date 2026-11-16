@@ -14,7 +14,9 @@ import java.util.Date
  * Checks that the other end of a TLS connection is a genuine Cast device, the way Open Screen's sender
  * does (cast/sender/channel/cast_auth_util.cc). A Chromecast's TLS certificate is self-signed, so TLS
  * alone proves nothing. Instead the device signs our nonce followed by that TLS certificate with its
- * device key, whose certificate chains to one of Google's Cast roots.
+ * device key, whose certificate chains to one of Google's Cast roots. Unlike Open Screen's default, the
+ * device must also hand a current revocation list ([CastCrl]) that revokes none of that chain: without
+ * it, a device key extracted and since revoked would still pass.
  */
 internal object CastDeviceAuth {
     // A device's TLS certificate is short-lived and regenerated; a longer one is refused.
@@ -33,6 +35,7 @@ internal object CastDeviceAuth {
         nonce: ByteArray,
         roots: List<X509Certificate> = CastRootCertificates.all,
         now: Date = Date(),
+        crlRoots: List<X509Certificate> = CastRootCertificates.crl,
     ) {
         val factory = CertificateFactory.getInstance("X.509")
         fun parse(der: ByteArray) = runCatching {
@@ -56,7 +59,9 @@ internal object CastDeviceAuth {
 
         if (response.intermediateCertificates.size > MAX_INTERMEDIATES) throw Failure("chain too long")
         val chain = (listOf(response.deviceCertificate) + response.intermediateCertificates).map(::parse)
-        verifyChain(chain, roots, now)
+        val root = verifyChain(chain, roots, now)
+        val crl = CastCrl.parse(response.crl, crlRoots, now) ?: throw Failure("no valid revocation list")
+        if (crl.revokes(chain + root)) throw Failure("revoked certificate")
 
         val device = chain.first()
         // keyUsage, when present, must allow signing.
@@ -73,8 +78,9 @@ internal object CastDeviceAuth {
     }
 
     // Each certificate must be in date, issued and signed by the next one; intermediates must be CAs;
-    // the last one must be issued and signed by one of [roots].
-    private fun verifyChain(chain: List<X509Certificate>, roots: List<X509Certificate>, now: Date) {
+    // the last one must be issued and signed by one of [roots], which is returned.
+    private fun verifyChain(chain: List<X509Certificate>, roots: List<X509Certificate>, now: Date): X509Certificate {
+        var root: X509Certificate? = null
         for ((i, cert) in chain.withIndex()) {
             runCatching { cert.checkValidity(now) }.getOrElse { throw Failure("certificate out of date") }
             if (i > 0 && cert.basicConstraints < 0) throw Failure("intermediate is not a CA")
@@ -85,7 +91,9 @@ internal object CastDeviceAuth {
             runCatching { cert.verify(issuer.publicKey) }.getOrElse { throw Failure("bad certificate signature") }
             if (issuer in roots) {
                 runCatching { issuer.checkValidity(now) }.getOrElse { throw Failure("root out of date") }
+                root = issuer
             }
         }
+        return root ?: throw Failure("not issued by a Cast root")
     }
 }

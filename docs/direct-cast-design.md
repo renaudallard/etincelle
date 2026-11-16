@@ -96,6 +96,12 @@ Device authentication:
 - Verify that the chain leads to Google's Cast root certificates (public, embedded in the app,
   taken from Chromium's `components/cast_certificate`) and that the signature matches the TLS
   certificate of this connection. On failure the connection is closed and the device is not used.
+- The device must also hand a current revocation list (`crl` in its answer, a `CrlBundle` signed under
+  the Cast CRL root, also embedded) that revokes no certificate of its chain, by key or by serial
+  number. Open Screen checks the same list but ignores the result by default (`kCrlOptional`); here a
+  missing, expired or badly signed list refuses the device, or a device key extracted and since
+  revoked would still pass. Seen on a Chromecast with Google TV: a list valid eight days, with 26
+  revoked keys and 33 serial ranges.
 - This is what lets the app send the DRM token and, for continue-watching, the access token, without
   trusting whatever answers on the LAN.
 
