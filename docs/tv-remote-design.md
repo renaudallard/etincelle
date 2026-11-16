@@ -5,8 +5,8 @@ protocol of our own (module `core:remote`) so that every part of it is under our
 
 ## Discovery
 
-While its activity is started, the TV app listens on UDP port 47811. The phone broadcasts
-`etincelle-discover\n1` there from an ephemeral port, during each of its scans for Chromecasts
+While its remote control runs (see "Always reachable"), the TV app listens on UDP port 47811. The phone
+broadcasts `etincelle-discover\n1` there from an ephemeral port, during each of its scans for Chromecasts
 (every 20 s or so while idle in the foreground, and one after the other while the list of devices is
 open, a cast running or not), and also
 sends it to each address of its subnet (up to a /22), as some TVs receive no broadcast or multicast at
@@ -23,22 +23,36 @@ already takes. A direct answer always arrives, as with the legacy unicast querie
 The phone lists each TV app as "<name> (appli TV)", route id `tv:<install id>`, next to the Chromecasts
 as "<name> (Chromecast)": a TV and its Chromecast often share a name.
 
-## Screensaver
+## Always reachable
 
-The Google TV screensaver stops the activity. The server is kept through it: `onStop` waits 3 s for
-`ACTION_DREAMING_STARTED`, and stops the server only without it (the app was left) or on
-`ACTION_SCREEN_OFF` (the TV went to sleep). `RemoteKeepAliveService`, a `connectedDevice` foreground
-service, keeps the stopped app from being frozen meanwhile; Android 12+ only lets a foreground service
-start from the foreground, so it starts in `onStart` and stops with the server. The status keeps going to
-the phone, whose 15 s read timeout would otherwise drop a silent TV.
+The server belongs to the process (`TvRemote`), not to the activity, and `RemoteKeepAliveService`, a
+`connectedDevice` foreground service, keeps the process running with nothing in front. Once the app may
+display over other apps (`SYSTEM_ALERT_WINDOW`, granted by the user from the TV app's settings), the
+service never stops: it starts with the TV (`BOOT_COMPLETED`) and after an update of the app
+(`MY_PACKAGE_REPLACED`), both of which may start a foreground service from the background, and is sticky,
+so Android starts it again after ending the app to free memory. A phone then finds the TV app whatever
+the TV shows, and asleep: a Chromecast with Google TV keeps its Wi-Fi and its processes running while
+asleep, and answers within half a second.
 
-A play command or a key arriving behind the screensaver brings the activity back with turn-screen-on set,
-which wakes the TV and ends the screensaver. Android 14 blocks that start from the background unless the
-app may display over other apps (`SYSTEM_ALERT_WINDOW`, `BAL_ALLOW_SAW_PERMISSION`), which the user grants
-from the TV app's settings. Verified on a Chromecast with Google TV: a wake lock with
-`ACQUIRE_CAUSES_WAKEUP` needs `TURN_SCREEN_ON`, denied by default with no settings page on Google TV, and
-a plain activity start is `BAL_BLOCK`. Without the permission the command is still taken and plays once the
-TV is woken.
+A play command or a key arriving with the activity not in front brings it back, or opens it when there
+is none (the play command then waits for the activity to resume). The activity is `singleTask`, so the
+launcher or a link from the home screen comes to that same one: the server drives a single screen. The activity declares
+`android:turnScreenOn`, and sets it again before coming back, which wakes the TV and ends the
+screensaver. Android 14 blocks such a start from the background unless the app may display over other
+apps (`BAL_ALLOW_SAW_PERMISSION`), hence the permission. Verified on a Chromecast with Google TV: a wake
+lock with `ACQUIRE_CAUSES_WAKEUP` needs `TURN_SCREEN_ON`, denied by default with no settings page on
+Google TV; a plain activity start is `BAL_BLOCK`; and turn-screen-on set from `onCreate` comes too late to
+wake a sleeping TV, it has to be in the manifest.
+
+With no activity nothing has read the saved sign-in, so the server reads it itself before working out the
+account key, which it works out again every five minutes at most, as the profiles it is made of may
+change while it runs. The status keeps going to the phone, idle when there is no activity: its 15 s read
+timeout would otherwise drop a silent TV.
+
+Without the permission the server only runs while the activity is started or behind the screensaver:
+`onStop` waits 3 s for `ACTION_DREAMING_STARTED`, and stops the server without it (the app was left) or
+on `ACTION_SCREEN_OFF` (the TV went to sleep). A command arriving behind the screensaver is still taken,
+and plays once the TV is woken.
 
 ## Authentication
 

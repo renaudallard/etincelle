@@ -6,9 +6,10 @@
     <!-- The home screen row and Watch Next (TvHome), kept fresh by a job that survives reboots. -->
     <uses-permission android:name="com.android.providers.tv.permission.WRITE_EPG_DATA" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <!-- The phone's remote control stays reachable through the screensaver (RemoteKeepAliveService); a
-         connected-device service needs one of the network permissions. Coming back from behind the
-         screensaver to play what the phone sent takes "display over other apps", granted by the user. -->
+    <!-- The phone's remote control stays reachable with the app not in front (RemoteKeepAliveService); a
+         connected-device service needs one of the network permissions. Coming back to the front to play
+         what the phone sent takes "display over other apps", granted by the user: the remote control is
+         then kept at all times, from the start of the TV on. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
@@ -34,14 +35,17 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Etincelle">
 
-        <!-- One instance only: it owns the player, so a link or the launcher opening the app while it
-             runs goes to the one there instead of starting a second copy. Every configuration change is
-             taken in place (Compose redraws): a recreation would restart what plays from where it was
-             opened, as when a keyboard or gamepad connects. -->
+        <!-- One instance only: it owns the player and is the screen the phone drives (see TvRemote), so
+             a link or the launcher opening the app while it runs goes to the one there instead of
+             starting a second copy. Every configuration change is taken in place (Compose redraws): a
+             recreation would restart what plays from where it was opened, as when a keyboard or gamepad
+             connects. Opening it turns the screen on: with the TV asleep, only a phone asking for a
+             programme does. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
+            android:turnScreenOn="true"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|touchscreen|uiMode|density|fontScale|fontWeightAdjustment|locale|layoutDirection|colorMode|mcc|mnc"
             android:theme="@style/Theme.Etincelle">
             <intent-filter>
@@ -87,6 +91,14 @@
             android:exported="true"
             android:theme="@style/Theme.Etincelle" />
 
+        <receiver
+            android:name=".RemoteStarter"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
         <receiver
             android:name=".TvHomeReceiver"
             android:exported="true">

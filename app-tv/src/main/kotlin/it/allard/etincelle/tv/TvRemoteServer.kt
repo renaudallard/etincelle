@@ -5,6 +5,7 @@ package it.allard.etincelle.tv
 
 import android.content.Context
 import android.os.Build
+import android.os.SystemClock
 import android.provider.Settings
 import it.allard.etincelle.core.remote.RemoteDiscovery
 import it.allard.etincelle.core.remote.RemoteLink
@@ -24,20 +25,22 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 
 /**
- * Lets a phone signed in to the same account drive this TV app while it is open (see
- * docs/tv-remote-design.md). It takes connections on a port of its own, announces itself as it starts and
- * answers the phones looking for TV apps (see [RemoteDiscovery]) with the TV's name, and keeps the latest
- * phone that proves the account key: its
- * commands reach [onCommand] on the main thread, and [send] tells it how playback goes. [start], [stop]
- * and [send] are main-thread calls.
+ * Lets a phone signed in to the same account drive this TV app (see docs/tv-remote-design.md). It takes
+ * connections on a port of its own, announces itself as it starts and answers the phones looking for TV apps
+ * (see [RemoteDiscovery]) with the TV's name, and keeps the latest phone that proves the account key: its
+ * commands reach [onCommand] on the main thread, and [send] tells it how playback goes. It may run for
+ * days (see [TvRemote]), so nothing short of [stop] ends it. [start], [stop] and [send] are main-thread
+ * calls.
  */
 class TvRemoteServer(
     private val context: Context,
@@ -53,9 +56,11 @@ class TvRemoteServer(
     @Volatile
     private var link: RemoteLink? = null
 
-    // The account key, worked out once while the server runs (main thread): a connection must cost no
-    // call to the backend, or any device on the network could flood the app's own calls with them.
+    // The account key and until when it is taken as current (main thread). A connection must cost no call
+    // to the backend, or any device on the network could flood the app's own calls with them; yet the
+    // profiles it is made of may change while the server runs, so it is worked out again now and then.
     private var key: ByteArray? = null
+    private var keyUntil = 0L
     private val keyLock = Mutex()
 
     // The addresses with a handshake in progress (main thread): each holds a thread, so a few at a time
@@ -82,7 +87,7 @@ class TvRemoteServer(
         writer = Executors.newSingleThreadExecutor()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate).also { scope = it }
         // Ready before the first phone connects.
-        scope.launch { accountKeyOnce() }
+        scope.launch { refreshKey() }
         discovery?.let { socket -> scope.launch(Dispatchers.IO) { answerDiscovery(socket, server.localPort) } }
         scope.launch {
             // A connection that fails as it comes in must not be the last one taken.
@@ -102,8 +107,8 @@ class TvRemoteServer(
         link = null
         scope?.cancel()
         scope = null
-        // Worked out afresh on the next start, should the account or its profiles have changed.
         key = null
+        keyUntil = 0
         writer?.shutdown()
         writer = null
     }
@@ -116,7 +121,11 @@ class TvRemoteServer(
 
     // One phone: the handshake, then its commands until it leaves. A newer phone takes over.
     private suspend fun serve(socket: Socket) {
-        val key = accountKeyOnce()
+        // The phone waits a few seconds for the greeting: past a short wait for a newer key, the one in
+        // hand serves, and the newer one the next connection.
+        val refresh = scope?.launch { refreshKey() }
+        withTimeoutOrNull(KEY_WAIT_MS) { refresh?.join() }
+        val key = key
         if (key == null) {
             runCatching { socket.close() }
             return
@@ -157,22 +166,30 @@ class TvRemoteServer(
         }
     }
 
-    private suspend fun accountKeyOnce(): ByteArray? = keyLock.withLock {
-        key ?: runCatching { accountKey() }.getOrNull()?.also { key = it }
+    // Works the account key out again once it is no longer current.
+    private suspend fun refreshKey() = keyLock.withLock {
+        if (SystemClock.elapsedRealtime() < keyUntil) return@withLock
+        // A call that fails (no network yet) keeps the key in hand; signed out, there is none.
+        val asked = runCatching { accountKey() }
+        // Stopped meanwhile: the key was dropped, and is not to come back.
+        currentCoroutineContext().ensureActive()
+        asked.onSuccess { key = it }
+        keyUntil = SystemClock.elapsedRealtime() + if (asked.isSuccess && key != null) KEY_CURRENT_MS else KEY_RETRY_MS
     }
 
     // Tells the phones already listening that this TV app opened, then each phone looking for TV apps where
     // to connect, on [socket], until the server stops: a request that cannot be answered, as the network
     // drops, must not be the last one heard.
     private fun answerDiscovery(socket: DatagramSocket, port: Int) {
-        val answer = RemoteDiscovery.answer(port, installId(), deviceName())
-        RemoteDiscovery.announce(socket, answer)
+        RemoteDiscovery.announce(socket, RemoteDiscovery.answer(port, installId(), deviceName()))
         val buffer = ByteArray(512)
         while (!socket.isClosed) {
             val served = runCatching {
                 val packet = DatagramPacket(buffer, buffer.size)
                 socket.receive(packet)
                 if (RemoteDiscovery.isRequest(packet.data, packet.length)) {
+                    // The TV may have been renamed since the server started.
+                    val answer = RemoteDiscovery.answer(port, installId(), deviceName())
                     socket.send(DatagramPacket(answer, answer.size, packet.socketAddress))
                 }
             }
@@ -195,6 +212,9 @@ class TvRemoteServer(
         const val KEY_ID = "install_id"
         const val MAX_HANDSHAKES = 4
         const val HANDSHAKE_DEADLINE_MS = 5_000L
+        const val KEY_CURRENT_MS = 5 * 60_000L
+        const val KEY_RETRY_MS = 10_000L
+        const val KEY_WAIT_MS = 2_000L
         // Before taking the next connection or discovery request after one that failed.
         const val RETRY_MS = 1_000L
     }

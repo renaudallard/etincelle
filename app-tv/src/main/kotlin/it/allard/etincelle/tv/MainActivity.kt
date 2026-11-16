@@ -82,13 +82,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
-// How often the phone driving this app hears how playback goes.
-private const val REMOTE_STATUS_MS = 1_000L
-
 // How long after the activity stops the screensaver's broadcast may come.
 private const val DREAM_GRACE_MS = 3_000L
 
-class MainActivity : ComponentActivity() {
+class MainActivity : ComponentActivity(), TvRemote.Screen {
 
     private val viewModel: MainViewModel by viewModels {
         MainViewModelFactory((application as EtincelleTvApp).container.repository, UpdateChecker(BuildConfig.VERSION_NAME, "tv"), AutoUpdate(this).takeIf { BuildConfig.SELF_UPDATE })
@@ -97,12 +94,13 @@ class MainActivity : ComponentActivity() {
     private var loadControl: AdaptiveLoadControl? = null
     private var pausedForBackground = false
     // A phone of the same account driving this app while it is open.
-    private lateinit var remote: TvRemoteServer
+    private val remote: TvRemote get() = (application as EtincelleTvApp).remote
     private val remoteWindow = Timeline.Window()
     // The last play request from the phone, echoed in the status (see RemoteMessages.REQUEST).
     private var remoteRequest = 0L
     // The screensaver stops this activity but not the remote control: a phone can still find this app and
-    // wake the TV with a command. Leaving the app or the TV going to sleep stop it as before.
+    // wake the TV with a command. Leaving the app or the TV going to sleep stop it, unless it is kept at
+    // all times (see TvRemote).
     private var dreaming = false
     private val handler = Handler(Looper.getMainLooper())
     private val stopRemoteUnlessDreaming = Runnable { if (!dreaming) leave() }
@@ -141,21 +139,15 @@ class MainActivity : ComponentActivity() {
             .setSeekForwardIncrementMs(LivePlayback.SEEK_FORWARD_MS)
             .build()
         player = exo
-        remote = TvRemoteServer(this, { (application as EtincelleTvApp).container.repository.remoteKey() }, ::onRemoteCommand)
+        remote.attach(this)
+        // Opening the app turns the screen on (see the manifest), which older versions only take from here.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) turnScreenOn(true)
         val screen = IntentFilter().apply {
             addAction(Intent.ACTION_DREAMING_STARTED)
             addAction(Intent.ACTION_DREAMING_STOPPED)
             addAction(Intent.ACTION_SCREEN_OFF)
         }
         ContextCompat.registerReceiver(this, screenReceiver, screen, ContextCompat.RECEIVER_NOT_EXPORTED)
-        // Tell the phone how playback goes, while one is connected, also behind the screensaver: a phone
-        // left without news for a while drops the connection.
-        lifecycleScope.launch {
-            while (true) {
-                if (remote.connected) remote.send(remoteStatus())
-                delay(REMOTE_STATUS_MS)
-            }
-        }
         // Only on a fresh launch; a process recreation must not replay the original deep link.
         if (savedInstanceState == null) handleDeepLink(intent)
         // A build from Google Play is updated by Google Play, and may not update itself.
@@ -316,12 +308,13 @@ class MainActivity : ComponentActivity() {
         viewModel.onDeepLink(id, kind)
     }
 
-    // A command from the phone driving this app (see TvRemoteServer).
-    private fun onRemoteCommand(message: JSONObject) {
+    // A command from the phone driving this app (see TvRemote).
+    override fun onRemoteCommand(message: JSONObject) {
         val player = player ?: return
         val type = message.optString(RemoteMessages.TYPE)
-        // Behind the screensaver: what needs the screen wakes the TV first, which brings this app back.
-        // A key only wakes it, as the first press on the TV's own remote does.
+        // Not in front (the screensaver, another app, the TV asleep): what needs the screen wakes the TV
+        // first, which brings this app back. A key only does that, as the first press on the TV's own
+        // remote only wakes it.
         if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) && (type == RemoteMessages.PLAY || type == RemoteMessages.KEY)) {
             wakeScreen()
             if (type == RemoteMessages.KEY) return
@@ -375,8 +368,7 @@ class MainActivity : ComponentActivity() {
         else -> null
     }
 
-    // What plays and where, for the phone (see RemoteMessages.STATUS).
-    private fun remoteStatus(): JSONObject {
+    override fun remoteStatus(): JSONObject {
         val status = JSONObject().put(RemoteMessages.TYPE, RemoteMessages.STATUS).put(RemoteMessages.REQUEST, remoteRequest)
         val state = viewModel.state.value
         val source = state.playing
@@ -441,7 +433,6 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         handler.removeCallbacks(stopRemoteUnlessDreaming)
         remote.start()
-        // Only startable while in front; kept running through the screensaver, stopped with the remote.
         RemoteKeepAliveService.start(this)
         // Back in the foreground: any memory pressure that shrank the buffer has passed.
         loadControl?.restoreFullBuffer()
@@ -465,16 +456,16 @@ class MainActivity : ComponentActivity() {
     }
 
     // The app is left for good, not just behind the screensaver where a phone may still call it: the
-    // remote control stops, and with nothing playing it is the moment for an automatic update, which
-    // closes the app.
+    // remote control stops unless it is kept at all times, and with nothing playing it is the moment for
+    // an automatic update, which closes the app.
     private fun leave() {
-        stopRemote()
+        if (!remote.always) stopRemote()
         if (viewModel.state.value.playing == null) installFetchedUpdate(viewModel)
     }
 
-    // Ends the screensaver: brought back to the front with the screen to be turned on, this activity wakes
-    // the TV. Android lets an app come back from behind like this only when it may display over other apps
-    // (see TvSettingsScreen); otherwise what was asked starts once someone wakes the TV.
+    // Brought back to the front with the screen to be turned on, this activity ends the screensaver or
+    // wakes the TV. Android lets an app come back from behind like this only when it may display over
+    // other apps (see TvSettingsScreen); otherwise what was asked starts once someone wakes the TV.
     private fun wakeScreen() {
         turnScreenOn(true)
         runCatching { startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)) }
@@ -495,12 +486,14 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         // Woken by a phone, or not: from now on the screen goes to sleep as usual.
         turnScreenOn(false)
+        remote.takeAsked()?.let(::onRemoteCommand)
     }
 
     override fun onDestroy() {
         handler.removeCallbacks(stopRemoteUnlessDreaming)
         runCatching { unregisterReceiver(screenReceiver) }
-        stopRemote()
+        remote.detach(this)
+        if (!remote.always) stopRemote()
         player?.release()
         player = null
         loadControl = null

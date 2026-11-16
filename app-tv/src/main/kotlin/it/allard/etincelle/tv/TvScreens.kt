@@ -7,7 +7,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import android.provider.Settings
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -530,15 +529,19 @@ fun TvSettingsScreen(
             }
         }
         TvButton(onClick = onProfiles, highlighted = false) { Text("Profils") }
-        // The phone wakes this TV from its screensaver to play what it sends only once the app may display
-        // over other apps; the switch is in the system's settings. Checked again on coming back from there.
-        var canWake by remember { mutableStateOf(canWakeFromPhone(context)) }
-        LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { canWake = canWakeFromPhone(context) }
+        // The phone finds this TV at all times and wakes it to play what it sends only once the app may
+        // display over other apps; the switch is in the system's settings. Checked again on coming back
+        // from there.
+        var canWake by remember { mutableStateOf(canComeBack(context)) }
+        LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { canWake = canComeBack(context) }
         if (canWake) {
-            Text("Le téléphone peut réveiller ce téléviseur pour lancer une lecture.", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Le téléphone trouve ce téléviseur à tout moment et le réveille pour lancer une lecture.",
+                style = MaterialTheme.typography.titleMedium,
+            )
         } else {
             TvButton(onClick = { openOverlaySettings(context) }, highlighted = false) {
-                Text("Laisser le téléphone réveiller ce téléviseur")
+                Text("Laisser le téléphone trouver et réveiller ce téléviseur à tout moment")
             }
         }
         // Installed once the app is left with nothing playing, since installing closes it.
@@ -564,10 +567,6 @@ fun TvSettingsScreen(
         )
     }
 }
-
-// The app may display over other apps, which lets it come back from behind the screensaver.
-private fun canWakeFromPhone(context: Context): Boolean =
-    Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(context)
 
 // The system page for this app's "display over other apps" switch, or the list of such apps.
 private fun openOverlaySettings(context: Context) {

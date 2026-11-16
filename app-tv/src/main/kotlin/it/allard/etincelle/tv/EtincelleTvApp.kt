@@ -9,4 +9,7 @@ import it.allard.etincelle.data.fubo.AppContainer
 /** TV application-scoped manual DI, sharing the same data layer as the phone app. */
 class EtincelleTvApp : Application() {
     val container: AppContainer by lazy { AppContainer(this, debug = BuildConfig.DEBUG) }
+
+    /** The phone's remote control, which may outlive the activity. */
+    val remote: TvRemote by lazy { TvRemote(this) }
 }

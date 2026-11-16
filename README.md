@@ -130,10 +130,9 @@ coupée, etincelle se reconnecte au Chromecast sans interrompre la lecture. La n
 lecture d'etincelle (voir plus bas) pilote alors le Chromecast.
 
 Le téléphone peut aussi **piloter l'application TV d'etincelle**, comme un Chromecast mais avec la
-télécommande d'etincelle elle-même : tant que l'application est ouverte sur un téléviseur, elle
+télécommande d'etincelle elle-même : elle
 apparaît dans la liste **Lire sur** sous le nom du téléviseur suivi de « (appli TV) », les Chromecast
-y portant « (Chromecast) » puisqu'ils ont souvent le même nom, dès son ouverture
-même pendant une diffusion, et l'on choisit
+y portant « (Chromecast) » puisqu'ils ont souvent le même nom, et l'on choisit
 laquelle quand il y en a plusieurs. La liste est cherchée de nouveau tant qu'elle est ouverte, même
 pendant une diffusion. Le téléviseur lit alors ce que l'on choisit sur le téléphone
 (direct, rattrapage, enregistrement) avec sa propre connexion, enchaîne lui-même l'épisode suivant,
@@ -143,12 +142,16 @@ Toucher la barre de diffusion ouvre une **télécommande** : ce qui passe, lectu
 téléphone connecté au **même compte** Molotov peut piloter le téléviseur, et réciproquement : chacun
 le prouve à l'autre à partir du compte, sans que la télécommande n'envoie le moindre identifiant sur
 le réseau local, et leurs échanges sont chiffrés. Le téléphone et le téléviseur doivent utiliser la
-même version du protocole : mettez à jour les deux applications ensemble. L'application TV reste joignable pendant l'**économiseur d'écran** ; une lecture
-lancée depuis le téléphone, ou une touche de sa télécommande, réveille alors le téléviseur, si
-l'application y est autorisée : dans ses
-**Paramètres**, **Laisser le téléphone réveiller ce téléviseur** ouvre la page système où l'autoriser à
-se superposer aux autres applications (une seule fois). Sans cette autorisation, la lecture démarre
-dès que l'on réveille le téléviseur avec sa télécommande.
+même version du protocole : mettez à jour les deux applications ensemble.
+
+L'application TV peut rester joignable **à tout moment**, comme un Chromecast : ouverte ou non, derrière
+l'économiseur d'écran ou une autre application, téléviseur en veille s'il garde alors sa connexion au
+réseau (c'est le cas d'un Chromecast avec Google TV), et cela dès le démarrage du téléviseur. Une lecture lancée depuis le téléphone, ou une touche de sa télécommande, ouvre alors
+etincelle et réveille le téléviseur. Il faut pour cela l'y autoriser, une seule fois : dans ses
+**Paramètres**, **Laisser le téléphone trouver et réveiller ce téléviseur à tout moment** ouvre la page
+système où l'autoriser à se superposer aux autres applications. Sans cette autorisation, elle n'est
+joignable que lorsqu'elle est à l'écran ou derrière l'**économiseur d'écran**, et la lecture demandée
+démarre dès que l'on réveille le téléviseur avec sa télécommande.
 
 Sur téléphone, la **lecture continue en arrière-plan** et écran verrouillé (le son seul, la vidéo
 reprenant au retour dans l'application), avec une **notification de lecture** et des **commandes sur
