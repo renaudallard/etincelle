@@ -91,7 +91,7 @@ private const val DREAM_GRACE_MS = 3_000L
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels {
-        MainViewModelFactory((application as EtincelleTvApp).container.repository, UpdateChecker(BuildConfig.VERSION_NAME, "tv"), AutoUpdate(this))
+        MainViewModelFactory((application as EtincelleTvApp).container.repository, UpdateChecker(BuildConfig.VERSION_NAME, "tv"), AutoUpdate(this).takeIf { BuildConfig.SELF_UPDATE })
     }
     private var player: ExoPlayer? = null
     private var loadControl: AdaptiveLoadControl? = null
@@ -158,7 +158,8 @@ class MainActivity : ComponentActivity() {
         }
         // Only on a fresh launch; a process recreation must not replay the original deep link.
         if (savedInstanceState == null) handleDeepLink(intent)
-        lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.watchForUpdates() } }
+        // A build from Google Play is updated by Google Play, and may not update itself.
+        if (BuildConfig.SELF_UPDATE) lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.watchForUpdates() } }
         lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.keepPageFresh() } }
         setContent {
             EtincelleTheme {
@@ -243,7 +244,7 @@ class MainActivity : ComponentActivity() {
                                 onProfiles = viewModel::openProfiles,
                                 gridColumns = gridColumns,
                                 onGridColumns = { gridColumns = it },
-                                autoUpdate = autoUpdate.takeIf { AutoUpdate.SUPPORTED },
+                                autoUpdate = autoUpdate.takeIf { BuildConfig.SELF_UPDATE && AutoUpdate.SUPPORTED },
                                 onAutoUpdate = viewModel::setAutoUpdate,
                             )
                         }

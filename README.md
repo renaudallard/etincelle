@@ -305,9 +305,16 @@ Prérequis sur la machine de build :
 - Le wrapper Gradle (Gradle 8.x) est versionné ; utilisez `./gradlew`, pas un Gradle système.
 
 ```bash
-./gradlew :app-mobile:assembleDebug      # APK debug téléphone/tablette
-./gradlew :app-tv:assembleDebug          # APK debug Android TV
+./gradlew :app-mobile:assembleGithubDebug      # APK debug téléphone/tablette
+./gradlew :app-tv:assembleGithubDebug          # APK debug Android TV
 ```
+
+Chaque application existe en deux variantes. **github** est celle des versions publiées sur GitHub :
+elle vérifie et installe elle-même ses mises à jour. **play** est destinée à Google Play, qui met
+lui-même ses applications à jour et interdit qu'elles le fassent autrement : elle n'a ni la
+vérification des mises à jour, ni le réglage **Mises à jour automatiques**, ni les permissions
+d'installation (`:app-mobile:bundlePlayRelease`, `:app-tv:bundlePlayRelease`). Les deux variantes
+portent le même identifiant et la même signature.
 
 Indiquez l'emplacement du SDK dans `local.properties` (`sdk.dir=/chemin/vers/Android/Sdk`).
 

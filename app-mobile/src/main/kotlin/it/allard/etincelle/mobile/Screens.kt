@@ -685,6 +685,8 @@ fun SettingsScreen(
     checkingUpdate: Boolean = false,
     updateStatus: String? = null,
     onCheckUpdate: () -> Unit = {},
+    // False in a build that Google Play updates: only the version is shown, with nothing to check.
+    selfUpdate: Boolean = true,
     // Null where Android cannot install an update without asking: the setting is not shown.
     autoUpdate: Boolean? = null,
     onAutoUpdate: (Boolean) -> Unit = {},
@@ -779,14 +781,14 @@ fun SettingsScreen(
         }
         HorizontalDivider(Modifier.padding(horizontal = 16.dp))
         Row(
-            Modifier.fillMaxWidth().clickable(enabled = !checkingUpdate) { onCheckUpdate() }
+            Modifier.fillMaxWidth().clickable(enabled = selfUpdate && !checkingUpdate) { onCheckUpdate() }
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Vérifier les mises à jour", style = MaterialTheme.typography.bodyLarge)
+                Text(if (selfUpdate) "Vérifier les mises à jour" else "Version", style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    updateStatus ?: "Version actuelle : $appVersion",
+                    updateStatus ?: if (selfUpdate) "Version actuelle : $appVersion" else appVersion,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

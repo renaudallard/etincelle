@@ -115,7 +115,7 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels {
-        MainViewModelFactory((application as EtincelleApp).container.repository, UpdateChecker(BuildConfig.VERSION_NAME, "mobile"), AutoUpdate(this))
+        MainViewModelFactory((application as EtincelleApp).container.repository, UpdateChecker(BuildConfig.VERSION_NAME, "mobile"), AutoUpdate(this).takeIf { BuildConfig.SELF_UPDATE })
     }
     private var player: ExoPlayer? = null
     private var castController: CastPlayerController? = null
@@ -161,7 +161,8 @@ class MainActivity : ComponentActivity() {
         castController = controller
         // Only on a fresh launch; a process recreation must not replay the original deep link.
         if (savedInstanceState == null) handleDeepLink(intent)
-        lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.watchForUpdates() } }
+        // A build from Google Play is updated by Google Play, and may not update itself.
+        if (BuildConfig.SELF_UPDATE) lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.watchForUpdates() } }
         lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.keepPageFresh() } }
         viewModel.setHideLocked(LocalPrefs.hideLocked(this))
 
@@ -607,7 +608,8 @@ private fun AppRoot(
                                 checkingUpdate = state.checkingUpdate,
                                 updateStatus = state.updateStatus,
                                 onCheckUpdate = { vm.checkForUpdateNow() },
-                                autoUpdate = autoUpdate.takeIf { AutoUpdate.SUPPORTED },
+                                selfUpdate = BuildConfig.SELF_UPDATE,
+                                autoUpdate = autoUpdate.takeIf { BuildConfig.SELF_UPDATE && AutoUpdate.SUPPORTED },
                                 onAutoUpdate = vm::setAutoUpdate,
                                 onConnectTv = { vm.confirmTvCode(it) },
                                 onClearTvConnect = { vm.clearTvConnect() },

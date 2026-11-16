@@ -42,6 +42,22 @@ android {
         }
     }
 
+    // Where the app comes from. A GitHub build updates itself; Google Play forbids that and updates its
+    // own builds, so the Play build has neither the update check nor the permissions it takes (see
+    // src/play/AndroidManifest.xml).
+    flavorDimensions += "store"
+    productFlavors {
+        create("github") {
+            dimension = "store"
+            isDefault = true
+            buildConfigField("boolean", "SELF_UPDATE", "true")
+        }
+        create("play") {
+            dimension = "store"
+            buildConfigField("boolean", "SELF_UPDATE", "false")
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
@@ -56,9 +72,11 @@ android {
 android.applicationVariants.all {
     if (buildType.name == "release") {
         val variantVersion = versionName
+        // The GitHub release carries etincelle-<version>-mobile.apk, which the in-app updater looks for.
+        val store = if (flavorName == "play") "-play" else ""
         outputs.all {
             (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName =
-                "etincelle-$variantVersion-mobile.apk"
+                "etincelle-$variantVersion-mobile$store.apk"
         }
     }
 }
