@@ -45,13 +45,26 @@ class UpNextSlateState {
     var left by mutableStateOf<Long?>(null)
         private set
 
+    // The episode was seen before its slate: only then is the player known to be on it.
+    private var armed = false
+
     /**
      * Moves the countdown of [upNext] to [positionMs] of [durationMs]; true once, when it runs out and
      * the next episode should start.
      */
     fun tick(upNext: UpNext, positionMs: Long, durationMs: Long): Boolean {
         val now = upNext.secondsLeft(positionMs, durationMs)
-        if (now == null) hidden = false
+        if (now == null) {
+            hidden = false
+            armed = true
+        }
+        // Just after the switch the player still reports where the previous episode ended, past this
+        // one's slate: going on from there would skip this episode. An episode always starts before
+        // its slate (a resume point past it starts over), so wait to see it there.
+        if (!armed) {
+            left = null
+            return false
+        }
         left = now
         // Watching the credits (a hidden slate) lets the episode end without going on.
         if (now != 0L || fired || hidden) return false
