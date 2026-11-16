@@ -83,13 +83,14 @@ fun CastButton(
                     }
                     state.devices.forEach { device ->
                         // Prefer the route id (unambiguous across same-named devices); fall back to the
-                        // name when no route id is known yet, e.g. a session resumed after an app kill.
+                        // name when no route id is known yet, e.g. a session resumed after an app kill,
+                        // which is always one with a Chromecast.
                         val selected = state.isCasting && when {
                             state.connectedRouteId != null -> state.connectedRouteId == device.routeId
-                            else -> state.connectedDeviceName == device.name
+                            else -> !device.tvApp && state.connectedDeviceName == device.name
                         }
                         TextButton(onClick = { if (!selected) onConnect(device.routeId); open = false }) {
-                            Text((if (selected) "• " else "") + device.name)
+                            Text((if (selected) "• " else "") + device.label)
                         }
                     }
                 }

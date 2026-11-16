@@ -33,8 +33,11 @@ import kotlinx.coroutines.withContext
 /** Route id prefix of an etincelle TV app found on the local network (see core/remote). */
 const val TV_ROUTE_PREFIX = "tv:"
 
-/** A reachable Cast device (a Chromecast / Cast-enabled TV, or an etincelle TV app). */
-data class CastDevice(val routeId: String, val name: String)
+/** A reachable Cast device: a Chromecast or Cast-enabled TV, or an etincelle TV app when [tvApp]. */
+data class CastDevice(val routeId: String, val name: String, val tvApp: Boolean = false) {
+    /** The name with what the device is, as the list shows it: a TV app and a Chromecast often share a name. */
+    val label: String get() = if (tvApp) "$name (appli TV)" else "$name (Chromecast)"
+}
 
 /** What the UI needs to know about casting: discovered devices and the connected one (if any). */
 data class CastUiState(
@@ -256,8 +259,7 @@ open class CastController(
         val scanned = scannedDevices.values.map { it.device }
             .filter { device -> routes.none { device.isBehind(it) } }
             .map { CastDevice(DIRECT_ROUTE_PREFIX + it.id, it.name) }
-        // A TV app is named after its TV, which may also be a Chromecast of the same name: say which.
-        val tvs = scannedTvs.values.map { CastDevice(TV_ROUTE_PREFIX + it.tv.id, "${it.tv.name} (appli TV)") }
+        val tvs = scannedTvs.values.map { CastDevice(TV_ROUTE_PREFIX + it.tv.id, it.tv.name, tvApp = true) }
         _state.value = _state.value.copy(devices = routes.map { CastDevice(it.id, it.name) } + scanned + tvs)
     }
 

@@ -131,7 +131,8 @@ lecture d'etincelle (voir plus bas) pilote alors le Chromecast.
 
 Le téléphone peut aussi **piloter l'application TV d'etincelle**, comme un Chromecast mais avec la
 télécommande d'etincelle elle-même : tant que l'application est ouverte sur un téléviseur, elle
-apparaît dans la liste **Lire sur** sous le nom du téléviseur suivi de « (appli TV) », dès son ouverture
+apparaît dans la liste **Lire sur** sous le nom du téléviseur suivi de « (appli TV) », les Chromecast
+y portant « (Chromecast) » puisqu'ils ont souvent le même nom, dès son ouverture
 même pendant une diffusion, et l'on choisit
 laquelle quand il y en a plusieurs. Le téléviseur lit alors ce que l'on choisit sur le téléphone
 (direct, rattrapage, enregistrement) avec sa propre connexion, enchaîne lui-même l'épisode suivant,

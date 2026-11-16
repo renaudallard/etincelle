@@ -16,7 +16,8 @@ send broadcasts, it only fails to receive them). Android's own service
 announcer (NSD) was tried first: on Android 14 it only answers by multicast, which some phones stop
 receiving, and it wants service names unique across all types, which the TV's own remote service
 already takes. A direct answer always arrives, as with the legacy unicast queries used for Chromecasts.
-The phone lists each TV app as "<name> (appli TV)", route id `tv:<install id>`.
+The phone lists each TV app as "<name> (appli TV)", route id `tv:<install id>`, next to the Chromecasts
+as "<name> (Chromecast)": a TV and its Chromecast often share a name.
 
 ## Screensaver
 
