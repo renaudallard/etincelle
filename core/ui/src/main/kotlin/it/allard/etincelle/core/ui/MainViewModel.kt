@@ -22,6 +22,7 @@ import it.allard.etincelle.core.model.Profiles
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.ProgramWindow
 import it.allard.etincelle.core.model.RecordAction
+import it.allard.etincelle.core.model.UpNext
 import it.allard.etincelle.core.model.withUpNext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -535,11 +536,14 @@ class MainViewModel(
         }
     }
 
-    /** Plays a DVR recording by its dvr asset id (from a recording card or a detail's recordings list). */
-    fun watchRecording(assetId: String) {
+    /**
+     * Plays a DVR recording by its dvr asset id (from a recording card or a detail's recordings list),
+     * offering [upNext] at its end when it is known (from the episode's own page).
+     */
+    fun watchRecording(assetId: String, upNext: UpNext? = null) {
         _state.update { it.copy(busy = true, error = null, info = null) }
         navLaunch {
-            runCatchingNav { repo.resolveRecording(assetId) }
+            runCatchingNav { repo.resolveRecording(assetId).let { if (upNext != null) it.withUpNext(upNext) else it } }
                 .onSuccess { src -> _state.update { it.copy(busy = false, playing = src) } }
                 .onFailure { e -> applyFailure(e, "Échec de lecture") }
         }
@@ -582,7 +586,7 @@ class MainViewModel(
         val d = _state.value.detail ?: return
         // A detail opened from a recording, or whose page says it is one, plays that recording: its
         // catch-up stream does not exist.
-        (_state.value.detailRecordingAssetId ?: d.recordingAssetId)?.let { watchRecording(it); return }
+        (_state.value.detailRecordingAssetId ?: d.recordingAssetId)?.let { watchRecording(it, d.upNext); return }
         // A series has no stream of its own (its vodId is the series id, not a playable asset); the UI
         // hides the Watch button for it, but guard here too so a stray caller cannot mis-resolve it.
         if (d.isSeries) return

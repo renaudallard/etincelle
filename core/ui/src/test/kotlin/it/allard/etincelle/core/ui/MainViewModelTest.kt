@@ -161,6 +161,18 @@ class MainViewModelTest {
         assertEquals(SOURCE, vm.state.value.playing)
     }
 
+    @Test
+    fun aRecordingPlayedFromItsPageOffersTheNextEpisode() {
+        val next = UpNext(1500, 9, "Next", null, "Commence dans %s", "Regarder", "Générique", "VOD_3")
+        val repo = FakeRepo()
+        repo.detail = { _, _ -> DETAIL.copy(vodId = "LIVE_1", recordingAssetId = "LIVE_1", upNext = next) }
+        val vm = viewModel(repo)
+        vm.onCardClick(CARD.copy(vodId = "LIVE_1"))
+        vm.watchDetail()
+
+        assertEquals(next, vm.state.value.playing?.upNext)
+    }
+
     private fun viewModel(repo: FakeRepo) = MainViewModel(repo, UpdateChecker("0", "mobile", "http://127.0.0.1:9/")).also {
         assertTrue(it.state.value.loggedIn)
     }
