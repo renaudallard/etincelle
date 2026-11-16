@@ -134,7 +134,8 @@ Toucher la barre de diffusion ouvre une **télécommande** : ce qui passe, lectu
 10 s, avance de 30 s, et les flèches, OK et Retour pour naviguer dans l'application TV. Seul un
 téléphone connecté au **même compte** Molotov peut piloter le téléviseur, et réciproquement : chacun
 le prouve à l'autre à partir du compte, sans que la télécommande n'envoie le moindre identifiant sur
-le réseau local. L'application TV reste joignable pendant l'**économiseur d'écran** ; une lecture
+le réseau local, et leurs échanges sont chiffrés. Le téléphone et le téléviseur doivent utiliser la
+même version du protocole : mettez à jour les deux applications ensemble. L'application TV reste joignable pendant l'**économiseur d'écran** ; une lecture
 lancée depuis le téléphone, ou une touche de sa télécommande, réveille alors le téléviseur, si
 l'application y est autorisée : dans ses
 **Paramètres**, **Laisser le téléphone réveiller ce téléviseur** ouvre la page système où l'autoriser à

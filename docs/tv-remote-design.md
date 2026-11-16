@@ -42,16 +42,22 @@ SHA-256 of `etincelle-remote-v1`, the user id and the sorted profile ids. Profil
 that only a device signed in to the account can read, and the remote control never sends them. (A cast
 does pass them, with the access token, to the Chromecast, over TLS: the key is no more secret than that.)
 
-Over TCP, frames are a 4-byte big-endian length and UTF-8 text (at most 64 KiB).
+Over TCP, frames are a 4-byte big-endian length and that many bytes (at most 64 KiB); the handshake's
+are UTF-8 text.
 
-1. TV: `etincelle-remote\n1\n<tv nonce>`
+1. TV: `etincelle-remote\n2\n<tv nonce>`
 2. Phone: `auth\n<phone nonce>\n<HMAC(key, "phone|tvNonce|phoneNonce")>`
 3. TV: `welcome\n<HMAC(key, "tv|tvNonce|phoneNonce")>`, or `denied` and it closes.
 
 Each side checks the other's proof, so neither talks to a device of another account. Then every message
-is `seq\nmac\npayload`, the mac being HMAC-SHA256 under `HMAC(key, "session|tvNonce|phoneNonce")` over
-the direction, the sequence number and the payload: a message can be neither forged nor altered,
-replayed or reordered. The TV keeps the latest phone that proves the key.
+is encrypted with AES-256-GCM under `HMAC(key, "session|tvNonce|phoneNonce")`, its 12-byte nonce made of
+the direction (1 from the TV, 2 from the phone) and the message's sequence number, which is not sent: a
+message can be neither read by others on the network, nor forged, altered, replayed or reordered. The TV
+keeps the latest phone that proves the key, and takes one handshake at a time per address (four in all).
+
+This is version 2 of the protocol. Version 1 (2026.11.0 to 2026.11.4) sent `seq\nmac\npayload` in the
+clear, authenticated but readable on the network. The version is in the discovery answer and in the
+greeting: a phone and a TV app of different versions do not list each other.
 
 ## Messages
 

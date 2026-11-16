@@ -48,9 +48,10 @@ class RemoteDiscoveryTest {
         val request = RemoteDiscovery.request()
         assertTrue(RemoteDiscovery.isRequest(request, request.size))
         assertNull(RemoteDiscovery.parseAnswer(request, request.size, "h"))
-        val badPort = "etincelle-tv\n1\n70000\nid\nname".toByteArray()
+        val badPort = "etincelle-tv\n${RemoteProtocol.VERSION}\n70000\nid\nname".toByteArray()
         assertNull(RemoteDiscovery.parseAnswer(badPort, badPort.size, "h"))
-        val otherVersion = "etincelle-tv\n2\n80\nid\nname".toByteArray()
+        // A TV app of the version before, whose messages were not encrypted, is not listed.
+        val otherVersion = "etincelle-tv\n${RemoteProtocol.VERSION - 1}\n80\nid\nname".toByteArray()
         assertNull(RemoteDiscovery.parseAnswer(otherVersion, otherVersion.size, "h"))
         val answer = RemoteDiscovery.answer(80, "id", "n")
         assertFalse(RemoteDiscovery.isRequest(answer, answer.size))
