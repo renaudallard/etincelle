@@ -69,6 +69,8 @@ private const val CAST_RETRY_MAX_BACKOFF_MS = 2000L
 // Failures more than this far apart are separate incidents, not one burst: restore the retry budget so
 // a long cast that self-heals occasionally is never eventually refused recovery.
 private const val CAST_RETRY_RESET_MS = 60_000L
+// How often the receiver's playhead is noted while it plays, for a recovery to resume there.
+private const val RECEIVER_PROGRESS_MS = 1_000L
 
 // media3's CastPlayer never reports a receiver-side failure as a player error, so the only way the
 // phone can notice a wedged cast (a stalled load, or a mid-cast token expiry the receiver cannot
@@ -253,9 +255,7 @@ class CastPlayerController(
             val client = watchedClient ?: return
             val status = client.mediaStatus
             val failed = status?.playerState == MediaStatus.PLAYER_STATE_IDLE && status.idleReason == MediaStatus.IDLE_REASON_ERROR
-            if (!failed && status != null && status.playerState != MediaStatus.PLAYER_STATE_IDLE) {
-                receiverPositionMs = client.approximateStreamPosition
-            }
+            noteReceiverPosition(client)
             // Only for what this phone loaded: a session resumed after the app was killed holds nothing
             // to reload, and a receiver that gave up earlier would only bring an error and a disconnect.
             if (failed && !receiverFailed && _currentPlayer.value === castPlayer && currentItem != null) onPlaybackError(castPlayer)
@@ -263,14 +263,30 @@ class CastPlayerController(
         }
     }
 
+    // The receiver's status only comes on a change of state, so a recovery long after the last pause or
+    // seek would resume there: also follow its playhead while it plays.
+    private val receiverProgressListener = RemoteMediaClient.ProgressListener { _, _ ->
+        watchedClient?.let(::noteReceiverPosition)
+    }
+
+    // Where the receiver plays, kept for a recovery. Not while it is stopped, and never 0: a stream
+    // still loading reports 0 until it has seeked to where it resumes.
+    private fun noteReceiverPosition(client: RemoteMediaClient) {
+        val state = client.mediaStatus?.playerState ?: return
+        if (state == MediaStatus.PLAYER_STATE_IDLE || state == MediaStatus.PLAYER_STATE_UNKNOWN) return
+        client.approximateStreamPosition.takeIf { it > 0 }?.let { receiverPositionMs = it }
+    }
+
     private fun watchReceiver(session: CastSession?) {
         val client = session?.remoteMediaClient
         if (client === watchedClient) return
         watchedClient?.unregisterCallback(receiverStatusCallback)
+        watchedClient?.removeProgressListener(receiverProgressListener)
         watchedClient = client
         receiverFailed = false
         receiverPositionMs = 0L
         client?.registerCallback(receiverStatusCallback)
+        client?.addProgressListener(receiverProgressListener, RECEIVER_PROGRESS_MS)
     }
 
     // Drives the connect animation: the bar fills while connecting and snaps full once the receiver
@@ -1196,9 +1212,10 @@ class CastPlayerController(
 
     private fun loadOn(player: Player, item: MediaItem, positionMs: Long) {
         currentItem = item
-        // A new item on the receiver: the last position it reported was the previous item's.
-        if (player === castPlayer) receiverPositionMs = 0L
         val isLive = (item.localConfiguration?.tag as? PlaybackSource)?.isLive == true
+        // A new item on the receiver: the last position it reported was the previous item's. Until it
+        // reports one, it is where this load starts, so a load failing before it plays retries there.
+        if (player === castPlayer) receiverPositionMs = if (isLive) 0L else positionMs.coerceAtLeast(0)
         // CastPlayer loads live DASH at the start of the receiver's DVR window (currentTime=0); ask
         // for a position well past the window so the receiver clamps to the live edge. ExoPlayer
         // already starts live at the edge, so it keeps the caller's position.
