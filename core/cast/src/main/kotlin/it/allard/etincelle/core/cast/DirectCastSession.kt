@@ -98,7 +98,7 @@ internal class DirectCastSession(
             withTimeout(LAUNCH_TIMEOUT_MS) {
                 requestReceiver(JSONObject().put("type", "GET_STATUS"))
                 runningApp(nextReceiverStatus { true }) ?: run {
-                    if (joinOnly) throw IOException("the receiver is not running")
+                    if (joinOnly) throw ReceiverNotRunningException()
                     launchSent = true
                     requestReceiver(JSONObject().put("type", "LAUNCH").put("appId", appId))
                     nextReceiverStatus { runningApp(it) != null || it.has(LAUNCH_ERROR_KEY) }
@@ -276,3 +276,6 @@ internal class DirectCastSession(
         const val LAUNCH_ERROR_KEY = "launchError"
     }
 }
+
+/** Joining a Chromecast found our receiver not running there (stopped on the TV, or never started). */
+class ReceiverNotRunningException : IOException("the receiver is not running")

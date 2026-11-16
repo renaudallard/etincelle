@@ -84,7 +84,7 @@ private const val LIVENESS_STALL_MS = 30_000L
 private const val VOLUME_STEP = 0.05
 
 // When a direct cast's connection drops, wait this long before each reconnection attempt.
-private val REJOIN_DELAYS_MS = longArrayOf(1_000, 3_000, 6_000)
+private val REJOIN_DELAYS_MS = longArrayOf(1_000, 3_000, 6_000, 10_000)
 
 /**
  * Plays a stream on the phone ([ExoPlayer]) or a Chromecast ([CastPlayer]), swapping between them
@@ -179,6 +179,10 @@ class CastPlayerController(
 
     private var currentItem: MediaItem? = null
     private var endingPosition = 0L
+    // The Chromecast of the Play Services session now ending, and whether that end was asked for (see
+    // takeBack).
+    private var endingDevice: DirectCastDevice? = null
+    private var endingOnPurpose = false
     private var endingPlayWhenReady = true
     private var endingCaptured = false
     private var castRetryCount = 0
@@ -678,18 +682,22 @@ class CastPlayerController(
                 delay(wait)
                 val fresh = newDirectSession(device)
                 directSession = fresh
-                val joined = runCatching { fresh.start(joinOnly = true) }.isSuccess
+                val joined = runCatching { fresh.start(joinOnly = true) }
                 // runCatching also catches a cancellation (Cet appareil meanwhile): stop there.
                 if (!isActive || directSession !== fresh) {
                     fresh.close()
                     return@launch
                 }
-                if (joined) {
+                if (joined.isSuccess) {
+                    markDirectConnected(device)
+                    clearConnecting()
                     directPlayer.attach(fresh)
                     fresh.requestStatus()
                     return@launch
                 }
                 fresh.close()
+                // Reached, but nothing of ours runs there any more (stopped on the TV): no use waiting.
+                if (joined.exceptionOrNull() is ReceiverNotRunningException) break
             }
             endDirectCast()
         }
@@ -826,6 +834,7 @@ class CastPlayerController(
         transferring = false
         transferFallbackJob?.cancel()
         reResolveJob?.cancel()
+        endingOnPurpose = true
         super.disconnect()
     }
 
@@ -1024,6 +1033,9 @@ class CastPlayerController(
         endingPosition = castPlayer.currentPosition
         endingPlayWhenReady = castPlayer.playWhenReady
         endingCaptured = true
+        endingDevice = session.castDevice?.let { cast ->
+            cast.inetAddress?.hostAddress?.let { DirectCastDevice(cast.deviceId, cast.friendlyName ?: cast.deviceId, it, cast.servicePort) }
+        }
     }
 
     override fun onSessionDisconnected() {
@@ -1031,6 +1043,9 @@ class CastPlayerController(
         // own paths (that clear their session first). Without this, coming back to the foreground, where
         // start() reports no Play Services session, would wipe the state of one still playing.
         if (directConnected || tvConnected) return
+        val lostDevice = endingDevice.takeIf { !endingOnPurpose }
+        endingDevice = null
+        endingOnPurpose = false
         watchReceiver(null)
         // Capture the in-flight transfer target name before super clears it, so the bar can keep
         // animating the connect toward the incoming device across the hand-off gap.
@@ -1093,10 +1108,29 @@ class CastPlayerController(
             return
         }
         pendingDirectRoute = null
+        val item = currentItem
+        if (lostDevice != null && item != null) {
+            takeBack(lostDevice, item)
+            return
+        }
         // Any other end (TV off, external stop, logout): stop, and tell the UI to drop its playing
         // state so the local player is not popped over whatever the user is now browsing.
         stopQuietly()
         onPlaybackStopped?.invoke()
+    }
+
+    // A Play Services cast that ended without anyone asking, typically the phone's Wi-Fi dropping for a
+    // few seconds: Play Services then drops the route and the session with it, while the TV plays on.
+    // Take it back over our own connection when our receiver still runs there, without reloading;
+    // stopped on the TV, or out of reach for good, it ends as any other cast (see rejoinDirect).
+    private fun takeBack(device: DirectCastDevice, item: MediaItem) {
+        clearDeferredStop()
+        runCatching { castPlayer.stop() }
+        castSessionId = null
+        markConnecting(device.name)
+        directPlayer.setItem(item)
+        _currentPlayer.value = directPlayer
+        rejoinDirect(device)
     }
 
     private fun swapTo(target: Player, fromPosition: Long, fromPlayWhenReady: Boolean) {
