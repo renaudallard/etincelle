@@ -88,11 +88,14 @@ genre** dans les grilles de catégories. Les vignettes portent le **logo de la c
 programme (directs, résultats de recherche…), comme dans l'application officielle, et gardent la
 forme de leur image : affiches en portrait, images en paysage, logos de chaînes sur un carré. Sur téléphone, un
 menu **Paramètres**, ouvert par l'engrenage de la
-barre du haut, regroupe les réglages : le **masquage des contenus verrouillés** (cache les programmes
-non inclus dans votre abonnement), le choix d'une **icône monochrome** (logo blanc), l'activation
-expérimentale du **récepteur Cast Fubo officiel** (redémarrage requis), un bouton **Vérifier les
-mises à jour** (compare la version installée à la dernière publiée sur GitHub) et la **déconnexion**
-(avec confirmation). Sur
+barre du haut, regroupe les réglages : les **profils**, le nombre de **vignettes par ligne** des
+grilles, le **masquage des contenus verrouillés** (cache les programmes non inclus dans votre
+abonnement), le choix d'une **icône monochrome** (logo blanc), l'activation expérimentale du
+**récepteur Cast Fubo officiel** (redémarrage requis), **Connecter une TV** (voir plus bas), un bouton
+**Vérifier les mises à jour** (compare la version installée à la dernière publiée sur GitHub) et la
+**déconnexion** (avec confirmation). Sur Android TV, l'onglet **Paramètres** propose la déconnexion,
+les profils, l'autorisation de réveil par le téléphone (voir plus bas) et le nombre de vignettes par
+ligne. Sur
 téléphone, vous pouvez **diffuser** le flux en cours vers un **Chromecast** et transférer la lecture
 d'un appareil à l'autre. Si le direct a été **rembobiné** avant la diffusion, le Chromecast reprend au
 même endroit dans le différé plutôt qu'au bord du direct. Une **coupure Wi-Fi** passagère du téléphone n'arrête pas
@@ -132,7 +135,8 @@ Toucher la barre de diffusion ouvre une **télécommande** : ce qui passe, lectu
 téléphone connecté au **même compte** Molotov peut piloter le téléviseur, et réciproquement : chacun
 le prouve à l'autre à partir du compte, sans que la télécommande n'envoie le moindre identifiant sur
 le réseau local. L'application TV reste joignable pendant l'**économiseur d'écran** ; une lecture
-lancée depuis le téléphone réveille alors le téléviseur, si l'application y est autorisée : dans ses
+lancée depuis le téléphone, ou une touche de sa télécommande, réveille alors le téléviseur, si
+l'application y est autorisée : dans ses
 **Paramètres**, **Laisser le téléphone réveiller ce téléviseur** ouvre la page système où l'autoriser à
 se superposer aux autres applications (une seule fois). Sans cette autorisation, la lecture démarre
 dès que l'on réveille le téléviseur avec sa télécommande.
@@ -151,7 +155,8 @@ vérifie sa taille et son empreinte SHA-256 publiées par GitHub, puis la confie
 d'Android, qui demande confirmation. La première fois, etincelle ouvre la page des paramètres où
 l'autoriser à installer des applications ; appuyez ensuite à nouveau sur **Installer**. Sur un
 téléviseur qui n'a pas cette page, etincelle ouvre ses paramètres et indique le chemin : **Applications
-> Sécurité et restrictions > Sources inconnues**, puis etincelle.
+> Sécurité et restrictions > Sources inconnues**, puis etincelle. Sur le téléviseur, Android ferme
+etincelle une fois la mise à jour installée : rouvrez-la depuis l'écran d'accueil.
 
 > ### ⚠️ Avertissement
 >
@@ -252,6 +257,7 @@ etincelle/
 │   ├── network/            OkHttp/Retrofit/Moshi + intercepteurs Fubo + session + TokenStore
 │   ├── player/             mapping Media3 : DrmSpec vers MediaItem Widevine
 │   ├── cast/               diffusion Chromecast Widevine, par Play Services ou en direct (téléphone)
+│   ├── remote/             télécommande de l'application TV : découverte, poignée de main, messages
 │   └── ui/                 MainViewModel/UiState partagés + vérif. de mise à jour GitHub
 ├── data/
 │   └── fubo/               FuboRepository (implémente MolotovRepository) + DTO/mappers + DI
@@ -262,7 +268,9 @@ Les deux applications affichent le même catalogue `papi` et lisent les mêmes f
 Compose diffère (Material3 + barre inférieure sur téléphone, lignes Compose-for-TV + focus D-pad sur
 TV). La couche de présentation (`core:ui`) ne dépend que de l'interface `MolotovRepository` de
 `core:domain`, le backend reste donc interchangeable. Les tests unitaires couvrent les intercepteurs,
-les mappers DTO vers métier/DRM et le rafraîchissement des jetons. L'injection de dépendances est un
+les mappers DTO vers métier/DRM, le rafraîchissement des jetons, la logique de lecture (points de
+reprise, direct, mémoire tampon, épisode suivant), la recherche et l'authentification des Chromecast,
+le protocole de la télécommande TV, la vérification des mises à jour et le `MainViewModel`. L'injection de dépendances est un
 petit `AppContainer` manuel (Hilt serait surdimensionné pour une application à un seul ViewModel et un
 seul backend ; il pourra être ajouté si le graphe grandit).
 
@@ -285,8 +293,8 @@ Indiquez l'emplacement du SDK dans `local.properties` (`sdk.dir=/chemin/vers/And
 
 ## Chaîne d'outils
 
-Kotlin 2.4, AGP 8.12, Gradle 8.x, Jetpack Compose (BOM 2026.05), Compose for TV (`androidx.tv`),
-AndroidX Media3 (ajouté lors du jalon de lecture). `compileSdk`/`targetSdk` = 36, `minSdk` = 23.
+Kotlin 2.4, AGP 8.12, Gradle 8.14, Jetpack Compose (BOM 2025.06), Compose for TV (`androidx.tv`),
+AndroidX Media3 1.7. `compileSdk`/`targetSdk` = 36, `minSdk` = 23.
 
 ## Licence
 
