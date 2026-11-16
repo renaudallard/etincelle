@@ -19,6 +19,7 @@ import java.net.DatagramSocket
 import java.net.InetSocketAddress
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
@@ -28,6 +29,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /** Route id prefix of an etincelle TV app found on the local network (see core/remote). */
@@ -122,6 +125,12 @@ open class CastController(
     }
     private var activeScanning = false
 
+    // Our own scan while the list of devices is looked at (see [setActiveScan]).
+    private var listScan: Job? = null
+
+    // One scan of ours at a time: two counting the same answers would drop a device twice as fast.
+    private val scanLock = Mutex()
+
     private var listening = false
     private val sessionListener = object : SessionManagerListener<CastSession> {
         override fun onSessionStarted(session: CastSession, sessionId: String) = onSessionConnected(session)
@@ -150,6 +159,8 @@ open class CastController(
             scope.launch { rediscoverWhileIdle() }
             scope.launch { listenForTvs() }
         }
+        // The list of devices may have stayed open while the app was away.
+        scanForList()
     }
 
     // Discovery pauses while the app is away, but the session keeps being followed: a cast that ends
@@ -158,7 +169,7 @@ open class CastController(
     open fun stop() {
         discoveryScope?.cancel()
         discoveryScope = null
-        setActiveScan(false)
+        scanForList()
         mediaRouter.removeCallback(routerCallback)
     }
 
@@ -196,16 +207,33 @@ open class CastController(
      * platform's own chooser does: the moment the user signals intent to cast, scan hard so a device
      * that briefly dropped off (or a second device for a device-to-device switch) reappears in ~1s
      * instead of waiting for the idle re-discovery tick. Cleared (back to passive discovery) when closed.
+     * Our own scan runs at once too and keeps running meanwhile, also during a cast, when nothing else
+     * looks for devices: the list would otherwise show what was there before the cast started.
      */
     fun setActiveScan(enabled: Boolean) {
         if (enabled == activeScanning) return
         activeScanning = enabled
-        if (enabled) {
+        scanForList()
+        refreshDevices()
+    }
+
+    // Scans as [activeScanning] asks, for as long as discovery runs (between [start] and [stop]).
+    private fun scanForList() {
+        listScan?.cancel()
+        listScan = null
+        val scope = discoveryScope
+        if (activeScanning && scope != null) {
             mediaRouter.addCallback(selector, activeScanCallback, MediaRouter.CALLBACK_FLAG_PERFORM_ACTIVE_SCAN)
+            listScan = scope.launch {
+                while (true) {
+                    scanDirectly()
+                    refreshDevices()
+                    delay(LIST_SCAN_MS)
+                }
+            }
         } else {
             mediaRouter.removeCallback(activeScanCallback)
         }
-        refreshDevices()
     }
 
     /** A Play Services session could not be started. */
@@ -292,7 +320,7 @@ open class CastController(
     }
 
     // Our own scan, run with each active scan pulse; folds the answers into [scannedDevices].
-    private suspend fun scanDirectly() {
+    private suspend fun scanDirectly() = scanLock.withLock {
         val network = wifiNetwork()
         // Off Wi-Fi no scan runs, so nothing would ever count as missed: the list kept offering the
         // devices of a network left an hour ago. Forget them as soon as that network is gone or replaced.
@@ -302,7 +330,7 @@ open class CastController(
             scannedTvs.clear()
             refreshDevices()
         }
-        if (network == null) return
+        if (network == null) return@withLock
         val found = withContext(Dispatchers.IO) { CastScanner.scan(receiverAppId, network) }
         val foundIds = found.map { it.id }.toSet()
         for (entry in scannedDevices.values) if (entry.device.id !in foundIds) entry.missed++
@@ -384,5 +412,7 @@ open class CastController(
         // Route id prefix of a Chromecast found by our own scan rather than by Play Services.
         const val DIRECT_ROUTE_PREFIX = "direct:"
         const val ACTIVE_SCAN_MS = 4_000L
+        // Between two of our own scans while the list of devices is looked at.
+        const val LIST_SCAN_MS = 2_000L
     }
 }

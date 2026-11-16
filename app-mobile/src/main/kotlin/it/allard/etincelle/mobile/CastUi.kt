@@ -28,7 +28,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,8 +53,14 @@ fun CastButton(
 ) {
     var open by remember { mutableStateOf(false) }
     // Scan aggressively while the picker is open (and stop when it closes), so a device that just
-    // flapped reappears in the list within ~1s instead of waiting for the idle re-discovery tick.
-    LaunchedEffect(open) { onActiveScan(open) }
+    // flapped reappears in the list within ~1s instead of waiting for the idle re-discovery tick. Also
+    // stopped when the button goes away with its picker open, as the player's does with its controls.
+    DisposableEffect(open) {
+        // As it is now: read when the picker closes, [open] would already say closed.
+        val opened = open
+        if (opened) onActiveScan(true)
+        onDispose { if (opened) onActiveScan(false) }
+    }
     // Hide the button when there is nothing to cast to, but keep an already-open picker on screen so it
     // does not vanish mid-interaction if the last discovered device drops off the network.
     if (!state.available && !open) return

@@ -134,7 +134,8 @@ télécommande d'etincelle elle-même : tant que l'application est ouverte sur u
 apparaît dans la liste **Lire sur** sous le nom du téléviseur suivi de « (appli TV) », les Chromecast
 y portant « (Chromecast) » puisqu'ils ont souvent le même nom, dès son ouverture
 même pendant une diffusion, et l'on choisit
-laquelle quand il y en a plusieurs. Le téléviseur lit alors ce que l'on choisit sur le téléphone
+laquelle quand il y en a plusieurs. La liste est cherchée de nouveau tant qu'elle est ouverte, même
+pendant une diffusion. Le téléviseur lit alors ce que l'on choisit sur le téléphone
 (direct, rattrapage, enregistrement) avec sa propre connexion, enchaîne lui-même l'épisode suivant,
 et se pilote depuis la barre de diffusion, la notification ou les touches de volume du téléphone.
 Toucher la barre de diffusion ouvre une **télécommande** : ce qui passe, lecture/pause, recul de

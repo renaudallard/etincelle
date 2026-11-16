@@ -518,7 +518,7 @@ private fun AppRoot(
                         playerFullscreen -> {
                             BackHandler { vm.stopPlaying() }
                             PlayerSurface(
-                                playing!!, currentPlayer, castState, onCastConnect, onCastDisconnect,
+                                playing!!, currentPlayer, castState, onCastConnect, onCastDisconnect, onCastActiveScan,
                                 fetchProgramWindow = vm::liveProgramWindow,
                                 onPlayNext = vm::playUpNext,
                                 upNextSlate = upNextSlate,
@@ -535,7 +535,7 @@ private fun AppRoot(
                         castControls -> {
                             BackHandler { castControlsOpen = false }
                             PlayerSurface(
-                                playing!!, currentPlayer, castState, onCastConnect, onCastDisconnect,
+                                playing!!, currentPlayer, castState, onCastConnect, onCastDisconnect, onCastActiveScan,
                                 fetchProgramWindow = vm::liveProgramWindow, secure = false,
                                 onPlayNext = vm::playUpNext,
                                 upNextSlate = upNextSlate,
@@ -828,6 +828,7 @@ private fun PlayerSurface(
     castState: CastUiState,
     onCastConnect: (String) -> Unit,
     onCastDisconnect: () -> Unit,
+    onCastActiveScan: (Boolean) -> Unit,
     fetchProgramWindow: suspend (String) -> ProgramWindow?,
     secure: Boolean = true,
     onPlayNext: () -> Unit = {},
@@ -934,7 +935,7 @@ private fun PlayerSurface(
         )
         if (controlsVisible) {
             Box(Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(8.dp)) {
-                CastButton(castState, onCastConnect, onCastDisconnect)
+                CastButton(castState, onCastConnect, onCastDisconnect, onCastActiveScan)
             }
         }
         if (behindLive && controlsVisible) {

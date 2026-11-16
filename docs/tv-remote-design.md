@@ -6,7 +6,9 @@ protocol of our own (module `core:remote`) so that every part of it is under our
 ## Discovery
 
 While its activity is started, the TV app listens on UDP port 47811. The phone broadcasts
-`etincelle-discover\n1` there from an ephemeral port, during each of its scans for Chromecasts, and also
+`etincelle-discover\n1` there from an ephemeral port, during each of its scans for Chromecasts
+(every 20 s or so while idle in the foreground, and one after the other while the list of devices is
+open, a cast running or not), and also
 sends it to each address of its subnet (up to a /22), as some TVs receive no broadcast or multicast at
 all (seen on a Google TV Streamer). Each TV app answers directly with
 `etincelle-tv\n2\n<port>\n<install id>\n<TV name>`, the port being TCP 47811 unless something else
