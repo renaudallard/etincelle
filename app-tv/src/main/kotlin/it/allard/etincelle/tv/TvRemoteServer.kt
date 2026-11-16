@@ -10,6 +10,7 @@ import it.allard.etincelle.core.remote.RemoteDiscovery
 import it.allard.etincelle.core.remote.RemoteLink
 import java.net.DatagramPacket
 import java.net.DatagramSocket
+import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
@@ -57,8 +58,9 @@ class TvRemoteServer(
     private var key: ByteArray? = null
     private val keyLock = Mutex()
 
-    // Handshakes in progress (main thread): each holds a thread, so a few at a time is all a phone needs.
-    private var handshakes = 0
+    // The addresses with a handshake in progress (main thread): each holds a thread, so a few at a time
+    // is all phones need, and one per address, so a single device cannot keep them all busy.
+    private val handshakes = HashSet<InetAddress?>()
 
     /** A phone is connected. */
     val connected: Boolean get() = link != null
@@ -117,11 +119,11 @@ class TvRemoteServer(
             return
         }
         // Its read timeout only bounds each read: a device trickling bytes must not hold a thread for long.
-        if (handshakes >= MAX_HANDSHAKES) {
+        val address = socket.inetAddress
+        if (handshakes.size >= MAX_HANDSHAKES || !handshakes.add(address)) {
             runCatching { socket.close() }
             return
         }
-        handshakes++
         val deadline = scope?.launch {
             delay(HANDSHAKE_DEADLINE_MS)
             runCatching { socket.close() }
@@ -130,7 +132,7 @@ class TvRemoteServer(
         val phone = try {
             runCatching { withContext(Dispatchers.IO + NonCancellable) { RemoteLink.accept(socket, key) } }.getOrNull()
         } finally {
-            handshakes--
+            handshakes.remove(address)
             deadline?.cancel()
         } ?: return
         if (!currentCoroutineContext().isActive) {
