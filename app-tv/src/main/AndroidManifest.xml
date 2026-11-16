@@ -34,11 +34,14 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Etincelle">
 
-        <!-- Every configuration change is taken in place (Compose redraws): a recreation would restart
-             what plays from where it was opened, as when a keyboard or gamepad connects. -->
+        <!-- One instance only: it owns the player, so a link or the launcher opening the app while it
+             runs goes to the one there instead of starting a second copy. Every configuration change is
+             taken in place (Compose redraws): a recreation would restart what plays from where it was
+             opened, as when a keyboard or gamepad connects. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTask"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|touchscreen|uiMode|density|fontScale|fontWeightAdjustment|locale|layoutDirection|colorMode|mcc|mnc"
             android:theme="@style/Theme.Etincelle">
             <intent-filter>
