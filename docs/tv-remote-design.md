@@ -9,7 +9,9 @@ While its activity is started, the TV app listens on UDP port 47811. The phone b
 `etincelle-discover\n1` there from an ephemeral port, during each of its scans for Chromecasts, and also
 sends it to each address of its subnet (up to a /22), as some TVs receive no broadcast or multicast at
 all (seen on a Google TV Streamer). Each TV app answers directly with
-`etincelle-tv\n1\n<port>\n<install id>\n<TV name>`. As it starts, the TV app also broadcasts that answer
+`etincelle-tv\n2\n<port>\n<install id>\n<TV name>`, the port being TCP 47811 unless something else
+holds it: a phone that listed the TV before its server last started still connects. As its server
+starts, the TV app also broadcasts that answer
 once, unasked, to port 47811, where the phone listens while it is in the foreground: a TV app opened
 meanwhile joins the list at once, even while the phone is connected and so not scanning (a Streamer can
 send broadcasts, it only fails to receive them). Android's own service
