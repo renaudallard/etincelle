@@ -39,6 +39,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.IdentityHashMap
 
 // TV pairing poll cadence: poll every few seconds, and regenerate the code a little before its
 // server expiry so a confirm racing the deadline is not lost.
@@ -49,6 +50,11 @@ private const val PAIRING_RETRY_MS = 5000L
 // the login screen cannot poll indefinitely.
 private const val PAIRING_MAX_ROUNDS = 12
 private const val UPDATE_INTERVAL_MS = 24 * 60 * 60 * 1000L
+// A page that shows what is on air goes stale as programmes change, and nothing on it says when. It is
+// loaded again once it is this old when someone comes back to it, and this old while it stays on screen.
+private const val STALE_ON_RETURN_MS = 2 * 60 * 1000L
+private const val STALE_ON_SCREEN_MS = 5 * 60 * 1000L
+private const val STALE_CHECK_MS = 30 * 1000L
 // The official app caps a profile name at 30 characters.
 const val PROFILE_NAME_MAX = 30
 
@@ -135,6 +141,10 @@ data class UiState(
     }
 }
 
+// A card with the backend's tag (DIRECT) that opens a channel is the programme now on that channel.
+private val ContentPage.showsWhatIsOnAir: Boolean
+    get() = rails.any { rail -> rail.cards.any { it.channelId != null && it.tag != null } }
+
 /** The profiles screen: [asking] when the app asks who is watching, else opened from the settings. */
 data class ProfileScreen(val list: Profiles, val currentId: String?, val asking: Boolean)
 
@@ -146,12 +156,26 @@ class MainViewModel(
     private val repo: MolotovRepository,
     private val updates: UpdateChecker,
     private val auto: AutoUpdateStore? = null,
+    private val clock: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
+    // When each page of the back stack was loaded, by instance: a page gets its time as it comes in.
+    private val loadedAt = IdentityHashMap<ContentPage, Long>()
+
     init {
+        viewModelScope.launch {
+            var seen: List<ContentPage>? = null
+            _state.collect { s ->
+                val stack = s.backStack
+                if (stack === seen) return@collect
+                seen = stack
+                loadedAt.keys.retainAll { known -> stack.any { it === known } }
+                for (page in stack) if (page !in loadedAt) loadedAt[page] = clock()
+            }
+        }
         viewModelScope.launch {
             val restored = runCatching { repo.restoreSession() }.getOrDefault(false)
             if (restored) {
@@ -417,7 +441,7 @@ class MainViewModel(
         loadPageInto(tab.path, replace = true, fallbackTitle = tab.label, grid = tab == Tab.LIVE || tab == Tab.CHANNELS || tab == Tab.RECORDINGS)
     }
 
-    private fun reloadGuide(silent: Boolean) {
+    private fun reloadGuide(silent: Boolean, quiet: Boolean = false) {
         _state.update {
             if (silent) it.copy(tab = Tab.GUIDE, error = null, refreshing = true)
             else it.copy(tab = Tab.GUIDE, error = null, busy = true, backStack = emptyList())
@@ -425,11 +449,11 @@ class MainViewModel(
         navLaunch(refresh = silent) {
             runCatchingNav { repo.loadGuide() }
                 .onSuccess { page -> _state.update { it.copy(busy = false, refreshing = false, backStack = listOf(page)) } }
-                .onFailure { e -> applyFailure(e, "Guide indisponible") }
+                .onFailure { e -> reloadFailed(e, "Guide indisponible", quiet) }
         }
     }
 
-    private fun reloadHome(silent: Boolean) {
+    private fun reloadHome(silent: Boolean, quiet: Boolean = false) {
         _state.update {
             if (silent) it.copy(tab = Tab.HOME, error = null, refreshing = true)
             else it.copy(tab = Tab.HOME, error = null, busy = true, backStack = emptyList())
@@ -437,37 +461,67 @@ class MainViewModel(
         navLaunch(refresh = silent) {
             runCatchingNav { repo.loadHome() }
                 .onSuccess { page -> _state.update { it.copy(busy = false, refreshing = false, backStack = listOf(page)) } }
-                .onFailure { e -> applyFailure(e, "Accueil indisponible") }
+                .onFailure { e -> reloadFailed(e, "Accueil indisponible", quiet) }
         }
     }
 
-    /** Refreshes time-sensitive content when the app returns to the foreground (the guide goes stale). */
-    fun refreshOnResume() {
+    /** Refreshes what the page shows as on air when the app returns to the foreground. */
+    fun refreshOnResume() = reloadIfStale(STALE_ON_RETURN_MS)
+
+    /**
+     * Keeps what the page on screen shows as on air current for as long as the caller runs: the activity
+     * runs this while it is started.
+     */
+    suspend fun keepPageFresh() {
+        while (true) {
+            delay(STALE_CHECK_MS)
+            reloadIfStale(STALE_ON_SCREEN_MS)
+        }
+    }
+
+    // Loads the page on screen again when it shows programmes on air and is at least [limitMs] old.
+    private fun reloadIfStale(limitMs: Long) {
         val s = _state.value
-        if (!s.loggedIn || s.playing != null || s.detail != null || s.settings || s.busy || s.refreshing) return
-        if (s.tab == Tab.GUIDE && s.backStack.isNotEmpty()) reloadGuide(silent = true)
+        val page = s.current ?: return
+        if (!s.loggedIn || s.tab == Tab.SEARCH || !(s.tab == Tab.GUIDE || page.showsWhatIsOnAir)) return
+        val age = clock() - (loadedAt[page] ?: return)
+        // A clock set back makes the age meaningless: load again.
+        if (age in 0 until limitMs) return
+        reloadCurrent(quiet = true)
     }
 
     /** Reloads the page currently shown (pull to refresh, or overscroll past an end). */
-    fun refreshCurrent() {
+    fun refreshCurrent() = reloadCurrent(quiet = false)
+
+    // [quiet] for a reload nobody asked for: when it fails the page stays as it is, with no message.
+    private fun reloadCurrent(quiet: Boolean) {
         val s = _state.value
         if (s.playing != null || s.detail != null || s.settings || s.busy || s.refreshing) return
         val top = s.backStack.lastOrNull()
         val reloadUrl = top?.reloadUrl
         when {
             // A drilled-in papi page reloads itself, whatever tab it lives under.
-            reloadUrl != null -> reloadPageTop(reloadUrl, top?.isGrid ?: false)
+            reloadUrl != null -> reloadPageTop(reloadUrl, top?.isGrid ?: false, quiet)
             // A drilled-in page with no backing url (a synthetic see-all) has nothing to reload.
             s.backStack.size > 1 -> {}
-            s.tab == Tab.GUIDE -> reloadGuide(silent = true)
+            s.tab == Tab.GUIDE -> reloadGuide(silent = true, quiet)
             s.tab == Tab.SEARCH -> lastQuery?.let { search(it, silent = true) }
-            s.tab == Tab.HOME -> reloadHome(silent = true)
+            s.tab == Tab.HOME -> reloadHome(silent = true, quiet)
             else -> {}
         }
     }
 
+    // A failed reload: said like any failed load, unless nobody asked for it and the session still stands.
+    private fun reloadFailed(e: Throwable, fallback: String, quiet: Boolean) {
+        if (quiet && !(e is AppError.Unauthorized && repo.currentSession() == null)) {
+            _state.update { it.copy(refreshing = false) }
+        } else {
+            applyFailure(e, fallback)
+        }
+    }
+
     /** Re-fetches the top page's papi url, replacing only that entry so the back stack is kept. */
-    private fun reloadPageTop(url: String, grid: Boolean) {
+    private fun reloadPageTop(url: String, grid: Boolean, quiet: Boolean = false) {
         _state.update { it.copy(refreshing = true, error = null) }
         navLaunch(refresh = true) {
             runCatchingNav { repo.loadPage(url) }
@@ -482,7 +536,7 @@ class MainViewModel(
                         }
                     }
                 }
-                .onFailure { e -> applyFailure(e, "Échec de chargement") }
+                .onFailure { e -> reloadFailed(e, "Échec de chargement", quiet) }
         }
     }
 
@@ -896,6 +950,7 @@ class MainViewModel(
         // Drop any in-flight load/play so it cannot re-open this screen after the user backed out.
         cancelNav()
         _state.update { it.copy(detailStack = it.detailStack.dropLast(1), error = null, info = null) }
+        reloadIfStale(STALE_ON_RETURN_MS)
     }
 
     private fun loadPageInto(url: String, replace: Boolean, fallbackTitle: String?, grid: Boolean = false) {
@@ -920,6 +975,7 @@ class MainViewModel(
     fun stopPlaying() {
         cancelNav()
         _state.update { it.copy(playing = null) }
+        reloadIfStale(STALE_ON_RETURN_MS)
     }
 
     // Where the player ends up is saved as the activity is destroyed, and by then a finishing

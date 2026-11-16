@@ -159,6 +159,7 @@ class MainActivity : ComponentActivity() {
         // Only on a fresh launch; a process recreation must not replay the original deep link.
         if (savedInstanceState == null) handleDeepLink(intent)
         lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.watchForUpdates() } }
+        lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.keepPageFresh() } }
         setContent {
             EtincelleTheme {
                 val state by viewModel.state.collectAsStateWithLifecycle()

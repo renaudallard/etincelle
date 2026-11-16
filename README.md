@@ -69,8 +69,12 @@ ses programmes **les plus vus**. Les **chaînes favorites** ouvrent cette grille
 choisissez : sur téléphone, l'**étoile** d'une chaîne l'ajoute aux favoris ou l'en retire, et l'étoile
 de la barre du haut ouvre **Réorganiser les favoris** (▲ et ▼ déplacent une chaîne) ; sur la TV, un
 **appui long sur OK** fait de même, et le bouton **Réorganiser les favoris** permet de saisir une
-chaîne avec OK puis de la déplacer avec Haut et Bas. Le **guide** couvre toutes les chaînes de l'offre sur 24 heures et se rafraîchit à chaque ouverture et au retour de l'application (son contenu se périme
-avec l'heure) ; sur téléphone, n'importe quelle page se **rafraîchit** en tirant au-delà du haut ou
+chaîne avec OK puis de la déplacer avec Haut et Bas. Le **guide** couvre toutes les chaînes de l'offre sur 24 heures et se rafraîchit à chaque ouverture.
+Ce qui passe **en ce moment** se périme avec l'heure : le guide et toute page qui montre des
+programmes en direct (l'accueil, **Direct**, les rangées « En direct ») se rechargent d'eux-mêmes,
+sans perdre la position dans la liste : toutes les 5 minutes tant qu'ils restent à l'écran, et dès
+que l'on y revient (retour dans l'application, sortie d'une fiche ou du lecteur) s'ils ont plus de
+2 minutes. Sur téléphone, n'importe quelle page se **rafraîchit** aussi en tirant au-delà du haut ou
 du bas de la liste.
 
 L'application accepte aussi des **liens profonds** vers une fiche, pour l'intégration par des

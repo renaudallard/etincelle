@@ -6,8 +6,10 @@ package it.allard.etincelle.core.ui
 import it.allard.etincelle.core.domain.DetailKind
 import it.allard.etincelle.core.domain.MolotovRepository
 import it.allard.etincelle.core.model.AppError
+import it.allard.etincelle.core.model.CardTag
 import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentPage
+import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.DrmSpec
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramDetail
@@ -239,6 +241,68 @@ class MainViewModelTest {
         assertTrue(vm.state.value.update!!.quiet)
     }
 
+    @Test
+    fun aPageShowingWhatIsOnAirIsLoadedAgainOnceItIsOld() {
+        val repo = FakeRepo()
+        var loads = 0
+        // Each load answers a page of its own, as the backend does.
+        repo.home = { loads++; ON_AIR.copy() }
+        var now = 1_000_000L
+        val vm = MainViewModel(repo, CHECKER, clock = { now })
+        assertEquals(1, loads)
+
+        // Back in the foreground soon after: still fresh.
+        now += 60_000
+        vm.refreshOnResume()
+        assertEquals(1, loads)
+
+        now += 60_000
+        vm.refreshOnResume()
+        assertEquals(2, loads)
+
+        // The new page starts its own two minutes, also when coming back from a programme's page.
+        now += 60_000
+        vm.onCardClick(CARD)
+        vm.closeDetail()
+        assertEquals(2, loads)
+        now += 60_000
+        vm.onCardClick(CARD)
+        vm.closeDetail()
+        assertEquals(3, loads)
+    }
+
+    @Test
+    fun aPageWithNothingOnAirIsLeftAlone() {
+        val repo = FakeRepo()
+        var loads = 0
+        repo.home = { loads++; HOME }
+        var now = 1_000_000L
+        val vm = MainViewModel(repo, CHECKER, clock = { now })
+        now += 3_600_000
+        vm.refreshOnResume()
+        assertEquals(1, loads)
+    }
+
+    @Test
+    fun aReloadNobodyAskedForFailsWithoutAWord() {
+        val repo = FakeRepo()
+        var now = 1_000_000L
+        repo.home = { ON_AIR.copy() }
+        val vm = MainViewModel(repo, CHECKER, clock = { now })
+        val shown = vm.state.value.current
+
+        repo.home = { throw AppError.Network("offline") }
+        now += 600_000
+        vm.refreshOnResume()
+        assertNull(vm.state.value.error)
+        assertFalse(vm.state.value.refreshing)
+        assertTrue(vm.state.value.current === shown)
+
+        // Asked for, the same failure is said.
+        vm.refreshCurrent()
+        assertEquals("offline", vm.state.value.error)
+    }
+
     // Runs [test] with a store in a scratch directory and an update whose APK a local server hands out.
     private fun withUpdate(test: (FakeStore, UpdateInfo) -> Unit) {
         val server = MockWebServer()
@@ -320,6 +384,11 @@ class MainViewModelTest {
         ) { _, method, _ -> throw UnsupportedOperationException(method.name) } as MolotovRepository
 
         val HOME = ContentPage("Accueil", emptyList())
+        // A page with a programme now on a channel, as the backend tags it.
+        val ON_AIR = ContentPage(
+            "Accueil",
+            listOf(ContentRail("live", "En direct", listOf(ContentCard("l1", "Journal", null, false, "12", null, null, null, tag = CardTag("DIRECT", null))))),
+        )
         val CARD = ContentCard("c1", "Show", null, false, null, "VOD_1", null, null)
         val DETAIL = ProgramDetail(
             title = "Show", subtitle = null, synopsis = null, posterUrl = null, genre = null, year = null,
