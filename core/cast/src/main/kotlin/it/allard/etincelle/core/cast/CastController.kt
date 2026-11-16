@@ -112,6 +112,7 @@ open class CastController(
     }
     private var activeScanning = false
 
+    private var listening = false
     private val sessionListener = object : SessionManagerListener<CastSession> {
         override fun onSessionStarted(session: CastSession, sessionId: String) = onSessionConnected(session)
         override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) = onSessionConnected(session)
@@ -128,7 +129,10 @@ open class CastController(
 
     fun start() {
         mediaRouter.addCallback(selector, routerCallback, MediaRouter.CALLBACK_FLAG_REQUEST_DISCOVERY)
-        castContext.sessionManager.addSessionManagerListener(sessionListener, CastSession::class.java)
+        if (!listening) {
+            castContext.sessionManager.addSessionManagerListener(sessionListener, CastSession::class.java)
+            listening = true
+        }
         refreshDevices()
         castContext.sessionManager.currentCastSession?.let(::onSessionConnected) ?: onSessionDisconnected()
         discoveryScope?.cancel()
@@ -137,12 +141,20 @@ open class CastController(
         }
     }
 
+    // Discovery pauses while the app is away, but the session keeps being followed: a cast that ends
+    // meanwhile (TV off, stopped on the TV, a recovery giving up) would otherwise leave the phone
+    // showing it as playing, with its notification, until the app came back.
     open fun stop() {
         discoveryScope?.cancel()
         discoveryScope = null
         setActiveScan(false)
         mediaRouter.removeCallback(routerCallback)
-        castContext.sessionManager.removeSessionManagerListener(sessionListener, CastSession::class.java)
+    }
+
+    /** Stops following the session; the controller is not used afterwards. */
+    open fun release() {
+        if (listening) castContext.sessionManager.removeSessionManagerListener(sessionListener, CastSession::class.java)
+        listening = false
     }
 
     /** Route playback to the given Cast device. Returns true only when a matching route was selected. */

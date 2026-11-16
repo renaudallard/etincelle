@@ -935,7 +935,8 @@ class CastPlayerController(
         publishVolume(level)
     }
 
-    fun release() {
+    override fun release() {
+        super.release()
         tvSession?.close()
         tvSession = null
         tvPlayer.release()
