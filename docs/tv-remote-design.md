@@ -18,6 +18,23 @@ receiving, and it wants service names unique across all types, which the TV's ow
 already takes. A direct answer always arrives, as with the legacy unicast queries used for Chromecasts.
 The phone lists each TV app as "<name> (appli TV)", route id `tv:<install id>`.
 
+## Screensaver
+
+The Google TV screensaver stops the activity. The server is kept through it: `onStop` waits 3 s for
+`ACTION_DREAMING_STARTED`, and stops the server only without it (the app was left) or on
+`ACTION_SCREEN_OFF` (the TV went to sleep). `RemoteKeepAliveService`, a `connectedDevice` foreground
+service, keeps the stopped app from being frozen meanwhile; Android 12+ only lets a foreground service
+start from the foreground, so it starts in `onStart` and stops with the server. The status keeps going to
+the phone, whose 15 s read timeout would otherwise drop a silent TV.
+
+A play command or a key arriving behind the screensaver brings the activity back with turn-screen-on set,
+which wakes the TV and ends the screensaver. Android 14 blocks that start from the background unless the
+app may display over other apps (`SYSTEM_ALERT_WINDOW`, `BAL_ALLOW_SAW_PERMISSION`), which the user grants
+from the TV app's settings. Verified on a Chromecast with Google TV: a wake lock with
+`ACQUIRE_CAUSES_WAKEUP` needs `TURN_SCREEN_ON`, denied by default with no settings page on Google TV, and
+a plain activity start is `BAL_BLOCK`. Without the permission the command is still taken and plays once the
+TV is woken.
+
 ## Authentication
 
 Both apps derive the same 32-byte key from the account they are signed in to:

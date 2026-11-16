@@ -6,6 +6,13 @@
     <!-- The home screen row and Watch Next (TvHome), kept fresh by a job that survives reboots. -->
     <uses-permission android:name="com.android.providers.tv.permission.WRITE_EPG_DATA" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- The phone's remote control stays reachable through the screensaver (RemoteKeepAliveService); a
+         connected-device service needs one of the network permissions. Coming back from behind the
+         screensaver to play what the phone sent takes "display over other apps", granted by the user. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <uses-feature
         android:name="android.software.leanback"
@@ -49,6 +56,10 @@
             </intent-filter>
         </activity>
 
+        <service
+            android:name=".RemoteKeepAliveService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
         <service
             android:name=".TvHomeJob"
             android:exported="false"

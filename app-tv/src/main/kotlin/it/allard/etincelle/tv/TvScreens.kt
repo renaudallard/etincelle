@@ -3,6 +3,12 @@
 
 package it.allard.etincelle.tv
 
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
@@ -38,6 +44,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -494,7 +502,7 @@ private fun TvTab(label: String, selected: Boolean, onClick: () -> Unit, modifie
     }
 }
 
-/** Settings page on TV. For now its only entry is Déconnexion, with an inline confirmation. */
+/** Settings page on TV: Déconnexion (with an inline confirmation), profiles, waking by the phone, grid density. */
 @Composable
 fun TvSettingsScreen(
     onBack: () -> Unit,
@@ -519,6 +527,17 @@ fun TvSettingsScreen(
             }
         }
         TvButton(onClick = onProfiles, highlighted = false) { Text("Profils") }
+        // The phone wakes this TV from its screensaver to play what it sends only once the app may display
+        // over other apps; the switch is in the system's settings. Checked again on coming back from there.
+        var canWake by remember { mutableStateOf(canWakeFromPhone(context)) }
+        LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { canWake = canWakeFromPhone(context) }
+        if (canWake) {
+            Text("Le téléphone peut réveiller ce téléviseur pour lancer une lecture.", style = MaterialTheme.typography.titleMedium)
+        } else {
+            TvButton(onClick = { openOverlaySettings(context) }, highlighted = false) {
+                Text("Laisser le téléphone réveiller ce téléviseur")
+            }
+        }
         Text("Vignettes par ligne : $gridColumns", style = MaterialTheme.typography.titleMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for (n in TvPrefs.MIN_GRID_COLUMNS..TvPrefs.MAX_GRID_COLUMNS) {
@@ -528,6 +547,21 @@ fun TvSettingsScreen(
                 ) { Text("$n") }
             }
         }
+    }
+}
+
+// The app may display over other apps, which lets it come back from behind the screensaver.
+private fun canWakeFromPhone(context: Context): Boolean =
+    Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(context)
+
+// The system page for this app's "display over other apps" switch, or the list of such apps.
+private fun openOverlaySettings(context: Context) {
+    listOf(
+        Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}")),
+        Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION),
+    ).firstOrNull { page ->
+        context.packageManager.queryIntentActivities(page, PackageManager.MATCH_DEFAULT_ONLY).isNotEmpty() &&
+            runCatching { context.startActivity(page) }.isSuccess
     }
 }
 
