@@ -89,6 +89,9 @@ open class CastController(
     private class ScannedTv(val tv: RemoteTv, var missed: Int = 0)
     private val scannedTvs = LinkedHashMap<String, ScannedTv>()
 
+    // The Wi-Fi network both lists were found on: nothing of them can be reached from another one.
+    private var scannedOn: Network? = null
+
     private val _state = MutableStateFlow(CastUiState())
     val state: StateFlow<CastUiState> = _state.asStateFlow()
 
@@ -288,7 +291,16 @@ open class CastController(
 
     // Our own scan, run with each active scan pulse; folds the answers into [scannedDevices].
     private suspend fun scanDirectly() {
-        val network = wifiNetwork() ?: return
+        val network = wifiNetwork()
+        // Off Wi-Fi no scan runs, so nothing would ever count as missed: the list kept offering the
+        // devices of a network left an hour ago. Forget them as soon as that network is gone or replaced.
+        if (network != scannedOn) {
+            scannedOn = network
+            scannedDevices.clear()
+            scannedTvs.clear()
+            refreshDevices()
+        }
+        if (network == null) return
         val found = withContext(Dispatchers.IO) { CastScanner.scan(receiverAppId, network) }
         val foundIds = found.map { it.id }.toSet()
         for (entry in scannedDevices.values) if (entry.device.id !in foundIds) entry.missed++

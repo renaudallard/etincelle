@@ -114,7 +114,9 @@ s'appuie sur un récepteur Cast Widevine personnalisé, hébergé séparément :
 Certains téléphones cessent de trouver les Chromecast par les services Google, jusqu'à ce que l'on
 coupe puis rallume le Wi-Fi. etincelle cherche donc aussi les Chromecast **par lui-même** sur le
 réseau Wi-Fi et ajoute ceux que les services Google ne voient pas à la liste ; si les services
-Google affichent un Chromecast sans parvenir à s'y connecter, etincelle s'y connecte lui-même. La
+Google affichent un Chromecast sans parvenir à s'y connecter, etincelle s'y connecte lui-même. Ce
+qu'il a trouvé ainsi, applications TV comprises, quitte la liste dès que le téléphone n'est plus sur
+ce réseau Wi-Fi. La
 diffusion vers un tel Chromecast passe par une **connexion directe** : le Chromecast doit d'abord
 prouver qu'il est un
 appareil Cast authentique (certificat signé par Google, et non révoqué) avant de recevoir quoi que ce soit, puis
