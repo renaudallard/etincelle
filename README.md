@@ -87,7 +87,7 @@ Elle ajoute un **sélecteur de saison** sur les séries qui en comptent plusieur
 genre** dans les grilles de catégories. Les vignettes portent le **logo de la chaîne** qui propose le
 programme (directs, résultats de recherche…), comme dans l'application officielle, et gardent la
 forme de leur image : affiches en portrait, images en paysage, logos de chaînes sur un carré. Sur téléphone, un
-menu **Paramètres**, accessible depuis la
+menu **Paramètres**, ouvert par l'engrenage de la
 barre du haut, regroupe les réglages : le **masquage des contenus verrouillés** (cache les programmes
 non inclus dans votre abonnement), le choix d'une **icône monochrome** (logo blanc), l'activation
 expérimentale du **récepteur Cast Fubo officiel** (redémarrage requis), un bouton **Vérifier les
