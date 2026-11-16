@@ -44,6 +44,11 @@ lock with `ACQUIRE_CAUSES_WAKEUP` needs `TURN_SCREEN_ON`, denied by default with
 Google TV; a plain activity start is `BAL_BLOCK`; and turn-screen-on set from `onCreate` comes too late to
 wake a sleeping TV, it has to be in the manifest.
 
+A TV set woken this way powers on while playback starts. On a Google TV Streamer its HDMI link drops
+and comes back about four seconds in, Android broadcasts `ACTION_AUDIO_BECOMING_NOISY`, and the player,
+which pauses on it as for unplugged headphones, would stay paused: within 30 s of a play command from
+the phone it plays on instead.
+
 With no activity nothing has read the saved sign-in, so the server reads it itself before working out the
 account key, which it works out again every five minutes at most, as the profiles it is made of may
 change while it runs. The status keeps going to the phone, idle when there is no activity: its 15 s read

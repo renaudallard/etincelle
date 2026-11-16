@@ -11,6 +11,7 @@ import android.content.IntentFilter
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.media.AudioManager
 import android.os.Bundle
 import android.view.KeyEvent
@@ -82,6 +83,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
+// How long a TV set may take to settle once the phone's programme woke it.
+private const val TV_WAKING_MS = 30_000L
+
 // How long after the activity stops the screensaver's broadcast may come.
 private const val DREAM_GRACE_MS = 3_000L
 
@@ -98,6 +102,8 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
     private val remoteWindow = Timeline.Window()
     // The last play request from the phone, echoed in the status (see RemoteMessages.REQUEST).
     private var remoteRequest = 0L
+    // When the phone last asked for a programme (SystemClock.elapsedRealtime).
+    private var remotePlayAt = 0L
     // The screensaver stops this activity but not the remote control: a phone can still find this app and
     // wake the TV with a command. Leaving the app or the TV going to sleep stop it, unless it is kept at
     // all times (see TvRemote).
@@ -138,6 +144,15 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
             .setSeekBackIncrementMs(LivePlayback.SEEK_BACK_MS)
             .setSeekForwardIncrementMs(LivePlayback.SEEK_FORWARD_MS)
             .build()
+        // A TV set waking for what the phone sent drops its HDMI link and brings it back a few seconds
+        // into playback, which Android reports as the audio output being unplugged: the player pauses for
+        // it, as it should for headphones. Play on.
+        exo.addListener(object : Player.Listener {
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                val unplugged = !playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY
+                if (unplugged && SystemClock.elapsedRealtime() - remotePlayAt < TV_WAKING_MS) exo.playWhenReady = true
+            }
+        })
         player = exo
         remote.attach(this)
         // Opening the app turns the screen on (see the manifest), which older versions only take from here.
@@ -329,6 +344,7 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                 }
                 val id = message.optString(RemoteMessages.ID).takeIf { it.isNotEmpty() } ?: return
                 remoteRequest = message.optLong(RemoteMessages.REQUEST)
+                remotePlayAt = SystemClock.elapsedRealtime()
                 viewModel.playFromRemote(kind, id, message.optLong(RemoteMessages.POSITION), message.optLong(RemoteMessages.REWIND))
             }
             RemoteMessages.PAUSE -> player.playWhenReady = false
