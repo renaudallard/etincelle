@@ -3,6 +3,8 @@
 
 package it.allard.etincelle.mobile
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -672,6 +674,9 @@ fun FavoriteOrderScreen(
     }
 }
 
+// The privacy policy, kept with the source.
+private const val PRIVACY_URL = "https://github.com/renaudallard/etincelle/blob/master/PRIVACY.md"
+
 /** Settings page: app-icon, hide-locked and Cast-receiver toggles, plus Déconnexion (with confirmation). */
 @Composable
 fun SettingsScreen(
@@ -806,6 +811,19 @@ fun SettingsScreen(
             )
             HorizontalDivider(Modifier.padding(horizontal = 16.dp))
         }
+        Column(
+            Modifier.fillMaxWidth()
+                .clickable { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PRIVACY_URL))) } }
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+        ) {
+            Text("Politique de confidentialité", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "Ce que l'application envoie, et à qui",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        HorizontalDivider(Modifier.padding(horizontal = 16.dp))
         Text(
             "Déconnexion",
             style = MaterialTheme.typography.bodyLarge,

@@ -178,6 +178,9 @@ encore afficher sa propre demande pour une version qu'il ne connaît pas ; et si
 malgré tout une confirmation, ou si l'installation échoue, la version est proposée comme d'habitude
 à l'ouverture suivante. **Vérifier les mises à jour** propose toujours l'installation immédiate.
 
+La [politique de confidentialité](PRIVACY.md) dit ce que les applications envoient, et à qui ; elle
+s'ouvre aussi depuis **Paramètres**.
+
 > ### ⚠️ Avertissement
 >
 > Projet non officiel, sans aucune affiliation avec Molotov ni Fubo. **etincelle** n'est qu'un

@@ -556,6 +556,12 @@ fun TvSettingsScreen(
                 ) { Text("$n") }
             }
         }
+        // A TV has no browser to open it with: the address is there to be read.
+        Text(
+            "Politique de confidentialité : github.com/renaudallard/etincelle/blob/master/PRIVACY.md",
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.White.copy(alpha = 0.6f),
+        )
     }
 }
 
