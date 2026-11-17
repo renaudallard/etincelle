@@ -95,6 +95,7 @@ import it.allard.etincelle.core.player.LiveBarGeometry
 import it.allard.etincelle.core.player.LivePlayback
 import it.allard.etincelle.core.player.MediaItemFactory
 import it.allard.etincelle.core.player.PlaybackProgress
+import it.allard.etincelle.core.player.PlaybackRecovery
 import it.allard.etincelle.core.player.keepScreenOnWhilePlaying
 import it.allard.etincelle.core.ui.installFetchedUpdate
 import it.allard.etincelle.core.ui.installUpdate
@@ -167,6 +168,16 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.keepPageFresh() } }
         viewModel.setHideLocked(LocalPrefs.hideLocked(this))
 
+        // Without Google Play services there is no cast controller, nor the recovery from playback errors
+        // it holds: the player then gets the one the TV app uses.
+        var recovery: PlaybackRecovery? = null
+        val dropRecovery = {
+            recovery?.let {
+                exo.removeListener(it)
+                it.stop()
+            }
+            recovery = null
+        }
         val onPlay: (PlaybackSource) -> Unit = { source ->
             // Hosts the media session so playback can go on in the background. The next episode starts
             // from the background, where Android may refuse the call; the service then still runs from
@@ -176,9 +187,12 @@ class MainActivity : ComponentActivity() {
             if (controller != null) {
                 controller.play(item, source.startPositionMs)
             } else {
+                dropRecovery()
                 if (source.startPositionMs > 0) exo.setMediaItem(item, source.startPositionMs) else exo.setMediaItem(item)
                 exo.prepare()
                 exo.playWhenReady = true
+                recovery = PlaybackRecovery(exo, lifecycleScope, source, viewModel::reResolve) { viewModel.playbackFailed(source) }
+                    .also(exo::addListener)
             }
         }
         val onStop: (PlaybackSource) -> Unit = { source ->
@@ -189,6 +203,7 @@ class MainActivity : ComponentActivity() {
                     viewModel.reportProgress(source, pos, dur)
                 }
             } else {
+                dropRecovery()
                 val pos = exo.currentPosition
                 val dur = exo.duration
                 exo.stop()
