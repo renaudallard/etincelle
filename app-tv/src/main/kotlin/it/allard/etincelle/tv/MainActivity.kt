@@ -433,9 +433,10 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
     }
 
     override fun onStop() {
-        // The screensaver starting is told apart from leaving the app only by its broadcast, which may
-        // come just after.
-        handler.postDelayed(stopRemoteUnlessDreaming, DREAM_GRACE_MS)
+        // Closed with Back, the app is left for good, and this activity is gone before a wait would end.
+        // Otherwise the screensaver starting is told apart from leaving the app only by its broadcast,
+        // which may come just after.
+        if (isFinishing) leave() else handler.postDelayed(stopRemoteUnlessDreaming, DREAM_GRACE_MS)
         // What was just watched belongs in Watch Next.
         TvHomeJob.schedule(this)
         player?.let {
