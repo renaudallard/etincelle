@@ -817,9 +817,17 @@ class CastPlayerController(
         if (tvSession != null) {
             // Only what the phone knows can continue here; something else the TV plays stays on it.
             val playsOnTv = _currentPlayer.value === tvPlayer && currentItem != null
+            val phonePlays = phoneStillPlays
             val position = tvPlayer.currentPosition
             stopTvSession(stopTv = playsOnTv)
-            if (playsOnTv) currentItem?.let { loadResolved(localPlayer, it, position, true) }
+            if (playsOnTv) {
+                currentItem?.let { loadResolved(localPlayer, it, position, true) }
+            } else if (!phonePlays) {
+                // The TV went on to something else, which stays on it: nothing is left to play here, and
+                // the phone would open its player on what it had sent, with nothing behind it.
+                currentItem = null
+                onPlaybackStopped?.invoke()
+            }
             return
         }
         // Direct session: stop the TV and play on the phone again, where the TV was (or where the phone
