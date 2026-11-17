@@ -11,6 +11,7 @@ import it.allard.etincelle.core.model.DrmSpec
 import it.allard.etincelle.core.model.LoginResult
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramWindow
+import it.allard.etincelle.core.model.UpNext
 import it.allard.etincelle.core.model.UserSession
 import it.allard.etincelle.core.network.ProfilePick
 import it.allard.etincelle.core.network.ProgressStore
@@ -328,6 +329,21 @@ class FuboRepositoryTest {
         repo.reportProgress(
             playheadSource(mapOf("lastOffset" to "@", "duration" to 6054.0)),
             positionMs = 6_050_000L,
+            durationMs = 6_054_000L,
+        )
+
+        assertTrue(server.takeRequest().body.readUtf8().contains("\"lastOffset\":6054"))
+    }
+
+    @Test
+    fun `reportProgress marks an episode left in its credits as watched`() = runTest {
+        server.enqueue(MockResponse().setBody("{}"))
+        // The next episode is announced from 5800 s on, well before the last 15 s.
+        val next = UpNext(5800, 9, "Next", null, "Commence dans %s", "Regarder", "Générique", "VOD_3")
+
+        repo.reportProgress(
+            playheadSource(mapOf("lastOffset" to "@", "duration" to 6054.0)).copy(upNext = next),
+            positionMs = 5_900_000L,
             durationMs = 6_054_000L,
         )
 

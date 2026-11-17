@@ -581,11 +581,12 @@ class FuboRepository(
         val url = source.progressUrl ?: return
         val payload = source.progressPayload ?: return
         // Mirror the local resume policy (PlaybackProgress.positionToSave) so the server and the local
-        // store agree: skip a barely-started item or one with an unknown duration. Near the end, mark
-        // it watched at its full duration, like the official app; otherwise report the position.
+        // store agree: skip a barely-started item or one with an unknown duration. Near the end, or in
+        // the credits once the next episode is announced, mark it watched at its full duration, like the
+        // official app; otherwise report the position.
         if (durationMs <= 0 || positionMs < PROGRESS_MIN_MS) return
-        val nearEnd = positionMs >= durationMs - PROGRESS_END_MS
-        val offsetSeconds = (if (nearEnd) durationMs else positionMs) / 1000
+        val watched = positionMs >= durationMs - PROGRESS_END_MS || source.upNext?.let { positionMs >= it.atSec * 1000 } == true
+        val offsetSeconds = (if (watched) durationMs else positionMs) / 1000
         if (offsetSeconds <= 0) return // the server rejects lastOffset <= 0
         // Overwrite the offset; restore the other template values to integers (Moshi decoded them as Double).
         val body = payload.mapValues { (key, value) ->
