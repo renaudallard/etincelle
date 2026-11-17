@@ -864,7 +864,8 @@ private fun PlayerSurface(
     // Local only: a cast is told where to start in its LOAD, and opening the cast controls later must
     // not send it back to the show's start.
     var pendingStartOver by remember(source) { mutableStateOf(secure && source.isLive && source.liveRewindOffsetMs > 0L) }
-    LaunchedEffect(currentPlayer, source.isLive) {
+    // Per source, not per kind: another live channel has its own programme, rewind and channel to ask.
+    LaunchedEffect(currentPlayer, source) {
         // VOD and recordings have no live edge, so do not poll: stay at "not behind" without a 1s loop.
         if (!source.isLive) {
             behindLive = false

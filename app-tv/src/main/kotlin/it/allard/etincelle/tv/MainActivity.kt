@@ -628,7 +628,8 @@ private fun TvPlayerSurface(
     // Called by the player view before its own key handling; true when the key was used here. Such a
     // key never reaches the controls, so restart their hide timer by hand.
     fun remoteKey(event: KeyEvent): Boolean = remoteKeyUsed(event).also { if (it) playerView?.showController() }
-    LaunchedEffect(source.isLive) {
+    // Per source, not per kind: another live channel has its own programme, rewind and channel to ask.
+    LaunchedEffect(source) {
         // VOD and recordings have no live edge, so do not poll: stay at "not behind" without a 1s loop.
         if (!source.isLive) {
             behindLive = false
