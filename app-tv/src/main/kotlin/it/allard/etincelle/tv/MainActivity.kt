@@ -332,7 +332,9 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
         // Not in front (the screensaver, another app, the TV asleep): what needs the screen wakes the TV
         // first, which brings this app back. A key only does that, as the first press on the TV's own
         // remote only wakes it.
-        if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) && (type == RemoteMessages.PLAY || type == RemoteMessages.KEY)) {
+        val inFront = lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+        val resumes = type == RemoteMessages.RESUME && viewModel.state.value.playing != null
+        if (!inFront && (type == RemoteMessages.PLAY || type == RemoteMessages.KEY || resumes)) {
             wakeScreen()
             if (type == RemoteMessages.KEY) return
         }
@@ -349,8 +351,13 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                 remotePlayAt = SystemClock.elapsedRealtime()
                 viewModel.playFromRemote(kind, id, message.optLong(RemoteMessages.POSITION), message.optLong(RemoteMessages.REWIND))
             }
-            RemoteMessages.PAUSE -> player.playWhenReady = false
-            RemoteMessages.RESUME -> player.playWhenReady = true
+            RemoteMessages.PAUSE -> {
+                player.playWhenReady = false
+                pausedForBackground = false
+            }
+            // Not in front, playback resumes as the app comes back (see onStart), not behind what the
+            // TV shows meanwhile.
+            RemoteMessages.RESUME -> if (inFront) player.playWhenReady = true else pausedForBackground = true
             RemoteMessages.SEEK -> {
                 val position = message.optLong(RemoteMessages.POSITION, -1)
                 if (position < 0) player.seekToDefaultPosition() else player.seekTo(position)
