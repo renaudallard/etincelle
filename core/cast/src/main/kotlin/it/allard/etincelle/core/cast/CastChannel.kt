@@ -14,6 +14,7 @@ import java.security.cert.X509Certificate
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.net.SocketFactory
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLSocket
@@ -170,6 +171,7 @@ internal class CastChannel private constructor(
         private const val HEARTBEAT_MS = 5_000L
         private const val NONCE_SIZE = 16
         private const val MAX_MESSAGE = 64 * 1024
+        private const val OPEN_DEADLINE_MS = 15_000L
 
         /**
          * Connects to [host]:[port] over [network] (the default network when null) and authenticates
@@ -177,6 +179,20 @@ internal class CastChannel private constructor(
          */
         fun open(host: String, port: Int, network: Network?): CastChannel {
             val raw = (network?.socketFactory ?: SocketFactory.getDefault()).createSocket()
+            // The timeouts below bound each read, not the exchange: a device answering a byte at a time
+            // would hold this thread for days. Past the deadline the connection is closed under it.
+            val settled = AtomicBoolean()
+            val deadline = Thread {
+                try {
+                    Thread.sleep(OPEN_DEADLINE_MS)
+                    if (settled.compareAndSet(false, true)) runCatching { raw.close() }
+                } catch (e: InterruptedException) {
+                    // Opened or failed in time.
+                }
+            }.apply {
+                isDaemon = true
+                start()
+            }
             try {
                 raw.connect(InetSocketAddress(host, port), CONNECT_TIMEOUT_MS)
                 val tls = SSLContext.getInstance("TLS").apply { init(null, arrayOf(DeviceAuthenticatedLater), SecureRandom()) }
@@ -188,6 +204,7 @@ internal class CastChannel private constructor(
                 val channel = CastChannel(socket, peer)
                 try {
                     channel.authenticate()
+                    if (!settled.compareAndSet(false, true)) throw IOException("the device took too long")
                 } catch (e: Exception) {
                     channel.close()
                     throw e
@@ -196,6 +213,9 @@ internal class CastChannel private constructor(
             } catch (e: Exception) {
                 runCatching { raw.close() }
                 throw e
+            } finally {
+                settled.set(true)
+                deadline.interrupt()
             }
         }
     }
