@@ -49,6 +49,8 @@ private const val PAIRING_RETRY_MS = 5000L
 // Cap on how many codes the login screen will cycle through before giving up, so a TV left idle on
 // the login screen cannot poll indefinitely.
 private const val PAIRING_MAX_ROUNDS = 12
+// Shown while no code could be had, until one is.
+private const val PAIRING_RETRY_NOTICE = "Connexion impossible, nouvel essai…"
 private const val UPDATE_INTERVAL_MS = 24 * 60 * 60 * 1000L
 // A page that shows what is on air goes stale as programmes change, and nothing on it says when. It is
 // loaded again once it is this old when someone comes back to it, and this old while it stays on screen.
@@ -285,7 +287,8 @@ class MainViewModel(
      */
     fun loginWithCode() {
         pairingJob?.cancel()
-        _state.update { it.copy(busy = true, error = null, pairingCode = null) }
+        // A session that expired is why this screen is shown: that stays said until the sign-in.
+        _state.update { it.copy(busy = true, error = it.error.takeIf { e -> e == AppError.Unauthorized.message }, pairingCode = null) }
         pairingJob = viewModelScope.launch {
             var rounds = 0
             while (rounds < PAIRING_MAX_ROUNDS) {
@@ -294,11 +297,11 @@ class MainViewModel(
                 if (pairing == null) {
                     // Still busy: the loop retries on its own after the delay, so the screen shows the
                     // notice without offering a manual retry button that would just restart this loop.
-                    _state.update { it.copy(busy = true, pairingCode = null, error = "Connexion impossible, nouvel essai…") }
+                    _state.update { it.copy(busy = true, pairingCode = null, error = PAIRING_RETRY_NOTICE) }
                     delay(PAIRING_RETRY_MS)
                     continue
                 }
-                _state.update { it.copy(busy = false, error = null, pairingCode = pairing.code) }
+                _state.update { it.copy(busy = false, error = it.error.takeIf { e -> e != PAIRING_RETRY_NOTICE }, pairingCode = pairing.code) }
                 // Poll until confirmed or the code is about to expire (then loop to regenerate). Count
                 // polls locally with a margin rather than trusting the wall clock against server time.
                 val polls = ((pairing.ttlSeconds - PAIRING_EXPIRY_MARGIN_SEC) / PAIRING_POLL_SEC).coerceAtLeast(1)

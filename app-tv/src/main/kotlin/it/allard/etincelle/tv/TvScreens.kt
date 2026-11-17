@@ -193,8 +193,9 @@ private fun TvCodeLoginScreen(code: String?, busy: Boolean, error: String?, onSt
                 Text(error, color = MaterialTheme.colorScheme.error)
                 // The code loop stops after a while so it does not poll an idle TV forever; once it has
                 // stopped (not busy) let the user restart it instead of dead-ending with no code and no
-                // way back. While it is still auto-retrying (busy) no button is needed.
-                if (!busy) {
+                // way back. While it is still auto-retrying (busy) no button is needed, nor next to a
+                // code that works, under the reason this screen is shown (a session that expired).
+                if (!busy && code == null) {
                     Spacer(Modifier.height(12.dp))
                     TvButton(onClick = onStart) { Text("Réessayer") }
                 }
