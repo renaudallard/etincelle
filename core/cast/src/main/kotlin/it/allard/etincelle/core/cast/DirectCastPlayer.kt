@@ -96,7 +96,10 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
             live = media.optString("streamType") == "LIVE"
             duration = media.optDouble("duration", 0.0).takeIf { it.isFinite() && it > 0 } ?: 0.0
         }
-        playerState = status.optString("playerState")
+        // While it loads an item the receiver says IDLE (INTERRUPTED when another was playing) and
+        // gives the loading away in its extended status only (seen on a Chromecast with Google TV).
+        val loading = status.optJSONObject("extendedStatus")?.optString("playerState") == "LOADING"
+        playerState = status.optString("playerState").let { if (it == "IDLE" && loading) "LOADING" else it }
         idleReason = status.optString("idleReason")
         var start = times.start
         var end = times.end
