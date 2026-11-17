@@ -1289,8 +1289,9 @@ class CastPlayerController(
         var target = client.approximateStreamPosition + deltaMs
         val start = client.approximateLiveSeekableRangeStart
         val end = client.approximateLiveSeekableRangeEnd
-        if (start >= 0 && end >= start) target = target.coerceIn(start, end)
-        client.seek(MediaSeekOptions.Builder().setPosition(target).build())
+        // Both are 0 when the receiver reports no range: nothing to keep within then.
+        if (start >= 0 && end > start) target = target.coerceIn(start, end)
+        client.seek(MediaSeekOptions.Builder().setPosition(target.coerceAtLeast(0)).build())
     }
 
     private fun onPlaybackError(failedPlayer: Player) {
