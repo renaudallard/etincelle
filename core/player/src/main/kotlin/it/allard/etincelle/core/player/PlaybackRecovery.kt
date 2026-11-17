@@ -52,6 +52,13 @@ class PlaybackRecovery(
     // fails before its stream is ready no longer knows it.
     private var liveAt: Long? = null
 
+    /**
+     * The duration of what plays, as last known: a reload that fails before its stream has loaded
+     * leaves the player without one, and with it no way to tell where to resume from.
+     */
+    var durationMs: Long = C.TIME_UNSET
+        private set
+
     override fun onPlayerError(error: PlaybackException) = recover(error.errorCode)
 
     override fun onPlaybackStateChanged(playbackState: Int) {
@@ -74,6 +81,7 @@ class PlaybackRecovery(
         }
         attempts++
         val position = player.currentPosition
+        player.duration.takeIf { it > 0 }?.let { durationMs = it }
         // Fills [window] when a live stream is loaded.
         val behind = LivePlayback.behindLiveEdgeMs(player, window)
         when {

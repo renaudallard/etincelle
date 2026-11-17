@@ -204,9 +204,11 @@ class MainActivity : ComponentActivity() {
                     viewModel.reportProgress(source, pos, dur)
                 }
             } else {
+                // Given up on in the middle of a reload, the player no longer knows its duration.
+                val known = recovery?.durationMs ?: C.TIME_UNSET
                 dropRecovery()
                 val pos = exo.currentPosition
-                val dur = exo.duration
+                val dur = exo.duration.takeIf { it > 0 } ?: known
                 exo.stop()
                 exo.clearMediaItems()
                 PlaybackProgress.closingToSave(source, pos, dur)?.let { viewModel.savePlaybackPosition(source.resumeKey, it) }

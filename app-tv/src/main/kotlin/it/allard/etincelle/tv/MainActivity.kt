@@ -586,7 +586,8 @@ private fun TvPlayerSurface(
             player.removeListener(recovery)
             recovery.stop()
             val pos = player.currentPosition
-            val dur = player.duration
+            // Given up on in the middle of a reload, the player no longer knows its duration.
+            val dur = player.duration.takeIf { it > 0 } ?: recovery.durationMs
             PlaybackProgress.closingToSave(source, pos, dur)?.let { onSavePosition(source.resumeKey, it) }
             onReportProgress(source, pos, dur)
             player.stop()
