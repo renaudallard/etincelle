@@ -816,13 +816,13 @@ class CastPlayerController(
         // TV app: stop it and play on the phone again, where the TV was.
         if (tvSession != null) {
             // Only what the phone knows can continue here; something else the TV plays stays on it.
-            val playsOnTv = _currentPlayer.value === tvPlayer && currentItem != null
-            val phonePlays = phoneStillPlays
+            val onTv = _currentPlayer.value === tvPlayer
+            val playsOnTv = onTv && currentItem != null
             val position = tvPlayer.currentPosition
             stopTvSession(stopTv = playsOnTv)
             if (playsOnTv) {
                 currentItem?.let { loadResolved(localPlayer, it, position, true) }
-            } else if (!phonePlays) {
+            } else if (onTv) {
                 // The TV went on to something else, which stays on it: nothing is left to play here, and
                 // the phone would open its player on what it had sent, with nothing behind it.
                 currentItem = null
