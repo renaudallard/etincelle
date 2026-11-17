@@ -19,6 +19,7 @@ import java.net.Socket
 import java.util.UUID
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.Dispatchers
@@ -56,6 +57,9 @@ class TvRemoteServer(
 
     @Volatile
     private var link: RemoteLink? = null
+
+    // A message to the phone is waiting to leave or leaving.
+    private val sending = AtomicBoolean()
 
     // The account key and until when it is taken as current (main thread). A connection must cost no call
     // to the backend, or any device on the network could flood the app's own calls with them; yet the
@@ -139,8 +143,22 @@ class TvRemoteServer(
 
     fun send(message: JSONObject) {
         val link = link ?: return
+        // One at a time: each tells how playback goes now and makes the one before moot, and a phone that
+        // stopped reading while keeping its connection must not have them pile up for days.
+        if (!sending.compareAndSet(false, true)) return
         val text = message.toString()
-        runCatching { writer?.execute { runCatching { link.send(text) } } }
+        val queued = runCatching {
+            writer?.execute {
+                try {
+                    link.send(text)
+                } catch (e: Exception) {
+                    // The phone left: its reader ends the link.
+                } finally {
+                    sending.set(false)
+                }
+            }
+        }
+        if (queued.getOrNull() == null) sending.set(false)
     }
 
     // One phone: the handshake, then its commands until it leaves. A newer phone takes over.
