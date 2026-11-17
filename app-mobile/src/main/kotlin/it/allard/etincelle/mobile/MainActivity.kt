@@ -95,6 +95,7 @@ import it.allard.etincelle.core.player.LiveBarGeometry
 import it.allard.etincelle.core.player.LivePlayback
 import it.allard.etincelle.core.player.MediaItemFactory
 import it.allard.etincelle.core.player.PlaybackProgress
+import it.allard.etincelle.core.player.keepScreenOnWhilePlaying
 import it.allard.etincelle.core.ui.installFetchedUpdate
 import it.allard.etincelle.core.ui.installUpdate
 import it.allard.etincelle.core.ui.AutoUpdate
@@ -836,17 +837,17 @@ private fun PlayerSurface(
     upNextSlate: UpNextSlateState? = null,
 ) {
     val view = LocalView.current
-    DisposableEffect(secure) {
-        // Keep the screen awake while playing. For local playback also block screenshots/recording
-        // (FLAG_SECURE); the cast controller (secure=false) renders no video here, so it does not need it.
+    DisposableEffect(secure, currentPlayer) {
+        // Keep the screen awake while playing, here or on what the cast controller drives. For local
+        // playback also block screenshots/recording (FLAG_SECURE); the cast controller (secure=false)
+        // renders no video here, so it does not need it.
         val window = (view.context as? Activity)?.window
-        val flags = if (secure) {
-            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or WindowManager.LayoutParams.FLAG_SECURE
-        } else {
-            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+        if (secure) window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        val letScreenSleep = keepScreenOnWhilePlaying(window, currentPlayer)
+        onDispose {
+            letScreenSleep()
+            if (secure) window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         }
-        window?.addFlags(flags)
-        onDispose { window?.clearFlags(flags) }
     }
     // Track how far behind the live edge we are, so a "back to live" pill can appear once the viewer
     // has scrubbed into the DVR window of a live show (and disappear again at the edge).

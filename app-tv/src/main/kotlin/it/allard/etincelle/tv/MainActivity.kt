@@ -72,6 +72,7 @@ import it.allard.etincelle.core.player.LiveBarGeometry
 import it.allard.etincelle.core.player.LivePlayback
 import it.allard.etincelle.core.player.MediaItemFactory
 import it.allard.etincelle.core.player.PlaybackProgress
+import it.allard.etincelle.core.player.keepScreenOnWhilePlaying
 import it.allard.etincelle.core.remote.RemoteMessages
 import it.allard.etincelle.core.ui.installFetchedUpdate
 import it.allard.etincelle.core.ui.installUpdate
@@ -545,14 +546,18 @@ private fun TvPlayerSurface(
 ) {
     val view = LocalView.current
     val scope = rememberCoroutineScope()
-    DisposableEffect(Unit) {
-        // Keep the screen on and mark the window secure while a stream is on screen (parity with mobile):
-        // secure protects the software/L3 decode path on top of Widevine L1 + HDCP, and scoping
-        // keep-screen-on here lets the TV sleep when idling on browse/login instead of staying awake.
+    DisposableEffect(player) {
+        // Mark the window secure while a stream is on screen (parity with mobile): it protects the
+        // software/L3 decode path on top of Widevine L1 + HDCP. The screen is kept on while the stream
+        // plays only, so the TV still goes to its screensaver and to sleep on a paused programme, as it
+        // does idling on browse/login.
         val window = (view.context as? Activity)?.window
-        val flags = WindowManager.LayoutParams.FLAG_SECURE or WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-        window?.addFlags(flags)
-        onDispose { window?.clearFlags(flags) }
+        window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        val letScreenSleep = keepScreenOnWhilePlaying(window, player)
+        onDispose {
+            letScreenSleep()
+            window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
     }
     DisposableEffect(source) {
         val item = MediaItemFactory.create(source)
