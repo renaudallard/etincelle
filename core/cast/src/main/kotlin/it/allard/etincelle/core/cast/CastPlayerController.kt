@@ -1341,13 +1341,14 @@ class CastPlayerController(
             onError?.invoke(PLAYBACK_ERROR_MESSAGE)
             // If the dead stream was on the cast player, end the session so the bar stops claiming an
             // active cast over playback that never recovered.
+            // On the phone itself, close the player: it would stay up over a frozen picture.
+            val onPhone = _currentPlayer.value === localPlayer
             if (_currentPlayer.value === castPlayer && castContext.sessionManager.currentCastSession != null) disconnect()
             if (_currentPlayer.value === directPlayer && stopDirect()) {
                 currentItem = null
                 onPlaybackStopped?.invoke()
             }
-            // On the phone itself, close the player: it would stay up over a frozen picture.
-            if (_currentPlayer.value === localPlayer) onPlaybackStopped?.invoke()
+            if (onPhone) onPlaybackStopped?.invoke()
             return
         }
         castRetryCount++
