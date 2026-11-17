@@ -332,6 +332,18 @@ class FuboRepositoryTest {
     }
 
     @Test
+    fun `an answer of an unexpected shape surfaces a plain message, not the parser's`() = runTest {
+        session.session = UserSession("AT", "RT", "u1", "p1")
+        // A title sent as a plain string where an object is expected.
+        server.enqueue(MockResponse().setBody("""{"title":"Accueil","content":{"template":"catalog","sections":[]}}"""))
+
+        val error = runCatching { repo.loadHome() }.exceptionOrNull()
+
+        assertTrue(error is AppError.Unknown)
+        assertEquals("Chargement impossible, réessayez", error?.message)
+    }
+
+    @Test
     fun `a 451 sign-in is a region block and a 403 is a blocked account`() = runTest {
         server.enqueue(MockResponse().setResponseCode(451))
         val geo = runCatching { repo.login("e@x", "pw") }.exceptionOrNull()
