@@ -10,10 +10,16 @@ import java.util.UUID
 /** Device identity reported to Fubo. The id must stay stable across launches (see [persistent]). */
 class DeviceInfo(
     val deviceId: String = UUID.randomUUID().toString(),
-    val brand: String = Build.BRAND ?: "android",
-    val model: String = Build.MODEL ?: "android",
-    val osVersion: String = Build.VERSION.RELEASE ?: "",
+    brand: String = Build.BRAND ?: "android",
+    model: String = Build.MODEL ?: "android",
+    osVersion: String = Build.VERSION.RELEASE ?: "",
 ) {
+    // These go into request headers, which OkHttp only builds from printable ASCII: a model named in
+    // Chinese or with an accent would otherwise end the app at its first request.
+    val brand: String = headerSafe(brand).ifEmpty { "android" }
+    val model: String = headerSafe(model).ifEmpty { "android" }
+    val osVersion: String = headerSafe(osVersion)
+
     companion object {
         /**
          * Device identity with an install-stable id: generated once and persisted, so Fubo sees the
@@ -27,3 +33,5 @@ class DeviceInfo(
         }
     }
 }
+
+private fun headerSafe(value: String): String = value.filter { it in ' '..'~' }.trim()

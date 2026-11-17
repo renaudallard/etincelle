@@ -41,6 +41,18 @@ class InterceptorTest {
     }
 
     @Test
+    fun `a device named outside ASCII still makes its requests`() {
+        val device = DeviceInfo(deviceId = "dev-1", brand = "小米", model = "Redmi Note 13 青春版", osVersion = "١٤")
+        server.enqueue(MockResponse().setBody("{}"))
+        OkHttpClient.Builder().addInterceptor(FuboHeadersInterceptor(device)).build()
+            .newCall(Request.Builder().url(server.url("/x")).build()).execute().close()
+        val req = server.takeRequest()
+        assertEquals("android", req.getHeader("x-device-brand"))
+        assertEquals("Redmi Note 13", req.getHeader("x-device-model"))
+        assertEquals("", req.getHeader("x-os-version"))
+    }
+
+    @Test
     fun `adds the molotov application id and device headers`() {
         call()
         val req = server.takeRequest()
