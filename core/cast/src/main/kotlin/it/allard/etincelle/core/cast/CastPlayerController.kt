@@ -1320,6 +1320,8 @@ class CastPlayerController(
                 currentItem = null
                 onPlaybackStopped?.invoke()
             }
+            // On the phone itself, close the player: it would stay up over a frozen picture.
+            if (_currentPlayer.value === localPlayer) onPlaybackStopped?.invoke()
             return
         }
         castRetryCount++
