@@ -946,9 +946,9 @@ class MainViewModel(
         viewModelScope.launch {
             runCatching { repo.toggleFavorite(action) }
                 .onSuccess {
-                    // A page opened meanwhile owns the spinner, and the refresh would cancel it: the
-                    // stars are brought up to date when that page is left.
-                    val navigating = navJob?.isActive == true
+                    // A page opened meanwhile owns the spinner, and the refresh would cancel it. Not a
+                    // silent reload, which has no spinner to take down and is replaced by this one.
+                    val navigating = navJob?.isActive == true && !_state.value.refreshing
                     _state.update {
                         it.copy(busy = navigating && it.busy, info = if (card.isFavorite) "Retirée des favoris" else "Ajoutée aux favoris")
                     }

@@ -15,6 +15,7 @@ import it.allard.etincelle.core.model.LoginResult
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.Profiles
+import it.allard.etincelle.core.model.RecordAction
 import it.allard.etincelle.core.model.UpNext
 import it.allard.etincelle.core.model.UserSession
 import androidx.lifecycle.ViewModelProvider
@@ -109,6 +110,34 @@ class MainViewModelTest {
         assertEquals(NEXT, vm.state.value.playing)
         assertTrue(vm.state.value.detailStack.isEmpty())
         assertFalse(vm.state.value.busy)
+    }
+
+    @Test
+    fun aFavouriteSavedDuringAReloadTakesItsSpinnerDown() {
+        val repo = FakeRepo()
+        val vm = viewModel(repo)
+        repo.home = { CompletableDeferred<ContentPage>().await() }
+        vm.refreshCurrent()
+        assertTrue(vm.state.value.refreshing)
+
+        vm.toggleFavorite(CARD.copy(favorite = RecordAction("Ajouter", "https://action", emptyMap())))
+        assertFalse(vm.state.value.busy)
+        assertEquals("Ajoutée aux favoris", vm.state.value.info)
+    }
+
+    @Test
+    fun aFavouriteSavedWhileAPageOpensLeavesItsSpinner() {
+        val repo = FakeRepo()
+        val vm = viewModel(repo)
+        val saved = CompletableDeferred<Unit>()
+        repo.favorite = { saved.await() }
+        vm.toggleFavorite(CARD.copy(favorite = RecordAction("Ajouter", "https://action", emptyMap())))
+        // A card opened before the save has answered.
+        repo.detail = { _, _ -> CompletableDeferred<ProgramDetail>().await() }
+        vm.onCardClick(CARD)
+        saved.complete(Unit)
+
+        assertTrue(vm.state.value.busy)
     }
 
     @Test
@@ -439,6 +468,8 @@ class MainViewModelTest {
         var detail: suspend (String, DetailKind) -> ProgramDetail = { _, _ -> DETAIL }
         var session: UserSession? = UserSession("access", "refresh", "user", "profile")
 
+        var favorite: suspend () -> Unit = {}
+        override suspend fun toggleFavorite(action: RecordAction) = favorite()
         override suspend fun restoreSession() = restore()
         override suspend fun login(email: String, password: String): LoginResult = LoginResult.SignedIn(session!!)
         override fun currentSession() = session
