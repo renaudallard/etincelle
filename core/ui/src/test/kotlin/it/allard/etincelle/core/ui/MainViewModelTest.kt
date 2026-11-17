@@ -126,6 +126,32 @@ class MainViewModelTest {
     }
 
     @Test
+    fun aFavouriteSavedDuringAReloadIsShownByAReloadAskedAfterIt() {
+        val repo = FakeRepo()
+        val vm = viewModel(repo)
+        // The reload on its way asked for the page before the save; the one after it sees the new star.
+        val before = CompletableDeferred<ContentPage>()
+        val after = CompletableDeferred<ContentPage>()
+        val answers = ArrayDeque(listOf(before, after))
+        var asked = 0
+        repo.home = { asked++; answers.removeFirst().await() }
+        vm.refreshCurrent()
+        assertEquals(1, asked)
+
+        vm.toggleFavorite(CARD.copy(favorite = RecordAction("Ajouter", "https://action", emptyMap())))
+        assertEquals(2, asked)
+        assertTrue(vm.state.value.refreshing)
+
+        // The first answer, stale, is no longer waited for; the second one is the page shown.
+        val fresh = ContentPage("Accueil à jour", emptyList())
+        before.complete(ContentPage("Accueil d'avant", emptyList()))
+        after.complete(fresh)
+        assertEquals(fresh, vm.state.value.current)
+        assertFalse(vm.state.value.refreshing)
+        assertFalse(vm.state.value.busy)
+    }
+
+    @Test
     fun aFavouriteSavedWhileAPageOpensLeavesItsSpinner() {
         val repo = FakeRepo()
         val vm = viewModel(repo)

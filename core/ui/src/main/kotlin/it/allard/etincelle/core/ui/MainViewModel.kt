@@ -519,9 +519,10 @@ class MainViewModel(
     }
 
     // [quiet] for a reload nobody asked for: when it fails the page stays as it is, with no message.
-    private fun reloadCurrent(quiet: Boolean) {
+    // [restart] when a reload already on its way is to be replaced, as one that may predate a change.
+    private fun reloadCurrent(quiet: Boolean, restart: Boolean = false) {
         val s = _state.value
-        if ((s.playing != null && !playerAside) || s.detail != null || s.settings || s.busy || s.refreshing) return
+        if ((s.playing != null && !playerAside) || s.detail != null || s.settings || s.busy || (s.refreshing && !restart)) return
         val top = s.backStack.lastOrNull()
         val reloadUrl = top?.reloadUrl
         when {
@@ -947,12 +948,13 @@ class MainViewModel(
             runCatching { repo.toggleFavorite(action) }
                 .onSuccess {
                     // A page opened meanwhile owns the spinner, and the refresh would cancel it. Not a
-                    // silent reload, which has no spinner to take down and is replaced by this one.
+                    // silent reload, which has no spinner to take down and is replaced by this one: it
+                    // may have asked for the page before the save, and would show the star as it was.
                     val navigating = navJob?.isActive == true && !_state.value.refreshing
                     _state.update {
                         it.copy(busy = navigating && it.busy, info = if (card.isFavorite) "Retirée des favoris" else "Ajoutée aux favoris")
                     }
-                    if (!navigating) refreshCurrent()
+                    if (!navigating) reloadCurrent(quiet = false, restart = true)
                 }
                 .onFailure { e -> applyFailure(e, "Échec de la mise à jour des favoris") }
         }
