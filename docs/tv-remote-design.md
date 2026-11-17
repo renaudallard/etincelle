@@ -37,8 +37,9 @@ finds the TV app whatever
 the TV shows, and asleep: a Chromecast with Google TV keeps its Wi-Fi and its processes running while
 asleep, and answers within half a second.
 
-A play command or a key arriving with the activity not in front brings it back, or opens it when there
-is none (the play command then waits for the activity to resume). The activity is `singleTask`, so the
+A play command, a key, or a resume of what it plays, arriving with the activity not in front brings it
+back, or opens it when there is none (the play command then waits for the activity to resume, and a
+resume plays once it is back in front, not behind what the TV shows meanwhile). The activity is `singleTask`, so the
 launcher or a link from the home screen comes to that same one: the server drives a single screen. The activity declares
 `android:turnScreenOn`, and sets it again before coming back, which wakes the TV and ends the
 screensaver. Android 14 blocks such a start from the background unless the app may display over other
@@ -54,12 +55,14 @@ the phone it plays on instead.
 
 With no activity nothing has read the saved sign-in, so the server reads it itself before working out the
 account key, which it works out again every five minutes at most, as the profiles it is made of may
-change while it runs. The status keeps going to the phone, idle when there is no activity: its 15 s read
+change while it runs; sooner after a phone was refused, which is what a phone holding a newer key looks
+like, but then no more than every ten seconds. Signing out drops the key and the connected phone at once. The status keeps going to the phone, idle when there is no activity: its 15 s read
 timeout would otherwise drop a silent TV.
 
 Without the permission the server only runs while the activity is started or behind the screensaver:
 `onStop` waits 3 s for `ACTION_DREAMING_STARTED`, and stops the server without it (the app was left) or
-on `ACTION_SCREEN_OFF` (the TV went to sleep). A command arriving behind the screensaver is still taken,
+on `ACTION_SCREEN_OFF` (the TV went to sleep); an activity that is finishing, closed with Back, does not
+wait. A command arriving behind the screensaver is still taken,
 and plays once the TV is woken.
 
 ## Authentication
@@ -90,8 +93,10 @@ greeting: a phone and a TV app of different versions do not list each other.
 
 JSON objects with a type `t` (see `RemoteMessages`). The phone sends `play` (kind live, vod or
 recording, id, position, rewind behind live), `pause`, `resume`, `seek`, `stop`, `key` (up, down, left,
-right, ok, back, dispatched through the TV activity as remote presses) and `volume` (up, down, mute).
-The TV sends `status` every second: state, title, position and duration (within the rewind window on a
+right, ok, dispatched through the TV activity as remote presses; back, handed to the back navigation,
+which a Back key event no longer reaches on Android 16) and `volume` (up, down, mute).
+The TV sends `status` every second, one at a time (none is queued while the last has not left): state
+(buffering, not idle, while what it plays is loading or being brought back after an error), title, position and duration (within the rewind window on a
 live stream), live, what plays, the number of the last `play` it handled (each `play` carries one) and,
 when nothing plays, the error that stopped it, so the phone can tell a failed request from a stale error.
 
