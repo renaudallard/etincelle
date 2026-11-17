@@ -63,6 +63,10 @@ class TvRemoteServer(
     private var key: ByteArray? = null
     private var keyUntil = 0L
     private var keyAt = 0L
+
+    // Counts the accounts signed out, so what was started for one (a key being worked out, a phone
+    // proving it) is not kept once that account has left.
+    private var accounts = 0
     private val keyLock = Mutex()
 
     // The addresses with a handshake in progress (main thread): each holds a thread, so a few at a time
@@ -115,6 +119,18 @@ class TvRemoteServer(
         writer = null
     }
 
+    /**
+     * The account was signed out: its key no longer opens this TV, and the phone it let in is let go.
+     * The key of the account signed in next is worked out as its first phone connects.
+     */
+    fun forgetAccount() {
+        accounts++
+        link?.close()
+        link = null
+        key = null
+        keyUntil = 0
+    }
+
     fun send(message: JSONObject) {
         val link = link ?: return
         val text = message.toString()
@@ -128,6 +144,7 @@ class TvRemoteServer(
         val refresh = scope?.launch { refreshKey() }
         withTimeoutOrNull(KEY_WAIT_MS) { refresh?.join() }
         val key = key
+        val account = accounts
         if (key == null) {
             runCatching { socket.close() }
             return
@@ -151,7 +168,7 @@ class TvRemoteServer(
             handshakes.remove(address)
             deadline?.cancel()
         } ?: return
-        if (!currentCoroutineContext().isActive) {
+        if (!currentCoroutineContext().isActive || account != accounts) {
             phone.close()
             return
         }
@@ -174,9 +191,11 @@ class TvRemoteServer(
     private suspend fun refreshKey() = keyLock.withLock {
         if (SystemClock.elapsedRealtime() < keyUntil) return@withLock
         // A call that fails (no network yet) keeps the key in hand; signed out, there is none.
+        val account = accounts
         val asked = runCatching { accountKey() }
-        // Stopped meanwhile: the key was dropped, and is not to come back.
+        // Stopped or signed out meanwhile: the key was dropped, and is not to come back.
         currentCoroutineContext().ensureActive()
+        if (account != accounts) return@withLock
         asked.onSuccess { key = it }
         keyAt = SystemClock.elapsedRealtime()
         keyUntil = keyAt + if (asked.isSuccess && key != null) KEY_CURRENT_MS else KEY_RETRY_MS

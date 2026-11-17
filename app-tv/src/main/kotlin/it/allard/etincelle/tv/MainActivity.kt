@@ -82,6 +82,8 @@ import it.allard.etincelle.core.ui.MainViewModelFactory
 import it.allard.etincelle.core.ui.Tab
 import it.allard.etincelle.core.ui.UpdateChecker
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
@@ -170,6 +172,14 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
         // A build from Google Play is updated by Google Play, and may not update itself.
         if (BuildConfig.SELF_UPDATE) lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.watchForUpdates() } }
         lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.keepPageFresh() } }
+        // Signed out, by hand or as the session died: the account's phones lose this TV at once.
+        lifecycleScope.launch {
+            var signedIn = false
+            viewModel.state.map { it.loggedIn }.distinctUntilChanged().collect { now ->
+                if (signedIn && !now) remote.signedOut()
+                signedIn = now
+            }
+        }
         setContent {
             EtincelleTheme {
                 val state by viewModel.state.collectAsStateWithLifecycle()

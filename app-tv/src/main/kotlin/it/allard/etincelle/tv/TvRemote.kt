@@ -65,6 +65,12 @@ class TvRemote(private val app: EtincelleTvApp) {
         asked = null
     }
 
+    /** The account was signed out here: the phones it let in no longer drive this TV. */
+    fun signedOut() {
+        server.forgetAccount()
+        asked = null
+    }
+
     /** [screen] takes the phone's commands from now on. */
     fun attach(screen: Screen) {
         this.screen = screen

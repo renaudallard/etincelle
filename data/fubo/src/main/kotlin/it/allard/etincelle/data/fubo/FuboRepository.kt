@@ -218,7 +218,8 @@ class FuboRepository(
     override suspend fun profiles(): Profiles = withRefresh { api.profiles().toProfiles() }
 
     override suspend fun remoteKey(): ByteArray? {
-        val userId = session.session?.userId ?: return null
+        // A sign-in under way has a session before it has its user.
+        val userId = session.session?.userId?.takeIf { it.isNotEmpty() } ?: return null
         return RemoteProtocol.accountKey(userId, profiles().profiles.map { it.id })
     }
 
