@@ -732,7 +732,9 @@ class MainViewModel(
      * player, as when it is chosen here, so Back lands on it and its next episode follows.
      */
     fun playFromRemote(kind: PlayKind, id: String, positionMs: Long, rewindMs: Long) {
-        _state.update { it.copy(busy = true, error = null, info = null, settings = false, favoriteOrder = null, profileScreen = null) }
+        _state.update {
+            it.copy(busy = true, error = null, info = null, settings = false, favoriteOrder = null, profileScreen = null, profileEditor = null)
+        }
         navLaunch {
             runCatchingNav {
                 when (kind) {
