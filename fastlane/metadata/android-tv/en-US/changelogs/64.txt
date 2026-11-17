@@ -1,0 +1,1 @@
+First release on Google Play. It is the app published on GitHub, without its own update check: Google Play keeps it up to date.
