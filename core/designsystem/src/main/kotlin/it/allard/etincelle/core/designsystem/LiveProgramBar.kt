@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -72,6 +73,9 @@ fun LiveProgramBar(
     // The gestures outlive a recomposition: they call what the bar was last given.
     val seekTo by rememberUpdatedState(onSeekToFraction)
     val scrubbing by rememberUpdatedState(onScrubbing)
+    // A bar taken off screen under a finger gets no end of drag: say it is over, or it would count as
+    // dragged for good.
+    DisposableEffect(Unit) { onDispose { scrubbing(false) } }
 
     val gestures = if (onSeekToFraction == null) {
         Modifier

@@ -952,7 +952,11 @@ private fun PlayerSurface(
     val controlsHeld = castMenuOpen || scrubbing
     LaunchedEffect(controlsHeld, playerView) {
         // The cast controller's are pinned already.
-        if (secure) playerView?.controllerShowTimeoutMs = if (controlsHeld) 0 else PlayerControlView.DEFAULT_SHOW_TIMEOUT_MS
+        val view = playerView?.takeIf { secure } ?: return@LaunchedEffect
+        view.controllerShowTimeoutMs = if (controlsHeld) 0 else PlayerControlView.DEFAULT_SHOW_TIMEOUT_MS
+        // The timeout alone only takes on controls shown in full: past their five seconds they are
+        // already on their way out, and would still take the menu or the drag with them.
+        if (controlsHeld) view.showController()
     }
     Box(Modifier.fillMaxSize()) {
         AndroidView(
