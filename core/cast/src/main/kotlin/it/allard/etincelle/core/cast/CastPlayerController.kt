@@ -67,6 +67,8 @@ private const val CAST_RETRY_BACKOFF_MS = 1500L
 // Cap the backoff well under the receiver's reconnect grace window so this fresh cast lands before the
 // receiver starts its own (stale-token) reload.
 private const val CAST_RETRY_MAX_BACKOFF_MS = 2000L
+// The phone's own player waits this long before its second attempt, and twice as long before each next.
+private const val LOCAL_RETRY_BACKOFF_MS = 2000L
 // Failures more than this far apart are separate incidents, not one burst: restore the retry budget so
 // a long cast that self-heals occasionally is never eventually refused recovery.
 private const val CAST_RETRY_RESET_MS = 60_000L
@@ -1352,10 +1354,16 @@ class CastPlayerController(
             return
         }
         castRetryCount++
-        // Back off on each consecutive failure (capped) so a persistently broken stream is not hammered,
-        // staying under the receiver's reconnect grace so its own stale-token reload does not fire first.
-        val backoff = ((castRetryCount - 1) * CAST_RETRY_BACKOFF_MS).coerceAtMost(CAST_RETRY_MAX_BACKOFF_MS)
         val target = _currentPlayer.value
+        // Back off on each consecutive failure so a persistently broken stream is not hammered. For a
+        // receiver the wait is capped, staying under its reconnect grace so its own stale-token reload
+        // does not fire first. The phone's own player has no such race, and waits as the TV app's does:
+        // 2, 4, 8 then 16 s, so that half a minute without network does not close it.
+        val backoff = when {
+            target !== localPlayer -> ((castRetryCount - 1) * CAST_RETRY_BACKOFF_MS).coerceAtMost(CAST_RETRY_MAX_BACKOFF_MS)
+            castRetryCount == 1 -> 0L
+            else -> LOCAL_RETRY_BACKOFF_MS shl (castRetryCount - 2)
+        }
         // A receiver stopped on an error may no longer report where it was: fall back to the position
         // it last reported while playing.
         val position = (target.currentPosition.takeIf { it > 0 || target !== castPlayer } ?: receiverPositionMs).coerceAtLeast(0)
