@@ -424,11 +424,15 @@ class FuboRepository(
                 // replay / most-viewed / live-and-upcoming carousels. Best-effort and title-filtered (the
                 // tab bar is a title-less section), with the see-all dropped (it would navigate out of the
                 // open detail). Empty on failure, leaving the plain live detail.
-                val sections = runCatching {
+                val sections = try {
                     api.channelDetail(id, "id-tab-see-also").toRails()
                         .filter { it.title != null }
                         .map { it.copy(seeAllUrl = null) }
-                }.getOrDefault(emptyList())
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    emptyList()
+                }
                 resp.toProgramDetail(channelId = id, vodId = null, isLive = true).copy(sections = sections)
             }
         }
@@ -467,10 +471,14 @@ class FuboRepository(
      * whole lookup is best-effort: it must never fail the detail open, since the episode list is only a
      * supplement to the show's own page.
      */
-    private suspend fun seriesEpisodes(seriesId: String): List<ContentCard> = runCatching {
+    private suspend fun seriesEpisodes(seriesId: String): List<ContentCard> = try {
         val series = api.seriesDetail(seriesId)
         if (series.hasWatchNowTab()) api.seriesDetail(seriesId, "id-tab-watch-now").toEpisodes() else emptyList()
-    }.getOrDefault(emptyList())
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        emptyList()
+    }
 
     override suspend fun record(action: RecordAction) = post(action.url, action.payload)
 
