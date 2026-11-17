@@ -24,6 +24,7 @@ internal object CastScanner {
     private const val LISTEN_MS = 1_500L
     private const val RECEIVE_TIMEOUT_MS = 300
     private const val MAX_PACKET = 9_000
+    private const val MAX_RECORDS = 2_048
 
     /**
      * Asks the network for Chromecasts that can run [appId] and returns those that answer. Blocking for
@@ -47,6 +48,9 @@ internal object CastScanner {
                         continue
                     }
                     records += Mdns.parse(packet.data, packet.length)
+                    // Far more than a home network answers: a device flooding the scan must not fill
+                    // the memory, and what was heard before it is enough to go on.
+                    if (records.size >= MAX_RECORDS) break
                 }
             }
         }
