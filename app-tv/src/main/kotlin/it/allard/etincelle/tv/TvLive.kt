@@ -34,14 +34,16 @@ import androidx.tvprovider.media.tv.Program
 import it.allard.etincelle.core.designsystem.theme.EtincelleTheme
 import it.allard.etincelle.core.domain.MolotovRepository
 import it.allard.etincelle.core.model.LiveChannel
+import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.player.MediaItemFactory
+import it.allard.etincelle.core.player.PlaybackRecovery
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -159,6 +161,7 @@ class TvLiveInputService : TvInputService() {
         private val player = ExoPlayer.Builder(context).build()
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
         private var tuneJob: Job? = null
+        private var recovery: PlaybackRecovery? = null
 
         init {
             player.addListener(object : Player.Listener {
@@ -170,33 +173,53 @@ class TvLiveInputService : TvInputService() {
                     }
                 }
 
+                // Being brought back (see onTune), which says so itself if it cannot be.
                 override fun onPlayerError(error: PlaybackException) =
-                    notifyVideoUnavailable(TvInputManager.VIDEO_UNAVAILABLE_REASON_UNKNOWN)
+                    notifyVideoUnavailable(TvInputManager.VIDEO_UNAVAILABLE_REASON_BUFFERING)
             })
+        }
+
+        // The stream of channel [id], or null when it cannot be had.
+        private suspend fun resolve(id: String): PlaybackSource? = try {
+            withContext(Dispatchers.IO) {
+                val repo = (application as EtincelleTvApp).container.repository
+                if (repo.currentSession() == null) repo.restoreSession()
+                repo.resolveLiveChannel(id)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+
+        private fun dropRecovery() {
+            recovery?.let {
+                player.removeListener(it)
+                it.stop()
+            }
+            recovery = null
         }
 
         override fun onTune(channelUri: Uri): Boolean {
             notifyVideoUnavailable(TvInputManager.VIDEO_UNAVAILABLE_REASON_TUNING)
             tuneJob?.cancel()
+            dropRecovery()
             player.stop()
+            // A newer tune cancels this one, and reports its own state.
             tuneJob = scope.launch {
-                val repo = (application as EtincelleTvApp).container.repository
-                val source = runCatching {
-                    withContext(Dispatchers.IO) {
-                        val id = TvLive.channelId(this@TvLiveInputService, channelUri) ?: error("unknown channel")
-                        if (repo.currentSession() == null) repo.restoreSession()
-                        repo.resolveLiveChannel(id)
-                    }
-                }.getOrNull()
-                // A newer tune cancelled this one: it reports its own state.
-                ensureActive()
-                if (source == null) {
+                val id = withContext(Dispatchers.IO) { runCatching { TvLive.channelId(this@TvLiveInputService, channelUri) }.getOrNull() }
+                val source = id?.let { resolve(it) }
+                if (id == null || source == null) {
                     notifyVideoUnavailable(TvInputManager.VIDEO_UNAVAILABLE_REASON_UNKNOWN)
                     return@launch
                 }
                 player.setMediaItem(MediaItemFactory.create(source))
                 player.prepare()
                 player.playWhenReady = true
+                // An error would otherwise leave the channel black until it is tuned again.
+                recovery = PlaybackRecovery(player, scope, source, { resolve(id) }) {
+                    notifyVideoUnavailable(TvInputManager.VIDEO_UNAVAILABLE_REASON_UNKNOWN)
+                }.also(player::addListener)
             }
             return true
         }
@@ -213,6 +236,7 @@ class TvLiveInputService : TvInputService() {
         override fun onSetCaptionEnabled(enabled: Boolean) = Unit
 
         override fun onRelease() {
+            dropRecovery()
             scope.cancel()
             player.release()
         }

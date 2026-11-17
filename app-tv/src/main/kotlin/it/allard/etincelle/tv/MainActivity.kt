@@ -72,6 +72,7 @@ import it.allard.etincelle.core.player.LiveBarGeometry
 import it.allard.etincelle.core.player.LivePlayback
 import it.allard.etincelle.core.player.MediaItemFactory
 import it.allard.etincelle.core.player.PlaybackProgress
+import it.allard.etincelle.core.player.PlaybackRecovery
 import it.allard.etincelle.core.player.keepScreenOnWhilePlaying
 import it.allard.etincelle.core.remote.RemoteMessages
 import it.allard.etincelle.core.ui.installFetchedUpdate

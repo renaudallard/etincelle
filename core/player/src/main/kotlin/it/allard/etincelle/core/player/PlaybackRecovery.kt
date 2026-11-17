@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Renaud Allard <renaud@allard.it>
 // SPDX-License-Identifier: BSD-2-Clause
 
-package it.allard.etincelle.tv
+package it.allard.etincelle.core.player
 
 import android.os.SystemClock
 import androidx.media3.common.C
@@ -9,8 +9,6 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import it.allard.etincelle.core.model.PlaybackSource
-import it.allard.etincelle.core.player.LivePlayback
-import it.allard.etincelle.core.player.MediaItemFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -36,7 +34,7 @@ private const val SEEK_POLL_MS = 250L
  * position of a replay, the time of day of a live programme watched behind the live point. After
  * [MAX_RECOVERIES] failures in a row [onGiveUp] is called. Main thread only; [stop] ends it.
  */
-internal class PlaybackRecovery(
+class PlaybackRecovery(
     private val player: Player,
     private val scope: CoroutineScope,
     private val source: PlaybackSource,
