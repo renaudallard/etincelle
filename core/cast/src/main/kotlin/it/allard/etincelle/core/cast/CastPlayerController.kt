@@ -6,6 +6,7 @@ package it.allard.etincelle.core.cast
 import android.content.Context
 import android.os.SystemClock
 import androidx.media3.cast.CastPlayer
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -190,6 +191,10 @@ class CastPlayerController(
     private var endingCaptured = false
     private var castRetryCount = 0
     private var lastCastErrorAt = 0L
+
+    // The duration the phone's own player had when it last failed: a reload that has not loaded yet
+    // leaves it without one, and with it no way to tell where to resume from.
+    private var failedDurationMs = C.TIME_UNSET
     private var reResolveJob: Job? = null
 
     // True only when the user explicitly asked to bring playback back to this phone ("Cet appareil"):
@@ -343,6 +348,7 @@ class CastPlayerController(
 
     /** Load + play [item] on whichever player is current (phone or cast). */
     fun play(item: MediaItem, startPositionMs: Long) {
+        failedDurationMs = C.TIME_UNSET
         // Nominally on the cast player but the session is gone (e.g. an abandoned transfer): drop back
         // to local first so the load below does not target a dead CastPlayer.
         if (_currentPlayer.value === castPlayer && castContext.sessionManager.currentCastSession == null) {
@@ -937,7 +943,9 @@ class CastPlayerController(
         clearDeferredStop()
         val player = _currentPlayer.value
         val pos = player.currentPosition
-        val dur = player.duration
+        // Given up on in the middle of a reload, the player no longer knows its duration.
+        val dur = player.duration.takeIf { it > 0 } ?: failedDurationMs
+        failedDurationMs = C.TIME_UNSET
         player.stop()
         player.clearMediaItems()
         currentItem = null
@@ -1335,6 +1343,7 @@ class CastPlayerController(
         val now = SystemClock.elapsedRealtime()
         if (now - lastCastErrorAt > CAST_RETRY_RESET_MS) castRetryCount = 0
         lastCastErrorAt = now
+        if (failedPlayer === localPlayer) localPlayer.duration.takeIf { it > 0 }?.let { failedDurationMs = it }
         if (source == null || resolver == null || castRetryCount >= MAX_CAST_RECOVERIES) {
             // Out of recovery attempts (or nothing to re-resolve): cut any source kept alive for the
             // hand-off so it stops decoding with nothing taking over, and stop the connect animation.
