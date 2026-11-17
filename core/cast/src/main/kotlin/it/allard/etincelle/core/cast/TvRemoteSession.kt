@@ -43,25 +43,28 @@ internal class TvRemoteSession(
 
     /** Connects and checks that the TV is signed in to the same account ([accountKey]). Throws otherwise. */
     suspend fun start(accountKey: ByteArray) {
-        // Not cancellable, or a socket opened meanwhile would be dropped without being closed.
+        // Not cancellable, or a socket opened meanwhile would be dropped without being closed. The link is
+        // kept from in there: a caller cancelled meanwhile is not handed it, and can only [close].
         val connected = withContext(Dispatchers.IO + NonCancellable) {
             val socket = network?.socketFactory?.createSocket() ?: Socket()
             try {
                 socket.connect(InetSocketAddress(tv.host, tv.port), CONNECT_TIMEOUT_MS)
-                RemoteLink.connect(socket, accountKey).also {
-                    // The TV says how playback goes every second: silence this long means it is gone.
-                    socket.soTimeout = READ_TIMEOUT_MS
+                val connected = RemoteLink.connect(socket, accountKey)
+                // The TV says how playback goes every second: silence this long means it is gone.
+                socket.soTimeout = READ_TIMEOUT_MS
+                synchronized(this@TvRemoteSession) {
+                    if (closed) {
+                        connected.close()
+                        throw IOException("session closed")
+                    }
+                    link = connected
                 }
+                connected
             } catch (e: IOException) {
                 runCatching { socket.close() }
                 throw e
             }
         }
-        if (closed) {
-            connected.close()
-            throw IOException("session closed")
-        }
-        link = connected
         scope.launch(Dispatchers.IO) { read(connected) }
     }
 
@@ -72,8 +75,10 @@ internal class TvRemoteSession(
     }
 
     fun close() {
-        closed = true
-        val link = link
+        val link = synchronized(this) {
+            closed = true
+            link
+        }
         // After the messages already queued, such as a last stop, so they are not lost.
         if (runCatching { writer.execute { link?.close() } }.isFailure) link?.close()
         writer.shutdown()
