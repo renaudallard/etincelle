@@ -364,11 +364,16 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                 if (position < 0) player.seekToDefaultPosition() else player.seekTo(position)
             }
             RemoteMessages.STOP -> viewModel.stopPlaying()
-            RemoteMessages.KEY -> remoteKeyCode(message.optString(RemoteMessages.KEY_NAME))?.let { code ->
-                // Through the activity, as a remote press would come, so the screens and the player
-                // see it the same way.
-                dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
-                dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
+            RemoteMessages.KEY -> when (val name = message.optString(RemoteMessages.KEY_NAME)) {
+                // Straight to what handles Back: from Android 16 an activity no longer turns a Back key
+                // event into it for an app built for that version.
+                "back" -> onBackPressedDispatcher.onBackPressed()
+                else -> remoteKeyCode(name)?.let { code ->
+                    // Through the activity, as a remote press would come, so the screens and the
+                    // player see it the same way.
+                    dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
+                    dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
+                }
             }
             // The media volume, which Android passes on to the TV set over HDMI-CEC when the device allows
             // it. A device whose HDMI output has a fixed volume and CEC volume control off leaves it as is.
@@ -390,7 +395,6 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
         "left" -> KeyEvent.KEYCODE_DPAD_LEFT
         "right" -> KeyEvent.KEYCODE_DPAD_RIGHT
         "ok" -> KeyEvent.KEYCODE_DPAD_CENTER
-        "back" -> KeyEvent.KEYCODE_BACK
         else -> null
     }
 
