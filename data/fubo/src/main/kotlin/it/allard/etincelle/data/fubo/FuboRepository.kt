@@ -518,7 +518,7 @@ class FuboRepository(
     override suspend fun resolveRecording(assetId: String): PlaybackSource = withRefresh {
         // A DVR recording is seekable VOD-like content, so remember and resume its position like VOD.
         api.playbackAsset(id = assetId, type = "dvr").toPlaybackSource()
-            .copy(resumeKey = assetId, startPositionMs = progress.read(assetId), originRecordingAssetId = assetId)
+            .copy(resumeKey = assetId, startPositionMs = resumePosition(assetId), originRecordingAssetId = assetId)
     }
 
     override suspend fun resolveLiveChannel(channelId: String): PlaybackSource = withRefresh {
@@ -555,11 +555,23 @@ class FuboRepository(
 
     override suspend fun resolveVod(vodId: String): PlaybackSource = withRefresh {
         api.playbackAsset(id = vodId, type = "vod").toPlaybackSource()
-            .copy(resumeKey = vodId, startPositionMs = progress.read(vodId), originVodId = vodId)
+            .copy(resumeKey = vodId, startPositionMs = resumePosition(vodId), originVodId = vodId)
     }
 
+    // Resume points are each profile's own: a programme one profile left must not resume there for
+    // another of the account. Null signed out.
+    private fun profileKey(key: String): String? = session.session?.let { "${it.profileId}/$key" }
+
+    // Those saved before they were per profile, under the bare key, still count until they are replaced.
+    private suspend fun resumePosition(key: String): Long =
+        profileKey(key)?.let { progress.read(it) }?.takeIf { it > 0 } ?: progress.read(key)
+
     override suspend fun savePlaybackPosition(key: String, positionMs: Long) {
-        if (positionMs > 0) progress.save(key, positionMs) else progress.clear(key)
+        // Signed out, as when the session died under a programme, there is no one to save for: the
+        // store was just wiped for the next account.
+        val own = profileKey(key) ?: return
+        progress.clear(key)
+        if (positionMs > 0) progress.save(own, positionMs) else progress.clear(own)
     }
 
     override suspend fun reportProgress(source: PlaybackSource, positionMs: Long, durationMs: Long) {

@@ -88,7 +88,8 @@ Les **profils** du compte sont pris en charge : avec plusieurs profils, etincell
 regarde ?** au démarrage, comme l'application officielle (quand le choix date de plus de deux jours
 ou que les profils ont changé). **Profils**, dans les paramètres, permet de changer de profil, d'en
 **ajouter** (jusqu'à la limite du compte), et avec **Modifier** de renommer un profil, de changer
-son avatar ou de le supprimer. Les chaînes favorites et l'accueil suivent le profil choisi.
+son avatar ou de le supprimer. Les chaînes favorites, l'accueil et les points de reprise des
+programmes suivent le profil choisi.
 
 Elle ajoute un **sélecteur de saison** sur les séries qui en comptent plusieurs, et des **icônes de
 genre** dans les grilles de catégories. Les vignettes portent le **logo de la chaîne** qui propose le

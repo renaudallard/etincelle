@@ -260,11 +260,37 @@ class FuboRepositoryTest {
 
     @Test
     fun `savePlaybackPosition stores a position and clears it at zero`() = runTest {
+        session.session = UserSession("AT", "RT", "u1", "p1")
         repo.savePlaybackPosition("VOD_7", 30_000L)
-        assertEquals(30_000L, progress.positions["VOD_7"])
+        assertEquals(mapOf("p1/VOD_7" to 30_000L), progress.positions)
 
         repo.savePlaybackPosition("VOD_7", 0L)
-        assertEquals(null, progress.positions["VOD_7"])
+        assertTrue(progress.positions.isEmpty())
+    }
+
+    @Test
+    fun `a resume point belongs to the profile that left it`() = runTest {
+        val vod = """{"stream":{"url":"https://cdn/m.mpd","packagingProtocol":"dash","drmProtected":false,"live":false},"type":"vod"}"""
+        repeat(3) { server.enqueue(MockResponse().setBody(vod)) }
+        session.session = UserSession("AT", "RT", "u1", "p1")
+        repo.savePlaybackPosition("VOD_7", 30_000L)
+
+        session.session = UserSession("AT", "RT", "u1", "p2")
+        assertEquals(0L, repo.resolveVod("VOD_7").startPositionMs)
+        session.session = UserSession("AT", "RT", "u1", "p1")
+        assertEquals(30_000L, repo.resolveVod("VOD_7").startPositionMs)
+
+        // One saved before they were per profile counts until it is replaced.
+        progress.positions["VOD_8"] = 42_000L
+        assertEquals(42_000L, repo.resolveVod("VOD_8").startPositionMs)
+        repo.savePlaybackPosition("VOD_8", 50_000L)
+        assertEquals(mapOf("p1/VOD_7" to 30_000L, "p1/VOD_8" to 50_000L), progress.positions)
+    }
+
+    @Test
+    fun `nothing is saved once signed out`() = runTest {
+        repo.savePlaybackPosition("VOD_7", 30_000L)
+        assertTrue(progress.positions.isEmpty())
     }
 
     private fun playheadSource(payload: Map<String, Any?>) = PlaybackSource(
