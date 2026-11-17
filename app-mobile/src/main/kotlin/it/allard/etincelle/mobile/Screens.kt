@@ -61,6 +61,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -915,7 +916,8 @@ fun SearchScreen(
     searched: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    var query by remember { mutableStateOf("") }
+    // Saved, so it is still there on coming back from a result opened over the search.
+    var query by rememberSaveable { mutableStateOf("") }
     val keyboard = LocalSoftwareKeyboardController.current
     Column(modifier.fillMaxSize()) {
         OutlinedTextField(

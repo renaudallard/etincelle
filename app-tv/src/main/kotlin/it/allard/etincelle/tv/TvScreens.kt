@@ -398,7 +398,8 @@ private fun TvSearchContent(
     gridColumns: Int,
 ) {
     // A TextFieldValue so the remote can tell when the cursor is at the end of the text (see below).
-    var query by remember { mutableStateOf(TextFieldValue("")) }
+    // Saved, so it is still there on coming back from a result opened over the search.
+    var query by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue("")) }
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     // A text field opens the keyboard as soon as it gets focus, which catches a remote that is only
