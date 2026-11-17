@@ -40,8 +40,8 @@ data class PlaybackSource(
     val startPositionMs: Long = 0L,
     /** Live only: how far behind the live edge (ms) playback should begin instead of at the edge.
      * Carries a manual rewind across a cast hand-off, and starts the current show from its beginning
-     * ("depuis le début"). The cast receiver gets it as live_rewind_sec; the local player seeks to the
-     * programme start once the live window is known. 0 = live edge. */
+     * ("depuis le début"). The cast receiver gets it as live_rewind_sec; the phone's own player seeks to
+     * the programme start, and the TV app that far back, once the live window is known. 0 = live edge. */
     val liveRewindOffsetMs: Long = 0L,
     /** The originating ids, so a stream can be re-resolved (e.g. when a Cast transfer hits an
      * expired token). At most one is set: [originChannelId] for live, [originVodId] for VOD/replay,

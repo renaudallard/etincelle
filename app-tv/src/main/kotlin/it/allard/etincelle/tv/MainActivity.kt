@@ -572,9 +572,11 @@ private fun TvPlayerSurface(
     // rewind/forward buttons), so it carries no seek callback.
     var programWindow by remember(source) { mutableStateOf(source.programWindow) }
     var barGeometry by remember { mutableStateOf<LiveBarGeometry?>(null) }
-    // A "depuis le début" start asks playback to begin at the current show's start; the player joins at
-    // the live edge first, so seek back once the live window has loaded, then stop retrying.
-    var pendingStartOver by remember(source) { mutableStateOf(source.isLive && source.liveRewindOffsetMs > 0L) }
+    // A "depuis le début" start, or a rewound programme handed over by the phone, asks playback to begin
+    // that far behind the live edge; the player joins at the edge first, so seek back to what aired then
+    // once the live window has loaded, then stop retrying.
+    var pendingRewind by remember(source) { mutableStateOf(source.isLive && source.liveRewindOffsetMs > 0L) }
+    val rewindTo = remember(source) { System.currentTimeMillis() - source.liveRewindOffsetMs }
     var controlsVisible by remember { mutableStateOf(true) }
     // The remote only reaches the PlayerView (OK or a direction shows the controls) while that view
     // holds the Android focus; otherwise the keys stop at Compose and the controls cannot be brought
@@ -637,9 +639,7 @@ private fun TvPlayerSurface(
         while (true) {
             behindLive = LivePlayback.behindLiveEdgeMs(player, liveWindow) > LivePlayback.LIVE_REWIND_THRESHOLD_MS
             barGeometry = LivePlayback.liveBarGeometry(player, liveWindow, programWindow)
-            if (pendingStartOver && LivePlayback.seekToProgramStartIfReady(player, liveWindow, programWindow)) {
-                pendingStartOver = false
-            }
+            if (pendingRewind && LivePlayback.seekToTimeIfReady(player, liveWindow, rewindTo)) pendingRewind = false
             val pw = programWindow
             val edge = LivePlayback.liveEdgeEpochMs(player, liveWindow)
             val now = System.currentTimeMillis()
