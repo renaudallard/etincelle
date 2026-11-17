@@ -11,6 +11,7 @@ import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.DrmSpec
+import it.allard.etincelle.core.model.LoginResult
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.Profiles
@@ -108,6 +109,24 @@ class MainViewModelTest {
         assertEquals(NEXT, vm.state.value.playing)
         assertTrue(vm.state.value.detailStack.isEmpty())
         assertFalse(vm.state.value.busy)
+    }
+
+    @Test
+    fun aSignInWhoseHomePageFailsIsStillASignIn() {
+        val repo = FakeRepo()
+        repo.restore = { false }
+        val vm = MainViewModel(repo, CHECKER)
+        assertFalse(vm.state.value.loggedIn)
+        repo.home = { throw AppError.Network("offline") }
+        vm.login("a@b.c", "secret")
+
+        assertTrue(vm.state.value.loggedIn)
+        assertFalse(vm.state.value.busy)
+        assertEquals("Échec du chargement de l'accueil", vm.state.value.error)
+        // Accueil loads when chosen again.
+        repo.home = { HOME }
+        vm.selectTab(Tab.HOME)
+        assertEquals(HOME, vm.state.value.current)
     }
 
     @Test
@@ -421,6 +440,7 @@ class MainViewModelTest {
         var session: UserSession? = UserSession("access", "refresh", "user", "profile")
 
         override suspend fun restoreSession() = restore()
+        override suspend fun login(email: String, password: String): LoginResult = LoginResult.SignedIn(session!!)
         override fun currentSession() = session
         override suspend fun loadHome() = home()
         override suspend fun loadPage(url: String) = page(url)

@@ -55,6 +55,8 @@ private const val UPDATE_INTERVAL_MS = 24 * 60 * 60 * 1000L
 private const val STALE_ON_RETURN_MS = 2 * 60 * 1000L
 private const val STALE_ON_SCREEN_MS = 5 * 60 * 1000L
 private const val STALE_CHECK_MS = 30 * 1000L
+// Signed in, but the first page did not come: the tabs are there to load one.
+private const val HOME_FAILED = "Échec du chargement de l'accueil"
 // The official app caps a profile name at 30 characters.
 const val PROFILE_NAME_MAX = 30
 
@@ -194,7 +196,7 @@ class MainViewModel(
                             if (sessionDead) {
                                 it.copy(checking = false, loggedIn = false)
                             } else {
-                                it.copy(checking = false, loggedIn = true, tab = Tab.HOME, error = "Échec du chargement de l'accueil")
+                                it.copy(checking = false, loggedIn = true, tab = Tab.HOME, error = HOME_FAILED)
                             }
                         }
                         // Still signed in: a link that opened the app and the profile question go ahead.
@@ -232,7 +234,14 @@ class MainViewModel(
                 consumeDeepLink()
                 askWhoIsWatching()
             }
-            .onFailure { e -> applyFailure(e, "Échec de connexion") }
+            .onFailure { e ->
+                // The sign-in went through and is saved: a home page that fails to load must not read
+                // as a failed sign-in, least of all after a code that is now spent.
+                if (repo.currentSession() == null) return@onFailure applyFailure(e, "Échec de connexion")
+                _state.update { it.copy(busy = false, mfa = null, loggedIn = true, tab = Tab.HOME, error = HOME_FAILED) }
+                consumeDeepLink()
+                askWhoIsWatching()
+            }
     }
 
     /** Two-factor login: sends the [code] the user received. */
@@ -305,7 +314,7 @@ class MainViewModel(
                             if (page != null) {
                                 it.copy(loggedIn = true, pairingCode = null, error = null, busy = false, tab = Tab.HOME, backStack = listOf(page))
                             } else {
-                                it.copy(loggedIn = true, pairingCode = null, busy = false, tab = Tab.HOME, error = "Échec du chargement de l'accueil")
+                                it.copy(loggedIn = true, pairingCode = null, busy = false, tab = Tab.HOME, error = HOME_FAILED)
                             }
                         }
                         consumeDeepLink()
