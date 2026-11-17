@@ -18,7 +18,7 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
@@ -95,7 +95,7 @@ internal class DirectCastSession(
         // Join the receiver if another sender already started it; otherwise launch it. Newer firmware
         // first answers a launch with a status that does not list the app yet, so wait for one that does.
         val app = try {
-            withTimeout(LAUNCH_TIMEOUT_MS) {
+            withTimeoutOrNull(LAUNCH_TIMEOUT_MS) {
                 requestReceiver(JSONObject().put("type", "GET_STATUS"))
                 runningApp(nextReceiverStatus { true }) ?: run {
                     if (joinOnly) throw ReceiverNotRunningException()
@@ -104,7 +104,7 @@ internal class DirectCastSession(
                     nextReceiverStatus { runningApp(it) != null || it.has(LAUNCH_ERROR_KEY) }
                         .let { runningApp(it) ?: throw IOException("the receiver did not start") }
                 }
-            }
+            } ?: throw IOException("the receiver did not answer")
         } catch (e: Throwable) {
             if (stopOnLaunch) close()
             throw e
@@ -206,7 +206,9 @@ internal class DirectCastSession(
             if (channel?.send(CastChannel.NS_MEDIA, request.toString(), source = senderId, destination = transport) != true) {
                 throw IOException("connection lost")
             }
-            return withTimeout(timeoutMs) { reply.await() }
+            // An IOException, as for a lost connection: a timeout of its own kind would pass for the
+            // caller being cancelled, and the load that got no answer for nothing to report.
+            return withTimeoutOrNull(timeoutMs) { reply.await() } ?: throw IOException("no answer")
         } finally {
             pending.remove(id)
         }
