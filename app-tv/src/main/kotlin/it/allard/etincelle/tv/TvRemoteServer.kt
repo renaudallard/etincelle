@@ -7,6 +7,7 @@ import android.content.Context
 import android.os.Build
 import android.os.SystemClock
 import android.provider.Settings
+import it.allard.etincelle.core.remote.RemoteAuthException
 import it.allard.etincelle.core.remote.RemoteDiscovery
 import it.allard.etincelle.core.remote.RemoteLink
 import java.net.DatagramPacket
@@ -61,6 +62,7 @@ class TvRemoteServer(
     // profiles it is made of may change while the server runs, so it is worked out again now and then.
     private var key: ByteArray? = null
     private var keyUntil = 0L
+    private var keyAt = 0L
     private val keyLock = Mutex()
 
     // The addresses with a handshake in progress (main thread): each holds a thread, so a few at a time
@@ -142,7 +144,9 @@ class TvRemoteServer(
         }
         // Not cancellable, so a handshake ending as the server stops still has its connection closed.
         val phone = try {
-            runCatching { withContext(Dispatchers.IO + NonCancellable) { RemoteLink.accept(socket, key) } }.getOrNull()
+            runCatching { withContext(Dispatchers.IO + NonCancellable) { RemoteLink.accept(socket, key) } }
+                .onFailure { if (it is RemoteAuthException) keyRefused() }
+                .getOrNull()
         } finally {
             handshakes.remove(address)
             deadline?.cancel()
@@ -174,7 +178,15 @@ class TvRemoteServer(
         // Stopped meanwhile: the key was dropped, and is not to come back.
         currentCoroutineContext().ensureActive()
         asked.onSuccess { key = it }
-        keyUntil = SystemClock.elapsedRealtime() + if (asked.isSuccess && key != null) KEY_CURRENT_MS else KEY_RETRY_MS
+        keyAt = SystemClock.elapsedRealtime()
+        keyUntil = keyAt + if (asked.isSuccess && key != null) KEY_CURRENT_MS else KEY_RETRY_MS
+    }
+
+    // A phone failed to prove the key. One of this account holds a newer key when a profile was added or
+    // removed since this one was worked out: the next connection works it out again, yet a stranger
+    // failing on purpose costs a call no more often than a failed one is retried.
+    private fun keyRefused() {
+        keyUntil = minOf(keyUntil, keyAt + KEY_RETRY_MS)
     }
 
     // Tells the phones already listening that this TV app opened, then each phone looking for TV apps where
