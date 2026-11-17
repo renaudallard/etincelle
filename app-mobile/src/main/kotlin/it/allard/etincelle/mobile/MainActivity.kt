@@ -291,7 +291,11 @@ class MainActivity : ComponentActivity() {
                             }
                         },
                         // "Cet appareil" in the picker: bring playback back to this phone (not a stop).
-                        onCastDisconnect = { controller?.returnToThisDevice() },
+                        // With nothing playing as far as the pages know (a link opened during the cast
+                        // closed it), there is no player to bring it back to: the cast just ends.
+                        onCastDisconnect = {
+                            if (viewModel.state.value.playing == null) controller?.disconnect() else controller?.returnToThisDevice()
+                        },
                         // Active-scan while the cast picker is open so the device list stays fresh.
                         onCastActiveScan = { controller?.setActiveScan(it) },
                         onTvKey = { controller?.sendTvKey(it) },
