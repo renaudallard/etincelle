@@ -1,6 +1,6 @@
 # Direct casting: design
 
-Status: proposal, not implemented.
+Status: implemented, in `core/cast`.
 
 ## Problem
 
@@ -75,7 +75,7 @@ Transport:
   source id, destination id, namespace, payload type, UTF-8 or binary payload). The encoder and
   decoder are written by hand (varints and length-delimited fields), with no protobuf dependency.
 - Payloads are JSON (`org.json`, already used), except device authentication, which is binary.
-- One reader coroutine on `Dispatchers.IO`; writes are serialized; events are posted to the main
+- One reader thread; writes are serialized on a thread of their own; events are posted to the main
   thread.
 
 Namespaces:
@@ -83,7 +83,7 @@ Namespaces:
 | Namespace | Use |
 |---|---|
 | `urn:x-cast:com.google.cast.tp.connection` | CONNECT and CLOSE, to the platform (`receiver-0`) and to the app's transport id |
-| `urn:x-cast:com.google.cast.tp.heartbeat` | PING every 5 s, answer PONG; three missed answers end the session |
+| `urn:x-cast:com.google.cast.tp.heartbeat` | PING every 5 s, answer PONG; 20 s without anything read end the session |
 | `urn:x-cast:com.google.cast.receiver` | LAUNCH, GET_STATUS, STOP, SET_VOLUME (level and mute) |
 | `urn:x-cast:com.google.cast.media` | LOAD, PLAY, PAUSE, SEEK, STOP, GET_STATUS; MEDIA_STATUS updates |
 | `urn:x-cast:com.google.cast.tp.deviceauth` | device authentication challenge and response |
@@ -94,7 +94,7 @@ Device authentication:
   with its certificate, intermediate certificates and a signature over the nonce and the TLS
   certificate it presented.
 - Verify that the chain leads to Google's Cast root certificates (public, embedded in the app,
-  taken from Chromium's `components/cast_certificate`) and that the signature matches the TLS
+  taken from Open Screen) and that the signature matches the TLS
   certificate of this connection. On failure the connection is closed and the device is not used.
 - The device must also hand a current revocation list (`crl` in its answer, a `CrlBundle` signed under
   the Cast CRL root, also embedded) that revokes no certificate of its chain, by key or by serial
@@ -114,8 +114,8 @@ Session steps:
    today. `FuboCastMediaItemConverter`'s customData code is moved to a pure function used by both
    paths, so the receiver contract has one definition.
 4. Follow MEDIA_STATUS (broadcast on changes) and send GET_STATUS every 5 s for the position.
-5. Stop: media STOP (the receiver then ends the cast, as with Play Services). Return to the phone:
-   read the position, STOP, CLOSE.
+5. Stop: receiver STOP with the session id, which ends the receiver app (as with Play Services).
+   Return to the phone: read the position, STOP, CLOSE.
 
 ## 3. Player: `DirectCastPlayer`
 
@@ -123,15 +123,15 @@ A media3 `SimpleBasePlayer` (available in 1.7.1) backed by the channel:
 
 - State from MEDIA_STATUS: `playerState` (IDLE, BUFFERING, PLAYING, PAUSED) to media3 states and
   `playWhenReady`; `idleReason` ERROR to a player error, which feeds the existing recovery path.
-- Position: the last `currentTime`, advanced by the elapsed time times `playbackRate` between
-  updates, so the bar moves smoothly.
+- Position: the last `currentTime`, advanced by the time elapsed since while `playerState` is
+  PLAYING, so the bar moves smoothly (`playbackRate` is not used, see the notes below).
 - Live: a single-window timeline marked live, built from the status' `liveSeekableRange`
   (start and end), so `LivePlayback.behindLiveEdgeMs`, `castRewindOffsetMs`, `liveBarGeometry` and
   `seekToFraction` work as they do with media3's `CastPlayer`. Whether the receiver's player time is
   epoch-based (which would give the timeline a wall-clock anchor and a better programme bar than
   today's cast path) is to be measured; parity with `CastPlayer` is the baseline.
 - Commands: `setPlayWhenReady` to PLAY or PAUSE, `seekTo` to SEEK (`currentTime` = window start +
-  position), `stop` to media STOP, `setMediaItem` and `prepare` to LOAD.
+  position), `stop` to receiver STOP, `setMediaItem` and `prepare` to LOAD.
 - Volume and mute through the receiver namespace, for the phone's volume keys.
 
 ## 4. Integration
@@ -151,7 +151,7 @@ As built (step 4), slightly simpler than first planned:
   INTERRUPTED), so, as on the Play Services path, a stall of 30 s or a reported error makes the phone
   resolve a fresh stream and load it again, within the same retry budget.
 - A dropped connection (an I/O error, not a stop on the TV) is rejoined: reconnect to the same device
-  and join the receiver still running, at 1, 3 and 6 s, then give up. Returning to the foreground no
+  and join the receiver still running, at 1, 3, 6 and 10 s, then give up. Returning to the foreground no
   longer clears the state of a direct cast. Back on the root screen only backgrounds the app (Android
   12 and later), so the session survives it; a killed process does not (not a goal).
 

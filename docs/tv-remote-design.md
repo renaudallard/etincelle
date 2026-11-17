@@ -30,7 +30,10 @@ The server belongs to the process (`TvRemote`), not to the activity, and `Remote
 display over other apps (`SYSTEM_ALERT_WINDOW`, granted by the user from the TV app's settings), the
 service never stops: it starts with the TV (`BOOT_COMPLETED`) and after an update of the app
 (`MY_PACKAGE_REPLACED`), both of which may start a foreground service from the background, and is sticky,
-so Android starts it again after ending the app to free memory. A phone then finds the TV app whatever
+so Android starts it again after ending the app to free memory (seen on Android 14; not tried on
+Android 15 and later, which are stricter about starting a foreground service from the background, and
+where the service would then only come back at the next start of the TV or of the app). A phone then
+finds the TV app whatever
 the TV shows, and asleep: a Chromecast with Google TV keeps its Wi-Fi and its processes running while
 asleep, and answers within half a second.
 
