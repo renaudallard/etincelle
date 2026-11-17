@@ -9,6 +9,7 @@ import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.HomeProgram
 import it.allard.etincelle.core.model.LiveChannel
 import it.allard.etincelle.core.model.LiveProgram
+import it.allard.etincelle.core.model.ProgramWindow
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -133,6 +134,17 @@ private fun EpgProgramWithAssetsDto.toCard(channelId: String, channelLogo: Strin
         recordingAssetId = null,
     )
 }
+
+/**
+ * The air-window of the programme the guide has on [channelId] at [nowMs], or null when it has none.
+ * It starts when the programme really did, to the second, where a live stream's own window
+ * ([AccessRightsV2Dto]) starts with the planned slot.
+ */
+internal fun EpgResponse.onAirWindow(channelId: String, nowMs: Long): ProgramWindow? =
+    response.orEmpty().firstOrNull { it.data?.channel?.id == channelId }?.data?.programsWithAssets.orEmpty()
+        .mapNotNull { it.assets?.firstOrNull()?.accessRights }
+        .mapNotNull { AccessRightsV2WindowDto(it.startTime, it.endTime).toProgramWindow() }
+        .firstOrNull { nowMs >= it.startMs && nowMs < it.endMs }
 
 /** The programmes of a home feed, each with its first playable asset. */
 fun TopshelfResponse.toHomePrograms(): List<HomeProgram> = response.orEmpty().mapNotNull { entry ->

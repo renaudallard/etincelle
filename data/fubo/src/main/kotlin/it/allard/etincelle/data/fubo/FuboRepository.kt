@@ -38,6 +38,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import retrofit2.HttpException
 import java.io.IOException
 
@@ -47,6 +48,10 @@ private const val GUIDE_WINDOW_MS = 24L * 60 * 60 * 1000
 private const val GUIDE_PAGE_SIZE = 100
 // Bounds the paging should the backend ever hand back an offset that does not move on.
 private const val GUIDE_MAX_PAGES = 10
+// The stretch of guide asked for to learn what is on air on a channel.
+private const val ON_AIR_SPAN_MS = 60_000L
+// How long a channel about to play waits for it.
+private const val ON_AIR_WAIT_MS = 3_000L
 private const val PROGRESS_OFFSET_KEY = "lastOffset"
 private const val PROGRESS_END_MS = 15_000L
 private const val PROGRESS_MIN_MS = 10_000L
@@ -505,15 +510,35 @@ class FuboRepository(
     }
 
     override suspend fun resolveLiveChannel(channelId: String): PlaybackSource = withRefresh {
-        val resp = api.playbackAsset(channelId = channelId, type = "live")
-        resp.toPlaybackSource().copy(
-            originChannelId = channelId,
-            programWindow = resp.accessRightsV2?.live?.toProgramWindow(),
-        )
+        coroutineScope {
+            val onAir = async { onAirWindow(channelId) }
+            val resp = api.playbackAsset(channelId = channelId, type = "live")
+            resp.toPlaybackSource().copy(
+                originChannelId = channelId,
+                programWindow = onAir.await() ?: resp.accessRightsV2?.live?.toProgramWindow(),
+            )
+        }
     }
 
     override suspend fun liveProgramWindow(channelId: String): ProgramWindow? = withRefresh {
-        api.playbackAsset(channelId = channelId, type = "live").accessRightsV2?.live?.toProgramWindow()
+        onAirWindow(channelId) ?: api.playbackAsset(channelId = channelId, type = "live").accessRightsV2?.live?.toProgramWindow()
+    }
+
+    /**
+     * The air-window of the programme on [channelId] now as the guide has it, which is where "depuis le
+     * début" must start: the stream's own window starts with the planned slot, up to a quarter of an hour
+     * before the programme does. Best-effort: null when the guide cannot be read or is slow to answer,
+     * leaving that window, as a channel must not wait for it to start.
+     */
+    private suspend fun onAirWindow(channelId: String): ProgramWindow? = try {
+        val now = System.currentTimeMillis()
+        withTimeoutOrNull(ON_AIR_WAIT_MS) {
+            api.epg(startTime = rfc3339Utc(now), endTime = rfc3339Utc(now + ON_AIR_SPAN_MS), limit = 1, stationId = channelId)
+        }?.onAirWindow(channelId, now)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        null
     }
 
     override suspend fun resolveVod(vodId: String): PlaybackSource = withRefresh {

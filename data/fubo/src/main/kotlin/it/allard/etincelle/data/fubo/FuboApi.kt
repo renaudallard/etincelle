@@ -146,7 +146,10 @@ interface FuboApi {
     @GET("papi/v1/my-stuff/folder/seriesId/{id}")
     suspend fun recordingsFolder(@Path("id") id: String): PageResponse
 
-    /** Live guide (EPG): channels with their programs over an RFC3339-UTC time window. */
+    /**
+     * Live guide (EPG): channels with their programs over an RFC3339-UTC time window, or channel
+     * [stationId] alone.
+     */
     @GET("epg")
     suspend fun epg(
         @Query("startTime") startTime: String,
@@ -154,6 +157,7 @@ interface FuboApi {
         @Query("limit") limit: Int,
         @Query("offset") offset: Int? = null,
         @Query("ignoreEmpty") ignoreEmpty: Boolean = true,
+        @Query("stationId") stationId: String? = null,
     ): EpgResponse
 
     /** Live: pass [channelId]+type=live. VOD/replay: pass [id]+type=vod. */

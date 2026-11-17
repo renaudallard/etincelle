@@ -3,6 +3,7 @@
 
 package it.allard.etincelle.data.fubo
 
+import it.allard.etincelle.core.model.ProgramWindow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -51,6 +52,34 @@ class EpgMapperTest {
         } finally {
             TimeZone.setDefault(previous)
         }
+    }
+
+    @Test
+    fun `the programme on air is the one the guide has running on that channel`() {
+        fun programme(start: String, end: String) =
+            EpgProgramWithAssetsDto(EpgProgramDto("P", null, null), listOf(EpgAssetDto(EpgAccessRightsDto(start, end))))
+        val response = EpgResponse(
+            response = listOf(
+                EpgEntryDto(EpgChannelDataDto(EpgChannelDto("1", "x", "X", null), listOf(programme("2026-11-17T00:00:00Z", "2026-11-17T06:00:00Z")))),
+                EpgEntryDto(
+                    EpgChannelDataDto(
+                        EpgChannelDto("600048", "rmc", "RMC Story", null),
+                        listOf(
+                            programme("2026-11-16T22:30:00Z", "2026-11-17T00:04:10Z"),
+                            programme("2026-11-17T00:04:10Z", "2026-11-17T05:00:00Z"),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val start = rfc3339UtcToEpochMillis("2026-11-17T00:04:10Z")!!
+        val end = rfc3339UtcToEpochMillis("2026-11-17T05:00:00Z")!!
+
+        assertEquals(ProgramWindow(start, end), response.onAirWindow("600048", start))
+        assertEquals(ProgramWindow(start, end), response.onAirWindow("600048", end - 1))
+        // Past what the guide holds, and a channel it does not have.
+        assertNull(response.onAirWindow("600048", end))
+        assertNull(response.onAirWindow("2", start))
     }
 
     @Test

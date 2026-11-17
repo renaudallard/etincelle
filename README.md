@@ -34,7 +34,8 @@ vignettes portent les mêmes indications que dans l'application officielle : sou
 l'image l'étiquette du programme (**REC** pour un enregistrement, l'heure de diffusion pour *Ce soir*) ; sur le téléviseur, l'image du programme en occupe le fond, comme dans
 l'application officielle. Pour une chaîne en **direct**, la fiche propose, à côté de **Regarder
 en direct**, un bouton **Regarder depuis le début** qui reprend le programme en
-cours à son commencement (dans la limite de la fenêtre de rembobinage), un bouton **Regarder le
+cours à son commencement (dans la limite de la fenêtre de rembobinage) : celui que le guide indique,
+l'heure affichée sur la fiche, et non l'horaire prévu, qu'un programme en retard ne tient pas, un bouton **Regarder le
 replay** quand ce même programme est aussi disponible à la demande, qui le lit alors en entier depuis
 sa première minute, et un menu **Enregistrer** pour
 enregistrer soit **l'épisode** en cours, soit **la série** entière. Quand un programme fait partie d'une série en rattrapage, sa fiche

@@ -10,11 +10,13 @@ import it.allard.etincelle.core.model.AppError
 import it.allard.etincelle.core.model.DrmSpec
 import it.allard.etincelle.core.model.LoginResult
 import it.allard.etincelle.core.model.PlaybackSource
+import it.allard.etincelle.core.model.ProgramWindow
 import it.allard.etincelle.core.model.UserSession
 import it.allard.etincelle.core.network.ProfilePick
 import it.allard.etincelle.core.network.ProgressStore
 import it.allard.etincelle.core.network.SessionManager
 import it.allard.etincelle.core.network.SessionStore
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
@@ -205,6 +207,55 @@ class FuboRepositoryTest {
         assertEquals("dvr", request.requestUrl?.queryParameter("type"))
         assertEquals("LIVE_42", request.requestUrl?.queryParameter("id"))
         assertEquals("LIVE_42", source.originRecordingAssetId)
+    }
+
+    // A live channel whose stream says its programme started at [planned], and whose guide answers [guide].
+    private fun liveChannel(planned: String, end: String, guide: MockResponse) {
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse = when (request.requestUrl?.encodedPath) {
+                "/epg" -> if (request.requestUrl?.queryParameter("stationId") == "600048") guide else MockResponse().setResponseCode(400)
+                "/vapi/asset/v1" -> MockResponse().setBody(
+                    """{"stream":{"url":"https://cdn/l.mpd","packagingProtocol":"dash","drmProtected":false,"live":true},"type":"live",
+                      "accessRightsV2":{"live":{"startTime":"$planned","endTime":"$end"}}}""",
+                )
+                else -> MockResponse().setResponseCode(404)
+            }
+        }
+    }
+
+    // The two tests below wait for the guide in real time: the virtual time of runTest would cut it short.
+    @Test
+    fun `a live channel starts its programme where the guide says it began`() = runBlocking {
+        val now = System.currentTimeMillis()
+        val planned = rfc3339Utc(now - 30 * 60_000)
+        val began = rfc3339Utc(now - 16 * 60_000)
+        val end = rfc3339Utc(now + 60 * 60_000)
+        liveChannel(
+            planned, end,
+            MockResponse().setBody(
+                """{"response":[{"data":{"channel":{"id":"600048","name":"RMC Story"},"programsWithAssets":[
+                  {"program":{"title":"P"},"assets":[{"accessRights":{"startTime":"$began","endTime":"$end"}}]}]}}]}""",
+            ),
+        )
+        val window = ProgramWindow(rfc3339UtcToEpochMillis(began)!!, rfc3339UtcToEpochMillis(end)!!)
+
+        assertEquals(window, repo.resolveLiveChannel("600048").programWindow)
+        assertEquals(window, repo.liveProgramWindow("600048"))
+    }
+
+    @Test
+    fun `a live channel keeps its stream's programme window when the guide has none`() = runBlocking {
+        val now = System.currentTimeMillis()
+        val planned = rfc3339Utc(now - 30 * 60_000)
+        val end = rfc3339Utc(now + 60 * 60_000)
+        val window = ProgramWindow(rfc3339UtcToEpochMillis(planned)!!, rfc3339UtcToEpochMillis(end)!!)
+
+        liveChannel(planned, end, MockResponse().setResponseCode(404))
+        assertEquals(window, repo.resolveLiveChannel("600048").programWindow)
+        assertEquals(window, repo.liveProgramWindow("600048"))
+
+        liveChannel(planned, end, MockResponse().setBody("""{"response":[]}"""))
+        assertEquals(window, repo.resolveLiveChannel("600048").programWindow)
     }
 
     @Test
