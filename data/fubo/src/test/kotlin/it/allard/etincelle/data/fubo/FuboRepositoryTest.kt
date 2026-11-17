@@ -26,6 +26,7 @@ import okhttp3.mockwebserver.RecordedRequest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -155,16 +156,57 @@ class FuboRepositoryTest {
     }
 
     @Test
-    fun `the home still loads for an account without recordings`() = runTest {
+    fun `the home loads with the channels page and nothing else`() = runTest {
         session.session = UserSession("AT", "RT", "u1", "p1")
         server.enqueue(MockResponse().setBody("""{"title":{"text":"Accueil"},"content":{"template":"catalog","sections":[]}}"""))
         server.enqueue(MockResponse().setBody("""{"content":{"sections":[]}}""")) // channels page (apps)
-        server.enqueue(MockResponse().setResponseCode(404).setBody("404 page not found")) // no recording option
 
         val home = repo.loadHome()
 
         assertEquals("Accueil", home.title)
-        assertTrue(home.rails.none { it.id == "recordings" })
+        assertEquals(2, server.requestCount)
+    }
+
+    @Test
+    fun `a refresh refused as unauthorised signs out`() = runTest {
+        session.session = UserSession("OLD", "RT", "u1", "p1")
+        store.saved = session.session
+        server.enqueue(MockResponse().setResponseCode(401)) // loadHome
+        server.enqueue(MockResponse().setResponseCode(401)) // refresh
+
+        val error = runCatching { repo.loadHome() }.exceptionOrNull()
+
+        assertTrue(error is AppError.Unauthorized)
+        assertNull(repo.currentSession())
+        assertNull(store.saved)
+    }
+
+    @Test
+    fun `a refresh that fails for another reason keeps the session`() = runTest {
+        session.session = UserSession("OLD", "RT", "u1", "p1")
+        store.saved = session.session
+        server.enqueue(MockResponse().setResponseCode(401)) // loadHome
+        server.enqueue(MockResponse().setResponseCode(503)) // refresh
+
+        val error = runCatching { repo.loadHome() }.exceptionOrNull()
+
+        assertTrue(error is AppError.Network)
+        assertEquals("OLD", repo.currentSession()?.accessToken)
+        assertEquals("OLD", store.saved?.accessToken)
+    }
+
+    @Test
+    fun `a call refused again with the renewed session signs out`() = runTest {
+        session.session = UserSession("OLD", "RT", "u1", "p1")
+        store.saved = session.session
+        server.enqueue(MockResponse().setResponseCode(401)) // loadHome
+        server.enqueue(MockResponse().setBody("""{"access_token":"NEW","refresh_token":"RT2"}""")) // refresh
+        server.enqueue(MockResponse().setResponseCode(401)) // retry
+
+        val error = runCatching { repo.loadHome() }.exceptionOrNull()
+
+        assertTrue(error is AppError.Unauthorized)
+        assertNull(repo.currentSession())
     }
 
     @Test
