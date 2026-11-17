@@ -88,13 +88,20 @@ private fun utcFormatter() =
 /** Formats an epoch instant as an RFC3339 UTC timestamp, the format /epg expects. */
 internal fun rfc3339Utc(epochMillis: Long): String = utcFormatter().format(Date(epochMillis))
 
-/** Parses an RFC3339 UTC timestamp to epoch millis, or null if absent/unparseable. */
-internal fun rfc3339UtcToEpochMillis(rfc3339: String?): Long? =
-    rfc3339?.let { runCatching { utcFormatter().parse(it) }.getOrNull() }?.time
+private val FRACTION_OF_SECOND = Regex("\\.\\d+")
 
-/** Parses an RFC3339 UTC timestamp and renders it as device-local "HH:mm", or null if unparseable. */
+// The backend writes "2026-06-13T19:10:00Z". A fraction of a second, or an offset in place of the Z,
+// would be as valid a timestamp, and must not read as no time at all: every programme would lose its.
+private fun parseRfc3339(rfc3339: String?): Date? = rfc3339?.let {
+    runCatching { SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US).parse(it.replace(FRACTION_OF_SECOND, "")) }.getOrNull()
+}
+
+/** Parses an RFC3339 timestamp to epoch millis, or null if absent/unparseable. */
+internal fun rfc3339UtcToEpochMillis(rfc3339: String?): Long? = parseRfc3339(rfc3339)?.time
+
+/** Parses an RFC3339 timestamp and renders it as device-local "HH:mm", or null if unparseable. */
 private fun localHourMinute(rfc3339: String?): String? {
-    val parsed = rfc3339?.let { runCatching { utcFormatter().parse(it) }.getOrNull() } ?: return null
+    val parsed = parseRfc3339(rfc3339) ?: return null
     return SimpleDateFormat("HH:mm", Locale.getDefault()).format(parsed)
 }
 

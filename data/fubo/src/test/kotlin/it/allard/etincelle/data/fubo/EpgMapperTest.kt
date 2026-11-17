@@ -83,6 +83,20 @@ class EpgMapperTest {
     }
 
     @Test
+    fun `a timestamp reads the same with a fraction of a second or an offset`() {
+        val expected = rfc3339UtcToEpochMillis("2026-06-13T19:10:00Z")
+        assertEquals(1_781_377_800_000L, expected)
+        assertEquals(expected, rfc3339UtcToEpochMillis("2026-06-13T19:10:00.000Z"))
+        assertEquals(expected, rfc3339UtcToEpochMillis("2026-06-13T19:10:00.123456Z"))
+        assertEquals(expected, rfc3339UtcToEpochMillis("2026-06-13T21:10:00+02:00"))
+        assertEquals(expected, rfc3339UtcToEpochMillis("2026-06-13T19:10:00+00:00"))
+        assertNull(rfc3339UtcToEpochMillis("13/06/2026"))
+        assertNull(rfc3339UtcToEpochMillis(null))
+        // And back, in the one shape the guide is asked with.
+        assertEquals("2026-06-13T19:10:00Z", rfc3339Utc(expected!!))
+    }
+
+    @Test
     fun `drops channels with no playable programs`() {
         val response = EpgResponse(
             response = listOf(
