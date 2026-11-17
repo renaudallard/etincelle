@@ -853,7 +853,9 @@ class CastPlayerController(
         transferring = false
         transferFallbackJob?.cancel()
         reResolveJob?.cancel()
-        endingOnPurpose = true
+        // Only a session can end: with none, nothing would take the mark back, and the next cast to
+        // lose its device would pass for ended on purpose.
+        endingOnPurpose = castContext.sessionManager.currentCastSession != null
         super.disconnect()
     }
 
