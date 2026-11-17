@@ -36,6 +36,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -199,7 +200,7 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                             BackHandler { viewModel.stopPlaying() }
                             TvPlayerSurface(
                                 playing, exo, viewModel::savePlaybackPosition, viewModel::reportProgress,
-                                viewModel::liveProgramWindow, viewModel::playUpNext,
+                                viewModel::liveProgramWindow, viewModel::reResolve, viewModel::playbackFailed, viewModel::playUpNext,
                             )
                         }
 
@@ -525,9 +526,12 @@ private fun TvPlayerSurface(
     onSavePosition: (String?, Long) -> Unit,
     onReportProgress: (PlaybackSource, Long, Long) -> Unit,
     fetchProgramWindow: suspend (String) -> ProgramWindow?,
+    reResolve: suspend (PlaybackSource) -> PlaybackSource?,
+    onPlaybackFailed: (PlaybackSource) -> Unit,
     onPlayNext: () -> Unit = {},
 ) {
     val view = LocalView.current
+    val scope = rememberCoroutineScope()
     DisposableEffect(Unit) {
         // Keep the screen on and mark the window secure while a stream is on screen (parity with mobile):
         // secure protects the software/L3 decode path on top of Widevine L1 + HDCP, and scoping
@@ -542,10 +546,16 @@ private fun TvPlayerSurface(
         if (source.startPositionMs > 0) player.setMediaItem(item, source.startPositionMs) else player.setMediaItem(item)
         player.prepare()
         player.playWhenReady = true
+        val recovery = PlaybackRecovery(player, scope, source, reResolve) { onPlaybackFailed(source) }
+        player.addListener(recovery)
         onDispose {
+            player.removeListener(recovery)
+            recovery.stop()
             val pos = player.currentPosition
             val dur = player.duration
-            onSavePosition(source.resumeKey, PlaybackProgress.positionToSave(source, pos, dur))
+            // Closed before its stream loaded, there is no duration to judge the position by: the resume
+            // point stays as it was.
+            if (dur > 0) onSavePosition(source.resumeKey, PlaybackProgress.positionToSave(source, pos, dur))
             onReportProgress(source, pos, dur)
             player.stop()
             player.clearMediaItems()

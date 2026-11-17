@@ -997,6 +997,14 @@ class MainViewModel(
         reloadIfStale(STALE_ON_RETURN_MS)
     }
 
+    /**
+     * Playback of [source] failed for good: closes its player on what it was started from, which says
+     * so. Something else asked for meanwhile is left alone.
+     */
+    fun playbackFailed(source: PlaybackSource) {
+        _state.update { if (it.playing == source) it.copy(playing = null, error = "Lecture impossible, réessayez") else it }
+    }
+
     // Where the player ends up is saved as the activity is destroyed, and by then a finishing
     // activity has already cancelled viewModelScope, so these short writes run in their own scope.
     private val saveScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -1014,7 +1022,8 @@ class MainViewModel(
         saveScope.launch { runCatching { repo.reportProgress(source, positionMs, durationMs) } }
     }
 
-    /** Re-resolves a stream (fresh tokens/URL), used by Cast transfers when a token has expired. */
+    /** Re-resolves a stream (fresh tokens/URL): for a Cast transfer whose token has expired, or to bring
+     * back a playback that failed. Null when there is none to be had. */
     suspend fun reResolve(source: PlaybackSource): PlaybackSource? = try {
         val channelId = source.originChannelId
         val vodId = source.originVodId

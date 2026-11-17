@@ -226,6 +226,11 @@ ouvrez etincelle, allez dans **Paramètres > Connecter une TV** (ou sur molotov.
 et saisissez le code : le téléviseur se connecte automatiquement. La connexion par email reste
 disponible en secours.
 
+Sur Android TV, une lecture qu'une erreur interrompt (adresse du flux périmée, coupure du réseau)
+reprend d'elle-même là où elle en était, y compris dans un direct rembobiné, en redemandant le flux.
+Après cinq échecs de suite, le lecteur se ferme et la page d'où il a été lancé affiche « Lecture
+impossible, réessayez ».
+
 Sur Android TV, etincelle publie aussi une rangée **etincelle** de programmes recommandés sur
 l'écran d'accueil et place les programmes commencés dans **Continuer à regarder** (Watch Next), à
 partir des listes de Molotov. Elles se mettent à jour toutes les trois heures, et à chaque ouverture
