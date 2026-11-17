@@ -199,6 +199,11 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                     // so backing out keeps the grid where it was instead of jumping to the top. Lives above
                     // the screen `when` so it survives that swap (the browse branch leaves composition).
                     val contentStateHolder = rememberSaveableStateHolder()
+                    // What was typed in the search is kept with its results (see the SEARCH page key
+                    // below): not for a later search to start from, nor for the next account.
+                    LaunchedEffect(state.loggedIn, state.tab) {
+                        if (!state.loggedIn || state.tab != Tab.SEARCH) contentStateHolder.removeState("SEARCH")
+                    }
                     val favoriteOrder = state.favoriteOrder
                     val profileScreen = state.profileScreen
                     val profileEditor = state.profileEditor
