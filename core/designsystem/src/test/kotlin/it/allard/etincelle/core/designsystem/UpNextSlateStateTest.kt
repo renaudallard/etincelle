@@ -28,6 +28,16 @@ class UpNextSlateStateTest {
     }
 
     @Test
+    fun countdownFiresAgainWhenTheNextEpisodeDidNotStart() {
+        val state = UpNextSlateState()
+        assertFalse(state.tick(upNext, 100_000, 200_000))
+        assertTrue(state.tick(upNext, 176_000, 200_000))
+        // The same episode is still playing: seeking back and reaching the end again goes on.
+        assertFalse(state.tick(upNext, 100_000, 200_000))
+        assertTrue(state.tick(upNext, 176_000, 200_000))
+    }
+
+    @Test
     fun previousEpisodePositionDoesNotSkipThisOne() {
         val state = UpNextSlateState()
         // Just after the switch, the player still reports the end of the previous episode.

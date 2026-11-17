@@ -57,6 +57,9 @@ class UpNextSlateState {
         if (now == null) {
             hidden = false
             armed = true
+            // Back before the slate with the same episode still playing: the next one did not start
+            // (its request failed), and gets another chance when the countdown comes round again.
+            fired = false
         }
         // Just after the switch the player still reports where the previous episode ended, past this
         // one's slate: going on from there would skip this episode. An episode always starts before
