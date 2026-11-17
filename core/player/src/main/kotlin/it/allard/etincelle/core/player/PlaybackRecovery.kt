@@ -17,9 +17,9 @@ import kotlinx.coroutines.launch
 // How many times in a row playback is brought back before giving up.
 private const val MAX_RECOVERIES = 5
 
-// The wait before each attempt after the first, which grows up to a cap.
-private const val RETRY_BACKOFF_MS = 1_500L
-private const val RETRY_MAX_BACKOFF_MS = 2_000L
+// The wait before the second attempt, doubled before each one after it: 2, 4, 8 then 16 s, half a
+// minute in all, so a Wi-Fi access point restarting or a TV set waking does not close the player.
+private const val RETRY_BACKOFF_MS = 2_000L
 
 // Playback that held this long before failing again is a new incident, with all its attempts.
 private const val RETRY_RESET_MS = 60_000L
@@ -82,7 +82,7 @@ class PlaybackRecovery(
             behind > LivePlayback.LIVE_REWIND_THRESHOLD_MS && window.windowStartTimeMs != C.TIME_UNSET ->
                 liveAt = window.windowStartTimeMs + position
         }
-        val backoff = ((attempts - 1) * RETRY_BACKOFF_MS).coerceAtMost(RETRY_MAX_BACKOFF_MS)
+        val backoff = if (attempts == 1) 0L else RETRY_BACKOFF_MS shl (attempts - 2)
         job?.cancel()
         job = scope.launch {
             if (backoff > 0) delay(backoff)
