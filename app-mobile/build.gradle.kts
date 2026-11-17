@@ -20,8 +20,8 @@ android {
         applicationId = "it.allard.etincelle"
         minSdk = 24
         targetSdk = 36
-        versionCode = 65
-        versionName = "2026.11.13"
+        versionCode = 66
+        versionName = "2026.11.14"
     }
 
     signingConfigs {
