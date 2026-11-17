@@ -447,6 +447,10 @@ private fun AppRoot(
     val playerFullscreen = playing != null && onLocalPlayer && !castState.isCasting
     // During a cast the pages are browsed under what plays: they refresh as usual.
     LaunchedEffect(playerFullscreen) { vm.setPlayerAside(!playerFullscreen) }
+    // What was already started "depuis le début", here or on the TV it was cast to: the player leaves
+    // the screen during a cast, and coming back must not send the programme to its start once more.
+    var startedOver by remember { mutableStateOf<PlaybackSource?>(null) }
+    LaunchedEffect(playing, castState.isCasting) { if (castState.isCasting) startedOver = playing }
     // Tapping the cast bar opens a full-screen controller for the active cast (play/pause + seek that
     // drive the receiver); Back returns to browsing while the cast keeps playing. Closed when casting
     // ends. Gated on the app holding the playing source: the controls only drive the receiver while the
@@ -525,6 +529,8 @@ private fun AppRoot(
                                 fetchProgramWindow = vm::liveProgramWindow,
                                 onPlayNext = vm::playUpNext,
                                 upNextSlate = upNextSlate,
+                                startOver = playing !== startedOver,
+                                onStartedOver = { startedOver = playing },
                             )
                         }
 
@@ -837,6 +843,8 @@ private fun PlayerSurface(
     secure: Boolean = true,
     onPlayNext: () -> Unit = {},
     upNextSlate: UpNextSlateState? = null,
+    startOver: Boolean = false,
+    onStartedOver: () -> Unit = {},
 ) {
     val view = LocalView.current
     DisposableEffect(secure, currentPlayer) {
@@ -865,8 +873,8 @@ private fun PlayerSurface(
     // A "depuis le début" start asks playback to begin at the current show's start; the local player
     // joins at the live edge first, so seek back once the live window has loaded, then stop retrying.
     // Local only: a cast is told where to start in its LOAD, and opening the cast controls later must
-    // not send it back to the show's start.
-    var pendingStartOver by remember(source) { mutableStateOf(secure && source.isLive && source.liveRewindOffsetMs > 0L) }
+    // not send it back to the show's start. Once only ([startOver]), not each time this player comes back.
+    var pendingStartOver by remember(source) { mutableStateOf(startOver && secure && source.isLive && source.liveRewindOffsetMs > 0L) }
     // Per source, not per kind: another live channel has its own programme, rewind and channel to ask.
     LaunchedEffect(currentPlayer, source) {
         // VOD and recordings have no live edge, so do not poll: stay at "not behind" without a 1s loop.
@@ -882,6 +890,7 @@ private fun PlayerSurface(
                 barGeometry = LivePlayback.liveBarGeometry(currentPlayer, liveWindow, programWindow)
                 if (pendingStartOver && LivePlayback.seekToProgramStartIfReady(currentPlayer, liveWindow, programWindow)) {
                     pendingStartOver = false
+                    onStartedOver()
                 }
                 // Rollover: once the live edge passes the show's end, re-scope to the now-current
                 // programme. Throttled, and only adopted when it actually advances, so a backend that
