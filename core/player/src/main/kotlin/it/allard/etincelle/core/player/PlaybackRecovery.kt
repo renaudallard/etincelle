@@ -62,7 +62,9 @@ class PlaybackRecovery(
     override fun onPlayerError(error: PlaybackException) = recover(error.errorCode)
 
     override fun onPlaybackStateChanged(playbackState: Int) {
-        if (playbackState == Player.STATE_READY) readyAt = SystemClock.elapsedRealtime()
+        // The first time since the last failure: a seek or a rebuffer later on is not a new start, and
+        // would make a failure an hour after the last one count as following it.
+        if (playbackState == Player.STATE_READY && readyAt == 0L) readyAt = SystemClock.elapsedRealtime()
     }
 
     fun stop() {
