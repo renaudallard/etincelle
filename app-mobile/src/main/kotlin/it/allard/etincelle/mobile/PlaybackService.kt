@@ -20,6 +20,7 @@ import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionResult
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import java.util.UUID
 
 /**
  * Keeps playback going in the background, with the media notification and the lock-screen controls.
@@ -33,6 +34,13 @@ class PlaybackService : MediaSessionService() {
         super.onCreate()
         setMediaNotificationProvider(DefaultMediaNotificationProvider.Builder(this).build().apply { setSmallIcon(R.drawable.ic_notification) })
         session?.let { addSession(it) }
+    }
+
+    // The service may outlive the activity whose session it was created with: the one of the activity
+    // that starts it now is taken on then.
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        session?.let { if (!isSessionAdded(it)) addSession(it) }
+        return super.onStartCommand(intent, flags, startId)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
@@ -100,6 +108,10 @@ class PlaybackService : MediaSessionService() {
         /** The session for [player]; tapping the notification brings the app back. */
         fun createSession(context: Context, player: Player): MediaSession =
             MediaSession.Builder(context, player)
+                // One of its own for each activity: Android may create the next activity before it has
+                // destroyed the one being closed, whose session still exists, and two sessions under
+                // one id are refused with an exception that ends the app as it opens.
+                .setId(UUID.randomUUID().toString())
                 .setMediaButtonPreferences(SKIPS)
                 .setCallback(object : MediaSession.Callback {
                     override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo) =

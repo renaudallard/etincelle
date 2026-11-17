@@ -410,8 +410,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         endPlayback()
-        stopService(Intent(this, PlaybackService::class.java))
-        PlaybackService.session = null
+        // Unless a newer activity has taken them over: this one may be destroyed after that one opened.
+        if (PlaybackService.session === mediaSession) {
+            stopService(Intent(this, PlaybackService::class.java))
+            PlaybackService.session = null
+        }
         mediaSession?.release()
         mediaSession = null
         castController?.release()
