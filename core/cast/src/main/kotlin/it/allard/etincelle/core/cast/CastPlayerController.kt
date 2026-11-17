@@ -853,6 +853,17 @@ class CastPlayerController(
         super.disconnect()
     }
 
+    /**
+     * Ends the cast with nothing to bring back to this phone, as when the pages no longer hold what
+     * plays there. What this phone sent stops; what a TV app plays of its own accord is not this
+     * phone's to stop, and stays on it.
+     */
+    fun endCast() {
+        if (tvSession == null) return disconnect()
+        stopTvSession(stopTv = _currentPlayer.value === tvPlayer && currentItem != null)
+        currentItem = null
+    }
+
     override fun disconnect() {
         if (stopTvSession(stopTv = true) || stopDirect()) return
         // A plain disconnect (e.g. logout) stops casting without resuming on the phone; the session
