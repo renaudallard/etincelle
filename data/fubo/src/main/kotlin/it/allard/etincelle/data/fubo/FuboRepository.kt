@@ -196,7 +196,10 @@ class FuboRepository(
     /** Loads a persisted session into memory; returns true if one was present. */
     override suspend fun restoreSession(): Boolean {
         val saved = store.read() ?: return false
-        session.session = saved
+        // What was read may be behind by now: another restore, then a renewal of its tokens, may have
+        // happened meanwhile (the TV's background jobs restore too), and putting older tokens back
+        // would spend a refresh token twice and sign the device out. Only an empty seat is filled.
+        refreshMutex.withLock { if (session.session == null) session.session = saved }
         return true
     }
 
