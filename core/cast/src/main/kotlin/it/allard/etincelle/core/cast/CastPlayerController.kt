@@ -860,12 +860,19 @@ class CastPlayerController(
      */
     fun endCast() {
         if (tvSession == null) return disconnect()
+        val phonePlays = phoneStillPlays
         stopTvSession(stopTv = _currentPlayer.value === tvPlayer && currentItem != null)
-        currentItem = null
+        if (!phonePlays) currentItem = null
     }
 
     override fun disconnect() {
-        if (stopTvSession(stopTv = true) || stopDirect()) return
+        val phonePlays = phoneStillPlays
+        if (stopTvSession(stopTv = true) || stopDirect()) {
+            // Nothing of it is left to send to the next device picked, unless the phone still plays it
+            // (the device had not taken over yet).
+            if (!phonePlays) currentItem = null
+            return
+        }
         // A plain disconnect (e.g. logout) stops casting without resuming on the phone; the session
         // end takes the quiet-stop path. Clear transfer/re-resolve so nothing ejects after teardown.
         returnToPhoneOnEnd = false
