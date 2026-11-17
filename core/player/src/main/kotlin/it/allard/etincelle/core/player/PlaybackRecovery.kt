@@ -59,7 +59,23 @@ class PlaybackRecovery(
     var durationMs: Long = C.TIME_UNSET
         private set
 
+    // The reload under way goes to the live point whatever the position says (see recover).
+    private var toLivePoint = false
+
     override fun onPlayerError(error: PlaybackException) = recover(error.errorCode)
+
+    // Sets [liveAt] from where a live programme is being watched. A player between two streams, its
+    // reload not loaded yet, says nothing of it: what was noted before stands.
+    private fun noteLiveTime() {
+        if (toLivePoint) {
+            liveAt = null
+            return
+        }
+        // Fills [window] when a live stream is loaded.
+        val behind = LivePlayback.behindLiveEdgeMs(player, window)
+        if (!player.isCurrentMediaItemLive || window.windowStartTimeMs == C.TIME_UNSET) return
+        liveAt = (window.windowStartTimeMs + player.currentPosition).takeIf { behind > LivePlayback.LIVE_REWIND_THRESHOLD_MS }
+    }
 
     override fun onPlaybackStateChanged(playbackState: Int) {
         // The first time since the last failure: a seek or a rebuffer later on is not a new start, and
@@ -82,26 +98,24 @@ class PlaybackRecovery(
             return
         }
         attempts++
-        val position = player.currentPosition
         player.duration.takeIf { it > 0 }?.let { durationMs = it }
-        // Fills [window] when a live stream is loaded.
-        val behind = LivePlayback.behindLiveEdgeMs(player, window)
-        when {
-            // What was playing left the stream's rewind window: only the live point is sure to play.
-            errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW -> liveAt = null
-            behind > LivePlayback.LIVE_REWIND_THRESHOLD_MS && window.windowStartTimeMs != C.TIME_UNSET ->
-                liveAt = window.windowStartTimeMs + position
-        }
+        // What was playing left the stream's rewind window: only the live point is sure to play.
+        if (errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) toLivePoint = true
+        noteLiveTime()
         val backoff = if (attempts == 1) 0L else RETRY_BACKOFF_MS shl (attempts - 2)
         job?.cancel()
         job = scope.launch {
             if (backoff > 0) delay(backoff)
             // No stream to be had is one more failure.
             val fresh = resolve(source) ?: return@launch recover(PlaybackException.ERROR_CODE_UNSPECIFIED)
+            // Where playback is now, not where it failed: a seek made during the wait counts.
+            noteLiveTime()
+            val position = player.currentPosition
             val item = MediaItemFactory.create(fresh)
             if (!fresh.isLive && position > 0) player.setMediaItem(item, position) else player.setMediaItem(item)
             // Playing or paused, as it was.
             player.prepare()
+            toLivePoint = false
             val at = liveAt ?: return@launch
             while (!LivePlayback.seekToTimeIfReady(player, window, at)) delay(SEEK_POLL_MS)
             liveAt = null
