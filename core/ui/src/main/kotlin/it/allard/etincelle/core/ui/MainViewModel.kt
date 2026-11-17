@@ -610,6 +610,8 @@ class MainViewModel(
             _state.update { it.copy(busy = true, error = null) }
             loadPageInto(url, replace = false, fallbackTitle = rail.title, grid = true)
         } else {
+            // A reload of the page under it still on its way would replace the pages, this one included.
+            cancelNav()
             val page = ContentPage(rail.title, listOf(rail), isGrid = true)
             _state.update { it.copy(busy = false, error = null, backStack = it.backStack + page) }
         }
