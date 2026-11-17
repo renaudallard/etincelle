@@ -139,18 +139,20 @@ apparaît dans la liste **Lire sur** sous le nom du téléviseur suivi de « (ap
 y portant « (Chromecast) » puisqu'ils ont souvent le même nom, et l'on choisit
 laquelle quand il y en a plusieurs. La liste est cherchée de nouveau tant qu'elle est ouverte, même
 pendant une diffusion. Le téléviseur lit alors ce que l'on choisit sur le téléphone
-(direct, rattrapage, enregistrement) avec sa propre connexion, enchaîne lui-même l'épisode suivant,
+(direct, rattrapage, enregistrement) avec sa propre connexion, là où en était le téléphone, y compris
+dans un direct rembobiné, enchaîne lui-même l'épisode suivant,
 et se pilote depuis la barre de diffusion, la notification ou les touches de volume du téléphone.
 Toucher la barre de diffusion ouvre une **télécommande** : ce qui passe, lecture/pause, recul de
 10 s, avance de 30 s, et les flèches, OK et Retour pour naviguer dans l'application TV. Seul un
 téléphone connecté au **même compte** Molotov peut piloter le téléviseur, et réciproquement : chacun
 le prouve à l'autre à partir du compte, sans que la télécommande n'envoie le moindre identifiant sur
 le réseau local, et leurs échanges sont chiffrés. Le téléphone et le téléviseur doivent utiliser la
-même version du protocole : mettez à jour les deux applications ensemble.
+même version du protocole : mettez à jour les deux applications ensemble. Se déconnecter du compte
+sur le téléviseur y ferme aussitôt la télécommande des téléphones de ce compte.
 
 L'application TV peut rester joignable **à tout moment**, comme un Chromecast : ouverte ou non, derrière
 l'économiseur d'écran ou une autre application, téléviseur en veille s'il garde alors sa connexion au
-réseau (c'est le cas d'un Chromecast avec Google TV), et cela dès le démarrage du téléviseur. Une lecture lancée depuis le téléphone, ou une touche de sa télécommande, ouvre alors
+réseau (c'est le cas d'un Chromecast avec Google TV), et cela dès le démarrage du téléviseur. Une lecture lancée ou reprise depuis le téléphone, ou une touche de sa télécommande, ouvre alors
 etincelle et réveille le téléviseur. Il faut pour cela l'y autoriser, une seule fois : dans ses
 **Paramètres**, **Laisser le téléphone trouver et réveiller ce téléviseur à tout moment** ouvre la page
 système où l'autoriser à se superposer aux autres applications. Sans cette autorisation, elle n'est
@@ -231,7 +233,11 @@ disponible en secours.
 Sur Android TV, une lecture qu'une erreur interrompt (adresse du flux périmée, coupure du réseau)
 reprend d'elle-même là où elle en était, y compris dans un direct rembobiné, en redemandant le flux.
 Après cinq échecs de suite, le lecteur se ferme et la page d'où il a été lancé affiche « Lecture
-impossible, réessayez ».
+impossible, réessayez ». Une chaîne choisie dans le guide du téléviseur est reprise de la même façon.
+Sur un programme en pause, l'écran n'est plus maintenu allumé : le téléviseur passe à son économiseur
+d'écran puis en veille comme d'habitude, et la position est enregistrée dès que l'on quitte
+l'application. Sur le téléphone aussi, un lecteur que la reprise n'a pas pu relancer se ferme avec le
+même message, et l'écran ne reste allumé que pendant la lecture.
 
 Sur Android TV, etincelle publie aussi une rangée **etincelle** de programmes recommandés sur
 l'écran d'accueil et place les programmes commencés dans **Continuer à regarder** (Watch Next), à
