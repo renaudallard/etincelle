@@ -39,6 +39,17 @@ class PlaybackProgressTest {
     }
 
     @Test
+    fun aPlayerClosedBeforeItsStreamLoadedKeepsTheResumePoint() {
+        // The position is the one it was to resume at, and the duration is not known yet.
+        assertEquals(null, PlaybackProgress.closingToSave(episode, 120_000, -1))
+        assertEquals(null, PlaybackProgress.closingToSave(episode, 120_000, 0))
+        // Loaded, it follows the usual rule.
+        assertEquals(120_000L, PlaybackProgress.closingToSave(episode, 120_000, 200_000))
+        assertEquals(0L, PlaybackProgress.closingToSave(episode, 190_000, 200_000))
+        assertEquals(0L, PlaybackProgress.closingToSave(episode, 5_000, 200_000))
+    }
+
+    @Test
     fun resumePointPastTheSlateStartsOver() {
         assertEquals(0L, episode.copy(startPositionMs = 176_000).withUpNext(upNext).startPositionMs)
         assertEquals(60_000L, episode.copy(startPositionMs = 60_000).withUpNext(upNext).startPositionMs)

@@ -185,7 +185,7 @@ class MainActivity : ComponentActivity() {
             if (controller != null) {
                 // null while casting: the stream keeps playing on the TV, so nothing to stop or save.
                 controller.stopPlayback()?.let { (pos, dur) ->
-                    viewModel.savePlaybackPosition(source.resumeKey, PlaybackProgress.positionToSave(source, pos, dur))
+                    PlaybackProgress.closingToSave(source, pos, dur)?.let { viewModel.savePlaybackPosition(source.resumeKey, it) }
                     viewModel.reportProgress(source, pos, dur)
                 }
             } else {
@@ -193,7 +193,7 @@ class MainActivity : ComponentActivity() {
                 val dur = exo.duration
                 exo.stop()
                 exo.clearMediaItems()
-                viewModel.savePlaybackPosition(source.resumeKey, PlaybackProgress.positionToSave(source, pos, dur))
+                PlaybackProgress.closingToSave(source, pos, dur)?.let { viewModel.savePlaybackPosition(source.resumeKey, it) }
                 viewModel.reportProgress(source, pos, dur)
             }
         }

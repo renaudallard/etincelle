@@ -586,9 +586,7 @@ private fun TvPlayerSurface(
             recovery.stop()
             val pos = player.currentPosition
             val dur = player.duration
-            // Closed before its stream loaded, there is no duration to judge the position by: the resume
-            // point stays as it was.
-            if (dur > 0) onSavePosition(source.resumeKey, PlaybackProgress.positionToSave(source, pos, dur))
+            PlaybackProgress.closingToSave(source, pos, dur)?.let { onSavePosition(source.resumeKey, it) }
             onReportProgress(source, pos, dur)
             player.stop()
             player.clearMediaItems()
