@@ -4,7 +4,7 @@
 
 [![License: BSD-2-Clause](https://img.shields.io/badge/License-BSD%202--Clause-blue.svg)](LICENSE)
 ![Platform: Android 16](https://img.shields.io/badge/platform-Android%2016%20(API%2036)-3DDC84?logo=android&logoColor=white)
-![minSdk 23](https://img.shields.io/badge/minSdk-23-orange)
+![minSdk 24](https://img.shields.io/badge/minSdk-24-orange)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.4-7F52FF?logo=kotlin&logoColor=white)
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-%2B%20TV-4285F4?logo=jetpackcompose&logoColor=white)
 [![Downloads](https://img.shields.io/github/downloads/renaudallard/etincelle/total?label=downloads&color=success)](https://github.com/renaudallard/etincelle/releases)
@@ -257,7 +257,7 @@ Téléchargez l'APK signé pour votre appareil depuis la
 - **Téléphone / tablette** : `etincelle-<version>-mobile.apk`
 - **Android TV** : `etincelle-<version>-tv.apk`
 
-Les deux fonctionnent sur Android 6.0+ (`minSdk 23`) et sont auto-signés, donc Android vous demande
+Les deux fonctionnent sur Android 7.0+ (`minSdk 24`) et sont auto-signés, donc Android vous demande
 d'autoriser l'installation depuis une source inconnue. La connexion nécessite un compte payant
 **Molotov Extra** sur Fubo et une connexion depuis l'UE.
 
@@ -336,7 +336,7 @@ Indiquez l'emplacement du SDK dans `local.properties` (`sdk.dir=/chemin/vers/And
 ## Chaîne d'outils
 
 Kotlin 2.4, AGP 8.12, Gradle 8.14, Jetpack Compose (BOM 2025.06), Compose for TV (`androidx.tv`),
-AndroidX Media3 1.7. `compileSdk`/`targetSdk` = 36, `minSdk` = 23.
+AndroidX Media3 1.7. `compileSdk`/`targetSdk` = 36, `minSdk` = 24.
 
 ## Licence
 

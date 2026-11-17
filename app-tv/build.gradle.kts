@@ -18,7 +18,7 @@ android {
 
     defaultConfig {
         applicationId = "it.allard.etincelle.tv"
-        minSdk = 23
+        minSdk = 24
         targetSdk = 36
         versionCode = 63
         versionName = "2026.11.11"
