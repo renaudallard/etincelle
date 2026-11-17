@@ -399,7 +399,9 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
             Player.STATE_BUFFERING -> RemoteMessages.STATE_BUFFERING
             Player.STATE_READY -> if (player.playWhenReady) RemoteMessages.STATE_PLAYING else RemoteMessages.STATE_PAUSED
             Player.STATE_ENDED -> RemoteMessages.STATE_ENDED
-            else -> RemoteMessages.STATE_IDLE
+            // Not loaded yet, or being brought back after an error: on its way. Idle would tell the
+            // phone that the programme was stopped here, and it would drop it.
+            else -> RemoteMessages.STATE_BUFFERING
         }
         status.put(RemoteMessages.STATE, playback)
             .put(RemoteMessages.TITLE, source.title.orEmpty())
