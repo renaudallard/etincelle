@@ -281,9 +281,14 @@ open class CastController(
     }
 
     private fun refreshDevices() {
-        val routes = mediaRouter.routes.filter { it.matchesSelector(selector) && !it.isDefault && !it.isBluetooth }
-        // A device Play Services sees is used through it; match by Cast device id, or by name in case
-        // the two ids differ.
+        // The device a direct cast is on stays listed as our own find of it: the menu marks what is
+        // connected by its entry, and its Play Services route, picked there, would start the cast over.
+        val casting = scannedDevice(_state.value.connectedRouteId.orEmpty())
+        val routes = mediaRouter.routes
+            .filter { it.matchesSelector(selector) && !it.isDefault && !it.isBluetooth }
+            .filter { casting?.isBehind(it) != true }
+        // Any other device Play Services sees is used through it; match by Cast device id, or by name in
+        // case the two ids differ.
         val scanned = scannedDevices.values.map { it.device }
             .filter { device -> routes.none { device.isBehind(it) } }
             .map { CastDevice(DIRECT_ROUTE_PREFIX + it.id, it.name) }
@@ -317,6 +322,7 @@ open class CastController(
     /** A session with a Chromecast from our own scan is up (it does not go through Play Services). */
     protected fun markDirectConnected(device: DirectCastDevice) {
         _state.value = _state.value.copy(connectedDeviceName = device.name, connectedRouteId = DIRECT_ROUTE_PREFIX + device.id)
+        refreshDevices()
     }
 
     // Our own scan, run with each active scan pulse; folds the answers into [scannedDevices].
