@@ -50,6 +50,7 @@ fun CastButton(
     onConnect: (String) -> Unit,
     onDisconnect: () -> Unit,
     onActiveScan: (Boolean) -> Unit = {},
+    onOpenChange: (Boolean) -> Unit = {},
 ) {
     var open by remember { mutableStateOf(false) }
     // Scan aggressively while the picker is open (and stop when it closes), so a device that just
@@ -58,8 +59,16 @@ fun CastButton(
     DisposableEffect(open) {
         // As it is now: read when the picker closes, [open] would already say closed.
         val opened = open
-        if (opened) onActiveScan(true)
-        onDispose { if (opened) onActiveScan(false) }
+        if (opened) {
+            onActiveScan(true)
+            onOpenChange(true)
+        }
+        onDispose {
+            if (opened) {
+                onActiveScan(false)
+                onOpenChange(false)
+            }
+        }
     }
     // Hide the button when there is nothing to cast to, but keep an already-open picker on screen so it
     // does not vanish mid-interaction if the last discovered device drops off the network.

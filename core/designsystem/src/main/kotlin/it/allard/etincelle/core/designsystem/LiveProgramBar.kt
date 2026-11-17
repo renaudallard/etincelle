@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,8 +50,9 @@ val LiveProgramBarBottomOffset = 62.dp
  * LivePlayback.liveBarGeometry).
  *
  * [onSeekToFraction] makes the bar draggable (phone, touch); pass null for a position-only indicator
- * (TV, where the remote scrubs with the rewind/forward buttons). [startLabel]/[endLabel], when given,
- * are drawn at either end of the bar: the programme's start and end times.
+ * (TV, where the remote scrubs with the rewind/forward buttons), and [onScrubbing] tells when a drag
+ * starts and ends. [startLabel]/[endLabel], when given, are drawn at either end of the bar: the
+ * programme's start and end times.
  */
 @Composable
 fun LiveProgramBar(
@@ -61,11 +63,15 @@ fun LiveProgramBar(
     onSeekToFraction: ((Float) -> Unit)? = null,
     startLabel: String? = null,
     endLabel: String? = null,
+    onScrubbing: (Boolean) -> Unit = {},
 ) {
     // While dragging, follow the finger locally and commit the seek on release, so the thumb tracks
     // smoothly instead of fighting the 1s position poll.
     var scrub by remember { mutableStateOf<Float?>(null) }
     val played = scrub ?: playedFraction
+    // The gestures outlive a recomposition: they call what the bar was last given.
+    val seekTo by rememberUpdatedState(onSeekToFraction)
+    val scrubbing by rememberUpdatedState(onScrubbing)
 
     val gestures = if (onSeekToFraction == null) {
         Modifier
@@ -73,17 +79,27 @@ fun LiveProgramBar(
         Modifier
             .pointerInput(Unit) {
                 detectHorizontalDragGestures(
-                    onDragStart = { scrub = (it.x / size.width).coerceIn(0f, 1f) },
+                    onDragStart = {
+                        scrub = (it.x / size.width).coerceIn(0f, 1f)
+                        scrubbing(true)
+                    },
                     onHorizontalDrag = { change, _ ->
                         scrub = (change.position.x / size.width).coerceIn(0f, 1f)
                         change.consume()
                     },
-                    onDragEnd = { scrub?.let(onSeekToFraction); scrub = null },
-                    onDragCancel = { scrub = null },
+                    onDragEnd = {
+                        scrub?.let { seekTo?.invoke(it) }
+                        scrub = null
+                        scrubbing(false)
+                    },
+                    onDragCancel = {
+                        scrub = null
+                        scrubbing(false)
+                    },
                 )
             }
             .pointerInput(Unit) {
-                detectTapGestures { onSeekToFraction((it.x / size.width).coerceIn(0f, 1f)) }
+                detectTapGestures { seekTo?.invoke((it.x / size.width).coerceIn(0f, 1f)) }
             }
     }
 

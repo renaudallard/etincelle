@@ -73,6 +73,7 @@ import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
+import androidx.media3.ui.PlayerControlView
 import androidx.media3.ui.PlayerView
 import it.allard.etincelle.core.cast.CastPlayerController
 import it.allard.etincelle.core.cast.CastUiState
@@ -926,11 +927,22 @@ private fun PlayerSurface(
     // Follow the player controls' show/hide so the cast button and the back-to-live pill fade with the
     // position bar (tap to bring them back) instead of sitting permanently over the video.
     var controlsVisible by remember { mutableStateOf(true) }
+    // The cast menu open, or the programme bar under a finger: the controls stay up meanwhile. They hide
+    // after five seconds otherwise, which closed the menu being read and dropped the drag under way.
+    var castMenuOpen by remember { mutableStateOf(false) }
+    var scrubbing by remember { mutableStateOf(false) }
+    var playerView by remember { mutableStateOf<PlayerView?>(null) }
+    val controlsHeld = castMenuOpen || scrubbing
+    LaunchedEffect(controlsHeld, playerView) {
+        // The cast controller's are pinned already.
+        if (secure) playerView?.controllerShowTimeoutMs = if (controlsHeld) 0 else PlayerControlView.DEFAULT_SHOW_TIMEOUT_MS
+    }
     Box(Modifier.fillMaxSize()) {
         AndroidView(
             factory = { context ->
                 PlayerView(context).apply {
                     player = currentPlayer
+                    playerView = this
                     if (!secure) {
                         // The cast controller has no video to reveal, so pin the transport controls on
                         // screen instead of auto-hiding to a black surface.
@@ -955,6 +967,7 @@ private fun PlayerSurface(
                 if (!secure) it.showController()
             },
             onRelease = {
+                playerView = null
                 it.player = null
                 // Clear the listener too: it captures the controlsVisible setter, so leaving it set holds
                 // the recomposition scope on the detached view until it is garbage-collected.
@@ -964,7 +977,7 @@ private fun PlayerSurface(
         )
         if (controlsVisible) {
             Box(Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(8.dp)) {
-                CastButton(castState, onCastConnect, onCastDisconnect, onCastActiveScan)
+                CastButton(castState, onCastConnect, onCastDisconnect, onCastActiveScan, onOpenChange = { castMenuOpen = it })
             }
         }
         if (behindLive && controlsVisible) {
@@ -985,6 +998,7 @@ private fun PlayerSurface(
                         .padding(start = 16.dp, end = 16.dp, bottom = LiveProgramBarBottomOffset),
                     startLabel = pw?.let { LivePlayback.clockLabel(it.startMs) },
                     endLabel = pw?.let { LivePlayback.clockLabel(it.endMs) },
+                    onScrubbing = { scrubbing = it },
                 )
             }
         }
