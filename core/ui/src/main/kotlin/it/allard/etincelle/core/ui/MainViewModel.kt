@@ -941,10 +941,13 @@ class MainViewModel(
         viewModelScope.launch {
             runCatching { repo.toggleFavorite(action) }
                 .onSuccess {
+                    // A page opened meanwhile owns the spinner, and the refresh would cancel it: the
+                    // stars are brought up to date when that page is left.
+                    val navigating = navJob?.isActive == true
                     _state.update {
-                        it.copy(busy = false, info = if (card.isFavorite) "Retirée des favoris" else "Ajoutée aux favoris")
+                        it.copy(busy = navigating && it.busy, info = if (card.isFavorite) "Retirée des favoris" else "Ajoutée aux favoris")
                     }
-                    refreshCurrent()
+                    if (!navigating) refreshCurrent()
                 }
                 .onFailure { e -> applyFailure(e, "Échec de la mise à jour des favoris") }
         }
