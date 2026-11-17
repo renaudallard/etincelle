@@ -168,8 +168,10 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
             addAction(Intent.ACTION_SCREEN_OFF)
         }
         ContextCompat.registerReceiver(this, screenReceiver, screen, ContextCompat.RECEIVER_NOT_EXPORTED)
-        // Only on a fresh launch; a process recreation must not replay the original deep link.
-        if (savedInstanceState == null) handleDeepLink(intent)
+        // Only on a fresh launch; a process recreation must not replay the original deep link, nor the
+        // app reopened from the recent apps, which Android starts with the intent it was first opened by.
+        val reopened = intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0
+        if (savedInstanceState == null && !reopened) handleDeepLink(intent)
         // A build from Google Play is updated by Google Play, and may not update itself.
         if (BuildConfig.SELF_UPDATE) lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.watchForUpdates() } }
         lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.keepPageFresh() } }
