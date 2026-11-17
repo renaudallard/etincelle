@@ -111,6 +111,22 @@ class MainViewModelTest {
     }
 
     @Test
+    fun thePageRefreshesUnderWhatPlaysOnATv() {
+        val repo = FakeRepo()
+        val vm = viewModel(repo)
+        vm.watchRecording("REC_1")
+        repo.home = { CompletableDeferred<ContentPage>().await() }
+        // The player covers the page: nothing to refresh until it closes.
+        vm.refreshCurrent()
+        assertFalse(vm.state.value.refreshing)
+
+        // Playing on a TV, the page is the one being browsed.
+        vm.setPlayerAside(true)
+        vm.refreshCurrent()
+        assertTrue(vm.state.value.refreshing)
+    }
+
+    @Test
     fun aTabThatFailedToLoadLoadsWhenChosenAgain() {
         val repo = FakeRepo()
         val vm = viewModel(repo)

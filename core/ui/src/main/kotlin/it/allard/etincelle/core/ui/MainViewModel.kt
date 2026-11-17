@@ -495,10 +495,21 @@ class MainViewModel(
     /** Reloads the page currently shown (pull to refresh, or overscroll past an end). */
     fun refreshCurrent() = reloadCurrent(quiet = false)
 
+    // What plays leaves the pages on screen: the phone, while it plays on a TV.
+    private var playerAside = false
+
+    /**
+     * Whether the pages stay on screen under what plays, as on the phone during a cast: they are then
+     * kept fresh as when nothing plays. A player covering them leaves that for when it closes.
+     */
+    fun setPlayerAside(aside: Boolean) {
+        playerAside = aside
+    }
+
     // [quiet] for a reload nobody asked for: when it fails the page stays as it is, with no message.
     private fun reloadCurrent(quiet: Boolean) {
         val s = _state.value
-        if (s.playing != null || s.detail != null || s.settings || s.busy || s.refreshing) return
+        if ((s.playing != null && !playerAside) || s.detail != null || s.settings || s.busy || s.refreshing) return
         val top = s.backStack.lastOrNull()
         val reloadUrl = top?.reloadUrl
         when {

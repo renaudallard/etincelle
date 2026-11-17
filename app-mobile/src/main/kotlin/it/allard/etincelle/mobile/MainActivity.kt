@@ -445,6 +445,8 @@ private fun AppRoot(
     // we are not casting. Keying on "current player is local" (not just !isCasting) keeps a brief
     // device-to-device transfer gap on the show page instead of flashing an idle cast surface.
     val playerFullscreen = playing != null && onLocalPlayer && !castState.isCasting
+    // During a cast the pages are browsed under what plays: they refresh as usual.
+    LaunchedEffect(playerFullscreen) { vm.setPlayerAside(!playerFullscreen) }
     // Tapping the cast bar opens a full-screen controller for the active cast (play/pause + seek that
     // drive the receiver); Back returns to browsing while the cast keeps playing. Closed when casting
     // ends. Gated on the app holding the playing source: the controls only drive the receiver while the
