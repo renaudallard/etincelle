@@ -297,7 +297,8 @@ etincelle/
 │   ├── model/              types métier en Kotlin pur (PlaybackSource, DrmSpec, UserSession)
 │   ├── domain/             l'interface MolotovRepository (abstraction du backend)
 │   ├── network/            OkHttp/Retrofit/Moshi + intercepteurs Fubo + session + TokenStore
-│   ├── player/             mapping Media3 : DrmSpec vers MediaItem Widevine
+│   ├── player/             lecture Media3 : MediaItem Widevine, direct (barre de programme, retour au
+│   │                       début), reprise après une erreur, mémoire tampon, points de reprise
 │   ├── cast/               diffusion Chromecast Widevine, par Play Services ou en direct (téléphone)
 │   ├── remote/             télécommande de l'application TV : découverte, poignée de main, messages
 │   └── ui/                 MainViewModel/UiState partagés + vérif. de mise à jour GitHub
@@ -320,11 +321,11 @@ seul backend ; il pourra être ajouté si le graphe grandit).
 
 Prérequis sur la machine de build :
 
-- Android SDK avec `platforms;android-36` et `build-tools;36.0.0`
-  (`sdkmanager "platforms;android-36" "build-tools;36.0.0"`).
-- **JDK 21** pour Gradle (AGP 8.x ne supporte pas le JDK 25). Le JDK du daemon Gradle est fixé dans
-  `gradle.properties` via `org.gradle.java.home` ; adaptez le chemin à votre machine.
-- Le wrapper Gradle (Gradle 8.x) est versionné ; utilisez `./gradlew`, pas un Gradle système.
+- Android SDK avec `platforms;android-36` et `build-tools;35.0.0`, la version qu'AGP 8.12 utilise
+  (`sdkmanager "platforms;android-36" "build-tools;35.0.0"`).
+- **JDK 21** pour Gradle (Gradle 8.14 ne fonctionne pas sous le JDK 25). Le JDK du daemon Gradle est
+  fixé dans `gradle.properties` via `org.gradle.java.home` ; adaptez le chemin à votre machine.
+- Le wrapper Gradle (Gradle 8.14) est versionné ; utilisez `./gradlew`, pas un Gradle système.
 
 ```bash
 ./gradlew :app-mobile:assembleGithubDebug      # APK debug téléphone/tablette
