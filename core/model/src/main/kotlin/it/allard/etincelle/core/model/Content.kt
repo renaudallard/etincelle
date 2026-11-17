@@ -182,13 +182,14 @@ data class ProgramDetail(
     /**
      * The on-demand copy of the programme now on air, when the series it belongs to offers one: the
      * episode of [episodes] that goes by the same name as the programme, which is its episode ("S26 E16
-     * Dans le coma") or, for a programme that is no episode, its title. Null off a live page.
+     * Dans le coma") or, for a programme that is no episode, its title. An airing in that list (an id in
+     * "LIVE_") is no copy: it is the programme on air itself, listed first. Null off a live page.
      */
     val replay: ContentCard?
         get() {
             if (!isLive) return null
             val name = subtitle?.takeIf { it.isNotBlank() } ?: title ?: return null
-            return episodes.firstOrNull { it.vodId != null && it.title == name }
+            return episodes.firstOrNull { it.vodId?.startsWith("LIVE_") == false && it.title == name }
         }
 }
 

@@ -196,6 +196,10 @@ class MainViewModelTest {
         // A programme that is no episode goes by its title.
         val film = episode.copy(title = "Show")
         assertEquals(film, live.copy(subtitle = null, episodes = listOf(other, film)).replay)
+        // The programme on air is listed by that name too, and is no copy of itself.
+        val airing = episode.copy(id = "a", vodId = "LIVE_4864992")
+        assertNull(live.copy(episodes = listOf(airing, other)).replay)
+        assertEquals(episode, live.copy(episodes = listOf(airing, episode)).replay)
         // No episode by that name, or not a live page: none.
         assertNull(live.copy(episodes = listOf(other)).replay)
         assertNull(live.copy(isLive = false).replay)
