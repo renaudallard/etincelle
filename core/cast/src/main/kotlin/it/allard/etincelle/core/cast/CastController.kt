@@ -21,13 +21,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -348,15 +348,14 @@ open class CastController(
 
     // A TV app announcing itself as it opens joins the list at once, even while this phone is connected and
     // so not scanning. Until the discovery stops, while the app is in the foreground.
-    private suspend fun listenForTvs() {
+    private suspend fun listenForTvs() = coroutineScope {
         val socket = runCatching {
             DatagramSocket(null).apply {
                 reuseAddress = true
                 bind(InetSocketAddress(RemoteDiscovery.PORT))
             }
-        }.getOrNull() ?: return
-        currentCoroutineContext().job.invokeOnCompletion { socket.close() }
-        withContext(Dispatchers.IO) {
+        }.getOrNull() ?: return@coroutineScope
+        launch(Dispatchers.IO) {
             RemoteDiscovery.listen(socket) { tv ->
                 launch(Dispatchers.Main) {
                     // Nothing ages these out while this phone is connected and not scanning.
@@ -367,7 +366,13 @@ open class CastController(
                 }
             }
         }
-        socket.close()
+        // The listener waits in a read that cancelling does not end: only closing its socket does, or
+        // each stop of the discovery would leave its thread and its socket behind.
+        try {
+            awaitCancellation()
+        } finally {
+            socket.close()
+        }
     }
 
     // The Wi-Fi network, so the scan never goes out over mobile data or into a VPN. allNetworks is the
