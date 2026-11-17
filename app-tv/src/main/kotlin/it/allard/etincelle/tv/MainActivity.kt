@@ -437,18 +437,22 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
         handler.postDelayed(stopRemoteUnlessDreaming, DREAM_GRACE_MS)
         // What was just watched belongs in Watch Next.
         TvHomeJob.schedule(this)
-        // Pause playback in the background (no decoding/audio); resume on return. playWhenReady, not
-        // isPlaying: a player still buffering would otherwise start with sound behind the launcher.
         player?.let {
-            if (it.playWhenReady) {
-                // Persist the resume point now too: the player surface only saves on dispose, which a
-                // kill of the backgrounded process skips, losing the position. Only ever save a real
-                // position here, never clear (positionToSave returns 0 near the start/end), so a
-                // background blip cannot wipe a valid resume point; clearing is the dispose path's job.
-                viewModel.state.value.playing?.let { src ->
-                    val pos = PlaybackProgress.positionToSave(src, it.currentPosition, it.duration)
-                    if (pos > 0) viewModel.savePlaybackPosition(src.resumeKey, pos)
+            // Persist the resume point now too, playing or paused, and tell the server, which Watch Next
+            // is read from: the player surface only does so on dispose, which a kill of the backgrounded
+            // process or a TV switched off skips, losing the position. Only ever save a real position
+            // here, never clear (positionToSave returns 0 near the start/end), so a background blip
+            // cannot wipe a valid resume point; clearing is the dispose path's job.
+            viewModel.state.value.playing?.let { src ->
+                val pos = PlaybackProgress.positionToSave(src, it.currentPosition, it.duration)
+                if (pos > 0) {
+                    viewModel.savePlaybackPosition(src.resumeKey, pos)
+                    viewModel.reportProgress(src, it.currentPosition, it.duration)
                 }
+            }
+            // Pause playback in the background (no decoding/audio); resume on return. playWhenReady, not
+            // isPlaying: a player still buffering would otherwise start with sound behind the launcher.
+            if (it.playWhenReady) {
                 pausedForBackground = true
                 it.playWhenReady = false
             }
