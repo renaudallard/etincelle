@@ -111,6 +111,23 @@ class MainViewModelTest {
     }
 
     @Test
+    fun aTabThatFailedToLoadLoadsWhenChosenAgain() {
+        val repo = FakeRepo()
+        val vm = viewModel(repo)
+        repo.page = { throw AppError.Network("down") }
+        vm.selectTab(Tab.MOVIES)
+        // Not the page of the tab that was left, under the new tab's name.
+        assertEquals(Tab.MOVIES, vm.state.value.tab)
+        assertTrue(vm.state.value.backStack.isEmpty())
+        assertEquals("down", vm.state.value.error)
+
+        repo.page = { url -> ContentPage("Films", emptyList(), reloadUrl = url) }
+        vm.selectTab(Tab.MOVIES)
+        assertEquals("Films", vm.state.value.current?.title)
+        assertEquals(null, vm.state.value.error)
+    }
+
+    @Test
     fun aPageStillLoadingDoesNotLandInSearch() {
         val repo = FakeRepo()
         val vm = viewModel(repo)

@@ -435,7 +435,9 @@ class MainViewModel(
             return
         }
         if (tab == _state.value.tab && _state.value.backStack.size == 1) return
-        _state.update { it.copy(busy = true, error = null, tab = tab) }
+        // Without the pages of the tab being left: should the load fail they would stay under the new
+        // tab's name, and count for this tab's own page, which choosing it again would then not load.
+        _state.update { it.copy(busy = true, error = null, tab = tab, backStack = emptyList()) }
         // The Direct and Chaînes tabs load a page (/live-tv, /channels) that is also reachable from a
         // rail header, so render them as the same full-screen grid for a coherent experience.
         loadPageInto(tab.path, replace = true, fallbackTitle = tab.label, grid = tab == Tab.LIVE || tab == Tab.CHANNELS || tab == Tab.RECORDINGS)
