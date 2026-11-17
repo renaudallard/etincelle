@@ -403,6 +403,11 @@ class MainActivity : ComponentActivity() {
         loadControl?.onTrimMemory(level)
     }
 
+    override fun onLowMemory() {
+        super.onLowMemory()
+        loadControl?.onLowMemory()
+    }
+
     override fun onDestroy() {
         endPlayback()
         stopService(Intent(this, PlaybackService::class.java))

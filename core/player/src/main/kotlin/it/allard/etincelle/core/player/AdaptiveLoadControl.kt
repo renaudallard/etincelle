@@ -20,10 +20,10 @@ import androidx.media3.exoplayer.upstream.DefaultAllocator
  * of the per-app heap budget (ActivityManager.getMemoryClass), not of total device RAM. Live is
  * unaffected: it cannot buffer past the live edge, so the larger ceiling is simply never reached.
  *
- * Under memory pressure (onTrimMemory) the forward buffer is lowered so it stops growing, and the
- * allocator's reusable free list is trimmed back right away; the data already buffered is then given
- * up as it plays out, because the lowered cap keeps it from refilling. It is restored when the app
- * returns to the foreground.
+ * Under memory pressure (onTrimMemory, onLowMemory) the forward buffer is lowered so it stops growing,
+ * and the allocator's reusable free list is trimmed back right away; the data already buffered is then
+ * given up as it plays out, because the lowered cap keeps it from refilling. It is restored when the
+ * app returns to the foreground.
  *
  * It subclasses [DefaultLoadControl] and overrides only [shouldContinueLoading] to add the dynamic
  * cap, inheriting every other behaviour unchanged.
@@ -66,6 +66,12 @@ class AdaptiveLoadControl private constructor(
         allocator.setTargetBufferSize(cap)
         allocator.trim()
     }
+
+    /**
+     * The system as a whole is short of memory: taken as the most severe pressure. From Android 14 an
+     * app on screen is told nothing else, the graded onTrimMemory levels being no longer sent to it.
+     */
+    fun onLowMemory() = onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL)
 
     /** Restore the full buffer once memory pressure has passed (app back in the foreground). */
     fun restoreFullBuffer() {

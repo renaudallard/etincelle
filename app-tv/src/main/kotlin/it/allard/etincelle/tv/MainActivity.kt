@@ -500,6 +500,11 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
         loadControl?.onTrimMemory(level)
     }
 
+    override fun onLowMemory() {
+        super.onLowMemory()
+        loadControl?.onLowMemory()
+    }
+
     private fun stopRemote() {
         remote.stop()
         RemoteKeepAliveService.stop(this)
