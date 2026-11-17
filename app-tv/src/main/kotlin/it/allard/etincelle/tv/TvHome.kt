@@ -18,8 +18,6 @@ import androidx.tvprovider.media.tv.TvContractCompat
 import androidx.tvprovider.media.tv.WatchNextProgram
 import it.allard.etincelle.core.domain.MolotovRepository
 import it.allard.etincelle.core.model.HomeProgram
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -37,9 +35,9 @@ object TvHome {
 
     /** Brings the row and Watch Next up to date. Runs off the main thread (it does disk and network IO). */
     suspend fun sync(context: Context, repo: MolotovRepository) = lock.withLock {
-        if (repo.currentSession() == null) runCatching { repo.restoreSession() }
-        // A restore cut short by the job being stopped is not a sign-out: leave the row as it is.
-        currentCoroutineContext().ensureActive()
+        // A saved session that cannot be read, or a restore cut short by the job being stopped, is not a
+        // sign-out: leave the row as it is.
+        if (repo.currentSession() == null && runCatching { repo.restoreSession() }.isFailure) return@withLock
         if (repo.currentSession() == null) {
             replaceRow(context, emptyList())
             replaceWatchNext(context, emptyList())
