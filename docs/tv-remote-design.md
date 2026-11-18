@@ -65,6 +65,14 @@ on `ACTION_SCREEN_OFF` (the TV went to sleep); an activity that is finishing, cl
 wait. A command arriving behind the screensaver is still taken,
 and plays once the TV is woken.
 
+Left the same way with a programme on, the app only pauses it, to resume on return, and a paused
+player goes on loading: a live stream asks for its manifest every few seconds, and a decoder, a licence
+session and the buffer stay held (measured on a Chromecast with Google TV: 7.5 % of a core and 177 MB,
+for as long as the process lives, days when it is kept at all times). So once the app is really left
+the player is stopped, which keeps what it plays and where, and prepared again on return; a live
+stream goes back to what was airing when it was left, its window having moved on meanwhile. The status
+says paused meanwhile, so the phone neither drops the programme nor waits for a load.
+
 ## Authentication
 
 Both apps derive the same 32-byte key from the account they are signed in to:

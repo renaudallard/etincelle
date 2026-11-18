@@ -170,7 +170,9 @@ etincelle et réveille le téléviseur. Il faut pour cela l'y autoriser, une seu
 **Paramètres**, **Laisser le téléphone trouver et réveiller ce téléviseur à tout moment** ouvre la page
 système où l'autoriser à se superposer aux autres applications. Sans cette autorisation, elle n'est
 joignable que lorsqu'elle est à l'écran ou derrière l'**économiseur d'écran**, et la lecture demandée
-démarre dès que l'on réveille le téléviseur avec sa télécommande.
+démarre dès que l'on réveille le téléviseur avec sa télécommande. Quittée avec un programme en cours,
+l'application TV le met en pause et cesse de le charger ; elle le reprend là où il en était quand on y
+revient, y compris un direct, repris à ce qui passait alors.
 
 Sur téléphone, la **lecture continue en arrière-plan** et écran verrouillé (le son seul, la vidéo
 reprenant au retour dans l'application), le point de reprise étant enregistré dès que l'on quitte

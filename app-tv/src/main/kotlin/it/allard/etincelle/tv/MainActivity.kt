@@ -49,6 +49,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -82,6 +83,7 @@ import it.allard.etincelle.core.ui.AutoUpdate
 import it.allard.etincelle.core.ui.MainViewModelFactory
 import it.allard.etincelle.core.ui.Tab
 import it.allard.etincelle.core.ui.UpdateChecker
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -94,6 +96,11 @@ private const val TV_WAKING_MS = 30_000L
 // How long after the activity stops the screensaver's broadcast may come.
 private const val DREAM_GRACE_MS = 3_000L
 
+// How often, and how many times, a live stream loaded again on return is checked for its window having
+// been read anew, to go back to what was airing when it was left: half a minute in all.
+private const val RELOAD_SEEK_POLL_MS = 250L
+private const val RELOAD_SEEK_TRIES = 120
+
 // How long the screen is kept on after a key from the phone: about what a TV waits before its screensaver.
 private const val PHONE_KEY_AWAKE_MS = 5 * 60_000L
 
@@ -105,6 +112,16 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
     private var player: ExoPlayer? = null
     private var loadControl: AdaptiveLoadControl? = null
     private var pausedForBackground = false
+    // The programme held in pause was let go of when the app was left (see unload), to be loaded again
+    // on return. A live one is taken up again at what was airing then, noted as its time of day
+    // (epoch ms) with the start of the live window it was read in.
+    private var unloaded = false
+    private var resumeLiveAtMs: Long? = null
+    private var unloadedWindowStartMs = C.TIME_UNSET
+    private var reloadJob: Job? = null
+    // What was on as the app was left. Only that is resumed or loaded again on return: the phone may
+    // have stopped it meanwhile, or asked for another programme, which starts by itself.
+    private var awaySource: PlaybackSource? = null
     // A phone of the same account driving this app while it is open.
     private val remote: TvRemote get() = (application as EtincelleTvApp).remote
     private val remoteWindow = Timeline.Window()
@@ -381,8 +398,6 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                     else -> return
                 }
                 val id = message.optString(RemoteMessages.ID).takeIf { it.isNotEmpty() } ?: return
-                // What was paused as the app was left is not what plays on return.
-                pausedForBackground = false
                 remoteRequest = message.optLong(RemoteMessages.REQUEST)
                 remotePlayAt = SystemClock.elapsedRealtime()
                 viewModel.playFromRemote(kind, id, message.optLong(RemoteMessages.POSITION), message.optLong(RemoteMessages.REWIND))
@@ -395,13 +410,13 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
             // TV shows meanwhile.
             RemoteMessages.RESUME -> if (inFront) player.playWhenReady = true else pausedForBackground = true
             RemoteMessages.SEEK -> {
+                // Asked for while the programme waits to be loaded again: that is where it goes, not
+                // back to where it was left.
+                resumeLiveAtMs = null
                 val position = message.optLong(RemoteMessages.POSITION, -1)
                 if (position < 0) player.seekToDefaultPosition() else player.seekTo(position)
             }
-            RemoteMessages.STOP -> {
-                pausedForBackground = false
-                viewModel.stopPlaying()
-            }
+            RemoteMessages.STOP -> viewModel.stopPlaying()
             RemoteMessages.KEY -> {
                 val name = message.optString(RemoteMessages.KEY_NAME)
                 window.decorView.keepScreenOn = true
@@ -463,8 +478,9 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
             Player.STATE_READY -> if (player.playWhenReady) RemoteMessages.STATE_PLAYING else RemoteMessages.STATE_PAUSED
             Player.STATE_ENDED -> RemoteMessages.STATE_ENDED
             // Not loaded yet, or being brought back after an error: on its way. Idle would tell the
-            // phone that the programme was stopped here, and it would drop it.
-            else -> RemoteMessages.STATE_BUFFERING
+            // phone that the programme was stopped here, and it would drop it. Let go of as the app was
+            // left, it waits in pause for the app to come back.
+            else -> if (unloaded) RemoteMessages.STATE_PAUSED else RemoteMessages.STATE_BUFFERING
         }
         status.put(RemoteMessages.STATE, playback)
             .put(RemoteMessages.TITLE, source.title.orEmpty())
@@ -488,6 +504,7 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
     }
 
     override fun onStop() {
+        awaySource = viewModel.state.value.playing
         // Closed with Back, the app is left for good, and this activity is gone before a wait would end.
         // Otherwise the screensaver starting is told apart from leaving the app only by its broadcast,
         // which may come just after.
@@ -526,9 +543,67 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
         loadControl?.restoreFullBuffer()
         // Refresh the home screen row and Watch Next (and make sure their periodic sync is scheduled).
         TvHomeJob.schedule(this)
+        val same = viewModel.state.value.playing === awaySource
+        awaySource = null
+        if (unloaded) {
+            unloaded = false
+            // Where it was. A stream whose address went stale meanwhile fails here and is brought back
+            // by the recovery, as any other.
+            if (same) reload()
+        }
         if (pausedForBackground) {
             pausedForBackground = false
-            player?.playWhenReady = true
+            if (same) player?.playWhenReady = true
+        }
+    }
+
+    // A programme held in pause when the app is left goes on loading: a live stream asks for its
+    // manifest every few seconds, and a decoder, a licence session and the buffer stay held, for as
+    // long as this app is kept, days when a phone may reach it at all times. Its loading is stopped;
+    // the player keeps what it plays and where.
+    private fun unload() {
+        val player = player ?: return
+        if (unloaded || player.playbackState == Player.STATE_IDLE) return
+        // The player keeps its position in the live window, which will have moved on by the time it is
+        // loaded again: the same position would then be a later programme. What was airing is noted.
+        resumeLiveAtMs = null
+        unloadedWindowStartMs = C.TIME_UNSET
+        val timeline = player.currentTimeline
+        if (player.isCurrentMediaItemLive && !timeline.isEmpty) {
+            timeline.getWindow(player.currentMediaItemIndex, remoteWindow)
+            if (remoteWindow.windowStartTimeMs != C.TIME_UNSET) {
+                unloadedWindowStartMs = remoteWindow.windowStartTimeMs
+                resumeLiveAtMs = remoteWindow.windowStartTimeMs + player.currentPosition
+            }
+        }
+        player.stop()
+        unloaded = true
+    }
+
+    // Loads again what was let go of as the app was left, and takes a live stream back to what was
+    // airing then once its window has been read anew: not the one the player still holds from before,
+    // in which that is where it already stands.
+    private fun reload() {
+        val player = player ?: return
+        val source = viewModel.state.value.playing
+        player.prepare()
+        val at = resumeLiveAtMs ?: return
+        val staleStart = unloadedWindowStartMs
+        resumeLiveAtMs = null
+        reloadJob?.cancel()
+        reloadJob = lifecycleScope.launch {
+            val window = Timeline.Window()
+            // No longer than a stream takes to come back, and not over another programme chosen meanwhile.
+            repeat(RELOAD_SEEK_TRIES) {
+                if (viewModel.state.value.playing !== source) return@launch
+                val timeline = player.currentTimeline
+                if (!timeline.isEmpty) {
+                    timeline.getWindow(player.currentMediaItemIndex, window)
+                    val fresh = window.windowStartTimeMs != C.TIME_UNSET && window.windowStartTimeMs != staleStart
+                    if (fresh && LivePlayback.seekToTimeIfReady(player, window, at)) return@launch
+                }
+                delay(RELOAD_SEEK_POLL_MS)
+            }
         }
     }
 
@@ -553,7 +628,7 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
     // an automatic update, which closes the app.
     private fun leave() {
         if (!remote.always) stopRemote()
-        if (viewModel.state.value.playing == null) installFetchedUpdate(viewModel)
+        if (viewModel.state.value.playing == null) installFetchedUpdate(viewModel) else unload()
     }
 
     // Brought back to the front with the screen to be turned on, this activity ends the screensaver or
@@ -706,28 +781,32 @@ private fun TvPlayerSurface(
     // key never reaches the controls, so restart their hide timer by hand.
     fun remoteKey(event: KeyEvent): Boolean = remoteKeyUsed(event).also { if (it) playerView?.showController() }
     // Per source, not per kind: another live channel has its own programme, rewind and channel to ask.
-    LaunchedEffect(source) {
+    // Only while the app is on screen: it draws the bar, and asks the guide for the programme that follows.
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(source, lifecycle) {
         // VOD and recordings have no live edge, so do not poll: stay at "not behind" without a 1s loop.
         if (!source.isLive) {
             behindLive = false
             barGeometry = null
             return@LaunchedEffect
         }
-        var nextRolloverMs = 0L
-        while (true) {
-            behindLive = LivePlayback.behindLiveEdgeMs(player, liveWindow) > LivePlayback.LIVE_REWIND_THRESHOLD_MS
-            barGeometry = LivePlayback.liveBarGeometry(player, liveWindow, programWindow)
-            if (pendingRewind && LivePlayback.seekToTimeIfReady(player, liveWindow, rewindTo)) pendingRewind = false
-            val pw = programWindow
-            val edge = LivePlayback.liveEdgeEpochMs(player, liveWindow)
-            val now = System.currentTimeMillis()
-            if (pw != null && edge != null && edge >= pw.endMs && now >= nextRolloverMs) {
-                nextRolloverMs = now + 15_000
-                source.originChannelId?.let { channelId ->
-                    fetchProgramWindow(channelId)?.takeIf { it.endMs > pw.endMs }?.let { programWindow = it }
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            var nextRolloverMs = 0L
+            while (true) {
+                behindLive = LivePlayback.behindLiveEdgeMs(player, liveWindow) > LivePlayback.LIVE_REWIND_THRESHOLD_MS
+                barGeometry = LivePlayback.liveBarGeometry(player, liveWindow, programWindow)
+                if (pendingRewind && LivePlayback.seekToTimeIfReady(player, liveWindow, rewindTo)) pendingRewind = false
+                val pw = programWindow
+                val edge = LivePlayback.liveEdgeEpochMs(player, liveWindow)
+                val now = System.currentTimeMillis()
+                if (pw != null && edge != null && edge >= pw.endMs && now >= nextRolloverMs) {
+                    nextRolloverMs = now + 15_000
+                    source.originChannelId?.let { channelId ->
+                        fetchProgramWindow(channelId)?.takeIf { it.endMs > pw.endMs }?.let { programWindow = it }
+                    }
                 }
+                delay(1000)
             }
-            delay(1000)
         }
     }
     Box(Modifier.fillMaxSize()) {
