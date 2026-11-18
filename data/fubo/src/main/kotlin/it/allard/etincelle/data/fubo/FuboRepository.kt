@@ -686,7 +686,15 @@ class FuboRepository(
             val latest = session.session ?: throw AppError.Unauthorized
             val updated = latest.copy(accessToken = newAccess, refreshToken = tokens.refreshToken ?: refreshToken)
             session.session = updated
-            store.save(updated)
+            // The tokens are good and in use whatever becomes of their saving: a store that fails for
+            // a moment (the Keystore does) must not fail the call that waited for them with its own
+            // words. The next renewal saves again.
+            try {
+                store.save(updated)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+            }
         }
     }
 
