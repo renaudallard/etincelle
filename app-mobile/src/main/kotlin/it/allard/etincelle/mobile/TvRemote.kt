@@ -34,6 +34,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.Player
 import it.allard.etincelle.core.designsystem.theme.BrandBlack
 import it.allard.etincelle.core.designsystem.theme.BrandYellow
@@ -49,12 +52,16 @@ fun TvRemoteScreen(player: Player, tvName: String, onKey: (String) -> Unit, onCl
     var title by remember { mutableStateOf("") }
     var playing by remember { mutableStateOf(false) }
     var hasMedia by remember { mutableStateOf(false) }
-    LaunchedEffect(player) {
-        while (true) {
-            hasMedia = player.playbackState != Player.STATE_IDLE
-            title = player.mediaMetadata.title?.toString().orEmpty()
-            playing = player.playWhenReady
-            delay(REFRESH_MS)
+    // Only while the app is on screen.
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(player, lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                hasMedia = player.playbackState != Player.STATE_IDLE
+                title = player.mediaMetadata.title?.toString().orEmpty()
+                playing = player.playWhenReady
+                delay(REFRESH_MS)
+            }
         }
     }
     Column(

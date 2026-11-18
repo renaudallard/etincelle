@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -924,36 +925,40 @@ private fun PlayerSurface(
     // not send it back to the show's start. Once only ([startOver]), not each time this player comes back.
     var pendingStartOver by remember(source) { mutableStateOf(startOver && secure && source.isLive && source.liveRewindOffsetMs > 0L) }
     // Per source, not per kind: another live channel has its own programme, rewind and channel to ask.
-    LaunchedEffect(currentPlayer, source) {
+    // Only while the app is on screen: it draws the bar, and asks the guide for the programme that follows.
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(currentPlayer, source, lifecycle) {
         // VOD and recordings have no live edge, so do not poll: stay at "not behind" without a 1s loop.
         if (!source.isLive) {
             behindLive = false
             barGeometry = null
             return@LaunchedEffect
         }
-        var nextRolloverMs = 0L
-        while (true) {
-            behindLive = LivePlayback.behindLiveEdgeMs(currentPlayer, liveWindow) > LivePlayback.LIVE_REWIND_THRESHOLD_MS
-            if (showBar) {
-                barGeometry = LivePlayback.liveBarGeometry(currentPlayer, liveWindow, programWindow)
-                if (pendingStartOver && LivePlayback.seekToProgramStartIfReady(currentPlayer, liveWindow, programWindow)) {
-                    pendingStartOver = false
-                    onStartedOver()
-                }
-                // Rollover: once the live edge passes the show's end, re-scope to the now-current
-                // programme. Throttled, and only adopted when it actually advances, so a backend that
-                // lags the boundary is not polled every second.
-                val pw = programWindow
-                val edge = LivePlayback.liveEdgeEpochMs(currentPlayer, liveWindow)
-                val now = System.currentTimeMillis()
-                if (pw != null && edge != null && edge >= pw.endMs && now >= nextRolloverMs) {
-                    nextRolloverMs = now + 15_000
-                    source.originChannelId?.let { channelId ->
-                        fetchProgramWindow(channelId)?.takeIf { it.endMs > pw.endMs }?.let { programWindow = it }
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            var nextRolloverMs = 0L
+            while (true) {
+                behindLive = LivePlayback.behindLiveEdgeMs(currentPlayer, liveWindow) > LivePlayback.LIVE_REWIND_THRESHOLD_MS
+                if (showBar) {
+                    barGeometry = LivePlayback.liveBarGeometry(currentPlayer, liveWindow, programWindow)
+                    if (pendingStartOver && LivePlayback.seekToProgramStartIfReady(currentPlayer, liveWindow, programWindow)) {
+                        pendingStartOver = false
+                        onStartedOver()
+                    }
+                    // Rollover: once the live edge passes the show's end, re-scope to the now-current
+                    // programme. Throttled, and only adopted when it actually advances, so a backend that
+                    // lags the boundary is not polled every second.
+                    val pw = programWindow
+                    val edge = LivePlayback.liveEdgeEpochMs(currentPlayer, liveWindow)
+                    val now = System.currentTimeMillis()
+                    if (pw != null && edge != null && edge >= pw.endMs && now >= nextRolloverMs) {
+                        nextRolloverMs = now + 15_000
+                        source.originChannelId?.let { channelId ->
+                            fetchProgramWindow(channelId)?.takeIf { it.endMs > pw.endMs }?.let { programWindow = it }
+                        }
                     }
                 }
+                delay(1000)
             }
-            delay(1000)
         }
     }
     // Follow the player controls' show/hide so the cast button and the back-to-live pill fade with the
