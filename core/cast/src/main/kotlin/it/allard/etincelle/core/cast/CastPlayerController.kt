@@ -431,6 +431,7 @@ class CastPlayerController(
     fun play(item: MediaItem, startPositionMs: Long) {
         failedDurationMs = C.TIME_UNSET
         localLiveAtMs = null
+        heldForMove = false
         // Nominally on the cast player but the session is gone (e.g. an abandoned transfer): drop back
         // to local first so the load below does not target a dead CastPlayer.
         if (_currentPlayer.value === castPlayer && castContext.sessionManager.currentCastSession == null) {
@@ -450,7 +451,7 @@ class CastPlayerController(
         if ((castingRemotely || (tvConnected && tvStarted)) &&
             sameContent(currentItem, item) &&
             remoteState != Player.STATE_IDLE && remoteState != Player.STATE_ENDED &&
-            (newSource?.liveRewindOffsetMs ?: 0L) <= 0L
+            (newSource?.liveRewindOffsetMs ?: 0L) <= 0L && newSource?.fromStart != true
         ) {
             return
         }
@@ -496,6 +497,9 @@ class CastPlayerController(
             // Left to its wait, it fell back to the phone later, which then played along with the TV.
             transferring = false
             transferFallbackJob?.cancel()
+            // The second Chromecast may still answer: it is ended as it comes up, not cast onto.
+            giveUpStarting()
+            heldForMove = transferPlayWhenReady
             swapTo(localPlayer, transferPosition, false)
         }
         if (toDirect) return connectPicked(routeId)
@@ -546,6 +550,8 @@ class CastPlayerController(
                 session.close()
                 return@launch
             }
+            // Taken by the TV, or left on the phone in pause with the failure said.
+            heldForMove = false
             if (started.isFailure) {
                 tvSession = null
                 session.close()
@@ -743,6 +749,7 @@ class CastPlayerController(
         scope.launch {
             val started = runCatching { session.start() }
             if (directSession !== session) return@launch
+            heldForMove = false
             if (started.isFailure) {
                 directSession = null
                 session.close()
@@ -989,6 +996,10 @@ class CastPlayerController(
         }
     }
 
+    // A programme that was playing on a Chromecast is held in pause on the phone on its way to the
+    // device picked instead (see onSessionDisconnected).
+    private var heldForMove = false
+
     // Inside start(): what it reports is what coming back to the app found, not an event.
     private var returning = false
 
@@ -1038,7 +1049,9 @@ class CastPlayerController(
             stopTvSession(stopTv = playsOnTv)
             if (playsOnTv) {
                 currentItem?.let { loadResolved(localPlayer, it, position, true) }
-            } else if (onTv) {
+            } else if (!onTv) {
+                resumeHeld()
+            } else {
                 // The TV went on to something else, which stays on it: nothing is left to play here, and
                 // the phone would open its player on what it had sent, with nothing behind it.
                 currentItem = null
@@ -1051,6 +1064,7 @@ class CastPlayerController(
         if (directPending) {
             if (phoneStillPlays) {
                 stopDirect()
+                resumeHeld()
                 return
             }
             // A receiver still loading says 0: where it was asked to start, then.
@@ -1066,7 +1080,9 @@ class CastPlayerController(
             if (transferring) {
                 transferring = false
                 transferFallbackJob?.cancel()
-                swapTo(localPlayer, transferPosition, transferPlayWhenReady)
+                // Held in pause when it is on its way to another device (see heldForMove).
+                heldForMove = transferPlayWhenReady && pendingDirectRoute != null
+                swapTo(localPlayer, transferPosition, transferPlayWhenReady && pendingDirectRoute == null)
             }
             return
         }
@@ -1078,6 +1094,13 @@ class CastPlayerController(
         transferFallbackJob?.cancel()
         reResolveJob?.cancel()
         super.disconnect()
+    }
+
+    // "Cet appareil" picked while the phone held in pause a programme on its way to another device: it
+    // plays on here, as it was playing where it came from.
+    private fun resumeHeld() {
+        if (heldForMove && _currentPlayer.value === localPlayer) localPlayer.playWhenReady = true
+        heldForMove = false
     }
 
     // Gives up a Play Services session that is still being started, as when a device was picked by
@@ -1185,10 +1208,13 @@ class CastPlayerController(
     private fun playsOwn(player: Player, item: MediaItem): Boolean =
         if (player === directPlayer) !directPlayer.foreign else player.currentMediaItem?.localConfiguration?.uri?.bare() == item.localConfiguration?.uri?.bare()
 
-    /** False while a cast plays something this phone did not load: where it is says nothing of what the phone plays. */
+    /**
+     * False while a cast plays something this phone did not load: where it is says nothing of what the
+     * phone plays. The official receiver names what it plays in its own way, which cannot be compared.
+     */
     fun castPlaysOwn(): Boolean {
         val player = _currentPlayer.value
-        if (player === localPlayer || player === tvPlayer) return true
+        if (player === localPlayer || player === tvPlayer || CastReceiver.isOfficial(appContext)) return true
         return currentItem?.let { playsOwn(player, it) } == true
     }
 
@@ -1443,11 +1469,13 @@ class CastPlayerController(
                 // On its way to the device picked instead, the phone only holds the place: playing
                 // meanwhile, it would be heard for those seconds, and go on aloud with the app left
                 // should that device not answer.
+                heldForMove = endingPlayWhenReady && pendingDirectRoute != null
                 swapTo(localPlayer, endingPosition, endingPlayWhenReady && pendingDirectRoute == null)
             }
             pendingDirectRoute?.let {
                 pendingDirectRoute = null
-                connectPicked(it)
+                // No longer in the list by now: said, as a connection that fails is.
+                if (!connectPicked(it)) onError?.invoke(if (it.startsWith(TV_ROUTE_PREFIX)) TV_CONNECT_MESSAGE else CONNECT_ERROR_MESSAGE)
             }
             return
         }
@@ -1710,8 +1738,11 @@ class CastPlayerController(
             ensureActive()
             // Bail if a swap/stop superseded this stream while we were resolving.
             if (target !== _currentPlayer.value || currentItem == null) return@launch
-            // On the phone, where playback is now: a seek made during the wait counts.
+            // On the phone, where playback is now: a seek made during the wait counts, as does a return
+            // to the live point. Not for a stream that failed for having left its window, whose player
+            // still stands outside it.
             val position = if (target === localPlayer) localPlayer.currentPosition.coerceAtLeast(0) else failedAt
+            if (target === localPlayer && !leftLiveWindow) localLiveAtMs = LivePlayback.rewoundAt(localPlayer, liveWindow, localLiveAtMs)
             if (fresh == null) {
                 // The re-resolve itself failed - usually a transient blip (a Wi-Fi hiccup, a 5xx, the
                 // documented 528), not a permanently dead stream. Retry within the budget rather than
