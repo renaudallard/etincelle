@@ -1174,10 +1174,22 @@ class CastPlayerController(
         if (player === tvPlayer && !tvStarted) return null
         val item = currentItem ?: return null
         val source = item.localConfiguration?.tag as? PlaybackSource ?: return null
-        // By the stream's address without what follows it: its query is the access token of the stream,
-        // which a receiver may keep out of the status it sends to everyone on the network.
-        if (source.resumeKey == null || player.currentMediaItem?.localConfiguration?.uri?.bare() != item.localConfiguration?.uri?.bare()) return null
+        if (source.resumeKey == null || !playsOwn(player, item)) return null
         return Triple(source, player.currentPosition, player.duration)
+    }
+
+    // What [player] plays is [item], which this phone loaded, and not what another sender (a second
+    // phone, a home automation) has put on the same Chromecast since: that one's position is not this
+    // item's. By the stream's address without what follows it: its query is the access token of the
+    // stream, which a receiver may keep out of the status it sends to everyone on the network.
+    private fun playsOwn(player: Player, item: MediaItem): Boolean =
+        if (player === directPlayer) !directPlayer.foreign else player.currentMediaItem?.localConfiguration?.uri?.bare() == item.localConfiguration?.uri?.bare()
+
+    /** False while a cast plays something this phone did not load: where it is says nothing of what the phone plays. */
+    fun castPlaysOwn(): Boolean {
+        val player = _currentPlayer.value
+        if (player === localPlayer || player === tvPlayer) return true
+        return currentItem?.let { playsOwn(player, it) } == true
     }
 
     /**

@@ -68,9 +68,17 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
         handler.postDelayed(ticker, TICK_MS)
     }
 
+    /**
+     * The receiver plays something another sender loaded on it since: its position and its end are
+     * not those of this phone's item.
+     */
+    var foreign = false
+        private set
+
     /** The item now loaded on the receiver (the phone's [MediaItem], with its PlaybackSource tag). */
     fun setItem(item: MediaItem, liveRewindMs: Long = 0L) {
         this.item = item
+        foreign = false
         pendingRewindMs = liveRewindMs
         playerState = "BUFFERING"
         idleReason = ""
@@ -93,6 +101,11 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
     /** A MEDIA_STATUS entry from the receiver; an empty object when nothing is loaded. */
     fun onStatus(status: JSONObject) {
         status.optJSONObject("media")?.let { media ->
+            // By the stream's address without its query, the stream's access token, which a receiver
+            // may leave out of its status.
+            val playing = media.optString("contentId").substringBefore('?')
+            val own = item?.localConfiguration?.uri?.toString().orEmpty().substringBefore('?')
+            if (playing.isNotEmpty() && own.isNotEmpty()) foreign = playing != own
             live = media.optString("streamType") == "LIVE"
             duration = media.optDouble("duration", 0.0).takeIf { it.isFinite() && it > 0 } ?: 0.0
         }

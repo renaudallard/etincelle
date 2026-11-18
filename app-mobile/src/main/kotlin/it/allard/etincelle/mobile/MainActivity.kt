@@ -251,6 +251,8 @@ class MainActivity : ComponentActivity() {
                 while (true) {
                     delay(UP_NEXT_TICK_MS)
                     if (controller?.state?.value?.toTvApp == true) continue
+                    // Nor over what another sender has put on the same Chromecast since.
+                    if (controller?.castPlaysOwn() == false) continue
                     val p = playerFlow.value
                     if (upNextSlates.of(upNext).tick(upNext, p.currentPosition, p.duration)) viewModel.playUpNext()
                 }
