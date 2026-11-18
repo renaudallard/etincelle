@@ -1789,7 +1789,10 @@ class CastPlayerController(
                 // its status, unchanged, will not ask for one.
                 if (loadDirect(direct, freshItem, position, resolve = false, rewindMs = rewind, recovering = true) == false) onPlaybackError(target)
             } else {
+                // Paused, the phone's own player stays so: loaded again, it would start playing.
+                val paused = target === localPlayer && !localPlayer.playWhenReady
                 loadOn(target, freshItem, if (fresh.isLive) 0 else position)
+                if (paused) localPlayer.playWhenReady = false
             }
             val at = localLiveAtMs ?: return@launch
             if (target !== localPlayer || !fresh.isLive) return@launch
