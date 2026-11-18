@@ -201,18 +201,22 @@ class FuboRepository(
     }
 
     /** Loads a persisted session into memory; returns true if one was present. */
-    override suspend fun restoreSession(): Boolean {
-        val saved = store.read() ?: return false
-        // What was read may be behind by now: another restore, then a renewal of its tokens, may have
-        // happened meanwhile (the TV's background jobs restore too), and putting older tokens back
-        // would spend a refresh token twice and sign the device out. Only an empty seat is filled.
-        refreshMutex.withLock { if (session.session == null) session.session = saved }
-        return true
+    override suspend fun restoreSession(): Boolean = refreshMutex.withLock {
+        // Read under the lock a sign-out clears it under: read before that and put back after it, the
+        // session of the account just left would be in memory again.
+        val saved = store.read() ?: return@withLock false
+        // Another restore, then a renewal of its tokens, may have happened meanwhile (the TV's
+        // background jobs restore too), and putting older tokens back would spend a refresh token twice
+        // and sign the device out. Only an empty seat is filled.
+        if (session.session == null) session.session = saved
+        true
     }
 
     override suspend fun logout() {
-        session.session = null
-        store.clear()
+        refreshMutex.withLock {
+            session.session = null
+            store.clear()
+        }
         // Wipe continue-watching positions so a different account on this device does not resume into
         // the previous account's history.
         progress.clearAll()
