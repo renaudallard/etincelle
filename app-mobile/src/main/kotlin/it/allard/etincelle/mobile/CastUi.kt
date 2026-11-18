@@ -92,9 +92,10 @@ fun CastButton(
             title = { Text("Lire sur") },
             text = {
                 Column {
-                    // This phone — selecting it while casting transfers playback back here.
-                    TextButton(onClick = { if (state.isCasting) onDisconnect(); open = false }) {
-                        Text((if (!state.isCasting) "• " else "") + "Cet appareil")
+                    // This phone: selecting it while casting transfers playback back here, and gives up
+                    // on a device still being connected to.
+                    TextButton(onClick = { if (state.showStatus) onDisconnect(); open = false }) {
+                        Text((if (!state.showStatus) "• " else "") + "Cet appareil")
                     }
                     state.devices.forEach { device ->
                         // Prefer the route id (unambiguous across same-named devices); fall back to the
