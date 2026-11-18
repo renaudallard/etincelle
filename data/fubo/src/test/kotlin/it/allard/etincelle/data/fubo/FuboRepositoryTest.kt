@@ -17,12 +17,16 @@ import it.allard.etincelle.core.network.ProfilePick
 import it.allard.etincelle.core.network.ProgressStore
 import it.allard.etincelle.core.network.SessionManager
 import it.allard.etincelle.core.network.SessionStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
+import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -165,6 +169,24 @@ class FuboRepositoryTest {
 
         assertEquals("Accueil", home.title)
         assertEquals(2, server.requestCount)
+    }
+
+    @Test
+    fun `a refresh under way is seen through when its caller is cancelled`() = runBlocking {
+        session.session = UserSession("OLD", "RT", "u1", "p1")
+        store.saved = session.session
+        server.enqueue(MockResponse().setResponseCode(401)) // loadHome
+        server.enqueue(
+            MockResponse().setBody("""{"access_token":"NEW","refresh_token":"RT2"}""").setBodyDelay(300, TimeUnit.MILLISECONDS),
+        ) // refresh
+
+        val call = launch(Dispatchers.Default) { runCatching { repo.loadHome() } }
+        server.takeRequest() // the 401'd home
+        server.takeRequest() // the refresh has reached the server
+        call.cancelAndJoin()
+
+        assertEquals("NEW", store.saved?.accessToken)
+        assertEquals("RT2", repo.currentSession()?.refreshToken)
     }
 
     @Test

@@ -35,10 +35,12 @@ import it.allard.etincelle.core.network.SessionManager
 import it.allard.etincelle.core.network.SessionStore
 import it.allard.etincelle.core.remote.RemoteProtocol
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import retrofit2.HttpException
 import java.io.IOException
@@ -609,13 +611,18 @@ class FuboRepository(
         val current = session.session ?: throw AppError.Unauthorized
         if (usedAccessToken != null && current.accessToken != usedAccessToken) return@withLock
         val refreshToken = current.refreshToken ?: throw AppError.Unauthorized
-        val tokens = api.refresh("Bearer $refreshToken").tokens
-        val newAccess = tokens.accessToken ?: throw AppError.Unauthorized
-        // Apply the tokens to the session as it is now: a profile chosen during the call stays chosen.
-        val latest = session.session ?: throw AppError.Unauthorized
-        val updated = latest.copy(accessToken = newAccess, refreshToken = tokens.refreshToken ?: refreshToken)
-        session.session = updated
-        store.save(updated)
+        // Seen through even when the caller is cancelled, as when a page still loading is left: the
+        // server may already have replaced the refresh token, and its answer dropped, or kept in memory
+        // only, would be the session lost.
+        withContext(NonCancellable) {
+            val tokens = api.refresh("Bearer $refreshToken").tokens
+            val newAccess = tokens.accessToken ?: throw AppError.Unauthorized
+            // Apply the tokens to the session as it is now: a profile chosen during the call stays chosen.
+            val latest = session.session ?: throw AppError.Unauthorized
+            val updated = latest.copy(accessToken = newAccess, refreshToken = tokens.refreshToken ?: refreshToken)
+            session.session = updated
+            store.save(updated)
+        }
     }
 
     /** Runs an authenticated call, refreshing the token once on a 401, and mapping errors for the UI. */
