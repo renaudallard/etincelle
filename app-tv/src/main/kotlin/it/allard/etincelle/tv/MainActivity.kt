@@ -33,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -242,6 +243,8 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                         if (state.loggedIn) contentStateHolder.removeState(LOGIN_STATE)
                     }
                     val detailKeys = rememberStackStateKeys(contentStateHolder, state.detailStack.map { it.id })
+                    // The keys of the pages shown since a tab was last chosen.
+                    val pageKeys = remember { mutableSetOf<String>() }
                     val favoriteOrder = state.favoriteOrder
                     val profileScreen = state.profileScreen
                     val profileEditor = state.profileEditor
@@ -333,9 +336,21 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                                 "${state.tab.name}#${state.backStack.size}#${state.hideLocked}#" +
                                     (state.current?.reloadUrl ?: state.current?.title.orEmpty())
                             }
+                            if (state.tab != Tab.SEARCH) SideEffect { pageKeys += pageKey }
                             contentStateHolder.SaveableStateProvider(pageKey) {
                                 TvBrowseScreen(
-                                    state, viewModel::selectTab, viewModel::onCardClick, viewModel::search,
+                                    state,
+                                    { tab ->
+                                        // A tab chosen starts afresh. What its pages kept is for Back: the
+                                        // card to come back to would take the focus off the tab bar. The
+                                        // tab's own page, chosen again while on it, stays as it is.
+                                        if (tab != state.tab || state.backStack.size != 1) {
+                                            pageKeys.forEach(contentStateHolder::removeState)
+                                            pageKeys.clear()
+                                        }
+                                        viewModel.selectTab(tab)
+                                    },
+                                    viewModel::onCardClick, viewModel::search,
                                     viewModel::openSettings, viewModel::onRailSeeAll, gridColumns,
                                     onFavoriteOrder = viewModel::openFavoriteOrder,
                                 )
