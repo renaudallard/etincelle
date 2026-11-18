@@ -573,6 +573,8 @@ class CastPlayerController(
                 if (stopped) {
                     tvStarted = false
                     currentItem = null
+                    // What the TV plays next is its own, not to be shown as the programme just stopped.
+                    tvPlayer.showTvContent()
                 }
                 // Away, the link goes with what it was kept for, and the pages are told there.
                 if (!parkIdleTv() && stopped) onPlaybackStopped?.invoke()
