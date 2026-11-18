@@ -1225,6 +1225,9 @@ class CastPlayerController(
             markConnecting(transferTargetName)
             endingCaptured = false
             transferFallbackJob?.cancel()
+            // Not while the app is away (see stop): the phone would start playing aloud in a pocket.
+            // Coming back to the app gets here again.
+            if (awaySince != 0L) return
             transferFallbackJob = scope.launch {
                 delay(TRANSFER_TIMEOUT_MS)
                 if (transferring) {
