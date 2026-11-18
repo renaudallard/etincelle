@@ -577,7 +577,9 @@ class CastPlayerController(
                 if (!parkIdleTv() && stopped) onPlaybackStopped?.invoke()
             }
         }
-        if (resting) parkIdleTv()
+        // Each status is a chance to let go: the wait after leaving counts the time awake only, and a TV
+        // playing something of its own says nothing else that would.
+        parkIdleTv()
     }
 
     // Away from the screen, the link to a TV app keeps the phone from sleeping for as long as that TV
@@ -585,11 +587,14 @@ class CastPlayerController(
     // notification then drives: otherwise drop it, to connect again on return (see start). A TV left
     // paused, as when it is switched off, or on a programme that has ended, no longer plays it after a
     // while. Not in the first moments away, when what was just asked for may still be on its way to the
-    // TV: dropping the link tells the pages that playback stopped, which gives that up. True when dropped.
-    private fun parkIdleTv(): Boolean {
+    // TV: dropping the link tells the pages that playback stopped, which gives that up. [waited] says
+    // those moments are over, from the wait itself: its clock and the one read here may differ by a hair.
+    // True when dropped.
+    private fun parkIdleTv(waited: Boolean = false): Boolean {
         val session = tvSession ?: return false
         val now = SystemClock.elapsedRealtime()
-        if (awaySince == 0L || now - awaySince < TV_PARK_GRACE_MS || !tvConnected) return false
+        if (awaySince == 0L || !tvConnected) return false
+        if (!waited && now - awaySince < TV_PARK_GRACE_MS) return false
         val rested = tvRestingSince != 0L && now - tvRestingSince >= TV_REST_MS
         if (!tvIdle && !rested) return false
         parkedTv = session.tv
@@ -883,7 +888,7 @@ class CastPlayerController(
         parkJob?.cancel()
         parkJob = scope.launch {
             delay(TV_PARK_GRACE_MS)
-            parkIdleTv()
+            parkIdleTv(waited = true)
         }
         super.stop()
     }
