@@ -28,6 +28,9 @@ import kotlinx.coroutines.sync.withLock
  */
 object TvHome {
     private const val CHANNEL_KEY = "etincelle-recommendations"
+    private const val PREFS = "etincelle_home"
+    private const val ROW_WRITTEN = "row"
+    private const val NEXT_WRITTEN = "watch_next"
 
     // Syncs can overlap (the app starting while the periodic job runs); each replaces the whole row,
     // so they take turns rather than both inserting.
@@ -39,10 +42,24 @@ object TvHome {
         if (!signedIn) {
             replaceRow(context, emptyList())
             replaceWatchNext(context, emptyList())
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(ROW_WRITTEN).remove(NEXT_WRITTEN).apply()
             return@withLock
         }
-        runCatching { repo.homeRecommendations() }.onSuccess { replaceRow(context, it) }
-        runCatching { repo.continueWatching() }.onSuccess { replaceWatchNext(context, it) }
+        runCatching { repo.homeRecommendations() }.onSuccess { if (changed(context, ROW_WRITTEN, it)) replaceRow(context, it) }
+        runCatching { repo.continueWatching() }.onSuccess { if (changed(context, NEXT_WRITTEN, it)) replaceWatchNext(context, it) }
+    }
+
+    // Whether [programs] differ from those last written under [key], noting them as written. The row
+    // and Watch Next are brought up to date each time the app is left, and writing them means taking
+    // every card away and putting new ones in: with nothing new to show, that emptied and filled the
+    // row under the eyes of whoever had just come back to the home screen.
+    private fun changed(context: Context, key: String, programs: List<HomeProgram>): Boolean {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        // Their text, which is the same from one run of the app to the next, where a hash of them is not.
+        val now = programs.toString()
+        if (prefs.getString(key, null) == now) return false
+        prefs.edit().putString(key, now).apply()
+        return true
     }
 
     private fun replaceRow(context: Context, programs: List<HomeProgram>) {
