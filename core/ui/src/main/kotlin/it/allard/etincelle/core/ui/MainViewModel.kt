@@ -24,6 +24,8 @@ import it.allard.etincelle.core.model.ProgramWindow
 import it.allard.etincelle.core.model.RecordAction
 import it.allard.etincelle.core.model.UpNext
 import it.allard.etincelle.core.model.withUpNext
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -320,10 +322,13 @@ class MainViewModel(
                     continue
                 }
                 _state.update { it.copy(busy = false, error = it.error.takeIf { e -> e != PAIRING_RETRY_NOTICE }, pairingCode = pairing.code) }
-                // Poll until confirmed or the code is about to expire (then loop to regenerate). Count
-                // polls locally with a margin rather than trusting the wall clock against server time.
-                val polls = ((pairing.ttlSeconds - PAIRING_EXPIRY_MARGIN_SEC) / PAIRING_POLL_SEC).coerceAtLeast(1)
-                repeat(polls.toInt()) {
+                // Poll until confirmed or the code is about to expire (then loop to regenerate), by the
+                // time gone since it came, with a margin, rather than the wall clock against the
+                // server's. Not by a count of polls: each takes its own time on top of the wait, a
+                // stalled one its whole timeout, and the code stayed on screen past its expiry.
+                val since = TimeSource.Monotonic.markNow()
+                val lifetime = (pairing.ttlSeconds - PAIRING_EXPIRY_MARGIN_SEC).coerceAtLeast(PAIRING_POLL_SEC).seconds
+                while (since.elapsedNow() < lifetime) {
                     delay(PAIRING_POLL_SEC * 1000)
                     val session = orNull { repo.pollCodeLogin(pairing.code, pairing.deviceId) }
                     if (session != null) {
