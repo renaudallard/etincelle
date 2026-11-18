@@ -998,7 +998,14 @@ class MainViewModel(
             runCatching {
                 repo.deleteProfile(profile.id)
                 // Deleted: when the list cannot be refreshed, drop the profile from the one on screen.
-                runCatching { repo.profiles() }.getOrNull()
+                val list = runCatching { repo.profiles() }.getOrNull()
+                // Still the one in use, the repository not having got its list either: on to one of
+                // those left on screen, or every request goes on naming a profile that is gone.
+                if (repo.currentSession()?.profileId == profile.id) {
+                    val left = (list ?: _state.value.profileScreen?.list)?.profiles?.firstOrNull { it.id != profile.id }
+                    if (left != null) runCatching { repo.selectProfile(left.id) }
+                }
+                list
             }.onSuccess { list ->
                 _state.update { st ->
                     st.copy(
