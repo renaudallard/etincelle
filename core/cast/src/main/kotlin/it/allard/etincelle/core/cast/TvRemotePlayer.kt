@@ -13,6 +13,7 @@ import androidx.media3.common.SimpleBasePlayer
 import androidx.media3.common.util.UnstableApi
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.player.LivePlayback
 import it.allard.etincelle.core.remote.RemoteMessages
 import org.json.JSONObject
@@ -148,6 +149,10 @@ internal class TvRemotePlayer : SimpleBasePlayer(Looper.getMainLooper()) {
 
     override fun handleSeek(mediaItemIndex: Int, positionMs: Long, seekCommand: Int): ListenableFuture<*> {
         val session = session ?: return Futures.immediateVoidFuture()
+        // A live channel the TV has not said the window of yet: a skip then starts from 0, which the
+        // TV would take as the start of its window, four hours back.
+        val liveItem = live || (item?.localConfiguration?.tag as? PlaybackSource)?.isLive == true
+        if (liveItem && durationMs <= 0 && positionMs != C.TIME_UNSET) return Futures.immediateVoidFuture()
         // An unset position is the default one: the live edge, or the start of on-demand content.
         val target = if (positionMs == C.TIME_UNSET) -1L else positionMs.coerceAtLeast(0)
         session.send(JSONObject().put(RemoteMessages.TYPE, RemoteMessages.SEEK).put(RemoteMessages.POSITION, target))
