@@ -63,6 +63,10 @@ object TvLive {
     private const val SYNCED_AT = "live_guide_synced_at"
     // The account the guide was written for: another account's channels are rewritten at once.
     private const val SYNCED_FOR = "live_guide_synced_for"
+    // The last attempt, successful or not, and how long a failed one is left alone.
+    private const val TRIED_AT = "live_guide_tried_at"
+    private const val TRIED_FOR = "live_guide_tried_for"
+    private const val RETRY_MS = 30L * 60 * 1000
     private val lock = Mutex()
 
     fun inputId(context: Context): String =
@@ -73,7 +77,8 @@ object TvLive {
         val signedIn = repo.signedIn() ?: return@withLock
         if (!signedIn) {
             context.contentResolver.delete(TvContract.buildChannelsUriForInput(inputId(context)), null, null)
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(SYNCED_AT).remove(SYNCED_FOR).apply()
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .remove(SYNCED_AT).remove(SYNCED_FOR).remove(TRIED_AT).remove(TRIED_FOR).apply()
             return@withLock
         }
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -81,6 +86,12 @@ object TvLive {
         val account = repo.currentSession()?.userId
         val fresh = now - prefs.getLong(SYNCED_AT, 0) < REFRESH_MS && prefs.getString(SYNCED_FOR, null) == account
         if (fresh && hasChannels(context)) return@withLock
+        // Tried not long ago for this account without getting there, as where the system refuses the
+        // rows or has no guide to write to: not at every opening and leaving of the app, each a download
+        // of the whole feed.
+        val tried = now - prefs.getLong(TRIED_AT, 0)
+        if (tried in 0 until RETRY_MS && prefs.getString(TRIED_FOR, null) == account) return@withLock
+        prefs.edit().putLong(TRIED_AT, now).putString(TRIED_FOR, account).apply()
         val channels = repo.liveChannels(GUIDE_HOURS)
         if (channels.isNotEmpty()) {
             write(context, channels)
