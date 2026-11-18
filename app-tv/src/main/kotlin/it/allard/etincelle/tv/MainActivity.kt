@@ -382,15 +382,25 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                 if (position < 0) player.seekToDefaultPosition() else player.seekTo(position)
             }
             RemoteMessages.STOP -> viewModel.stopPlaying()
-            RemoteMessages.KEY -> when (val name = message.optString(RemoteMessages.KEY_NAME)) {
-                // Straight to what handles Back: from Android 16 an activity no longer turns a Back key
-                // event into it for an app built for that version.
-                "back" -> onBackPressedDispatcher.onBackPressed()
-                else -> remoteKeyCode(name)?.let { code ->
-                    // Through the activity, as a remote press would come, so the screens and the
-                    // player see it the same way.
-                    dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
-                    dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
+            RemoteMessages.KEY -> {
+                val name = message.optString(RemoteMessages.KEY_NAME)
+                when {
+                    // The update prompt is a window of its own, which keys sent through this activity
+                    // do not reach: they would act on the screen behind it. Its two answers are taken
+                    // here, OK for Installer, which it opens on, and Retour for Plus tard.
+                    viewModel.state.value.update?.quiet == false -> when (name) {
+                        "ok" -> installUpdate(viewModel)
+                        "back" -> if (viewModel.state.value.updateProgress == null) viewModel.dismissUpdate()
+                    }
+                    // Straight to what handles Back: from Android 16 an activity no longer turns a Back
+                    // key event into it for an app built for that version.
+                    name == "back" -> onBackPressedDispatcher.onBackPressed()
+                    else -> remoteKeyCode(name)?.let { code ->
+                        // Through the activity, as a remote press would come, so the screens and the
+                        // player see it the same way.
+                        dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
+                        dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
+                    }
                 }
             }
             // The media volume, which Android passes on to the TV set over HDMI-CEC when the device allows
