@@ -95,6 +95,9 @@ internal object CastLoadData {
                     },
                 )
                 put("access_token", s.accessToken)
+                // Where the credits start: left from there on, the episode counts as watched, as when
+                // this phone reports it itself.
+                source.upNext?.let { put("credits_sec", it.atSec) }
                 s.profileId.takeIf { it.isNotEmpty() }?.let { put("profile_id", it) }
                 s.userId.takeIf { it.isNotEmpty() }?.let { put("user_id", it) }
             }

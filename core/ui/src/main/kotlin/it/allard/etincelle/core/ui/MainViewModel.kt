@@ -1125,7 +1125,8 @@ class MainViewModel(
             // A fresh stream of the same recording, from the same page.
             recordingAssetId != null -> repo.resolveRecording(recordingAssetId).copy(originPageVodId = source.originPageVodId)
             else -> null
-        }
+        // The same programme: what follows it comes from its page, which a stream alone does not say.
+        }?.copy(upNext = source.upNext)
     } catch (c: CancellationException) {
         throw c
     } catch (e: Throwable) {
