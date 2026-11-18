@@ -392,9 +392,11 @@ class MainActivity : ComponentActivity() {
         }
         // Left with nothing playing, here or on a TV: the moment for an automatic update, which closes the app.
         // A TV app connected with nothing of this phone's on it does not count: it is about to be let go of.
+        // Something still loading does: it may be a programme tapped just before leaving.
         val cast = castController?.state?.value
         val casting = cast?.isCasting == true && castController?.tvIdle != true
-        if (!isChangingConfigurations && viewModel.state.value.playing == null && !casting && cast?.connecting != true) {
+        val idle = viewModel.state.value.let { it.playing == null && !it.busy }
+        if (!isChangingConfigurations && idle && !casting && cast?.connecting != true) {
             installFetchedUpdate(viewModel)
         }
         super.onStop()
