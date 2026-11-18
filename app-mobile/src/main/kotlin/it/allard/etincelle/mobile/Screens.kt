@@ -482,16 +482,17 @@ fun ProfilesScreen(
     error: String?,
     onPick: (Profile) -> Unit,
     onEdit: (Profile?) -> Unit,
+    onEditing: (Boolean) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var editing by remember { mutableStateOf(false) }
+    val editing = screen.editing
     val list = screen.list
     Column(modifier.fillMaxSize().statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onBack) { Text("← Retour") }
             Spacer(Modifier.weight(1f))
-            TextButton(onClick = { editing = !editing }, enabled = !busy) { Text(if (editing) "Terminé" else "Modifier") }
+            TextButton(onClick = { onEditing(!editing) }, enabled = !busy) { Text(if (editing) "Terminé" else "Modifier") }
         }
         Text(
             if (screen.asking) "Qui regarde ?" else "Profils",

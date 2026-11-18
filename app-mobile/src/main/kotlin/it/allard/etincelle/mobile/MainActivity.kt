@@ -650,6 +650,7 @@ private fun AppRoot(
                                 profileScreen, state.busy, state.error,
                                 onPick = vm::pickProfile,
                                 onEdit = vm::editProfile,
+                                onEditing = vm::setProfilesEditing,
                                 onBack = vm::closeProfiles,
                             )
                         }

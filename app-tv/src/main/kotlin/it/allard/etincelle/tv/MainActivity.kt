@@ -284,7 +284,7 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                             BackHandler { viewModel.closeProfiles() }
                             TvProfilesScreen(
                                 profileScreen, state.busy, state.error,
-                                viewModel::pickProfile, viewModel::editProfile, viewModel::closeProfiles,
+                                viewModel::pickProfile, viewModel::editProfile, viewModel::setProfilesEditing, viewModel::closeProfiles,
                             )
                         }
 

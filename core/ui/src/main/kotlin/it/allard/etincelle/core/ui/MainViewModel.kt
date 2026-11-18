@@ -150,7 +150,7 @@ private val ContentPage.showsWhatIsOnAir: Boolean
     get() = rails.any { rail -> rail.cards.any { it.channelId != null && it.tag != null } }
 
 /** The profiles screen: [asking] when the app asks who is watching, else opened from the settings. */
-data class ProfileScreen(val list: Profiles, val currentId: String?, val asking: Boolean)
+data class ProfileScreen(val list: Profiles, val currentId: String?, val asking: Boolean, val editing: Boolean = false)
 
 /** The profile being edited, or a new one when [profile] is null. */
 data class ProfileEditor(val profile: Profile?)
@@ -929,6 +929,9 @@ class MainViewModel(
     fun closeProfiles() = _state.update {
         it.copy(profileScreen = null, profileEditor = null, error = if (it.profileScreen?.asking == true) it.error else null, info = null)
     }
+
+    /** Modifier on the profiles screen: a tile then opens its profile's editor. Kept across the editor. */
+    fun setProfilesEditing(editing: Boolean) = _state.update { it.copy(profileScreen = it.profileScreen?.copy(editing = editing)) }
 
     /** Opens the editor on [profile], or on a new profile when null. */
     fun editProfile(profile: Profile?) = _state.update { it.copy(profileEditor = ProfileEditor(profile), error = null) }

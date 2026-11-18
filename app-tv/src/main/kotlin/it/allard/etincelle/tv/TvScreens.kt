@@ -599,9 +599,10 @@ fun TvProfilesScreen(
     error: String?,
     onPick: (Profile) -> Unit,
     onEdit: (Profile?) -> Unit,
+    onEditing: (Boolean) -> Unit,
     onBack: () -> Unit,
 ) {
-    var editing by remember { mutableStateOf(false) }
+    val editing = screen.editing
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         withFrameNanos { }
@@ -624,7 +625,7 @@ fun TvProfilesScreen(
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            TvButton(onClick = { editing = !editing }, highlighted = false) {
+            TvButton(onClick = { onEditing(!editing) }, highlighted = false) {
                 Text(if (editing) "Terminé" else "Modifier les profils")
             }
             TvButton(onClick = onBack, highlighted = false) { Text("Retour") }
