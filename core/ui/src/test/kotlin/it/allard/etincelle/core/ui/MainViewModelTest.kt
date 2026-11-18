@@ -12,6 +12,7 @@ import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.DrmSpec
 import it.allard.etincelle.core.model.LoginResult
+import it.allard.etincelle.core.model.PlayKind
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.Profiles
@@ -288,6 +289,19 @@ class MainViewModelTest {
         vm.onCardClick(CARD.copy(vodId = "LIVE_1"))
         vm.watchDetail()
 
+        assertEquals(next, vm.state.value.playing?.upNext)
+    }
+
+    @Test
+    fun anEpisodeHandedOverDuringItsCreditsGoesOnFromThere() {
+        val next = UpNext(1500, 9, "Next", null, "Commence dans %s", "Regarder", "Générique", "VOD_3")
+        val repo = FakeRepo()
+        repo.detail = { _, _ -> DETAIL.copy(upNext = next) }
+        val vm = viewModel(repo)
+
+        vm.playFromRemote(PlayKind.VOD, "VOD_1", positionMs = 1_520_000, rewindMs = 0)
+
+        assertEquals(1_520_000L, vm.state.value.playing?.startPositionMs)
         assertEquals(next, vm.state.value.playing?.upNext)
     }
 

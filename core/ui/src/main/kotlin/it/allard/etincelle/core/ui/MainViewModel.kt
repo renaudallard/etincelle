@@ -746,7 +746,9 @@ class MainViewModel(
                     PlayKind.RECORDING -> null to repo.resolveRecording(id).startingAt(positionMs)
                     PlayKind.VOD -> {
                         val detail = repo.fetchProgramDetail(id, DetailKind.PROGRAM)
-                        DetailEntry(detail, null, id, DetailKind.PROGRAM) to resolveProgramme(id, detail).startingAt(positionMs).withUpNext(detail.upNext)
+                        // The slate's rule first: it sends a resume point past the credits back to the
+                        // start, which is not for where the phone is watching now.
+                        DetailEntry(detail, null, id, DetailKind.PROGRAM) to resolveProgramme(id, detail).withUpNext(detail.upNext).startingAt(positionMs)
                     }
                 }
             }.onSuccess { (entry, src) ->
