@@ -731,8 +731,13 @@ class MainViewModel(
                     st.copy(busy = if (busy) false else st.busy, playing = src, detailStack = stack)
                 }
             }.onFailure { e ->
-                // Stopped, or something else chosen, meanwhile: nobody waits for this episode any more.
-                if (_state.value.playing === current) applyFailure(e, "Échec de lecture de l'épisode suivant")
+                // Stopped, or something else chosen, meanwhile: nobody waits for this episode any more,
+                // and only the spinner it put up is taken down.
+                if (_state.value.playing === current) {
+                    applyFailure(e, "Échec de lecture de l'épisode suivant")
+                } else if (busy) {
+                    _state.update { it.copy(busy = false) }
+                }
             }
         }
     }
