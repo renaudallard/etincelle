@@ -241,13 +241,18 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                     val contentStateHolder = rememberSaveableStateHolder()
                     // What was typed in the search is kept with its results (see the SEARCH page key
                     // below): not for a later search to start from, nor for the next account.
+                    // The keys of the pages shown since a tab was last chosen.
+                    val pageKeys = remember { mutableSetOf<String>() }
                     LaunchedEffect(state.loggedIn, state.tab) {
                         if (!state.loggedIn || state.tab != Tab.SEARCH) contentStateHolder.removeState("SEARCH")
                         if (state.loggedIn) contentStateHolder.removeState(LOGIN_STATE)
+                        // Nor are the pages' scroll and the place to come back to for the next account.
+                        if (!state.loggedIn) {
+                            pageKeys.forEach(contentStateHolder::removeState)
+                            pageKeys.clear()
+                        }
                     }
                     val detailKeys = rememberStackStateKeys(contentStateHolder, state.detailStack.map { it.id })
-                    // The keys of the pages shown since a tab was last chosen.
-                    val pageKeys = remember { mutableSetOf<String>() }
                     val favoriteOrder = state.favoriteOrder
                     val profileScreen = state.profileScreen
                     val profileEditor = state.profileEditor
@@ -456,8 +461,13 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                 // day it stands for.
                 val position = message.optLong(RemoteMessages.POSITION, -1)
                 val start = unloadedWindowStartMs
-                resumeLiveAtMs = if (unloaded && stoppedAway && position >= 0 && start != C.TIME_UNSET) start + position else null
+                // Just back in front, the stream's new window is still to come, and the phone still
+                // reads its positions in the old one: the wait for it then starts again, for this place.
+                val reloading = reloadJob?.isActive == true
+                val stale = (unloaded && stoppedAway) || reloading
+                resumeLiveAtMs = if (stale && position >= 0 && start != C.TIME_UNSET) start + position else null
                 if (position < 0) player.seekToDefaultPosition() else player.seekTo(position)
+                if (reloading) seekBackWhenFresh()
             }
             RemoteMessages.STOP -> viewModel.stopPlaying()
             RemoteMessages.KEY -> {
@@ -650,13 +660,18 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
     // airing then once its window has been read anew: not the one the player still holds from before,
     // in which that is where it already stands.
     private fun reload() {
+        player?.prepare()
+        seekBackWhenFresh()
+    }
+
+    // Takes a live stream being loaded again to the time of day noted for it, once its new window is read.
+    private fun seekBackWhenFresh() {
         val player = player ?: return
         val source = viewModel.state.value.playing
-        player.prepare()
+        reloadJob?.cancel()
         val at = resumeLiveAtMs ?: return
         val staleStart = unloadedWindowStartMs
         resumeLiveAtMs = null
-        reloadJob?.cancel()
         reloadJob = lifecycleScope.launch {
             val window = Timeline.Window()
             // A seek made meanwhile, with the remote or from the phone, is where playback goes instead.
@@ -675,13 +690,8 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                     if (!timeline.isEmpty) {
                         timeline.getWindow(player.currentMediaItemIndex, window)
                         val fresh = window.windowStartTimeMs != C.TIME_UNSET && window.windowStartTimeMs != staleStart
-                        if (fresh && at < window.windowStartTimeMs) {
-                            // Away for longer than the stream can be rewound: what was airing is gone, and
-                            // the oldest point still held, hours back, is no place to come back to.
-                            player.seekToDefaultPosition()
-                            return@launch
-                        }
-                        if (fresh && LivePlayback.seekToTimeIfReady(player, window, at)) return@launch
+                        // Away for longer than the stream can be rewound, it comes back live.
+                        if (fresh && LivePlayback.seekToTimeIfReady(player, window, at, liveIfGone = true)) return@launch
                     }
                     delay(RELOAD_SEEK_POLL_MS)
                 }

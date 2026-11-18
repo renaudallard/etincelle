@@ -1735,7 +1735,7 @@ class CastPlayerController(
             // No longer than a stream takes to come back. A failure meanwhile starts all this again,
             // the time to come back to still noted.
             repeat(LOCAL_LIVE_SEEK_TRIES) {
-                if (LivePlayback.seekToTimeIfReady(localPlayer, liveWindow, at)) {
+                if (LivePlayback.seekToTimeIfReady(localPlayer, liveWindow, at, liveIfGone = true)) {
                     localLiveAtMs = null
                     return@launch
                 }

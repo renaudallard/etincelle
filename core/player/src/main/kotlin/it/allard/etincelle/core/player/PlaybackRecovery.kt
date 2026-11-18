@@ -108,6 +108,8 @@ class PlaybackRecovery(
             while (held()) delay(HELD_POLL_MS)
             // No stream to be had is one more failure.
             val fresh = resolve(source) ?: return@launch recover(PlaybackException.ERROR_CODE_UNSPECIFIED)
+            // The app may have been left while the stream was asked for.
+            while (held()) delay(HELD_POLL_MS)
             // Where playback is now, not where it failed: a seek made during the wait counts.
             noteLiveTime()
             val position = player.currentPosition
@@ -117,7 +119,7 @@ class PlaybackRecovery(
             player.prepare()
             toLivePoint = false
             val at = liveAt ?: return@launch
-            while (!LivePlayback.seekToTimeIfReady(player, window, at)) delay(SEEK_POLL_MS)
+            while (!LivePlayback.seekToTimeIfReady(player, window, at, liveIfGone = true)) delay(SEEK_POLL_MS)
             liveAt = null
         }
     }

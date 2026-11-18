@@ -1067,9 +1067,13 @@ private fun TvEpisodesSection(
                 opened = ep.id
                 onEpisode(ep)
             },
-            focus = if (ep.id == opened) openedFocus else firstFocus.takeIf { i == 0 },
+            focus = firstFocus.takeIf { i == 0 },
+            modifier = if (ep.id == opened) Modifier.focusRequester(openedFocus) else Modifier,
         )
     }
+    // Once, as the page comes back, and after the rows have asked for theirs: a season chosen later
+    // must not send the focus to that episode again.
+    LaunchedEffect(Unit) { if (opened != null) runCatching { openedFocus.requestFocus() } }
 }
 
 /** One catch-up episode on the TV detail: a thumbnail and label, focusable and clickable. */
@@ -1318,15 +1322,15 @@ private fun Modifier.dpadLeavesField(focusManager: FocusManager, cursorAtEnd: ()
         }
     }
 
+// What the settings' entry in the tab bar is noted as, to come back to.
+private const val SETTINGS_FOCUS = "settings"
+
 /**
  * Brings the focus back to the item (a card, or a rail's "Tout voir") that opened a detail or a
  * sub-page. [saved] holds that item's key; it must live in the page's saveable state so it survives
  * the detail covering the page.
  */
 @Stable
-// What the settings' entry in the tab bar is noted as, to come back to.
-private const val SETTINGS_FOCUS = "settings"
-
 private class ReturnFocus(private val saved: MutableState<String?>) {
     private val requester = FocusRequester()
 
