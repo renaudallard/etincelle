@@ -92,6 +92,9 @@ class TvRemote(private val app: EtincelleTvApp) {
         if (this.screen === screen) this.screen = null
     }
 
+    /** [screen] is the one the phone's commands go to: not an older one on its way out. */
+    fun shows(screen: Screen) = this.screen === screen
+
     /** The programme whose asking opened the app, once, unless the phone has left since. */
     fun takeAsked(): JSONObject? = asked.also { asked = null }?.takeIf { server.connected }
 

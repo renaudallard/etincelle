@@ -693,7 +693,9 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
     // remote control stops unless it is kept at all times, and with nothing playing it is the moment for
     // an automatic update, which closes the app.
     private fun leave() {
-        if (!remote.always) stopRemote()
+        // Not from a screen closed with Back whose successor is already up: Android may end the old
+        // one after it has started the new one, whose remote control this would stop.
+        if (!remote.always && remote.shows(this)) stopRemote()
         // Whatever the pages say: a programme the phone stopped behind the screensaver is still loaded,
         // its screen being taken down only once the app is shown again.
         unload()
@@ -730,8 +732,9 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
         handler.removeCallbacks(stopRemoteUnlessDreaming)
         handler.removeCallbacks(letScreenRest)
         runCatching { unregisterReceiver(screenReceiver) }
+        val shown = remote.shows(this)
         remote.detach(this)
-        if (!remote.always) stopRemote()
+        if (shown && !remote.always) stopRemote()
         player?.release()
         player = null
         loadControl = null
