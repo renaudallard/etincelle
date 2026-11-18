@@ -40,6 +40,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -66,6 +67,9 @@ private const val PROGRESS_MIN_MS = 10_000L
 private const val PROFILE_PICK_TTL_MS = 2L * 24 * 60 * 60 * 1000
 // The recordings page of "Mes vidéos", which the Enregistrements tab and the recordings rows open.
 private const val RECORDINGS_PATH = "papi/v1/my-stuff/status/recordings"
+// How many times the user is asked for at the end of a sign-in, and how long between two.
+private const val USER_LOAD_TRIES = 3
+private const val USER_LOAD_RETRY_MS = 1_000L
 
 // The count closing a search result rail's title, as in "Programmes (8)".
 private val RAIL_COUNT = Regex("""\((\d+)\)\s*$""")
@@ -97,7 +101,7 @@ class FuboRepository(
         val previous = session.session
         session.session = UserSession(accessToken, refreshToken, userId = "", profileId = "")
         try {
-            val user = api.user().data ?: throw AppError.Unknown("Empty user response")
+            val user = userAtSignIn().data ?: throw AppError.Unknown("Empty user response")
             val userId = user.id ?: throw AppError.Unknown("Missing user id")
             val profileId = user.profiles?.firstOrNull()?.id ?: throw AppError.Unknown("Missing profile")
             return UserSession(accessToken, refreshToken, userId, profileId).also {
@@ -108,6 +112,22 @@ class FuboRepository(
             session.session = previous
             throw e
         }
+    }
+
+    // The tokens in hand were given for a password, a code typed or one confirmed on a phone, none of
+    // which serves twice: losing them to a network that fails for a moment means going through the
+    // sign-in again. So the user is asked for a few times before they are given up.
+    private suspend fun userAtSignIn(): UserResponse {
+        var failure: IOException? = null
+        repeat(USER_LOAD_TRIES) { attempt ->
+            if (attempt > 0) delay(USER_LOAD_RETRY_MS)
+            try {
+                return api.user()
+            } catch (e: IOException) {
+                failure = e
+            }
+        }
+        throw failure ?: IOException("no user")
     }
 
     /** Signs in, loads the user/profile id, and persists the session; or asks for a code (two-factor). */

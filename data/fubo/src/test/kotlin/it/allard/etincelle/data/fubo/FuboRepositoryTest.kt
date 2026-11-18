@@ -26,6 +26,7 @@ import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
+import okhttp3.mockwebserver.SocketPolicy
 import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -112,6 +113,19 @@ class FuboRepositoryTest {
         assertEquals("p1", result.profileId)
         assertEquals("AT", session.accessToken)
         assertEquals("AT", store.saved?.accessToken)
+    }
+
+    @Test
+    fun `a sign-in survives a network failure as the user is loaded`() = runTest {
+        server.enqueue(MockResponse().setBody("""{"access_token":"AT","refresh_token":"RT","id_token":"IT"}"""))
+        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AT_START))
+        server.enqueue(MockResponse().setBody("""{"data":{"id":"u1","profiles":[{"id":"p1"}]}}"""))
+
+        val result = (repo.login("e@x", "pw") as LoginResult.SignedIn).session
+
+        assertEquals("u1", result.userId)
+        assertEquals("AT", store.saved?.accessToken)
+        assertEquals(3, server.requestCount)
     }
 
     @Test
