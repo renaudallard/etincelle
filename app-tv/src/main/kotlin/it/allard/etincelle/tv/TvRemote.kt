@@ -74,6 +74,9 @@ class TvRemote(private val app: EtincelleTvApp) {
         asked = null
     }
 
+    /** An account signed in here: its phones may drive this TV from now on. */
+    fun signedIn() = server.accountChanged()
+
     /** The account was signed out here: the phones it let in no longer drive this TV. */
     fun signedOut() {
         server.forgetAccount()

@@ -149,6 +149,11 @@ class TvRemoteServer(
         keyUntil = 0
     }
 
+    /** An account signed in: its key is worked out as its first phone connects, not after a wait left from before. */
+    fun accountChanged() {
+        keyUntil = 0
+    }
+
     private fun dropPhones() {
         driver?.link?.close()
         driver = null

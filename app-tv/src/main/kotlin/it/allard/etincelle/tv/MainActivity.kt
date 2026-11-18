@@ -180,6 +180,7 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
             var signedIn = false
             viewModel.state.map { it.loggedIn }.distinctUntilChanged().collect { now ->
                 if (signedIn && !now) remote.signedOut()
+                if (!signedIn && now) remote.signedIn()
                 signedIn = now
             }
         }
