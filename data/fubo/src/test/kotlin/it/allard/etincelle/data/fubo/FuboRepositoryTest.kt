@@ -298,6 +298,7 @@ class FuboRepositoryTest {
     fun `a refresh refused as unauthorised signs out`() = runTest {
         session.session = UserSession("OLD", "RT", "u1", "p1")
         store.saved = session.session
+        progress.positions["p1/vod"] = 60_000L
         server.enqueue(MockResponse().setResponseCode(401)) // loadHome
         server.enqueue(MockResponse().setResponseCode(401)) // refresh
 
@@ -306,6 +307,12 @@ class FuboRepositoryTest {
         assertTrue(error is AppError.Unauthorized)
         assertNull(repo.currentSession())
         assertNull(store.saved)
+        // Nobody asked to leave: the account finds its resume points on signing in again.
+        assertEquals(60_000L, progress.positions["p1/vod"])
+
+        // Signed out by hand, they go.
+        repo.logout()
+        assertNull(progress.positions["p1/vod"])
     }
 
     @Test

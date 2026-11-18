@@ -107,6 +107,9 @@ class FuboRepository(
             val user = userAtSignIn().data ?: throw AppError.Unknown("Empty user response")
             val userId = user.id ?: throw AppError.Unknown("Missing user id")
             val profileId = user.profiles?.firstOrNull()?.id ?: throw AppError.Unknown("Missing profile")
+            // Another account than the one whose session had died here: its resume points go now.
+            if (expiredUserId != null && expiredUserId != userId) progress.clearAll()
+            expiredUserId = null
             return UserSession(accessToken, refreshToken, userId, profileId).also {
                 session.session = it
                 store.save(it)
@@ -236,13 +239,28 @@ class FuboRepository(
     }
 
     override suspend fun logout() {
+        endSession()
+        // Wipe continue-watching positions so a different account on this device does not resume into
+        // the previous account's history.
+        progress.clearAll()
+        expiredUserId = null
+    }
+
+    // The account whose session the server ended, which did not ask to leave: its resume points are
+    // kept for it to find on signing in again, and wiped should another account sign in instead.
+    private var expiredUserId: String? = null
+
+    // The session died of itself (its refresh was refused): signed out, without what [logout] wipes.
+    private suspend fun expire() {
+        expiredUserId = session.session?.userId?.takeIf { it.isNotEmpty() } ?: expiredUserId
+        endSession()
+    }
+
+    private suspend fun endSession() {
         refreshMutex.withLock {
             session.session = null
             store.clear()
         }
-        // Wipe continue-watching positions so a different account on this device does not resume into
-        // the previous account's history.
-        progress.clearAll()
         // Drop the cached channel data so the next account does not see the previous one's channels.
         dropAccountCaches()
     }
@@ -702,7 +720,7 @@ class FuboRepository(
                 // Only a genuine auth rejection means the session is dead. A transient network/5xx
                 // failure during refresh must leave the saved session intact (do not log out offline).
                 if (refreshError.isAuthFailure()) {
-                    logout()
+                    expire()
                     throw AppError.Unauthorized
                 }
                 throw refreshError
@@ -714,7 +732,7 @@ class FuboRepository(
                 block()
             } catch (retryError: HttpException) {
                 if (retryError.code() == 401) {
-                    logout()
+                    expire()
                     throw AppError.Unauthorized
                 }
                 throw retryError
