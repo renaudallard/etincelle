@@ -81,8 +81,10 @@ internal class DirectCastSession(
      * a receiver already running (to reconnect to a cast without restarting it). Throws on failure.
      */
     suspend fun start(joinOnly: Boolean = false) {
-        // Not cancellable, or a channel opened meanwhile would be dropped without being closed.
-        val ch = withContext(Dispatchers.IO + NonCancellable) { CastChannel.open(device.host, device.port, network) }
+        // Not cancellable, or a channel opened meanwhile would be dropped without being closed. In two
+        // steps: coming back from another dispatcher, a caller cancelled meanwhile is not handed the
+        // result, and the channel would be dropped all the same.
+        val ch = withContext(NonCancellable) { withContext(Dispatchers.IO) { CastChannel.open(device.host, device.port, network) } }
         // Closed (another device picked) or cancelled while connecting: nothing else would close it.
         if (ended || !currentCoroutineContext().isActive) {
             ch.close()
