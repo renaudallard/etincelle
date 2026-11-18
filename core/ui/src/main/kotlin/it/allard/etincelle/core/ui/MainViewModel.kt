@@ -845,7 +845,7 @@ class MainViewModel(
     private fun askWhoIsWatching() {
         viewModelScope.launch {
             val list = runCatching { repo.profilesToPick() }.getOrNull() ?: return@launch
-            _state.update { it.copy(profileScreen = ProfileScreen(list, repo.currentSession()?.profileId, asking = true)) }
+            _state.update { if (it.loggedIn) it.copy(profileScreen = ProfileScreen(list, repo.currentSession()?.profileId, asking = true)) else it }
         }
     }
 
@@ -856,9 +856,9 @@ class MainViewModel(
         viewModelScope.launch {
             runCatching { repo.profiles() }
                 .onSuccess { list ->
-                    _state.update { it.copy(busy = false, profileScreen = ProfileScreen(list, repo.currentSession()?.profileId, asking = false)) }
+                    _state.update { if (it.loggedIn) it.copy(busy = false, profileScreen = ProfileScreen(list, repo.currentSession()?.profileId, asking = false)) else it }
                 }
-                .onFailure { e -> applyFailure(e, "Échec de chargement des profils") }
+                .onFailure { e -> if (_state.value.loggedIn) applyFailure(e, "Échec de chargement des profils") }
         }
     }
 
@@ -971,8 +971,8 @@ class MainViewModel(
         _state.update { it.copy(busy = true, error = null, info = null) }
         viewModelScope.launch {
             runCatching { repo.favoriteOrder() }
-                .onSuccess { order -> _state.update { it.copy(busy = false, favoriteOrder = order) } }
-                .onFailure { e -> applyFailure(e, "Échec de chargement des favoris") }
+                .onSuccess { order -> _state.update { if (it.loggedIn) it.copy(busy = false, favoriteOrder = order) else it } }
+                .onFailure { e -> if (_state.value.loggedIn) applyFailure(e, "Échec de chargement des favoris") }
         }
     }
 

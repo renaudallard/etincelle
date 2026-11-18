@@ -251,6 +251,22 @@ class MainViewModelTest {
     }
 
     @Test
+    fun profilesAnsweredAfterSignOutDoNotShowOverTheSignInScreen() {
+        val repo = FakeRepo()
+        val vm = viewModel(repo)
+        val answer = CompletableDeferred<Profiles>()
+        repo.allProfiles = { answer.await() }
+        vm.openProfiles()
+        vm.logout()
+        assertFalse(vm.state.value.loggedIn)
+
+        answer.complete(Profiles(emptyList(), emptyList(), 5))
+
+        assertNull(vm.state.value.profileScreen)
+        assertNull(vm.state.value.error)
+    }
+
+    @Test
     fun loggingOutKeepsHideLocked() {
         val vm = viewModel(FakeRepo())
         vm.setHideLocked(true)
@@ -552,6 +568,8 @@ class MainViewModelTest {
         override suspend fun loadPage(url: String) = page(url)
         override suspend fun fetchProgramDetail(id: String, kind: DetailKind) = detail(id, kind)
         override suspend fun profilesToPick(): Profiles? = null
+        var allProfiles: suspend () -> Profiles = { Profiles(emptyList(), emptyList(), 5) }
+        override suspend fun profiles() = allProfiles()
         val resolvedRecordings = mutableListOf<String>()
         var vod: suspend (String) -> PlaybackSource = { NEXT }
         override suspend fun resolveVod(vodId: String) = vod(vodId)
