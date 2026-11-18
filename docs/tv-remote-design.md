@@ -104,3 +104,10 @@ The TV resolves streams with its own sign-in, so nothing is passed but ids; it s
 under the player and plays the next episode itself, so the phone shows no next-episode slate for it.
 On the phone, `TvRemotePlayer` turns the statuses into a media3 player, so the cast controller, the
 notification and the lock screen drive the TV unchanged, and the cast bar opens a remote screen.
+
+The link costs the phone battery for as long as it is up, and the TV app may run for days. So when the
+phone app leaves the screen, the link is only kept while the TV plays what the phone started (what it
+sent, or what the TV went on to from there, such as the next episode), which the notification then
+drives. Otherwise the phone closes it, also later when that playback stops, and connects to the same TV
+again by itself when the app comes back, without a message should the TV be gone by then. The remote
+screen stays up across that reconnection.

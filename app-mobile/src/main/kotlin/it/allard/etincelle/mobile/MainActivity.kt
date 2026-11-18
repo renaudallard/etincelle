@@ -502,12 +502,13 @@ private fun AppRoot(
         if (playing == null) castControlsOpen = false
     }
     val castControls = playing != null && castState.isCasting && castControlsOpen
-    // Driving an etincelle TV app, the cast bar opens its remote control instead, playing or not.
+    // Driving an etincelle TV app, the cast bar opens its remote control instead, playing or not. It
+    // stays up while the TV app, left alone while the app was away, is being connected to again.
     var tvRemoteOpen by remember { mutableStateOf(false) }
-    LaunchedEffect(castState.toTvApp) {
-        if (!castState.toTvApp) tvRemoteOpen = false
+    LaunchedEffect(castState.toTvApp, castState.connecting) {
+        if (!castState.toTvApp && !castState.connecting) tvRemoteOpen = false
     }
-    val tvRemote = castState.toTvApp && tvRemoteOpen
+    val tvRemote = (castState.toTvApp || castState.connecting) && tvRemoteOpen
     // The next-episode slate shows in the player, the cast controller or over the show page as the
     // viewer moves between them, each on the countdown the activity runs for the episode (with its
     // credits choice).
@@ -574,7 +575,7 @@ private fun AppRoot(
 
                         tvRemote -> {
                             BackHandler { tvRemoteOpen = false }
-                            TvRemoteScreen(currentPlayer, castState.connectedDeviceName.orEmpty(), onTvKey, onClose = { tvRemoteOpen = false })
+                            TvRemoteScreen(currentPlayer, castState.statusDeviceName.orEmpty(), onTvKey, onClose = { tvRemoteOpen = false })
                         }
 
                         // The cast controller: the same player surface bound to the cast player, so its

@@ -25,6 +25,7 @@ import it.allard.etincelle.core.player.LivePlayback
 import it.allard.etincelle.core.player.MediaItemFactory
 import it.allard.etincelle.core.remote.RemoteAuthException
 import it.allard.etincelle.core.remote.RemoteMessages
+import it.allard.etincelle.core.remote.RemoteTv
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -142,6 +143,13 @@ class CastPlayerController(
     private var tvStarted = false
     // Numbers the play requests sent to the TV app, which says in its status which one failed.
     private var tvRequests = 0L
+    // The TV went on by itself from what this phone sent (the next episode, another channel) and has
+    // played ever since: the notification still drives it.
+    private var tvMovedOn = false
+    // The app is away from the screen (between stop and start).
+    private var away = false
+    // The TV app whose link was dropped while away, to connect to again on return (see parkIdleTv).
+    private var parkedTv: RemoteTv? = null
 
     // Where playback coming back to the phone resumes (see loadResolved), for a TV app picked before
     // the phone has started it again.
@@ -433,12 +441,12 @@ class CastPlayerController(
 
     // A device from our own scans: a Chromecast, or an etincelle TV app.
     private fun connectPicked(routeId: String): Boolean =
-        if (routeId.startsWith(TV_ROUTE_PREFIX)) connectTv(routeId) else connectDirect(routeId)
+        if (routeId.startsWith(TV_ROUTE_PREFIX)) scannedTv(routeId)?.let { connectTv(it) } ?: false else connectDirect(routeId)
 
-    // Connect to the etincelle TV app [routeId], then have it play what the phone is playing. The TV
-    // fetches the stream with its own sign-in; the two only need to share the account (see core/remote).
-    private fun connectTv(routeId: String): Boolean {
-        val tv = scannedTv(routeId) ?: return false
+    // Connect to the etincelle TV app [tv], then have it play what the phone is playing. The TV fetches
+    // the stream with its own sign-in; the two only need to share the account (see core/remote). A
+    // failure is not said when [quiet]: nobody asked for a connection made again on return.
+    private fun connectTv(tv: RemoteTv, quiet: Boolean = false): Boolean {
         val key = remoteKey ?: return false
         markConnecting(tv.name)
         lateinit var session: TvRemoteSession
@@ -458,7 +466,7 @@ class CastPlayerController(
                 tvSession = null
                 session.close()
                 clearConnecting()
-                onError?.invoke(if (started.exceptionOrNull() is RemoteAuthException) TV_ACCOUNT_MESSAGE else TV_CONNECT_MESSAGE)
+                if (!quiet) onError?.invoke(if (started.exceptionOrNull() is RemoteAuthException) TV_ACCOUNT_MESSAGE else TV_CONNECT_MESSAGE)
                 return@launch
             }
             markTvConnected(tv)
@@ -476,6 +484,8 @@ class CastPlayerController(
                 runCatching { localPlayer.stop() }
             } else {
                 clearConnecting()
+                // The app was left while this was connecting.
+                parkIdleTv()
             }
         }
         return true
@@ -490,6 +500,7 @@ class CastPlayerController(
         message.put(RemoteMessages.REQUEST, ++tvRequests)
         currentItem = item
         tvStarted = false
+        tvMovedOn = false
         tvPlayer.setItem(item)
         _currentPlayer.value = tvPlayer
         session.send(message)
@@ -514,6 +525,7 @@ class CastPlayerController(
             } else if (tvStarted) {
                 // The TV moved on: what the phone sent no longer plays there, so sending it again plays it.
                 tvStarted = false
+                tvMovedOn = true
                 currentItem = null
                 tvPlayer.showTvContent()
             }
@@ -525,18 +537,38 @@ class CastPlayerController(
             tvPlayer.showTvContent()
             clearConnecting()
             onError?.invoke(error)
+            parkIdleTv()
             return
         }
         when (message.optString(RemoteMessages.STATE)) {
             RemoteMessages.STATE_PLAYING -> setReceiverPlaying(true)
             RemoteMessages.STATE_PAUSED, RemoteMessages.STATE_BUFFERING -> setReceiverPlaying(false)
-            RemoteMessages.STATE_IDLE -> if (tvStarted && currentItem != null) {
+            RemoteMessages.STATE_IDLE -> {
+                tvMovedOn = false
                 // Stopped on the TV (Back from its player): the phone drops what it was playing too.
-                tvStarted = false
-                currentItem = null
-                onPlaybackStopped?.invoke()
+                val stopped = tvStarted && currentItem != null
+                if (stopped) {
+                    tvStarted = false
+                    currentItem = null
+                }
+                // Away, the link goes with what it was kept for, and the pages are told there.
+                if (!parkIdleTv() && stopped) onPlaybackStopped?.invoke()
             }
         }
+    }
+
+    // Away from the screen, the link to a TV app keeps the phone from sleeping for as long as that TV
+    // runs, days maybe. It is only worth that while the TV plays what this phone started, which the
+    // notification then drives: otherwise drop it, to connect again on return (see start). True when
+    // dropped.
+    private fun parkIdleTv(): Boolean {
+        val session = tvSession ?: return false
+        if (!away || !tvConnected || currentItem != null || tvMovedOn) return false
+        parkedTv = session.tv
+        stopTvSession(stopTv = false)
+        // What the pages still held as playing, if anything, was no longer on the TV.
+        onPlaybackStopped?.invoke()
+        return true
     }
 
     /** Sends a remote-control key to the etincelle TV app (up, down, left, right, ok, back). */
@@ -570,6 +602,7 @@ class CastPlayerController(
     private fun leaveTvPlayer() {
         tvPlayer.detach()
         tvStarted = false
+        tvMovedOn = false
         if (_currentPlayer.value === tvPlayer) _currentPlayer.value = localPlayer
     }
 
@@ -813,7 +846,18 @@ class CastPlayerController(
         // return, a connected new device is loaded by onSessionConnected (different session id) and a
         // failed one re-arms its fallback. Nothing here can mis-fire because no flag is force-cleared.
         transferFallbackJob?.cancel()
+        away = true
+        parkIdleTv()
         super.stop()
+    }
+
+    override fun start() {
+        away = false
+        super.start()
+        // The TV app left on the way out is driven again, unless something else got connected meanwhile.
+        val tv = parkedTv ?: return
+        parkedTv = null
+        if (tvSession == null && !isCastSessionActive) connectTv(tv, quiet = true)
     }
 
     /**

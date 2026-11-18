@@ -148,7 +148,11 @@ téléphone connecté au **même compte** Molotov peut piloter le téléviseur, 
 le prouve à l'autre à partir du compte, sans que la télécommande n'envoie le moindre identifiant sur
 le réseau local, et leurs échanges sont chiffrés. Le téléphone et le téléviseur doivent utiliser la
 même version du protocole : mettez à jour les deux applications ensemble. Se déconnecter du compte
-sur le téléviseur y ferme aussitôt la télécommande des téléphones de ce compte.
+sur le téléviseur y ferme aussitôt la télécommande des téléphones de ce compte. Quand on quitte
+l'application du téléphone, il ne reste relié au téléviseur que tant que celui-ci lit ce que le
+téléphone a lancé (ou ce que le téléviseur a enchaîné ensuite), pour que la notification continue de
+le piloter ; sinon il referme la liaison pour ménager sa batterie, et la rétablit de lui-même au
+retour dans l'application.
 
 L'application TV peut rester joignable **à tout moment**, comme un Chromecast : ouverte ou non, derrière
 l'économiseur d'écran ou une autre application, téléviseur en veille s'il garde alors sa connexion au

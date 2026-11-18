@@ -146,7 +146,7 @@ open class CastController(
         override fun onSessionResuming(session: CastSession, sessionId: String) = Unit
     }
 
-    fun start() {
+    open fun start() {
         mediaRouter.addCallback(selector, routerCallback, MediaRouter.CALLBACK_FLAG_REQUEST_DISCOVERY)
         if (!listening) {
             castContext.sessionManager.addSessionManagerListener(sessionListener, CastSession::class.java)
