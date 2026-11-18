@@ -267,6 +267,34 @@ class FuboRepositoryTest {
     }
 
     @Test
+    fun `a 401 from another host reached through a redirect does not end the session`() = runTest {
+        val elsewhere = MockWebServer()
+        elsewhere.start()
+        try {
+            val api = Retrofit.Builder()
+                .baseUrl(server.url("/").newBuilder().host("localhost").build())
+                .addConverterFactory(MoshiConverterFactory.create(Moshi.Builder().add(KotlinJsonAdapterFactory()).build()))
+                .build()
+                .create(FuboApi::class.java)
+            val other = elsewhere.url("/home").newBuilder().host("127.0.0.1").build()
+            val guarded = FuboRepository(api, session, store, progress, ownHost = { it == "localhost" })
+            session.session = UserSession("AT", "RT", "u1", "p1")
+            store.saved = session.session
+            server.enqueue(MockResponse().setResponseCode(302).setHeader("Location", other.toString()))
+            elsewhere.enqueue(MockResponse().setResponseCode(401))
+
+            val error = runCatching { guarded.loadHome() }.exceptionOrNull()
+
+            assertTrue(error is AppError)
+            assertEquals("AT", repo.currentSession()?.accessToken)
+            assertEquals("AT", store.saved?.accessToken)
+            assertEquals(1, server.requestCount)
+        } finally {
+            elsewhere.shutdown()
+        }
+    }
+
+    @Test
     fun `a refresh refused as unauthorised signs out`() = runTest {
         session.session = UserSession("OLD", "RT", "u1", "p1")
         store.saved = session.session

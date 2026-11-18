@@ -214,6 +214,7 @@ class MainViewModel(
     }
 
     fun login(email: String, password: String) {
+        codeTaken = false
         _state.update { it.copy(busy = true, error = null) }
         viewModelScope.launch {
             runCatching { repo.login(email.trim(), password) }
@@ -253,7 +254,10 @@ class MainViewModel(
         _state.update { it.copy(busy = true, error = null, info = null) }
         codeJob = viewModelScope.launch {
             runCatchingNav { repo.verifyCode(challenge, code) }
-                .onSuccess { enterHome() }
+                .onSuccess {
+                    codeTaken = true
+                    enterHome()
+                }
                 .onFailure { e -> applyFailure(e, "Code refusé") }
         }
     }
@@ -273,13 +277,16 @@ class MainViewModel(
     // The code being checked, or sent again.
     private var codeJob: Job? = null
 
+    // The code of the sign-in under way was accepted.
+    private var codeTaken = false
+
     /**
      * Leaves the code screen, back to the sign-in form. A request still out is dropped with it: its
      * answer would bring this screen back, or sign in someone who has just declined to.
      */
     fun cancelCode() {
         // The code was taken: signed in already, with the home page on its way.
-        if (_state.value.mfa != null && repo.currentSession() != null) return
+        if (codeTaken) return
         codeJob?.cancel()
         _state.update { it.copy(mfa = null, busy = false, error = null, info = null) }
     }
