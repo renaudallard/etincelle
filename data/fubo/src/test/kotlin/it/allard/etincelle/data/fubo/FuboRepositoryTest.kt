@@ -190,6 +190,20 @@ class FuboRepositoryTest {
     }
 
     @Test
+    fun `a call refused with nobody signed in here leaves the saved session alone`() = runTest {
+        // Saved, but not read: a passing Keystore failure.
+        store.saved = UserSession("AT", "RT", "u1", "p1")
+        progress.positions["p1/vod"] = 60_000L
+        server.enqueue(MockResponse().setResponseCode(401))
+
+        val error = runCatching { repo.loadHome() }.exceptionOrNull()
+
+        assertTrue(error is AppError.Unauthorized)
+        assertEquals("AT", store.saved?.accessToken)
+        assertEquals(60_000L, progress.positions["p1/vod"])
+    }
+
+    @Test
     fun `a refresh refused as unauthorised signs out`() = runTest {
         session.session = UserSession("OLD", "RT", "u1", "p1")
         store.saved = session.session

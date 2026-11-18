@@ -636,6 +636,9 @@ class FuboRepository(
             block()
         } catch (e: HttpException) {
             if (e.code() != 401) throw e
+            // Nobody is signed in here, as when the saved session could not be read just now: the 401
+            // says no more than that, and what is saved is not to be cleared over it.
+            if (usedToken == null) throw AppError.Unauthorized
             try {
                 refreshTokens(usedToken)
             } catch (refreshError: Exception) {
