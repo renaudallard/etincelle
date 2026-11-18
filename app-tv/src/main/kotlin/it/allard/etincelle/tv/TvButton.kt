@@ -26,6 +26,10 @@ import it.allard.etincelle.core.designsystem.theme.BackgroundLevel2
  * that focuses its first button on entry does so before an event collector would be listening.
  * [highlighted] gives the brand yellow fill; false gives a neutral one, so a row of choices
  * (season, grid density) shows which one is current apart from which one has focus.
+ *
+ * A button that is not [enabled] looks it and takes no press, but still takes the focus: the stock one
+ * gives it up as it is disabled and nothing else gets it, so OK does nothing until an arrow is
+ * pressed, after a press that put the page to work, or on a page that opens on such a button.
  */
 @Composable
 fun TvButton(
@@ -36,15 +40,15 @@ fun TvButton(
     content: @Composable RowScope.() -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
+    val colors = if (highlighted) {
+        ButtonDefaults.buttonColors()
+    } else {
+        ButtonDefaults.buttonColors(containerColor = BackgroundLevel2, contentColor = Color.White)
+    }
     Button(
-        onClick = onClick,
+        onClick = { if (enabled) onClick() },
         modifier = modifier.onFocusChanged { focused = it.hasFocus }.scale(if (focused) 1.08f else 1f),
-        enabled = enabled,
-        colors = if (highlighted) {
-            ButtonDefaults.buttonColors()
-        } else {
-            ButtonDefaults.buttonColors(containerColor = BackgroundLevel2, contentColor = Color.White)
-        },
+        colors = if (enabled) colors else colors.copy(containerColor = colors.disabledContainerColor, contentColor = colors.disabledContentColor),
         border = if (focused) BorderStroke(3.dp, Color.White) else null,
         content = content,
     )

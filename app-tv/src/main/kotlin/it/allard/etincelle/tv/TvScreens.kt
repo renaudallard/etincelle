@@ -811,7 +811,7 @@ fun TvFavoriteOrderScreen(
                                 else -> false
                             }
                         }
-                        .clickable(enabled = !busy) { picked = if (moving) null else channel.id }
+                        .clickable { if (!busy) picked = if (moving) null else channel.id }
                         .padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -1080,7 +1080,8 @@ private fun TvEpisodeRow(
             .clip(RoundedCornerShape(8.dp))
             .background(if (focused) BackgroundLevel2 else Color.Transparent)
             .border(if (focused) 3.dp else 0.dp, if (focused) Color.White else Color.Transparent, RoundedCornerShape(8.dp))
-            .clickable(enabled = enabled) { onClick() }
+            // Never disabled, which would drop the focus: see TvButton.
+            .clickable { if (enabled) onClick() }
             .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
