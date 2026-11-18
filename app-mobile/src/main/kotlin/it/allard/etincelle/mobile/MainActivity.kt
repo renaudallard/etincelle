@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -56,6 +57,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
@@ -450,6 +452,12 @@ private const val CAST_PROGRESS_MS = 15_000L
 // How often the next-episode countdown moves.
 private const val UP_NEXT_TICK_MS = 250L
 
+// What the navigation bar leaves between two of its tabs.
+private val TAB_SPACING = 8.dp
+
+// Kept free on the two sides of a tab's label together, so that none touches its neighbour or the edge.
+private val TAB_LABEL_MARGIN = 6.dp
+
 // How often a programme started over is checked for its live window being known.
 private const val START_OVER_POLL_MS = 500L
 
@@ -739,10 +747,15 @@ private fun AppRoot(
                                                 },
                                                 label = {
                                                     // Seven tabs leave little room: a name that does not fit
-                                                    // shrinks rather than being cut.
+                                                    // shrinks rather than being cut. To its tab's own width,
+                                                    // less a margin: the bar lets a label be wider than its
+                                                    // tab, and the last one then ran off the screen.
                                                     val labelStyle = MaterialTheme.typography.labelSmall
+                                                    val barWidth = LocalConfiguration.current.screenWidthDp.dp
+                                                    val tabWidth = (barWidth - TAB_SPACING * (PHONE_TABS.size - 1)) / PHONE_TABS.size
                                                     BasicText(
                                                         tab.shortLabel,
+                                                        modifier = Modifier.widthIn(max = tabWidth - TAB_LABEL_MARGIN),
                                                         style = labelStyle.copy(color = LocalContentColor.current),
                                                         maxLines = 1,
                                                         softWrap = false,
