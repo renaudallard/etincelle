@@ -17,6 +17,12 @@ import java.security.MessageDigest
  * its size and sha256 match what GitHub published; false on any failure, with nothing left behind.
  */
 suspend fun downloadUpdate(info: UpdateInfo, target: File, onProgress: (Int) -> Unit): Boolean = withContext(Dispatchers.IO) {
+    // Already there from an earlier run of the app, which ended before it could be installed: not
+    // downloaded again at each start until it is.
+    if (target.length() == info.size && runCatching { sha256Of(target) }.getOrNull() == info.sha256) {
+        onProgress(100)
+        return@withContext true
+    }
     val part = File(target.path + ".part")
     var kept = false
     try {
@@ -48,7 +54,7 @@ suspend fun downloadUpdate(info: UpdateInfo, target: File, onProgress: (Int) -> 
                         }
                     }
                 }
-                val sha256 = digest.digest().joinToString("") { "%02x".format(it) }
+                val sha256 = digest.hex()
                 kept = done == info.size && sha256 == info.sha256 && part.renameTo(target)
             }
         } finally {
@@ -62,3 +68,18 @@ suspend fun downloadUpdate(info: UpdateInfo, target: File, onProgress: (Int) -> 
     }
     kept
 }
+
+private fun sha256Of(file: File): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    file.inputStream().use { input ->
+        val buf = ByteArray(64 * 1024)
+        while (true) {
+            val n = input.read(buf)
+            if (n < 0) break
+            digest.update(buf, 0, n)
+        }
+    }
+    return digest.hex()
+}
+
+private fun MessageDigest.hex() = digest().joinToString("") { "%02x".format(it) }
