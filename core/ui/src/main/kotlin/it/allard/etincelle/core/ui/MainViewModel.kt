@@ -719,7 +719,10 @@ class MainViewModel(
                     val stack = if (onEpisodePage(st)) st.detailStack.dropLast(1) + entry else st.detailStack
                     st.copy(busy = if (busy) false else st.busy, playing = src, detailStack = stack)
                 }
-            }.onFailure { e -> applyFailure(e, "Échec de lecture de l'épisode suivant") }
+            }.onFailure { e ->
+                // Stopped, or something else chosen, meanwhile: nobody waits for this episode any more.
+                if (_state.value.playing === current) applyFailure(e, "Échec de lecture de l'épisode suivant")
+            }
         }
     }
 
@@ -1029,6 +1032,7 @@ class MainViewModel(
 
     fun stopPlaying() {
         cancelNav()
+        upNextJob?.cancel()
         _state.update { it.copy(playing = null) }
         reloadIfStale(STALE_ON_RETURN_MS)
     }
@@ -1227,6 +1231,7 @@ class MainViewModel(
         navJob?.cancel()
         confirmJob?.cancel()
         pairingJob?.cancel()
+        upNextJob?.cancel()
         viewModelScope.launch {
             // Wait out a pending resume-position save so it cannot land after the progress wipe below
             // and leak the previous account's continue-watching position to the next one.

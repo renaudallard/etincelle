@@ -102,6 +102,23 @@ class MainViewModelTest {
     }
 
     @Test
+    fun aNextEpisodeThatFailsAfterAStopSaysNothing() {
+        val repo = FakeRepo()
+        val vm = viewModel(repo)
+        vm.onCardClick(CARD)
+        vm.watchRecording("REC_1")
+        val next = CompletableDeferred<ProgramDetail>()
+        repo.detail = { _, _ -> next.await() }
+        vm.playUpNext()
+        vm.stopPlaying()
+
+        next.completeExceptionally(AppError.Network("offline"))
+
+        assertNull(vm.state.value.error)
+        assertFalse(vm.state.value.busy)
+    }
+
+    @Test
     fun theNextEpisodeOfACastLeavesThePageBeingBrowsed() {
         val repo = FakeRepo()
         val vm = viewModel(repo)
