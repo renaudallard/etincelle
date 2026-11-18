@@ -51,6 +51,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -1028,7 +1029,11 @@ private fun TvEpisodesSection(
     firstFocus: FocusRequester? = null,
 ) {
     val seasons = remember(episodes) { episodes.groupBySeason() }
-    var selected by remember(episodes) { mutableStateOf(0) }
+    // Kept with the page (see where it is shown), as is the episode opened from it, on which Back
+    // from that episode's page lands again.
+    var selected by rememberSaveable { mutableIntStateOf(0) }
+    var opened by rememberSaveable { mutableStateOf<String?>(null) }
+    val openedFocus = remember { FocusRequester() }
     val idx = selected.coerceIn(0, seasons.size - 1)
     Spacer(Modifier.height(8.dp))
     Text("Épisodes disponibles", style = MaterialTheme.typography.titleMedium, color = Color.White)
@@ -1046,7 +1051,14 @@ private fun TvEpisodesSection(
         }
     }
     seasons[idx].second.forEachIndexed { i, ep ->
-        TvEpisodeRow(ep, enabled = !busy, onClick = { onEpisode(ep) }, focus = firstFocus.takeIf { i == 0 })
+        TvEpisodeRow(
+            ep, enabled = !busy,
+            onClick = {
+                opened = ep.id
+                onEpisode(ep)
+            },
+            focus = if (ep.id == opened) openedFocus else firstFocus.takeIf { i == 0 },
+        )
     }
 }
 

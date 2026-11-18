@@ -62,6 +62,7 @@ import androidx.media3.ui.PlayerView
 import it.allard.etincelle.core.designsystem.LiveProgramBar
 import it.allard.etincelle.core.designsystem.LiveProgramBarBottomOffset
 import it.allard.etincelle.core.designsystem.ReturnToLiveButton
+import it.allard.etincelle.core.designsystem.rememberStackStateKeys
 import it.allard.etincelle.core.designsystem.theme.EtincelleTheme
 import it.allard.etincelle.core.designsystem.UpNextSlate
 import it.allard.etincelle.core.domain.DetailKind
@@ -236,6 +237,7 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                     LaunchedEffect(state.loggedIn, state.tab) {
                         if (!state.loggedIn || state.tab != Tab.SEARCH) contentStateHolder.removeState("SEARCH")
                     }
+                    val detailKeys = rememberStackStateKeys(contentStateHolder, state.detailStack.map { it.id })
                     val favoriteOrder = state.favoriteOrder
                     val profileScreen = state.profileScreen
                     val profileEditor = state.profileEditor
@@ -257,13 +259,17 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
 
                         detail != null -> {
                             BackHandler { viewModel.closeDetail() }
-                            TvProgramDetailScreen(
-                                detail, state.busy, state.error, state.info,
-                                viewModel::watchDetail, viewModel::startOverDetail, viewModel::watchReplay, viewModel::recordDetail,
-                                viewModel::watchRecording,
-                                viewModel::onCardClick,
-                                isRecording = state.detailRecordingAssetId != null,
-                            )
+                            // Each page of the stack has its own scroll, season and episode last opened,
+                            // found again on Back from that episode's page, or from the player.
+                            contentStateHolder.SaveableStateProvider(detailKeys.last()) {
+                                TvProgramDetailScreen(
+                                    detail, state.busy, state.error, state.info,
+                                    viewModel::watchDetail, viewModel::startOverDetail, viewModel::watchReplay, viewModel::recordDetail,
+                                    viewModel::watchRecording,
+                                    viewModel::onCardClick,
+                                    isRecording = state.detailRecordingAssetId != null,
+                                )
+                            }
                         }
 
                         profileEditor != null -> {

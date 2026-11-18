@@ -85,6 +85,7 @@ import it.allard.etincelle.core.designsystem.LiveProgramBar
 import it.allard.etincelle.core.designsystem.LiveProgramBarBottomOffset
 import it.allard.etincelle.core.designsystem.R as DesignR
 import it.allard.etincelle.core.designsystem.ReturnToLiveButton
+import it.allard.etincelle.core.designsystem.rememberStackStateKeys
 import it.allard.etincelle.core.designsystem.theme.BrandBlack
 import it.allard.etincelle.core.designsystem.theme.BrandYellow
 import it.allard.etincelle.core.designsystem.theme.EtincelleTheme
@@ -567,6 +568,7 @@ private fun AppRoot(
     LaunchedEffect(state.loggedIn, state.tab) {
         if (!state.loggedIn || state.tab != Tab.SEARCH) contentStateHolder.removeState("SEARCH")
     }
+    val detailKeys = rememberStackStateKeys(contentStateHolder, state.detailStack.map { it.id })
     val favoriteOrder = state.favoriteOrder
     val profileScreen = state.profileScreen
     val profileEditor = state.profileEditor
@@ -613,21 +615,25 @@ private fun AppRoot(
 
                         detail != null -> {
                             BackHandler { vm.closeDetail() }
-                            ProgramDetailScreen(
-                                detail = detail,
-                                busy = state.busy,
-                                error = state.error,
-                                info = state.info,
-                                onWatch = { vm.watchDetail() },
-                                onStartOver = { vm.startOverDetail() },
-                                onWatchReplay = { vm.watchReplay() },
-                                onRecord = { vm.recordDetail(it) },
-                                onWatchRecording = { vm.watchRecording(it) },
-                                onBack = { vm.closeDetail() },
-                                onEpisode = { vm.onCardClick(it) },
-                                isRecording = state.detailRecordingAssetId != null,
-                                castButton = { CastButton(castState, onCastConnect, onCastDisconnect, onCastActiveScan) },
-                            )
+                            // Each page of the stack has its own scroll and season, found again on Back
+                            // from an episode opened from it, or from the player.
+                            contentStateHolder.SaveableStateProvider(detailKeys.last()) {
+                                ProgramDetailScreen(
+                                    detail = detail,
+                                    busy = state.busy,
+                                    error = state.error,
+                                    info = state.info,
+                                    onWatch = { vm.watchDetail() },
+                                    onStartOver = { vm.startOverDetail() },
+                                    onWatchReplay = { vm.watchReplay() },
+                                    onRecord = { vm.recordDetail(it) },
+                                    onWatchRecording = { vm.watchRecording(it) },
+                                    onBack = { vm.closeDetail() },
+                                    onEpisode = { vm.onCardClick(it) },
+                                    isRecording = state.detailRecordingAssetId != null,
+                                    castButton = { CastButton(castState, onCastConnect, onCastDisconnect, onCastActiveScan) },
+                                )
+                            }
                         }
 
                         profileEditor != null -> {
