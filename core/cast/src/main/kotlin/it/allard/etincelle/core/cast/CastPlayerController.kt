@@ -61,6 +61,7 @@ private const val CONNECT_TIMEOUT_MS = 30_000L
 private const val PLAYBACK_ERROR_MESSAGE = "Lecture impossible, réessayez"
 private const val CONNECT_ERROR_MESSAGE = "Connexion au Chromecast impossible"
 private const val TV_CONNECT_MESSAGE = "Connexion au téléviseur impossible"
+private const val TV_LOST_MESSAGE = "Connexion au téléviseur perdue"
 private const val TV_ACCOUNT_MESSAGE = "Ce téléviseur n'utilise pas le même compte"
 
 // Recover a failing cast by re-resolving fresh credentials (the receiver cannot refresh its own
@@ -715,10 +716,21 @@ class CastPlayerController(
     // it plays, and the phone stops showing a cast.
     private fun endTvCast() {
         val phonePlays = phoneStillPlays
+        // Handed over from this phone, which stopped for it, and not played by the TV as far as it
+        // said: with the link gone nothing says it ever will be.
+        val back = tvHandoverMs
         tvSession = null
         leaveTvPlayer()
         onSessionDisconnected()
         if (phonePlays) return
+        val item = currentItem
+        if (item != null && back >= 0) {
+            // It comes back here where it was rather than closing without a word, as when the TV says
+            // it cannot play it. In pause: the TV may be playing it all the same, out of reach.
+            onError?.invoke(TV_LOST_MESSAGE)
+            loadResolved(localPlayer, item, back, fromPlayWhenReady = false)
+            return
+        }
         currentItem = null
         onPlaybackStopped?.invoke()
     }
