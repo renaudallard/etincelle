@@ -199,4 +199,4 @@ data class UrlHolderDto(val url: String?)
 
 data class ConcurrencyDto(val heartbeatUrl: String?)
 
-data class ProgramDto(val title: String?)
+data class ProgramDto(val title: String?, val heading: String? = null)

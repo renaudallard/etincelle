@@ -124,7 +124,8 @@ fun EpgResponse.toGuidePage(): ContentPage {
 }
 
 private fun EpgProgramWithAssetsDto.toCard(channelId: String, channelLogo: String?, index: Int): ContentCard? {
-    val name = program?.title ?: program?.heading ?: return null
+    // The show's name: on an episode the title is the episode's own ("Episode 38").
+    val name = program?.heading ?: program?.title ?: return null
     val start = assets?.firstOrNull()?.accessRights?.startTime
     val time = localHourMinute(start)
     return ContentCard(
@@ -139,6 +140,7 @@ private fun EpgProgramWithAssetsDto.toCard(channelId: String, channelLogo: Strin
         seriesId = null,
         actionUrl = null,
         recordingAssetId = null,
+        caption = program?.title?.takeIf { it != name },
     )
 }
 

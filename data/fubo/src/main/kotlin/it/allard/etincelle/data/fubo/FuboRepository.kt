@@ -809,7 +809,8 @@ internal fun PlaybackResponse.toPlaybackSource(): PlaybackSource {
         // A DVR recording plays from the start like VOD, never the live edge, even though its manifest
         // can report live=true; without this a cast clamps it to the live-edge position and fails.
         isLive = type != "dvr" && (stream.live ?: (type == "live")),
-        title = program?.title,
+        // The show's name: on an episode the title is the episode's own.
+        title = program?.heading ?: program?.title,
         heartbeatUrl = heartbeat?.url,
         concurrencyHeartbeatUrl = concurrency?.heartbeatUrl,
         progressUrl = playhead?.url,

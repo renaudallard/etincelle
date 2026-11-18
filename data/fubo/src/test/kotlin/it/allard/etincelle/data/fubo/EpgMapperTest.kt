@@ -55,6 +55,29 @@ class EpgMapperTest {
     }
 
     @Test
+    fun `an episode is listed under its show's name, its own title below`() {
+        val response = EpgResponse(
+            listOf(
+                EpgEntryDto(
+                    EpgChannelDataDto(
+                        EpgChannelDto("600019", "France 2", "France 2", null),
+                        listOf(
+                            EpgProgramWithAssetsDto(EpgProgramDto("Episode 38", "Un si grand soleil", null), null),
+                            EpgProgramWithAssetsDto(EpgProgramDto("Le 20h", "Le 20h", null), null),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        val cards = response.toGuidePage().rails.single().cards
+        assertEquals("Un si grand soleil", cards[0].title)
+        assertEquals("Episode 38", cards[0].caption)
+        assertEquals("Le 20h", cards[1].title)
+        assertNull(cards[1].caption)
+    }
+
+    @Test
     fun `the programme on air is the one the guide has running on that channel`() {
         fun programme(start: String, end: String) =
             EpgProgramWithAssetsDto(EpgProgramDto("P", null, null), listOf(EpgAssetDto(EpgAccessRightsDto(start, end))))
