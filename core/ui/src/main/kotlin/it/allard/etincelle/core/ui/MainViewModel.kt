@@ -311,6 +311,8 @@ class MainViewModel(
         _state.update { it.copy(busy = true, error = it.error.takeIf { e -> e == AppError.Unauthorized.message }, pairingCode = null) }
         pairingJob = viewModelScope.launch {
             var rounds = 0
+            // A code was shown at least once: only then can the end of all this be one that expired.
+            var shown = false
             while (rounds < PAIRING_MAX_ROUNDS) {
                 rounds++
                 val pairing = orNull { repo.startCodeLogin() }
@@ -321,6 +323,7 @@ class MainViewModel(
                     delay(PAIRING_RETRY_MS)
                     continue
                 }
+                shown = true
                 _state.update { it.copy(busy = false, error = it.error.takeIf { e -> e != PAIRING_RETRY_NOTICE }, pairingCode = pairing.code) }
                 // Poll until confirmed or the code is about to expire (then loop to regenerate), by the
                 // time gone since it came, with a margin, rather than the wall clock against the
@@ -351,7 +354,7 @@ class MainViewModel(
             }
             // Polled across many codes without a confirmation: stop and let the user retry, so the loop
             // cannot keep polling forever (e.g. a TV left idle on the login screen).
-            _state.update { it.copy(busy = false, pairingCode = null, error = "Code expiré, réessayez.") }
+            _state.update { it.copy(busy = false, pairingCode = null, error = if (shown) "Code expiré, réessayez." else "Connexion impossible, réessayez.") }
         }
     }
 
@@ -378,7 +381,10 @@ class MainViewModel(
                 .onSuccess { _state.update { it.copy(busy = false, tvConnectInfo = "TV connectée") } }
                 .onFailure { e ->
                     if (e is CancellationException) throw e
-                    _state.update { it.copy(busy = false, tvConnectError = "Code invalide ou expiré") }
+                    // Not for want of a network, nor a session that has just died: only a code refused.
+                    if (e is AppError.Unauthorized && repo.currentSession() == null) return@onFailure applyFailure(e, "")
+                    val message = (e as? AppError.Network)?.message ?: "Code invalide ou expiré"
+                    _state.update { it.copy(busy = false, tvConnectError = message) }
                 }
         }
     }
