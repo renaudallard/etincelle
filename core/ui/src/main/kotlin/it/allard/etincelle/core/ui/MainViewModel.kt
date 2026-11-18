@@ -1107,7 +1107,8 @@ class MainViewModel(
     suspend fun liveProgramWindow(channelId: String): ProgramWindow? =
         runCatching { repo.liveProgramWindow(channelId) }.getOrNull()
 
-    fun openSettings() = _state.update { it.copy(settings = true, updateStatus = null) }
+    // Without the error of the page left: the settings screen shows what fails there.
+    fun openSettings() = _state.update { it.copy(settings = true, updateStatus = null, error = null) }
 
     fun closeSettings() = _state.update { it.copy(settings = false) }
 
