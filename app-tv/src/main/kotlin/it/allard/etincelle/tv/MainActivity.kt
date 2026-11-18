@@ -94,6 +94,9 @@ private const val TV_WAKING_MS = 30_000L
 // How long after the activity stops the screensaver's broadcast may come.
 private const val DREAM_GRACE_MS = 3_000L
 
+// How long the screen is kept on after a key from the phone: about what a TV waits before its screensaver.
+private const val PHONE_KEY_AWAKE_MS = 5 * 60_000L
+
 class MainActivity : ComponentActivity(), TvRemote.Screen {
 
     private val viewModel: MainViewModel by viewModels {
@@ -115,6 +118,9 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
     private var dreaming = false
     private val handler = Handler(Looper.getMainLooper())
     private val stopRemoteUnlessDreaming = Runnable { if (!dreaming) leave() }
+    // A key from the phone is no activity to Android, which would start the screensaver over someone
+    // browsing with the phone alone: the screen is kept on for a while after each.
+    private val letScreenRest = Runnable { window.decorView.keepScreenOn = false }
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
@@ -398,6 +404,9 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
             }
             RemoteMessages.KEY -> {
                 val name = message.optString(RemoteMessages.KEY_NAME)
+                window.decorView.keepScreenOn = true
+                handler.removeCallbacks(letScreenRest)
+                handler.postDelayed(letScreenRest, PHONE_KEY_AWAKE_MS)
                 when {
                     // The update prompt is a window of its own, which keys sent through this activity
                     // do not reach: they would act on the screen behind it. Its two answers are taken
@@ -575,6 +584,7 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
 
     override fun onDestroy() {
         handler.removeCallbacks(stopRemoteUnlessDreaming)
+        handler.removeCallbacks(letScreenRest)
         runCatching { unregisterReceiver(screenReceiver) }
         remote.detach(this)
         if (!remote.always) stopRemote()
