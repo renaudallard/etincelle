@@ -4,6 +4,7 @@
 package it.allard.etincelle.core.cast
 
 import android.content.Context
+import android.net.Uri
 import android.os.SystemClock
 import androidx.media3.cast.CastPlayer
 import androidx.media3.common.C
@@ -1023,6 +1024,8 @@ class CastPlayerController(
         super.disconnect()
     }
 
+    private fun Uri.bare(): Uri = buildUpon().clearQuery().fragment(null).build()
+
     // True when [a] and [b] are the same content (by its stable origin ids), ignoring the per-resolve
     // URL/token differences.
     private fun sameContent(a: MediaItem?, b: MediaItem): Boolean {
@@ -1058,7 +1061,9 @@ class CastPlayerController(
         if (player === tvPlayer && !tvStarted) return null
         val item = currentItem ?: return null
         val source = item.localConfiguration?.tag as? PlaybackSource ?: return null
-        if (source.resumeKey == null || player.currentMediaItem?.localConfiguration?.uri != item.localConfiguration?.uri) return null
+        // By the stream's address without what follows it: its query is the access token of the stream,
+        // which a receiver may keep out of the status it sends to everyone on the network.
+        if (source.resumeKey == null || player.currentMediaItem?.localConfiguration?.uri?.bare() != item.localConfiguration?.uri?.bare()) return null
         return Triple(source, player.currentPosition, player.duration)
     }
 
