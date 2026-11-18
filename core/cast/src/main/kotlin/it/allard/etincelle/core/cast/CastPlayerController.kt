@@ -889,6 +889,7 @@ class CastPlayerController(
 
     private fun leaveDirectPlayer() {
         directPlayer.detach()
+        directPositionMs = 0L
         if (_currentPlayer.value === directPlayer) _currentPlayer.value = localPlayer
     }
 
@@ -1397,6 +1398,8 @@ class CastPlayerController(
         castSessionId = null
         markConnecting(device.name)
         directPlayer.setItem(item)
+        // Where the cast was when it was lost, until the receiver says where it is.
+        directPositionMs = endingPosition.coerceAtLeast(0)
         _currentPlayer.value = directPlayer
         rejoinDirect(device)
     }
