@@ -63,6 +63,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -933,6 +934,11 @@ fun SearchScreen(
 ) {
     // Saved, so it is still there on coming back from a result opened over the search.
     var query by rememberSaveable { mutableStateOf("") }
+    // The results keep their scroll under the search that gave them and the page they are, the rails or
+    // one of them opened with "Tout voir": another search starts at its first results, not where the
+    // last ones were left, and Back from "Tout voir" finds the rails as they were.
+    var searchedFor by rememberSaveable { mutableStateOf("") }
+    val results = rememberSaveableStateHolder()
     val keyboard = LocalSoftwareKeyboardController.current
     Column(modifier.fillMaxSize()) {
         OutlinedTextField(
@@ -944,41 +950,44 @@ fun SearchScreen(
             // The keyboard would hide the results: close it once the search is sent.
             keyboardActions = KeyboardActions(onSearch = {
                 keyboard?.hide()
+                searchedFor = query
                 onSubmit(query)
             }),
             modifier = Modifier.fillMaxWidth().padding(16.dp),
         )
-        // A rail opened with "Tout voir" lists all its results in a grid, as elsewhere.
-        if (isGrid) {
-            GridContent(
-                rails = rails,
-                busy = busy,
-                error = error,
-                onCardClick = onCardClick,
-                refreshing = refreshing,
-                onRefresh = onRefresh,
-                columns = columns,
-                pageTitle = pageTitle,
-                modifier = Modifier.weight(1f),
-            )
-        } else if (searched && rails.isEmpty() && !busy && error == null) {
-            Text(
-                "Aucun résultat trouvé",
-                style = MaterialTheme.typography.titleMedium,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(32.dp),
-            )
-        } else {
-            PageContent(
-                rails = rails,
-                busy = busy,
-                error = error,
-                onCardClick = onCardClick,
-                onSeeAll = onSeeAll,
-                refreshing = refreshing,
-                onRefresh = onRefresh,
-                modifier = Modifier.weight(1f),
-            )
+        results.SaveableStateProvider("$searchedFor#${pageTitle.takeIf { isGrid }}") {
+            // A rail opened with "Tout voir" lists all its results in a grid, as elsewhere.
+            if (isGrid) {
+                GridContent(
+                    rails = rails,
+                    busy = busy,
+                    error = error,
+                    onCardClick = onCardClick,
+                    refreshing = refreshing,
+                    onRefresh = onRefresh,
+                    columns = columns,
+                    pageTitle = pageTitle,
+                    modifier = Modifier.weight(1f),
+                )
+            } else if (searched && rails.isEmpty() && !busy && error == null) {
+                Text(
+                    "Aucun résultat trouvé",
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(32.dp),
+                )
+            } else {
+                PageContent(
+                    rails = rails,
+                    busy = busy,
+                    error = error,
+                    onCardClick = onCardClick,
+                    onSeeAll = onSeeAll,
+                    refreshing = refreshing,
+                    onRefresh = onRefresh,
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
     }
 }
