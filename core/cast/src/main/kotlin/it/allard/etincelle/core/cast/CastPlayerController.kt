@@ -979,6 +979,9 @@ class CastPlayerController(
         }
     }
 
+    // Inside start(): what it reports is what coming back to the app found, not an event.
+    private var returning = false
+
     override fun stop() {
         // Pause the fallback while backgrounded. The transfer needs no special survival logic: on
         // return, a connected new device is loaded by onSessionConnected (different session id) and a
@@ -998,7 +1001,12 @@ class CastPlayerController(
     override fun start() {
         awaySince = 0L
         parkJob?.cancel()
-        super.start()
+        returning = true
+        try {
+            super.start()
+        } finally {
+            returning = false
+        }
         // The TV app left on the way out is driven again, unless something else got connected meanwhile.
         val tv = parkedTv ?: return
         parkedTv = null
@@ -1342,7 +1350,9 @@ class CastPlayerController(
         // own paths (that clear their session first). Without this, coming back to the foreground, where
         // start() reports no Play Services session, would wipe the state of one still playing, or of a
         // TV app being connected to, whose remote screen would close on it.
-        if (directConnected || tvSession != null) return
+        // Nor, on coming back, about a direct connection still being made, or made again after the
+        // Wi-Fi dropped: its "Connexion à …" would go until it is up.
+        if (directConnected || tvSession != null || (returning && directPending)) return
         val lostDevice = endingDevice.takeIf { !endingOnPurpose }
         endingDevice = null
         endingOnPurpose = false
