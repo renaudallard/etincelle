@@ -244,6 +244,10 @@ class CastPlayerController(
     // ended and playback is back on the phone (see connectTo).
     private var pendingDirectRoute: String? = null
 
+    // "Cet appareil" was picked while a Play Services session was still being started: it is ended as
+    // it comes up, before anything is sent to it (see giveUpStarting).
+    private var connectGivenUp = false
+
     // Our own scan's entry for the device a cast-out through Play Services is connecting to: used
     // directly if Play Services fails to start the session (see onSessionStartFailed).
     private var directFallback: DirectCastDevice? = null
@@ -455,6 +459,7 @@ class CastPlayerController(
         // TV was, then it is cast to the new device as usual, which picks up from there. A direct cast
         // still connecting is given up the same way.
         val toDirect = routeId.startsWith(DIRECT_ROUTE_PREFIX) || routeId.startsWith(TV_ROUTE_PREFIX)
+        connectGivenUp = false
         directFallback = null
         if (directPending || tvSession != null) returnToThisDevice()
         if (toDirect && super.isCastSessionActive) {
@@ -999,6 +1004,16 @@ class CastPlayerController(
             currentItem?.let { loadResolved(localPlayer, it, position, playWhenReady) }
             return
         }
+        if (giveUpStarting()) {
+            // A switch from another device was under way: playback comes back here now, not once the
+            // wait for the new device is over.
+            if (transferring) {
+                transferring = false
+                transferFallbackJob?.cancel()
+                swapTo(localPlayer, transferPosition, transferPlayWhenReady)
+            }
+            return
+        }
         // No live session to end (it already tore down): do nothing. Arming returnToPhoneOnEnd with no
         // onSessionEnded coming would leave it set to mis-fire a return-to-phone on a later cast.
         if (castContext.sessionManager.currentCastSession == null) return
@@ -1007,6 +1022,22 @@ class CastPlayerController(
         transferFallbackJob?.cancel()
         reResolveJob?.cancel()
         super.disconnect()
+    }
+
+    // Gives up a Play Services session that is still being started, as when a device was picked by
+    // mistake; true when there was one. It cannot be called off: the receiver was asked for already,
+    // and ending the session now would leave it running on the TV with nobody to stop it. The phone
+    // stops showing the connection at once, and the session is ended as it comes up, which closes the
+    // receiver (see onSessionConnected).
+    private fun giveUpStarting(): Boolean {
+        val session = castContext.sessionManager.currentCastSession
+        val starting = session?.isConnecting == true || (session == null && state.value.connecting)
+        if (!starting || tvSession != null || directPending) return false
+        connectGivenUp = true
+        directFallback = null
+        connectWatchdogJob?.cancel()
+        clearConnecting()
+        return true
     }
 
     /**
@@ -1030,6 +1061,7 @@ class CastPlayerController(
             if (!phonePlays) currentItem = null
             return
         }
+        if (giveUpStarting()) return
         // A plain disconnect (e.g. logout) stops casting without resuming on the phone; the session
         // end takes the quiet-stop path. Clear transfer/re-resolve so nothing ejects after teardown.
         returnToPhoneOnEnd = false
@@ -1186,6 +1218,7 @@ class CastPlayerController(
     // Some phones list a Chromecast through Play Services that they cannot actually connect to. When
     // our own scan found the same device, cast to it directly instead; the phone is still playing.
     override fun onSessionStartFailed() {
+        connectGivenUp = false
         val twin = directFallback
         directFallback = null
         onSessionDisconnected()
@@ -1197,6 +1230,15 @@ class CastPlayerController(
     }
 
     override fun onSessionConnected(session: CastSession) {
+        if (connectGivenUp) {
+            // Given up while it started: ended with its receiver once it is up, and never shown as
+            // connected. Coming back to the app gets here too, with the session still starting.
+            if (session.isConnected) {
+                connectGivenUp = false
+                castContext.sessionManager.endCurrentSession(true)
+            }
+            return
+        }
         super.onSessionConnected(session)
         watchReceiver(session)
         directFallback = null
