@@ -639,6 +639,12 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                 if (!timeline.isEmpty) {
                     timeline.getWindow(player.currentMediaItemIndex, window)
                     val fresh = window.windowStartTimeMs != C.TIME_UNSET && window.windowStartTimeMs != staleStart
+                    if (fresh && at < window.windowStartTimeMs) {
+                        // Away for longer than the stream can be rewound: what was airing is gone, and
+                        // the oldest point still held, hours back, is no place to come back to.
+                        player.seekToDefaultPosition()
+                        return@launch
+                    }
                     if (fresh && LivePlayback.seekToTimeIfReady(player, window, at)) return@launch
                 }
                 delay(RELOAD_SEEK_POLL_MS)
