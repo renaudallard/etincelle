@@ -113,7 +113,8 @@ got to between two of them, so the cast controller, the notification and the loc
 unchanged, and the cast bar opens a remote screen.
 
 The link costs the phone battery for as long as it is up, and the TV app may run for days. So when the
-phone app leaves the screen, the link is only kept while the TV plays what the phone started (what it
+phone app leaves the screen, the link is only kept, past the five seconds that what was tapped just
+before leaving may take to reach the TV, while the TV plays what the phone started (what it
 sent, or what the TV went on to from there, such as the next episode), which the notification then
 drives. Otherwise the phone closes it, also later when that playback stops, or has been paused or ended
 for ten minutes (a TV switched off pauses what it plays, and nothing closes a programme that has ended),

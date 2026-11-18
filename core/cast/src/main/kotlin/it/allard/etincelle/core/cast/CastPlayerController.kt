@@ -92,6 +92,10 @@ private const val VOLUME_STEP = 0.05
 // it while away from the screen: the time of a break, and more than the next episode takes to start.
 private const val TV_REST_MS = 10 * 60_000L
 
+// How long the phone app, once left, waits before letting go of a TV app that plays nothing of its own:
+// what was tapped just before leaving is still being worked out, and may be for that TV.
+private const val TV_PARK_GRACE_MS = 5_000L
+
 // When a direct cast's connection drops, wait this long before each reconnection attempt.
 private val REJOIN_DELAYS_MS = longArrayOf(1_000, 3_000, 6_000, 10_000)
 
@@ -153,8 +157,11 @@ class CastPlayerController(
     // Since when (elapsedRealtime ms) the TV has been paused or on a programme that has ended, as far
     // as it said since the app was last left: 0 while it plays, or has not said.
     private var tvRestingSince = 0L
-    // The app is away from the screen (between stop and start).
-    private var away = false
+    // Since when (elapsedRealtime ms) the app has been away from the screen (between stop and start), 0
+    // while it is on it.
+    private var awaySince = 0L
+    // Lets go of an idle TV app a moment after the app was left (see parkIdleTv).
+    private var parkJob: Job? = null
     // The TV app whose link was dropped while away, to connect to again on return (see parkIdleTv).
     private var parkedTv: RemoteTv? = null
 
@@ -165,6 +172,10 @@ class CastPlayerController(
     // The TV app is connected (not just connecting).
     private val tvConnected: Boolean
         get() = tvSession != null && state.value.toTvApp
+
+    /** Connected to a TV app that plays nothing this phone started: a link let go of once the app is left. */
+    val tvIdle: Boolean
+        get() = tvConnected && currentItem == null && !tvMovedOn
 
     // The direct session is connected (not just starting).
     private val directConnected: Boolean
@@ -573,12 +584,14 @@ class CastPlayerController(
     // runs, days maybe. It is only worth that while the TV plays what this phone started, which the
     // notification then drives: otherwise drop it, to connect again on return (see start). A TV left
     // paused, as when it is switched off, or on a programme that has ended, no longer plays it after a
-    // while. True when dropped.
+    // while. Not in the first moments away, when what was just asked for may still be on its way to the
+    // TV: dropping the link tells the pages that playback stopped, which gives that up. True when dropped.
     private fun parkIdleTv(): Boolean {
         val session = tvSession ?: return false
-        if (!away || !tvConnected) return false
-        val rested = tvRestingSince != 0L && SystemClock.elapsedRealtime() - tvRestingSince >= TV_REST_MS
-        if ((currentItem != null || tvMovedOn) && !rested) return false
+        val now = SystemClock.elapsedRealtime()
+        if (awaySince == 0L || now - awaySince < TV_PARK_GRACE_MS || !tvConnected) return false
+        val rested = tvRestingSince != 0L && now - tvRestingSince >= TV_REST_MS
+        if (!tvIdle && !rested) return false
         parkedTv = session.tv
         // Not to be sent again on return to a TV that may still hold it, paused.
         currentItem = null
@@ -864,15 +877,20 @@ class CastPlayerController(
         // return, a connected new device is loaded by onSessionConnected (different session id) and a
         // failed one re-arms its fallback. Nothing here can mis-fire because no flag is force-cleared.
         transferFallbackJob?.cancel()
-        away = true
+        awaySince = SystemClock.elapsedRealtime()
         // A break taken with the app on screen does not count: the wait starts on leaving.
         tvRestingSince = 0L
-        parkIdleTv()
+        parkJob?.cancel()
+        parkJob = scope.launch {
+            delay(TV_PARK_GRACE_MS)
+            parkIdleTv()
+        }
         super.stop()
     }
 
     override fun start() {
-        away = false
+        awaySince = 0L
+        parkJob?.cancel()
         super.start()
         // The TV app left on the way out is driven again, unless something else got connected meanwhile.
         val tv = parkedTv ?: return

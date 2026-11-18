@@ -391,8 +391,10 @@ class MainActivity : ComponentActivity() {
             it.trackSelectionParameters = it.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, true).build()
         }
         // Left with nothing playing, here or on a TV: the moment for an automatic update, which closes the app.
+        // A TV app connected with nothing of this phone's on it does not count: it is about to be let go of.
         val cast = castController?.state?.value
-        if (!isChangingConfigurations && viewModel.state.value.playing == null && cast?.isCasting != true && cast?.connecting != true) {
+        val casting = cast?.isCasting == true && castController?.tvIdle != true
+        if (!isChangingConfigurations && viewModel.state.value.playing == null && !casting && cast?.connecting != true) {
             installFetchedUpdate(viewModel)
         }
         super.onStop()
