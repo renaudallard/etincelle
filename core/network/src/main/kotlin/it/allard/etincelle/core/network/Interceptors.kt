@@ -62,9 +62,12 @@ class AuthInterceptor(
 
 private const val MFA_TOKEN_HEADER = "X-MFA-Token"
 
-// The app's own backend domains (Fubo's api-eu.fubo.tv plus the molotov.tv tenant) and any subdomain
-// the backend hands back in page/playhead/heartbeat URLs. Credentials are attached only to these.
-private fun String.isTrustedApiHost(): Boolean {
+/**
+ * Whether this host is one of the app's own backend domains (Fubo's api-eu.fubo.tv plus the molotov.tv
+ * tenant) or a subdomain of them, as the backend hands back in page/playhead/heartbeat URLs.
+ * Credentials are attached only to these.
+ */
+fun String.isTrustedApiHost(): Boolean {
     val h = lowercase()
     return h == "fubo.tv" || h.endsWith(".fubo.tv") || h == "molotov.tv" || h.endsWith(".molotov.tv")
 }

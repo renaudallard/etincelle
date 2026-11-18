@@ -33,6 +33,7 @@ import it.allard.etincelle.core.network.ProfilePick
 import it.allard.etincelle.core.network.ProgressStore
 import it.allard.etincelle.core.network.SessionManager
 import it.allard.etincelle.core.network.SessionStore
+import it.allard.etincelle.core.network.isTrustedApiHost
 import it.allard.etincelle.core.remote.RemoteProtocol
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
@@ -75,12 +76,15 @@ class FuboRepository(
     private val store: SessionStore,
     private val progress: ProgressStore,
     private val clock: () -> Long = System::currentTimeMillis,
+    // Whether a host is sent the session (see AuthInterceptor).
+    private val ownHost: (String) -> Boolean = { true },
 ) : MolotovRepository {
     constructor(network: NetworkClient, store: SessionStore, progress: ProgressStore) : this(
         network.retrofit.create(FuboApi::class.java),
         network.session,
         store,
         progress,
+        ownHost = String::isTrustedApiHost,
     )
 
     /**
@@ -636,6 +640,10 @@ class FuboRepository(
             block()
         } catch (e: HttpException) {
             if (e.code() != 401) throw e
+            // The pages name some urls themselves, and one outside the app's own hosts is not sent the
+            // session: its 401 says nothing about it.
+            val host = e.response()?.raw()?.request?.url?.host
+            if (host != null && !ownHost(host)) throw e
             // Nobody is signed in here, as when the saved session could not be read just now: the 401
             // says no more than that, and what is saved is not to be cleared over it.
             if (usedToken == null) throw AppError.Unauthorized

@@ -204,6 +204,26 @@ class FuboRepositoryTest {
     }
 
     @Test
+    fun `a 401 from a host that is not sent the session does not end it`() = runTest {
+        val api = Retrofit.Builder()
+            .baseUrl(server.url("/"))
+            .addConverterFactory(MoshiConverterFactory.create(Moshi.Builder().add(KotlinJsonAdapterFactory()).build()))
+            .build()
+            .create(FuboApi::class.java)
+        val guarded = FuboRepository(api, session, store, progress, ownHost = { false })
+        session.session = UserSession("AT", "RT", "u1", "p1")
+        store.saved = session.session
+        server.enqueue(MockResponse().setResponseCode(401))
+
+        val error = runCatching { guarded.loadHome() }.exceptionOrNull()
+
+        assertTrue(error is AppError)
+        assertEquals("AT", repo.currentSession()?.accessToken)
+        assertEquals("AT", store.saved?.accessToken)
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test
     fun `a refresh refused as unauthorised signs out`() = runTest {
         session.session = UserSession("OLD", "RT", "u1", "p1")
         store.saved = session.session
