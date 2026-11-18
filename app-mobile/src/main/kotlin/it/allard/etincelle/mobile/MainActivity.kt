@@ -675,6 +675,7 @@ private fun AppRoot(
                                 connectInfo = state.tvConnectInfo,
                                 connectError = state.tvConnectError,
                                 connecting = state.busy,
+                                error = state.error,
                             )
                         }
 

@@ -702,6 +702,8 @@ fun SettingsScreen(
     connectError: String? = null,
     connecting: Boolean = false,
     onProfiles: () -> Unit = {},
+    // What went wrong with something asked from this screen, such as the profiles that did not load.
+    error: String? = null,
     modifier: Modifier = Modifier,
 ) {
     var confirm by remember { mutableStateOf(false) }
@@ -721,6 +723,7 @@ fun SettingsScreen(
             Spacer(Modifier.width(8.dp))
             Text("Paramètres", style = MaterialTheme.typography.titleLarge)
         }
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp)) }
         Column(
             Modifier.fillMaxWidth().clickable(onClick = onProfiles).padding(horizontal = 16.dp, vertical = 12.dp),
         ) {
