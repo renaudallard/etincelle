@@ -449,6 +449,8 @@ class MainViewModel(
         if (tab == Tab.SEARCH) {
             // A page still loading for the tab being left must not land in the search results.
             cancelNav()
+            // With its results gone, the search has nothing to load again.
+            lastQuery = null
             _state.update { it.copy(tab = tab, error = null, backStack = emptyList()) }
             return
         }
@@ -548,6 +550,8 @@ class MainViewModel(
             reloadUrl != null -> reloadPageTop(reloadUrl, top?.isGrid ?: false, quiet)
             // A drilled-in page with no backing url (a synthetic see-all) has nothing to reload.
             s.backStack.size > 1 -> {}
+            // The tab's page never loaded: it is asked for as choosing the tab does.
+            top == null && s.tab != Tab.SEARCH -> selectTab(s.tab)
             s.tab == Tab.GUIDE -> reloadGuide(silent = true, quiet)
             s.tab == Tab.SEARCH -> lastQuery?.let { search(it, silent = true) }
             s.tab == Tab.HOME -> reloadHome(silent = true, quiet)

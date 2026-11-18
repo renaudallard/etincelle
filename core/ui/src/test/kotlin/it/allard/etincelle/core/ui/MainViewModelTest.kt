@@ -416,6 +416,20 @@ class MainViewModelTest {
     }
 
     @Test
+    fun aTabThatFailedToLoadLoadsOnRefresh() {
+        val repo = FakeRepo()
+        val vm = viewModel(repo)
+        repo.page = { throw java.io.IOException("down") }
+        vm.selectTab(Tab.MOVIES)
+        assertNull(vm.state.value.current)
+
+        repo.page = { url -> ContentPage("Films", emptyList(), reloadUrl = url) }
+        vm.refreshCurrent()
+
+        assertEquals("Films", vm.state.value.current?.title)
+    }
+
+    @Test
     fun profilesStillLoadingDoNotOpenOnceTheSettingsAreLeft() {
         val repo = FakeRepo()
         val vm = viewModel(repo)
