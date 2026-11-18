@@ -88,6 +88,10 @@ private const val LIVENESS_STALL_MS = 30_000L
 // One volume-key press steps the cast device volume by this fraction (the Cast SDK default).
 private const val VOLUME_STEP = 0.05
 
+// How long a TV app may stay paused, or on a programme that has ended, before the phone app lets go of
+// it while away from the screen: the time of a break, and more than the next episode takes to start.
+private const val TV_REST_MS = 10 * 60_000L
+
 // When a direct cast's connection drops, wait this long before each reconnection attempt.
 private val REJOIN_DELAYS_MS = longArrayOf(1_000, 3_000, 6_000, 10_000)
 
@@ -146,6 +150,9 @@ class CastPlayerController(
     // The TV went on by itself from what this phone sent (the next episode, another channel) and has
     // played ever since: the notification still drives it.
     private var tvMovedOn = false
+    // Since when (elapsedRealtime ms) the TV has been paused or on a programme that has ended, as far
+    // as it said since the app was last left: 0 while it plays, or has not said.
+    private var tvRestingSince = 0L
     // The app is away from the screen (between stop and start).
     private var away = false
     // The TV app whose link was dropped while away, to connect to again on return (see parkIdleTv).
@@ -501,6 +508,7 @@ class CastPlayerController(
         currentItem = item
         tvStarted = false
         tvMovedOn = false
+        tvRestingSince = 0L
         tvPlayer.setItem(item)
         _currentPlayer.value = tvPlayer
         session.send(message)
@@ -540,7 +548,10 @@ class CastPlayerController(
             parkIdleTv()
             return
         }
-        when (message.optString(RemoteMessages.STATE)) {
+        val state = message.optString(RemoteMessages.STATE)
+        val resting = state == RemoteMessages.STATE_PAUSED || state == RemoteMessages.STATE_ENDED
+        if (!resting) tvRestingSince = 0L else if (tvRestingSince == 0L) tvRestingSince = SystemClock.elapsedRealtime()
+        when (state) {
             RemoteMessages.STATE_PLAYING -> setReceiverPlaying(true)
             RemoteMessages.STATE_PAUSED, RemoteMessages.STATE_BUFFERING -> setReceiverPlaying(false)
             RemoteMessages.STATE_IDLE -> {
@@ -555,16 +566,22 @@ class CastPlayerController(
                 if (!parkIdleTv() && stopped) onPlaybackStopped?.invoke()
             }
         }
+        if (resting) parkIdleTv()
     }
 
     // Away from the screen, the link to a TV app keeps the phone from sleeping for as long as that TV
     // runs, days maybe. It is only worth that while the TV plays what this phone started, which the
-    // notification then drives: otherwise drop it, to connect again on return (see start). True when
-    // dropped.
+    // notification then drives: otherwise drop it, to connect again on return (see start). A TV left
+    // paused, as when it is switched off, or on a programme that has ended, no longer plays it after a
+    // while. True when dropped.
     private fun parkIdleTv(): Boolean {
         val session = tvSession ?: return false
-        if (!away || !tvConnected || currentItem != null || tvMovedOn) return false
+        if (!away || !tvConnected) return false
+        val rested = tvRestingSince != 0L && SystemClock.elapsedRealtime() - tvRestingSince >= TV_REST_MS
+        if ((currentItem != null || tvMovedOn) && !rested) return false
         parkedTv = session.tv
+        // Not to be sent again on return to a TV that may still hold it, paused.
+        currentItem = null
         stopTvSession(stopTv = false)
         // What the pages still held as playing, if anything, was no longer on the TV.
         onPlaybackStopped?.invoke()
@@ -603,6 +620,7 @@ class CastPlayerController(
         tvPlayer.detach()
         tvStarted = false
         tvMovedOn = false
+        tvRestingSince = 0L
         if (_currentPlayer.value === tvPlayer) _currentPlayer.value = localPlayer
     }
 
@@ -847,6 +865,8 @@ class CastPlayerController(
         // failed one re-arms its fallback. Nothing here can mis-fire because no flag is force-cleared.
         transferFallbackJob?.cancel()
         away = true
+        // A break taken with the app on screen does not count: the wait starts on leaving.
+        tvRestingSince = 0L
         parkIdleTv()
         super.stop()
     }

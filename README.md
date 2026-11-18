@@ -151,7 +151,7 @@ même version du protocole : mettez à jour les deux applications ensemble. Se d
 sur le téléviseur y ferme aussitôt la télécommande des téléphones de ce compte. Quand on quitte
 l'application du téléphone, il ne reste relié au téléviseur que tant que celui-ci lit ce que le
 téléphone a lancé (ou ce que le téléviseur a enchaîné ensuite), pour que la notification continue de
-le piloter ; sinon il referme la liaison pour ménager sa batterie, et la rétablit de lui-même au
+le piloter, et pas au-delà de dix minutes de pause ou après la fin du programme ; sinon il referme la liaison pour ménager sa batterie, et la rétablit de lui-même au
 retour dans l'application. Pour la même raison, le téléviseur ne tient le téléphone au courant que
 lorsque quelque chose change, et toutes les dix secondes sinon.
 
