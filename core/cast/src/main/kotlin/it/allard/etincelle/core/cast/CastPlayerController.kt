@@ -1061,7 +1061,17 @@ class CastPlayerController(
             if (!phonePlays) currentItem = null
             return
         }
-        if (giveUpStarting()) return
+        if (giveUpStarting()) {
+            // A switch from another device was under way: nothing of it is brought back to the phone
+            // here, now or once the wait for the new device would have run out.
+            if (transferring) {
+                transferring = false
+                transferFallbackJob?.cancel()
+                reResolveJob?.cancel()
+                stopQuietly()
+            }
+            return
+        }
         // A plain disconnect (e.g. logout) stops casting without resuming on the phone; the session
         // end takes the quiet-stop path. Clear transfer/re-resolve so nothing ejects after teardown.
         returnToPhoneOnEnd = false
