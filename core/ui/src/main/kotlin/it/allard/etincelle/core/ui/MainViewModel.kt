@@ -994,7 +994,8 @@ class MainViewModel(
             runCatching { repo.saveFavoriteOrder(order.save, order.channels.map { it.id }) }
                 .onSuccess {
                     _state.update { it.copy(busy = false, favoriteOrder = null, info = "Ordre des favoris enregistré") }
-                    refreshCurrent()
+                    // In the place of a reload already on its way, which may predate the save.
+                    reloadCurrent(quiet = false, restart = true)
                 }
                 .onFailure { e -> applyFailure(e, "Échec de l'enregistrement des favoris") }
         }
