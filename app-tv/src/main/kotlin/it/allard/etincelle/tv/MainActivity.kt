@@ -109,6 +109,9 @@ private const val RELOAD_SEEK_TRIES = 120
 // How long the screen is kept on after a key from the phone: about what a TV waits before its screensaver.
 private const val PHONE_KEY_AWAKE_MS = 5 * 60_000L
 
+// How long the app is away over a programme before an automatic update is installed all the same.
+private const val AWAY_INSTALL_MS = 60 * 60_000L
+
 // The key the sign-in screen keeps its state under.
 private const val LOGIN_STATE = "LOGIN"
 
@@ -145,6 +148,9 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
     private var dreaming = false
     private val handler = Handler(Looper.getMainLooper())
     private val stopRemoteUnlessDreaming = Runnable { if (!dreaming) leave() }
+    private val installOnceAway = Runnable {
+        if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) installFetchedUpdate(viewModel)
+    }
     // A key from the phone is no activity to Android, which would start the screensaver over someone
     // browsing with the phone alone: the screen is kept on for a while after each.
     private val letScreenRest = Runnable { window.decorView.keepScreenOn = false }
@@ -610,6 +616,7 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
     override fun onStart() {
         super.onStart()
         handler.removeCallbacks(stopRemoteUnlessDreaming)
+        handler.removeCallbacks(installOnceAway)
         remote.start()
         RemoteKeepAliveService.start(this)
         // Back in the foreground: any memory pressure that shrank the buffer has passed.
@@ -729,7 +736,16 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
         // Whatever the pages say: a programme the phone stopped behind the screensaver is still loaded,
         // its screen being taken down only once the app is shown again.
         unload()
-        if (viewModel.state.value.playing == null) installFetchedUpdate(viewModel)
+        if (viewModel.state.value.playing == null) {
+            installFetchedUpdate(viewModel)
+        } else {
+            // A TV is mostly left from the player, with Home or its power button: waiting for a leave
+            // with nothing playing, an automatic update would never be installed, and is never offered.
+            // So it also goes in once the app has been away for an hour over a programme, which is
+            // let go of by then and has its place saved.
+            handler.removeCallbacks(installOnceAway)
+            handler.postDelayed(installOnceAway, AWAY_INSTALL_MS)
+        }
     }
 
     // Brought back to the front with the screen to be turned on, this activity ends the screensaver or
@@ -760,6 +776,7 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
 
     override fun onDestroy() {
         handler.removeCallbacks(stopRemoteUnlessDreaming)
+        handler.removeCallbacks(installOnceAway)
         handler.removeCallbacks(letScreenRest)
         runCatching { unregisterReceiver(screenReceiver) }
         val shown = remote.shows(this)
