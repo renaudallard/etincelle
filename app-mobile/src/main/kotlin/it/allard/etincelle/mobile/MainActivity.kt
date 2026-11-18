@@ -450,6 +450,9 @@ private const val CAST_PROGRESS_MS = 15_000L
 // How often the next-episode countdown moves.
 private const val UP_NEXT_TICK_MS = 250L
 
+// How often a programme started over is checked for its live window being known.
+private const val START_OVER_POLL_MS = 500L
+
 /** Brand-pack vector icon for the tabs it covers; the rest keep their emoji glyph. */
 @DrawableRes
 private fun tabIconRes(tab: Tab): Int? = when (tab) {
@@ -925,6 +928,20 @@ private fun PlayerSurface(
     // Local only: a cast is told where to start in its LOAD, and opening the cast controls later must
     // not send it back to the show's start. Once only ([startOver]), not each time this player comes back.
     var pendingStartOver by remember(source) { mutableStateOf(startOver && secure && source.isLive && source.liveRewindOffsetMs > 0L) }
+    // A programme started over begins at the live edge and is taken back to its start once the live
+    // window is known, with the app on screen or not: left before that, it would go on at the edge in
+    // the background and jump back on return.
+    LaunchedEffect(currentPlayer, source) {
+        val window = Timeline.Window()
+        while (pendingStartOver) {
+            if (LivePlayback.seekToProgramStartIfReady(currentPlayer, window, programWindow)) {
+                pendingStartOver = false
+                onStartedOver()
+            } else {
+                delay(START_OVER_POLL_MS)
+            }
+        }
+    }
     // Per source, not per kind: another live channel has its own programme, rewind and channel to ask.
     // Only while the app is on screen: it draws the bar, and asks the guide for the programme that follows.
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -941,10 +958,6 @@ private fun PlayerSurface(
                 behindLive = LivePlayback.behindLiveEdgeMs(currentPlayer, liveWindow) > LivePlayback.LIVE_REWIND_THRESHOLD_MS
                 if (showBar) {
                     barGeometry = LivePlayback.liveBarGeometry(currentPlayer, liveWindow, programWindow)
-                    if (pendingStartOver && LivePlayback.seekToProgramStartIfReady(currentPlayer, liveWindow, programWindow)) {
-                        pendingStartOver = false
-                        onStartedOver()
-                    }
                     // Rollover: once the live edge passes the show's end, re-scope to the now-current
                     // programme. Throttled, and only adopted when it actually advances, so a backend that
                     // lags the boundary is not polled every second.
