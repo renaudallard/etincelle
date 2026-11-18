@@ -177,6 +177,9 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
     override fun handleSeek(mediaItemIndex: Int, positionMs: Long, seekCommand: Int): ListenableFuture<*> {
         val session = session ?: return Futures.immediateVoidFuture()
         freeze()
+        // Where the viewer chose to go, not back to the rewind the cast was started with, should that
+        // still wait for the receiver to play.
+        pendingRewindMs = 0
         // An unset position is the default one: the live edge, or the start of on-demand content.
         val target = when {
             live -> times.liveSeekTarget(positionMs)
