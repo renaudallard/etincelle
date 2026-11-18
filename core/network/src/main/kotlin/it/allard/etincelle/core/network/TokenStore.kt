@@ -7,11 +7,18 @@ import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStore
 import it.allard.etincelle.core.model.UserSession
 import kotlinx.coroutines.flow.first
 
-private val Context.dataStore by preferencesDataStore(name = "etincelle_session")
+// A file that no longer reads, as after a power cut while it was written, starts over empty: every
+// read and write would fail on it otherwise, and nobody could sign in again.
+private val Context.dataStore by preferencesDataStore(
+    name = "etincelle_session",
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+)
 
 /** Persists the authenticated session across app launches. */
 class TokenStore(private val context: Context) : SessionStore {
