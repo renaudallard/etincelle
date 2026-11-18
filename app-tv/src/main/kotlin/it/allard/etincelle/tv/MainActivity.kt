@@ -374,7 +374,9 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                             )
                         }
                     }
-                    state.update?.takeIf { !it.quiet }?.let { up ->
+                    // Not over a programme: it comes up at each return to the app, and would take the
+                    // first OK meant for the player.
+                    state.update?.takeIf { !it.quiet && playing == null }?.let { up ->
                         TvUpdateDialog(
                             up, state.updateProgress, state.updateError,
                             onInstall = { installUpdate(viewModel) },
@@ -465,8 +467,9 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                 when {
                     // The update prompt is a window of its own, which keys sent through this activity
                     // do not reach: they would act on the screen behind it. Its two answers are taken
-                    // here, OK for Installer, which it opens on, and Retour for Plus tard.
-                    viewModel.state.value.update?.quiet == false -> when (name) {
+                    // here, OK for Installer, which it opens on, and Retour for Plus tard. It is not shown
+                    // over a programme.
+                    viewModel.state.value.let { it.update?.quiet == false && it.playing == null } -> when (name) {
                         "ok" -> installUpdate(viewModel)
                         "back" -> if (viewModel.state.value.updateProgress == null) viewModel.dismissUpdate()
                     }
