@@ -23,6 +23,7 @@ class NetworkClient(
         .addInterceptor(RetryInterceptor())
         .addInterceptor(FuboHeadersInterceptor(device))
         .addInterceptor(AuthInterceptor(session))
+        .addNetworkInterceptor(RedirectGuardInterceptor())
         .apply {
             if (debug) {
                 addInterceptor(

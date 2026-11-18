@@ -85,6 +85,32 @@ class InterceptorTest {
     }
 
     @Test
+    fun `a redirect to an untrusted host carries no account header`() {
+        session.session = UserSession("AT", "RT", "user1", "profile1")
+        // The same server under two names: only the first is trusted.
+        val trusted = server.hostName
+        val elsewhere = server.url("/there").newBuilder().host(if (trusted == "127.0.0.1") "localhost" else "127.0.0.1").build()
+        val guarded = OkHttpClient.Builder()
+            .addInterceptor(AuthInterceptor(session) { it == trusted })
+            .addNetworkInterceptor(RedirectGuardInterceptor { it == trusted })
+            .build()
+        server.enqueue(MockResponse().setResponseCode(302).setHeader("Location", elsewhere.toString()))
+        server.enqueue(MockResponse().setBody("{}"))
+
+        guarded.newCall(Request.Builder().url(server.url("/here")).header("X-MFA-Token", "MT").build()).execute().close()
+
+        val first = server.takeRequest()
+        assertEquals("Bearer AT", first.getHeader("authorization"))
+        assertEquals("user1", first.getHeader("x-user-id"))
+        val hop = server.takeRequest()
+        assertEquals("/there", hop.path)
+        assertEquals(null, hop.getHeader("authorization"))
+        assertEquals(null, hop.getHeader("x-user-id"))
+        assertEquals(null, hop.getHeader("x-profile-id"))
+        assertEquals(null, hop.getHeader("X-MFA-Token"))
+    }
+
+    @Test
     fun `omits the two-factor token for an untrusted host`() {
         val guarded = OkHttpClient.Builder().addInterceptor(AuthInterceptor(session)).build()
         server.enqueue(MockResponse().setBody("{}"))

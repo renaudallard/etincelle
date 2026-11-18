@@ -60,7 +60,25 @@ class AuthInterceptor(
     }
 }
 
+/**
+ * Keeps the account's headers from following a redirect off the app's own hosts. [AuthInterceptor] sees
+ * a call once, before any redirect: each hop after it is sent the same headers, of which OkHttp only
+ * drops Authorization when the host changes. Runs on the network, so on every hop.
+ */
+class RedirectGuardInterceptor(
+    private val isTrustedHost: (String) -> Boolean = String::isTrustedApiHost,
+) : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val request = chain.request()
+        if (isTrustedHost(request.url.host)) return chain.proceed(request)
+        val bare = request.newBuilder()
+        for (header in ACCOUNT_HEADERS) bare.removeHeader(header)
+        return chain.proceed(bare.build())
+    }
+}
+
 private const val MFA_TOKEN_HEADER = "X-MFA-Token"
+private val ACCOUNT_HEADERS = listOf("authorization", MFA_TOKEN_HEADER, "x-user-id", "x-profile-id")
 
 /**
  * Whether this host is one of the app's own backend domains (Fubo's api-eu.fubo.tv plus the molotov.tv
