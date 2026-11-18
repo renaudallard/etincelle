@@ -1398,7 +1398,10 @@ class CastPlayerController(
                 // goes on. Loaded again, it would start where the receiver was, which is nowhere yet.
                 keepPhonePlaying()
             } else {
-                swapTo(localPlayer, endingPosition, endingPlayWhenReady)
+                // On its way to the device picked instead, the phone only holds the place: playing
+                // meanwhile, it would be heard for those seconds, and go on aloud with the app left
+                // should that device not answer.
+                swapTo(localPlayer, endingPosition, endingPlayWhenReady && pendingDirectRoute == null)
             }
             pendingDirectRoute?.let {
                 pendingDirectRoute = null
