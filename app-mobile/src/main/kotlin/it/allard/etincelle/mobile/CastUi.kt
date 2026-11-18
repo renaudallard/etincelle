@@ -117,7 +117,8 @@ fun CastButton(
 /**
  * The persistent cast bar shown at the bottom while a stream plays (or is being sent) on a
  * Chromecast. A Chromecast glyph fills from the bottom while connecting and snaps full once the
- * receiver actually plays, next to a "Connexion à …" / "Lecture sur …" label.
+ * receiver actually plays, next to a "Connexion à …" / "Lecture sur …" label, or "Connecté à …" when
+ * nothing plays there, as on a TV app the phone only drives.
  */
 @Composable
 fun CastStatusBar(state: CastUiState, onClick: (() -> Unit)?, modifier: Modifier = Modifier) {
@@ -126,7 +127,11 @@ fun CastStatusBar(state: CastUiState, onClick: (() -> Unit)?, modifier: Modifier
     // receiver reports playback, and bounded by a watchdog), so the label follows it directly even
     // when the old device of a device-to-device switch is still reporting playback.
     val connecting = state.connecting
-    val label = if (connecting) "Connexion à $name…" else "Lecture sur $name"
+    val label = when {
+        connecting -> "Connexion à $name…"
+        state.playing -> "Lecture sur $name"
+        else -> "Connecté à $name"
+    }
     // Tapping the bar opens the full playback controls (the expand glyph hints it). When [onClick] is
     // null those controls cannot open (no playing source, e.g. a cast resumed after an app kill), so
     // the bar is plain, non-clickable status with no affordance.

@@ -564,8 +564,9 @@ class CastPlayerController(
         if (!resting) tvRestingSince = 0L else if (tvRestingSince == 0L) tvRestingSince = SystemClock.elapsedRealtime()
         when (state) {
             RemoteMessages.STATE_PLAYING -> setReceiverPlaying(true)
-            RemoteMessages.STATE_PAUSED, RemoteMessages.STATE_BUFFERING -> setReceiverPlaying(false)
+            RemoteMessages.STATE_PAUSED, RemoteMessages.STATE_BUFFERING, RemoteMessages.STATE_ENDED -> setReceiverPlaying(false)
             RemoteMessages.STATE_IDLE -> {
+                setReceiverPlaying(false)
                 tvMovedOn = false
                 // Stopped on the TV (Back from its player): the phone drops what it was playing too.
                 val stopped = tvStarted && currentItem != null
