@@ -580,7 +580,7 @@ class CastPlayerController(
                 val position = if (phonePlays) localPlayer.currentPosition else handoffPositionMs
                 playOnTv(item, position, rewind)
                 if (phonePlays) tvHandoverMs = position
-                runCatching { localPlayer.stop() }
+                stopPhonePlayer()
             } else {
                 clearConnecting()
                 // The app was left while this was connecting.
@@ -781,7 +781,8 @@ class CastPlayerController(
             // Casting out a rewound live stream: resume the TV that far behind the edge.
             val isLive = (item.localConfiguration?.tag as? PlaybackSource)?.isLive == true
             val rewind = if (isLive) LivePlayback.castRewindOffsetMs(localPlayer, liveWindow) else 0L
-            val position = localPlayer.currentPosition
+            // Where the phone is, or was asked to start when it has not loaded yet.
+            val position = if (phoneStillPlays) localPlayer.currentPosition else handoffPositionMs
             if (loadDirect(session, item, position, resolve = true, rewindMs = rewind) == false && directSession === session) {
                 // The TV did not take it: end the session, the phone keeps playing.
                 stopDirect()
@@ -847,7 +848,7 @@ class CastPlayerController(
             directFailed = false
             _currentPlayer.value = directPlayer
             // The phone stops once the TV has the stream, whichever load got it there.
-            runCatching { localPlayer.stop() }
+            stopPhonePlayer()
         } else {
             // The TV keeps what it had, and so does the session: picking the programme again retries it.
             currentItem = previous
@@ -1196,7 +1197,7 @@ class CastPlayerController(
     private fun stopQuietly() {
         clearDeferredStop()
         runCatching { castPlayer.stop() }
-        runCatching { localPlayer.stop() }
+        stopPhonePlayer()
         currentItem = null
         castSessionId = null
         _currentPlayer.value = localPlayer
@@ -1644,10 +1645,21 @@ class CastPlayerController(
         _currentPlayer.value = localPlayer
     }
 
+    // Stops the phone's own player as another device takes over, and empties it: a stopped player
+    // still holds its programme, which the notification then goes on showing once the cast has ended
+    // elsewhere, and which Play on it, or on a headset, would start on the phone with no screen for it
+    // and nothing able to stop it. What may come back here is in currentItem.
+    private fun stopPhonePlayer() {
+        runCatching {
+            localPlayer.stop()
+            localPlayer.clearMediaItems()
+        }
+    }
+
     // Cut the pending source now (the target started, or a new swap superseded this one).
     private fun clearDeferredStop() {
         deferStopListener?.let { deferStopTarget?.removeListener(it) }
-        deferStopSource?.let { runCatching { it.stop() } }
+        deferStopSource?.let { if (it === localPlayer) stopPhonePlayer() else runCatching { it.stop() } }
         deferStopSource = null
         deferStopTarget = null
         deferStopListener = null
