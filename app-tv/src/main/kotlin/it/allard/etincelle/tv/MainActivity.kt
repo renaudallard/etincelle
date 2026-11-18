@@ -54,6 +54,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.withResumed
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.Player
@@ -386,7 +387,7 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                     state.update?.takeIf { !it.quiet && playing == null }?.let { up ->
                         TvUpdateDialog(
                             up, state.updateProgress, state.updateError,
-                            onInstall = { installUpdate(viewModel) },
+                            onInstall = { installUpdate(viewModel) { lifecycle.withResumed {} } },
                             onDismiss = viewModel::dismissUpdate,
                         )
                     }
@@ -482,7 +483,7 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                     // here, OK for Installer, which it opens on, and Retour for Plus tard. It is not shown
                     // over a programme.
                     viewModel.state.value.let { it.update?.quiet == false && it.playing == null } -> when (name) {
-                        "ok" -> installUpdate(viewModel)
+                        "ok" -> installUpdate(viewModel) { lifecycle.withResumed {} }
                         "back" -> if (viewModel.state.value.updateProgress == null) viewModel.dismissUpdate()
                     }
                     // Straight to what handles Back: from Android 16 an activity no longer turns a Back

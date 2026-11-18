@@ -1282,6 +1282,8 @@ class MainViewModel(
                     null
                 }
             } catch (e: CancellationException) {
+                // Given up, as when the screen it waited for is gone: the prompt is not left counting.
+                _state.update { it.copy(updateProgress = null) }
                 throw e
             } catch (e: Exception) {
                 "Installation impossible, réessayez."

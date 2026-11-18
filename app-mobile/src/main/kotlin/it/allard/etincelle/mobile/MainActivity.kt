@@ -69,6 +69,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.withResumed
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.Player
@@ -320,7 +321,7 @@ class MainActivity : ComponentActivity() {
                 state.update?.takeIf { !it.quiet }?.let { up ->
                     UpdateDialog(
                         up, state.updateProgress, state.updateError,
-                        onInstall = { installUpdate(viewModel) },
+                        onInstall = { installUpdate(viewModel) { lifecycle.withResumed {} } },
                         onDismiss = viewModel::dismissUpdate,
                     )
                 }

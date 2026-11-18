@@ -21,9 +21,11 @@ import java.io.File
 /**
  * Installs the update [viewModel] proposes: downloads it, then hands it to the system installer, which
  * asks the user to confirm. When this app may not install apps yet, opens the system page that allows
- * it instead, and the prompt says to come back.
+ * it instead, and the prompt says to come back. [inFront] returns once the app is on screen: the
+ * system's confirmation can only come up over it, and an install handed over with the app left during
+ * the download was dropped without a word.
  */
-fun Activity.installUpdate(viewModel: MainViewModel) {
+fun Activity.installUpdate(viewModel: MainViewModel, inFront: suspend () -> Unit = {}) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
         // The closest page the device has: this app's own switch, the list of apps that may install
         // apps, then the security or main settings. Some TVs have none of the first two, and asking
@@ -47,7 +49,10 @@ fun Activity.installUpdate(viewModel: MainViewModel) {
         return
     }
     val app = applicationContext
-    viewModel.installUpdate(File(cacheDir, "update.apk")) { installApk(app, it) }
+    viewModel.installUpdate(File(cacheDir, "update.apk")) {
+        inFront()
+        installApk(app, it)
+    }
 }
 
 /**
