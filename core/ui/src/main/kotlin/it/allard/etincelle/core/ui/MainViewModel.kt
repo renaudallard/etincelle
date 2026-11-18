@@ -1145,6 +1145,10 @@ class MainViewModel(
      */
     fun installFetchedUpdate(install: suspend (File, String) -> Unit) {
         val store = auto ?: return
+        // Not over something under way: what was just asked for, or a sign-in whose code is being
+        // fetched from another app or typed on another device, which closing the app would lose.
+        val state = _state.value
+        if (state.busy || state.mfa != null || state.pairingCode != null) return
         val info = _state.value.update?.takeIf { it.quiet && it.version == fetched } ?: return
         fetched = null
         viewModelScope.launch {

@@ -12,6 +12,7 @@ import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.ContentRail
 import it.allard.etincelle.core.model.DrmSpec
 import it.allard.etincelle.core.model.LoginResult
+import it.allard.etincelle.core.model.MfaChallenge
 import it.allard.etincelle.core.model.PlayKind
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramDetail
@@ -364,6 +365,22 @@ class MainViewModelTest {
     }
 
     @Test
+    fun anUpdateIsNotInstalledOverASignInWaitingForItsCode() = withUpdate { store, info ->
+        val repo = FakeRepo()
+        repo.restore = { false }
+        repo.signIn = { LoginResult.CodeRequired(MfaChallenge("token", "Code", null, "Code", "code", 6, "Valider", "u", emptyMap(), null, null)) }
+        val vm = MainViewModel(repo, CHECKER, store)
+        vm.take(info)
+        waitFor { store.file.exists() }
+        vm.login("a@b.c", "password")
+        assertTrue(vm.state.value.mfa != null)
+
+        vm.installFetchedUpdate { _, _ -> error("installed over a sign-in") }
+
+        assertTrue(store.file.exists())
+    }
+
+    @Test
     fun anUpdateIsProposedWhenAutomaticUpdatesAreOffOrNotPossible() = withUpdate { store, info ->
         store.enabled = false
         val vm = MainViewModel(FakeRepo(), CHECKER, store)
@@ -511,7 +528,8 @@ class MainViewModelTest {
         var favorite: suspend () -> Unit = {}
         override suspend fun toggleFavorite(action: RecordAction) = favorite()
         override suspend fun restoreSession() = restore()
-        override suspend fun login(email: String, password: String): LoginResult = LoginResult.SignedIn(session!!)
+        var signIn: suspend () -> LoginResult = { LoginResult.SignedIn(session!!) }
+        override suspend fun login(email: String, password: String): LoginResult = signIn()
         override fun currentSession() = session
         override suspend fun loadHome() = home()
         override suspend fun loadPage(url: String) = page(url)
