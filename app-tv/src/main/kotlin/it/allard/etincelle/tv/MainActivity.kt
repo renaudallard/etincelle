@@ -121,6 +121,8 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
     // on return. A live one is taken up again at what was airing then, noted as its time of day
     // (epoch ms) with the start of the live window it was read in.
     private var unloaded = false
+    // The player was stopped for it, and is to be prepared again on return.
+    private var stoppedAway = false
     private var resumeLiveAtMs: Long? = null
     private var unloadedWindowStartMs = C.TIME_UNSET
     private var reloadJob: Job? = null
@@ -261,6 +263,7 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                             TvPlayerSurface(
                                 playing, exo, viewModel::savePlaybackPosition, viewModel::reportProgress,
                                 viewModel::liveProgramWindow, viewModel::reResolve, viewModel::playbackFailed, viewModel::playUpNext,
+                                away = { unloaded },
                             )
                         }
 
@@ -580,7 +583,7 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
             unloaded = false
             // Where it was. A stream whose address went stale meanwhile fails here and is brought back
             // by the recovery, as any other.
-            if (same) reload()
+            if (same && stoppedAway) reload()
         }
         if (pausedForBackground) {
             pausedForBackground = false
@@ -594,11 +597,16 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
     // the player keeps what it plays and where.
     private fun unload() {
         val player = player ?: return
-        if (unloaded || player.playbackState == Player.STATE_IDLE) return
-        // The player keeps its position in the live window, which will have moved on by the time it is
-        // loaded again: the same position would then be a later programme. What was airing is noted.
+        if (unloaded) return
+        unloaded = true
+        stoppedAway = false
         resumeLiveAtMs = null
         unloadedWindowStartMs = C.TIME_UNSET
+        // Nothing loaded, or a stream that failed and is being brought back: that waits for the app to
+        // come back (see TvPlayerSurface), and loads the stream again by itself then.
+        if (player.playbackState == Player.STATE_IDLE) return
+        // The player keeps its position in the live window, which will have moved on by the time it is
+        // loaded again: the same position would then be a later programme. What was airing is noted.
         val timeline = player.currentTimeline
         if (player.isCurrentMediaItemLive && !timeline.isEmpty) {
             timeline.getWindow(player.currentMediaItemIndex, remoteWindow)
@@ -608,7 +616,7 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
             }
         }
         player.stop()
-        unloaded = true
+        stoppedAway = true
     }
 
     // Loads again what was let go of as the app was left, and takes a live stream back to what was
@@ -659,7 +667,10 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
     // an automatic update, which closes the app.
     private fun leave() {
         if (!remote.always) stopRemote()
-        if (viewModel.state.value.playing == null) installFetchedUpdate(viewModel) else unload()
+        // Whatever the pages say: a programme the phone stopped behind the screensaver is still loaded,
+        // its screen being taken down only once the app is shown again.
+        unload()
+        if (viewModel.state.value.playing == null) installFetchedUpdate(viewModel)
     }
 
     // Brought back to the front with the screen to be turned on, this activity ends the screensaver or
@@ -711,6 +722,8 @@ private fun TvPlayerSurface(
     reResolve: suspend (PlaybackSource) -> PlaybackSource?,
     onPlaybackFailed: (PlaybackSource) -> Unit,
     onPlayNext: () -> Unit = {},
+    // The app was left: nothing is to be loaded until it is back.
+    away: () -> Boolean = { false },
 ) {
     val view = LocalView.current
     val scope = rememberCoroutineScope()
@@ -732,7 +745,7 @@ private fun TvPlayerSurface(
         if (source.startPositionMs > 0) player.setMediaItem(item, source.startPositionMs) else player.setMediaItem(item)
         player.prepare()
         player.playWhenReady = true
-        val recovery = PlaybackRecovery(player, scope, source, reResolve) { onPlaybackFailed(source) }
+        val recovery = PlaybackRecovery(player, scope, source, reResolve, away) { onPlaybackFailed(source) }
         player.addListener(recovery)
         onDispose {
             player.removeListener(recovery)
