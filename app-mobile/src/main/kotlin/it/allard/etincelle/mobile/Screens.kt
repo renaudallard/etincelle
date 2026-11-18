@@ -655,7 +655,15 @@ fun FavoriteOrderScreen(
             )
         }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
-        LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(vertical = 8.dp)) {
+        val listState = rememberLazyListState()
+        // The list holds on to its first row shown and follows it when it moves, which takes the row
+        // just moved up to the top out of sight, or the list along with the one sent down: it is told
+        // to stay where it is.
+        val move = { from: Int, to: Int ->
+            listState.requestScrollToItem(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
+            onMove(from, to)
+        }
+        LazyColumn(Modifier.weight(1f), state = listState, contentPadding = PaddingValues(vertical = 8.dp)) {
             itemsIndexed(order.channels, key = { _, c -> c.id }) { i, channel ->
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
@@ -669,8 +677,8 @@ fun FavoriteOrderScreen(
                         contentScale = ContentScale.Fit,
                     )
                     Text(channel.name, modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
-                    TextButton(onClick = { onMove(i, i - 1) }, enabled = !busy && i > 0) { Text("▲") }
-                    TextButton(onClick = { onMove(i, i + 1) }, enabled = !busy && i < order.channels.size - 1) { Text("▼") }
+                    TextButton(onClick = { move(i, i - 1) }, enabled = !busy && i > 0) { Text("▲") }
+                    TextButton(onClick = { move(i, i + 1) }, enabled = !busy && i < order.channels.size - 1) { Text("▼") }
                 }
             }
         }
