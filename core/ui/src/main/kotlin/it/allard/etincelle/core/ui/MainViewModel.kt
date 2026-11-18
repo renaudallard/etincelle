@@ -400,6 +400,7 @@ class MainViewModel(
     // it stays an in-place banner. Local prefs survive the reset.
     private fun applyFailure(e: Throwable, fallback: String) {
         if (e is AppError.Unauthorized && repo.currentSession() == null) {
+            lastQuery = null
             _state.update { UiState(checking = false, error = e.message, hideLocked = it.hideLocked, update = it.update) }
         } else {
             _state.update { it.copy(busy = false, refreshing = false, error = e.message ?: fallback) }
@@ -1233,6 +1234,7 @@ class MainViewModel(
         confirmJob?.cancel()
         pairingJob?.cancel()
         upNextJob?.cancel()
+        lastQuery = null
         viewModelScope.launch {
             // Wait out a pending resume-position save so it cannot land after the progress wipe below
             // and leak the previous account's continue-watching position to the next one.
