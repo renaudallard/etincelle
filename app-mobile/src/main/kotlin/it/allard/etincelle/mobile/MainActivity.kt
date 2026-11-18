@@ -685,7 +685,7 @@ private fun AppRoot(
                                 onClearTvConnect = { vm.clearTvConnect() },
                                 connectInfo = state.tvConnectInfo,
                                 connectError = state.tvConnectError,
-                                connecting = state.busy,
+                                busy = state.busy,
                                 error = state.error,
                             )
                         }

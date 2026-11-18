@@ -416,6 +416,23 @@ class MainViewModelTest {
     }
 
     @Test
+    fun profilesStillLoadingDoNotOpenOnceTheSettingsAreLeft() {
+        val repo = FakeRepo()
+        val vm = viewModel(repo)
+        val list = CompletableDeferred<Profiles>()
+        repo.allProfiles = { list.await() }
+        vm.openSettings()
+        vm.openProfiles()
+        assertTrue(vm.state.value.busy)
+
+        vm.closeSettings()
+        list.complete(Profiles(emptyList(), emptyList(), 5))
+
+        assertNull(vm.state.value.profileScreen)
+        assertFalse(vm.state.value.busy)
+    }
+
+    @Test
     fun leavingTheCodeScreenDropsTheRequestStillOut() {
         val repo = FakeRepo()
         repo.restore = { false }

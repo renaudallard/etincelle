@@ -700,7 +700,8 @@ fun SettingsScreen(
     onClearTvConnect: () -> Unit = {},
     connectInfo: String? = null,
     connectError: String? = null,
-    connecting: Boolean = false,
+    // Something asked from this screen is under way: the TV's code being checked, the profiles loading.
+    busy: Boolean = false,
     onProfiles: () -> Unit = {},
     // What went wrong with something asked from this screen, such as the profiles that did not load.
     error: String? = null,
@@ -723,6 +724,7 @@ fun SettingsScreen(
             Spacer(Modifier.width(8.dp))
             Text("Paramètres", style = MaterialTheme.typography.titleLarge)
         }
+        if (busy && !connectTv) LinearProgressIndicator(Modifier.fillMaxWidth(), color = BrandYellow)
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp)) }
         Column(
             Modifier.fillMaxWidth().clickable(onClick = onProfiles).padding(horizontal = 16.dp, vertical = 12.dp),
@@ -863,7 +865,7 @@ fun SettingsScreen(
                         },
                         label = { Text("Code") },
                         singleLine = true,
-                        enabled = !connecting,
+                        enabled = !busy,
                     )
                     if (connectError != null) {
                         Spacer(Modifier.height(8.dp))
@@ -879,7 +881,7 @@ fun SettingsScreen(
                 // code and replace the success message with a spurious error.
                 TextButton(
                     onClick = { onConnectTv(tvCode) },
-                    enabled = tvCode.length >= 4 && !connecting && connectInfo == null,
+                    enabled = tvCode.length >= 4 && !busy && connectInfo == null,
                 ) { Text("Connecter") }
             },
             dismissButton = { TextButton(onClick = { connectTv = false; tvCode = ""; onClearTvConnect() }) { Text("Fermer") } },

@@ -514,6 +514,9 @@ fun TvSettingsScreen(
     // Null where Android cannot install an update without asking: the setting is not shown.
     autoUpdate: Boolean? = null,
     onAutoUpdate: (Boolean) -> Unit = {},
+    // The profiles asked for from this screen are loading, or did not load.
+    busy: Boolean = false,
+    error: String? = null,
 ) {
     var confirm by remember { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
@@ -530,7 +533,11 @@ fun TvSettingsScreen(
                 TvButton(onClick = onLogout) { Text("Se déconnecter") }
             }
         }
-        TvButton(onClick = onProfiles, highlighted = false) { Text("Profils") }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            TvButton(onClick = onProfiles, highlighted = false) { Text("Profils") }
+            if (busy) CircularProgressIndicator(Modifier.size(24.dp))
+            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        }
         // The phone finds this TV at all times and wakes it to play what it sends only once the app may
         // display over other apps; the switch is in the system's settings. Checked again on coming back
         // from there.

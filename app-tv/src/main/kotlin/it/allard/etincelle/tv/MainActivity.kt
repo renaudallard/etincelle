@@ -306,6 +306,8 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                                 onGridColumns = { gridColumns = it },
                                 autoUpdate = autoUpdate.takeIf { BuildConfig.SELF_UPDATE && AutoUpdate.SUPPORTED },
                                 onAutoUpdate = viewModel::setAutoUpdate,
+                                busy = state.busy,
+                                error = state.error,
                             )
                         }
 

@@ -384,13 +384,19 @@ class MainViewModel(
     // navigation supersedes a reload still in flight, whose bar would otherwise never come down.
     private fun navLaunch(refresh: Boolean = false, block: suspend () -> Unit) {
         navJob?.cancel()
+        overlayJob?.cancel()
         if (!refresh) _state.update { it.copy(refreshing = false) }
         navJob = viewModelScope.launch { block() }
     }
 
+    // The load of a screen that opens over the pages (the profiles, the favourites order). Going
+    // elsewhere meanwhile drops it: its screen would open over where the user went.
+    private var overlayJob: Job? = null
+
     // Drops the in-flight navigation along with the spinner or progress bar it put up.
     private fun cancelNav() {
         navJob?.cancel()
+        overlayJob?.cancel()
         _state.update { it.copy(busy = false, refreshing = false) }
     }
 
@@ -880,8 +886,9 @@ class MainViewModel(
     fun openProfiles() {
         if (_state.value.busy) return
         _state.update { it.copy(busy = true, error = null, info = null) }
-        viewModelScope.launch {
-            runCatching { repo.profiles() }
+        overlayJob?.cancel()
+        overlayJob = viewModelScope.launch {
+            runCatchingNav { repo.profiles() }
                 .onSuccess { list ->
                     _state.update { if (it.loggedIn) it.copy(busy = false, profileScreen = ProfileScreen(list, repo.currentSession()?.profileId, asking = false)) else it }
                 }
@@ -1002,8 +1009,9 @@ class MainViewModel(
     fun openFavoriteOrder() {
         if (_state.value.busy) return
         _state.update { it.copy(busy = true, error = null, info = null) }
-        viewModelScope.launch {
-            runCatching { repo.favoriteOrder() }
+        overlayJob?.cancel()
+        overlayJob = viewModelScope.launch {
+            runCatchingNav { repo.favoriteOrder() }
                 .onSuccess { order -> _state.update { if (it.loggedIn) it.copy(busy = false, favoriteOrder = order) else it } }
                 .onFailure { e -> if (_state.value.loggedIn) applyFailure(e, "Échec de chargement des favoris") }
         }
@@ -1127,7 +1135,12 @@ class MainViewModel(
     // Without the error of the page left: the settings screen shows what fails there.
     fun openSettings() = _state.update { it.copy(settings = true, updateStatus = null, error = null) }
 
-    fun closeSettings() = _state.update { it.copy(settings = false, error = null, info = null) }
+    fun closeSettings() {
+        // The profiles asked for from here and not there yet: no longer wanted.
+        val loading = overlayJob?.isActive == true
+        overlayJob?.cancel()
+        _state.update { it.copy(settings = false, busy = it.busy && !loading, error = null, info = null) }
+    }
 
     /** Hides or shows locked (unentitled) cards across the content lists; see [UiState.visibleRails]. */
     fun setHideLocked(hide: Boolean) = _state.update { it.copy(hideLocked = hide) }
