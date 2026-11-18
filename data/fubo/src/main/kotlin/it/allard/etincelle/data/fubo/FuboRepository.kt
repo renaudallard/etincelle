@@ -36,6 +36,7 @@ import it.allard.etincelle.core.network.SessionStore
 import it.allard.etincelle.core.network.isTrustedApiHost
 import it.allard.etincelle.core.remote.RemoteProtocol
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -379,7 +380,8 @@ class FuboRepository(
             entries += response.response.orEmpty()
             offset = response.nextOffset?.takeIf { it > offset } ?: break
         }
-        EpgResponse(entries).toGuidePage()
+        // A day of every channel, with two dates to read for each programme: off the caller's thread.
+        withContext(Dispatchers.Default) { EpgResponse(entries).toGuidePage() }
     }
 
     override suspend fun search(query: String): ContentPage = withRefresh { api.search(query).toPage().groupByTitle() }
