@@ -72,7 +72,7 @@ ses programmes **les plus vus**. Les **chaînes favorites** ouvrent cette grille
 choisissez : sur téléphone, l'**étoile** d'une chaîne l'ajoute aux favoris ou l'en retire, et l'étoile
 de la barre du haut ouvre **Réorganiser les favoris** (▲ et ▼ déplacent une chaîne) ; sur la TV, un
 **appui long sur OK** fait de même, et le bouton **Réorganiser les favoris** permet de saisir une
-chaîne avec OK puis de la déplacer avec Haut et Bas. Le **guide** couvre toutes les chaînes de l'offre sur 24 heures et se rafraîchit à chaque ouverture.
+chaîne avec OK puis de la déplacer avec Haut et Bas. Le **guide** couvre toutes les chaînes de l'offre sur 24 heures et se rafraîchit à chaque ouverture ; un épisode y porte le nom de sa série, son propre titre en dessous.
 Ce qui passe **en ce moment** se périme avec l'heure : le guide et toute page qui montre des
 programmes en direct (l'accueil, **Direct**, les rangées « En direct ») se rechargent d'eux-mêmes,
 sans perdre la position dans la liste : toutes les 5 minutes tant qu'ils restent à l'écran, et dès
@@ -107,7 +107,7 @@ ligne. Sur
 téléphone, vous pouvez **diffuser** le flux en cours vers un **Chromecast** et transférer la lecture
 d'un appareil à l'autre. Si le direct a été **rembobiné** avant la diffusion, le Chromecast reprend au
 même endroit dans le différé plutôt qu'au bord du direct, et y revient aussi quand le flux doit être
-rechargé en cours de diffusion ou que l'on change de Chromecast. Une **coupure Wi-Fi** passagère du téléphone n'arrête pas
+rechargé en cours de diffusion ou que l'on change de Chromecast. D'un Chromecast vers l'application TV, ou vers un Chromecast joint directement, la lecture passe par le téléphone, qui en garde la place sans rien jouer. Une **coupure Wi-Fi** passagère du téléphone n'arrête pas
 la diffusion : le téléphone reprend la main sur le Chromecast, qui joue sans interruption. Un programme diffusé garde son **point de reprise** sur le
 téléphone, même arrêté depuis le téléviseur : il reprend ensuite là où la diffusion s'est arrêtée. Le **programme en cours** est aussi repéré
 sur la barre du téléviseur pendant la diffusion. Pendant la diffusion, l'application **reste sur la fiche du programme** : une
@@ -149,7 +149,7 @@ lit, « Connecté à » quand rien n'y passe.
 Toucher la barre de diffusion ouvre une **télécommande** : ce qui passe, lecture/pause, recul de
 10 s, avance de 30 s, et les flèches, OK et Retour pour naviguer dans l'application TV. Tant qu'on la
 pilote ainsi, le téléviseur ne lance pas son économiseur d'écran, et OK ou Retour répondent à sa
-proposition de mise à jour quand elle est affichée. Seul un
+proposition de mise à jour quand elle est affichée (elle ne l'est jamais par-dessus un programme en cours). Seul un
 téléphone connecté au **même compte** Molotov peut piloter le téléviseur, et réciproquement : chacun
 le prouve à l'autre à partir du compte, sans que la télécommande n'envoie le moindre identifiant sur
 le réseau local, et leurs échanges sont chiffrés. Le téléphone et le téléviseur doivent utiliser la
@@ -172,7 +172,7 @@ système où l'autoriser à se superposer aux autres applications. Sans cette au
 joignable que lorsqu'elle est à l'écran ou derrière l'**économiseur d'écran**, et la lecture demandée
 démarre dès que l'on réveille le téléviseur avec sa télécommande. Quittée avec un programme en cours,
 l'application TV le met en pause et cesse de le charger ; elle le reprend là où il en était quand on y
-revient, y compris un direct, repris à ce qui passait alors.
+revient, y compris un direct, repris à ce qui passait alors, ou au direct si cela remonte à plus loin que la fenêtre de rembobinage.
 
 Sur téléphone, la **lecture continue en arrière-plan** et écran verrouillé (le son seul, la vidéo
 reprenant au retour dans l'application), le point de reprise étant enregistré dès que l'on quitte
@@ -250,6 +250,7 @@ Sur Android TV, une lecture qu'une erreur interrompt (adresse du flux périmée,
 reprend d'elle-même là où elle en était, y compris dans un direct rembobiné, en redemandant le flux.
 Après cinq échecs de suite, le lecteur se ferme et la page d'où il a été lancé affiche « Lecture
 impossible, réessayez ». Une chaîne choisie dans le guide du téléviseur est reprise de la même façon.
+Sur téléphone, un direct rembobiné retrouve lui aussi sa place quand le flux doit être redemandé.
 Sur un programme en pause, l'écran n'est plus maintenu allumé : le téléviseur passe à son économiseur
 d'écran puis en veille comme d'habitude, et la position est enregistrée dès que l'on quitte
 l'application. Sur le téléphone aussi, un lecteur que la reprise n'a pas pu relancer se ferme avec le

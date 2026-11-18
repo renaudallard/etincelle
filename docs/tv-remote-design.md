@@ -70,8 +70,13 @@ player goes on loading: a live stream asks for its manifest every few seconds, a
 session and the buffer stay held (measured on a Chromecast with Google TV: 7.5 % of a core and 177 MB,
 for as long as the process lives, days when it is kept at all times). So once the app is really left
 the player is stopped, which keeps what it plays and where, and prepared again on return; a live
-stream goes back to what was airing when it was left, its window having moved on meanwhile. The status
-says paused meanwhile, so the phone neither drops the programme nor waits for a load.
+stream goes back to what was airing when it was left, its window having moved on meanwhile, or to the
+live point when that has left the window (four hours). The status
+says paused meanwhile, so the phone neither drops the programme nor waits for a load. A seek from the
+phone meanwhile names a position in the window as it was read on leaving, and is kept as the time of
+day it stands for. The player is stopped whatever the pages say: a programme the phone stopped behind
+the screensaver is still loaded, its screen being taken down only once the app is shown again. A
+stream that had just failed is not loaded again by its recovery until the app is back.
 
 ## Authentication
 
@@ -123,7 +128,12 @@ not leave is sent again at the next look): state
 live stream), live, what plays, the number of the last `play` it handled (each `play` carries one) and
 the error it ended on, if any, so the phone can tell a failed request from a stale error. The error is
 given whether something else plays or not: a request that fails over a programme still playing leaves
-that programme on.
+that programme on. A programme the player does not hold yet (its screen is only drawn once the app
+is shown, so not behind the screensaver) is said to be on its way, at the position it will start
+from: the player's own state and position are then those of what it had before. The phone takes the
+TV to have a programme once the status names it, and to play it once it says playing, paused or
+ended: an error before that is a request that failed, and until the status names it the programme
+is where the phone sent it.
 
 The TV resolves streams with its own sign-in, so nothing is passed but ids; it shows a programme's page
 under the player and plays the next episode itself, so the phone shows no next-episode slate for it.
