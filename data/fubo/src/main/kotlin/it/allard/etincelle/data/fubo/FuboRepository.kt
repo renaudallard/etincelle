@@ -66,6 +66,8 @@ private const val PROGRESS_END_MS = 15_000L
 private const val PROGRESS_MIN_MS = 10_000L
 // The official app asks who is watching again once the last choice is two days old.
 private const val PROFILE_PICK_TTL_MS = 2L * 24 * 60 * 60 * 1000
+// How long the channels page, with the applications it lists as locked or not, is taken as current.
+private const val CHANNELS_PAGE_MAX_AGE_MS = 10L * 60 * 1000
 // The recordings page of "Mes vidéos", which the Enregistrements tab and the recordings rows open.
 private const val RECORDINGS_PATH = "papi/v1/my-stuff/status/recordings"
 // How many times the user is asked for at the end of a sign-in, and how long between two.
@@ -355,12 +357,24 @@ class FuboRepository(
     // The channels page, fetched once and cached; it carries both the channel directory and the
     // broadcaster "Apps" section surfaced on the home page.
     private var channelsPageCache: PageResponse? = null
+    private var channelsPageAt = 0L
     private suspend fun channelsPage(): PageResponse? {
-        channelsPageCache?.let { return it }
-        return runCatching { api.channelsPage() }
+        // Not for the life of the app, which a TV keeps for days: an application subscribed to since
+        // would stay locked there. A clock set back makes the age meaningless: asked again.
+        val cached = channelsPageCache
+        if (cached != null && clock() - channelsPageAt in 0 until CHANNELS_PAGE_MAX_AGE_MS) return cached
+        val asker = session.session
+        val fresh = runCatching { api.channelsPage() }
             .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
             .getOrNull()
-            ?.also { channelsPageCache = it }
+            // The one in hand, however old, when the new one could not be had.
+            ?: return cached
+        // Not kept for the account that signed in while it was on its way.
+        if (session.session?.userId == asker?.userId && session.session?.profileId == asker?.profileId) {
+            channelsPageCache = fresh
+            channelsPageAt = clock()
+        }
+        return fresh
     }
 
     // Cached channel id -> name directory, loaded lazily the first time a page carries live cards.
