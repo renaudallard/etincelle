@@ -734,6 +734,8 @@ class CastPlayerController(
         positionMs: Long,
         resolve: Boolean,
         rewindMs: Long = (item.localConfiguration?.tag as? PlaybackSource)?.liveRewindOffsetMs ?: 0L,
+        // One attempt of a recovery: a refusal is not said, as the next attempt or the giving up will be.
+        recovering: Boolean = false,
     ): Boolean? {
         val source = item.localConfiguration?.tag as? PlaybackSource ?: return false
         val previous = currentItem
@@ -785,8 +787,10 @@ class CastPlayerController(
             // The TV keeps what it had, and so does the session: picking the programme again retries it.
             currentItem = previous
             previous?.let { directPlayer.setItem(it) }
-            clearConnecting()
-            onError?.invoke(PLAYBACK_ERROR_MESSAGE)
+            if (!recovering) {
+                clearConnecting()
+                onError?.invoke(PLAYBACK_ERROR_MESSAGE)
+            }
         }
         return loaded
     }
@@ -1630,7 +1634,7 @@ class CastPlayerController(
             if (target === directPlayer && direct != null) {
                 // A load the receiver refuses is the same failure still: on to the next attempt, as
                 // its status, unchanged, will not ask for one.
-                if (loadDirect(direct, freshItem, position, resolve = false, rewindMs = rewind) == false) onPlaybackError(target)
+                if (loadDirect(direct, freshItem, position, resolve = false, rewindMs = rewind, recovering = true) == false) onPlaybackError(target)
             } else {
                 loadOn(target, freshItem, if (fresh.isLive) 0 else position)
             }
