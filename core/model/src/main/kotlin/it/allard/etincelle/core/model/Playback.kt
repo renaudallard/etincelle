@@ -108,3 +108,14 @@ data class UpNext(
         const val END_MARGIN_MS = 2_500L
     }
 }
+
+/**
+ * [other] is the same programme, whatever stream each was resolved to: one asked for again after an
+ * error still is. Never true of a source that does not say what it is.
+ */
+fun PlaybackSource.isSameProgramme(other: PlaybackSource): Boolean {
+    if (originChannelId == null && originVodId == null && originRecordingAssetId == null) return false
+    return originChannelId == other.originChannelId &&
+        originVodId == other.originVodId &&
+        originRecordingAssetId == other.originRecordingAssetId
+}

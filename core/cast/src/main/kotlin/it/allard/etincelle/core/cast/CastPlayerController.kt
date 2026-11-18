@@ -21,6 +21,7 @@ import com.google.android.gms.cast.framework.CastSession
 import com.google.android.gms.cast.framework.media.MediaQueue
 import com.google.android.gms.cast.framework.media.RemoteMediaClient
 import it.allard.etincelle.core.model.PlaybackSource
+import it.allard.etincelle.core.model.isSameProgramme
 import it.allard.etincelle.core.model.UserSession
 import it.allard.etincelle.core.player.LivePlayback
 import it.allard.etincelle.core.player.MediaItemFactory
@@ -151,12 +152,19 @@ class CastPlayerController(
     // An etincelle TV app driven by etincelle's own remote control, and its player for the UI.
     private var tvSession: TvRemoteSession? = null
     private val tvPlayer = TvRemotePlayer()
-    // The TV has played what was last sent to it: its going idle then means it stopped, and its playing
-    // something else that it moved on (zapped there, or played the next episode itself).
+    // The TV has taken what was last sent to it, naming it in its status: its going idle then means it
+    // stopped, and its playing something else that it moved on (zapped there, or played the next
+    // episode itself).
     private var tvStarted = false
+    // It has got as far as playing it. A TV that took a programme may still fail to play it, which is
+    // said as a request that failed, not taken for a programme stopped there.
+    private var tvPlayed = false
+    // Where the TV was asked to start what was last sent: where that programme is until the TV has
+    // taken it, its status saying until then where something else was.
+    private var tvSentMs = 0L
     // Numbers the play requests sent to the TV app, which says in its status which one failed.
     private var tvRequests = 0L
-    // Where the phone was in what it handed over to the TV app, until the TV has started it: playback
+    // Where the phone was in what it handed over to the TV app, until the TV has played it: playback
     // comes back there should the TV fail to. -1 when nothing was handed over.
     private var tvHandoverMs = -1L
     // The TV went on by itself from what this phone sent (the next episode, another channel) and has
@@ -558,6 +566,8 @@ class CastPlayerController(
         message.put(RemoteMessages.REQUEST, ++tvRequests)
         currentItem = item
         tvStarted = false
+        tvPlayed = false
+        tvSentMs = positionMs
         tvMovedOn = false
         tvRestingSince = 0L
         tvHandoverMs = -1L
@@ -575,10 +585,14 @@ class CastPlayerController(
         tvPlayer.onStatus(message)
         val playing = message.optString(RemoteMessages.ID).takeIf { it.isNotEmpty() }?.let { message.optString(RemoteMessages.KIND) to it }
         val sent = remoteTargets(currentItem)
+        val state = message.optString(RemoteMessages.STATE)
         if (playing != null && sent.isNotEmpty()) {
             if (playing in sent) {
                 tvStarted = true
-                tvHandoverMs = -1L
+                if (state == RemoteMessages.STATE_PLAYING || state == RemoteMessages.STATE_PAUSED || state == RemoteMessages.STATE_ENDED) {
+                    tvPlayed = true
+                    tvHandoverMs = -1L
+                }
             } else if (tvStarted) {
                 // The TV moved on: what the phone sent no longer plays there, so sending it again plays it.
                 tvStarted = false
@@ -587,9 +601,10 @@ class CastPlayerController(
                 tvPlayer.showTvContent()
             }
         }
-        // The TV could not start what was sent: say why, rather than "Connexion à …" for ever.
+        // The TV could not start what was sent, or took it and never got it to play: say why, rather
+        // than "Connexion à …" for ever, or a programme that closes without a word.
         val error = message.optString(RemoteMessages.ERROR)
-        if (!tvStarted && currentItem != null && error.isNotEmpty() && message.optLong(RemoteMessages.REQUEST) == tvRequests) {
+        if (!tvPlayed && currentItem != null && error.isNotEmpty() && message.optLong(RemoteMessages.REQUEST) == tvRequests) {
             // Handed over from the phone, which stopped for it: playback comes back to the phone where
             // it was, and the TV is let go of. Not aloud with the app away: it waits there, paused.
             val item = currentItem
@@ -601,13 +616,13 @@ class CastPlayerController(
                 return
             }
             currentItem = null
+            tvStarted = false
             tvPlayer.showTvContent()
             clearConnecting()
             onError?.invoke(error)
             parkIdleTv()
             return
         }
-        val state = message.optString(RemoteMessages.STATE)
         val resting = state == RemoteMessages.STATE_PAUSED || state == RemoteMessages.STATE_ENDED
         if (!resting) tvRestingSince = 0L else if (tvRestingSince == 0L) tvRestingSince = SystemClock.elapsedRealtime()
         when (state) {
@@ -688,6 +703,7 @@ class CastPlayerController(
     private fun leaveTvPlayer() {
         tvPlayer.detach()
         tvStarted = false
+        tvPlayed = false
         tvMovedOn = false
         tvRestingSince = 0L
         tvHandoverMs = -1L
@@ -985,7 +1001,8 @@ class CastPlayerController(
             // Only what the phone knows can continue here; something else the TV plays stays on it.
             val onTv = _currentPlayer.value === tvPlayer
             val playsOnTv = onTv && currentItem != null
-            val position = tvPlayer.currentPosition
+            // A TV that has not taken the programme yet still says where what it had before was.
+            val position = if (tvStarted) tvPlayer.currentPosition else tvSentMs
             stopTvSession(stopTv = playsOnTv)
             if (playsOnTv) {
                 currentItem?.let { loadResolved(localPlayer, it, position, true) }
@@ -1098,10 +1115,7 @@ class CastPlayerController(
     private fun sameContent(a: MediaItem?, b: MediaItem): Boolean {
         val sa = (a?.localConfiguration?.tag as? PlaybackSource) ?: return false
         val sb = (b.localConfiguration?.tag as? PlaybackSource) ?: return false
-        if (sa.originChannelId == null && sa.originVodId == null && sa.originRecordingAssetId == null) return false
-        return sa.originChannelId == sb.originChannelId &&
-            sa.originVodId == sb.originVodId &&
-            sa.originRecordingAssetId == sb.originRecordingAssetId
+        return sa.isSameProgramme(sb)
     }
 
     // Tear down to the phone without resuming playback (a Cast session ended and the user did not ask

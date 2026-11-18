@@ -69,6 +69,7 @@ import it.allard.etincelle.core.designsystem.UpNextSlate
 import it.allard.etincelle.core.domain.DetailKind
 import it.allard.etincelle.core.model.PlayKind
 import it.allard.etincelle.core.model.PlaybackSource
+import it.allard.etincelle.core.model.isSameProgramme
 import it.allard.etincelle.core.model.ProgramWindow
 import it.allard.etincelle.core.player.AdaptiveLoadControl
 import it.allard.etincelle.core.player.LiveBarGeometry
@@ -516,6 +517,18 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
         // would wait for it for good.
         state.error?.let { status.put(RemoteMessages.ERROR, it) }
         if (source == null || player == null) return status.put(RemoteMessages.STATE, RemoteMessages.STATE_IDLE)
+        // The player takes what the pages play once its screen is drawn, which waits for the app to be
+        // shown: behind the screensaver it still holds the programme before, or nothing, and neither
+        // that one's state nor its position are this one's. On its way, from where it will start.
+        val held = (player.currentMediaItem?.localConfiguration?.tag as? PlaybackSource)?.isSameProgramme(source) == true
+        if (!held) {
+            return status.put(RemoteMessages.STATE, RemoteMessages.STATE_BUFFERING)
+                .put(RemoteMessages.TITLE, source.title.orEmpty())
+                .put(RemoteMessages.POSITION, source.startPositionMs)
+                .put(RemoteMessages.DURATION, -1L)
+                .put(RemoteMessages.LIVE, source.isLive)
+                .putProgramme(source)
+        }
         val playback = when (player.playbackState) {
             Player.STATE_BUFFERING -> RemoteMessages.STATE_BUFFERING
             Player.STATE_READY -> if (player.playWhenReady) RemoteMessages.STATE_PLAYING else RemoteMessages.STATE_PAUSED
@@ -535,15 +548,20 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
             timeline.getWindow(player.currentMediaItemIndex, remoteWindow)
             if (remoteWindow.windowStartTimeMs != C.TIME_UNSET) status.put(RemoteMessages.WINDOW_START, remoteWindow.windowStartTimeMs)
         }
+        return status.putProgramme(source)
+    }
+
+    // What [source] is, as the phone names it.
+    private fun JSONObject.putProgramme(source: PlaybackSource): JSONObject {
         val channelId = source.originChannelId
         val vodId = source.originVodId
         val recordingId = source.originRecordingAssetId
         when {
-            channelId != null -> status.put(RemoteMessages.KIND, RemoteMessages.KIND_LIVE).put(RemoteMessages.ID, channelId)
-            recordingId != null -> status.put(RemoteMessages.KIND, RemoteMessages.KIND_RECORDING).put(RemoteMessages.ID, recordingId)
-            vodId != null -> status.put(RemoteMessages.KIND, RemoteMessages.KIND_VOD).put(RemoteMessages.ID, vodId)
+            channelId != null -> put(RemoteMessages.KIND, RemoteMessages.KIND_LIVE).put(RemoteMessages.ID, channelId)
+            recordingId != null -> put(RemoteMessages.KIND, RemoteMessages.KIND_RECORDING).put(RemoteMessages.ID, recordingId)
+            vodId != null -> put(RemoteMessages.KIND, RemoteMessages.KIND_VOD).put(RemoteMessages.ID, vodId)
         }
-        return status
+        return this
     }
 
     override fun onStop() {
