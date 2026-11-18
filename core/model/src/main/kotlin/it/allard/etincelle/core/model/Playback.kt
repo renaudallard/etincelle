@@ -38,6 +38,9 @@ data class PlaybackSource(
     val resumeKey: String? = null,
     /** Where to start playback (ms); 0 starts at the beginning / live edge. */
     val startPositionMs: Long = 0L,
+    /** Asked for from its beginning, which [startPositionMs] at 0 alone does not say: it is also what a
+     * programme never watched here has. Another device playing it then leaves its own resume point be. */
+    val fromStart: Boolean = false,
     /** Live only: how far behind the live edge (ms) playback should begin instead of at the edge.
      * Carries a manual rewind across a cast hand-off, and starts the current show from its beginning
      * ("depuis le début"). The cast receiver gets it as live_rewind_sec; the phone's own player seeks to

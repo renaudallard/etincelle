@@ -553,6 +553,8 @@ class CastPlayerController(
         val (kind, id) = remoteTargets(item).firstOrNull() ?: return
         val message = JSONObject().put(RemoteMessages.TYPE, RemoteMessages.PLAY).put(RemoteMessages.KIND, kind).put(RemoteMessages.ID, id)
         if (kind == RemoteMessages.KIND_LIVE) message.put(RemoteMessages.REWIND, rewindMs) else message.put(RemoteMessages.POSITION, positionMs)
+        // From 0 because that was asked, not for want of a resume point here: the TV's own is not to be used.
+        if ((item.localConfiguration?.tag as? PlaybackSource)?.fromStart == true && positionMs <= 0) message.put(RemoteMessages.FROM_START, true)
         message.put(RemoteMessages.REQUEST, ++tvRequests)
         currentItem = item
         tvStarted = false

@@ -108,7 +108,8 @@ greeting: a phone and a TV app of different versions do not list each other.
 ## Messages
 
 JSON objects with a type `t` (see `RemoteMessages`). The phone sends `play` (kind live, vod or
-recording, id, position, rewind behind live), `pause`, `resume`, `seek`, `stop`, `key` (up, down, left,
+recording, id, position, rewind behind live; a position of 0 lets the TV use its own resume point,
+unless `start` says the programme was asked for from its beginning), `pause`, `resume`, `seek`, `stop`, `key` (up, down, left,
 right, ok, dispatched through the TV activity as remote presses; back, handed to the back navigation,
 which a Back key event no longer reaches on Android 16) and `volume` (up, down, mute).
 The TV works its `status` out every second but only sends it when it tells the phone something new

@@ -7,8 +7,8 @@ package it.allard.etincelle.core.remote
  * The messages a [RemoteLink] carries, as JSON objects whose "t" field names the type.
  *
  * Phone to TV: [PLAY] (kind live/vod/recording, id, where a recording played from the page of its
- * episode is asked for as that page, a vod, which is where its next episode is; pos ms, rewind ms behind
- * live, req: a number the
+ * episode is asked for as that page, a vod, which is where its next episode is; pos ms, where 0 leaves
+ * the TV its own resume point unless start is true; rewind ms behind live, req: a number the
  * TV echoes in its status, so the phone knows the error there is about this request), [PAUSE], [RESUME],
  * [SEEK] (pos ms in the stream, or -1 for the live edge), [STOP], [KEY] (k: up, down, left, right, ok,
  * back), [VOLUME] (dir: up, down, or mute).
@@ -35,6 +35,7 @@ object RemoteMessages {
     const val ID = "id"
     const val POSITION = "pos"
     const val REWIND = "rewind"
+    const val FROM_START = "start"
     const val KEY_NAME = "k"
     const val DIRECTION = "dir"
     const val STATE = "state"

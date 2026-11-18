@@ -342,6 +342,19 @@ class MainViewModelTest {
     }
 
     @Test
+    fun aProgrammeSentWithoutAPositionStartsAtTheTvsOwnUnlessAskedFromItsStart() {
+        val repo = FakeRepo()
+        repo.vod = { NEXT.copy(startPositionMs = 600_000) }
+        val vm = viewModel(repo)
+
+        vm.playFromRemote(PlayKind.VOD, "VOD_1", positionMs = 0, rewindMs = 0)
+        assertEquals(600_000L, vm.state.value.playing?.startPositionMs)
+
+        vm.playFromRemote(PlayKind.VOD, "VOD_1", positionMs = 0, rewindMs = 0, fromStart = true)
+        assertEquals(0L, vm.state.value.playing?.startPositionMs)
+    }
+
+    @Test
     fun aLiveProgrammeOffersTheEpisodeOnDemandThatGoesByItsName() {
         val episode = CARD.copy(id = "e16", title = "S26 E16 Dans le coma", vodId = "VOD_16")
         val other = CARD.copy(id = "e9", title = "S13 E9 Perdu en chemin", vodId = "VOD_9")

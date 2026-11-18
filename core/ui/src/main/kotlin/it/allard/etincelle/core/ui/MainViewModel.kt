@@ -772,10 +772,11 @@ class MainViewModel(
 
     /**
      * Plays what a phone of this account sent to this TV (see core/remote): [id] as [kind], from
-     * [positionMs] on demand or [rewindMs] behind the live edge. A programme opens its page under the
-     * player, as when it is chosen here, so Back lands on it and its next episode follows.
+     * [positionMs] on demand or [rewindMs] behind the live edge. A position of 0 is this TV's own
+     * resume point, unless the phone asked for the beginning ([fromStart]). A programme opens its page
+     * under the player, as when it is chosen here, so Back lands on it and its next episode follows.
      */
-    fun playFromRemote(kind: PlayKind, id: String, positionMs: Long, rewindMs: Long) {
+    fun playFromRemote(kind: PlayKind, id: String, positionMs: Long, rewindMs: Long, fromStart: Boolean = false) {
         _state.update {
             it.copy(busy = true, error = null, info = null, settings = false, favoriteOrder = null, profileScreen = null, profileEditor = null)
         }
@@ -783,12 +784,12 @@ class MainViewModel(
             runCatchingNav {
                 when (kind) {
                     PlayKind.LIVE -> null to repo.resolveLiveChannel(id).copy(liveRewindOffsetMs = rewindMs.coerceAtLeast(0))
-                    PlayKind.RECORDING -> null to repo.resolveRecording(id).startingAt(positionMs)
+                    PlayKind.RECORDING -> null to repo.resolveRecording(id).startingAt(positionMs, fromStart)
                     PlayKind.VOD -> {
                         val detail = repo.fetchProgramDetail(id, DetailKind.PROGRAM)
                         // The slate's rule first: it sends a resume point past the credits back to the
                         // start, which is not for where the phone is watching now.
-                        DetailEntry(detail, null, id, DetailKind.PROGRAM) to resolveProgramme(id, detail).withUpNext(detail.upNext).startingAt(positionMs)
+                        DetailEntry(detail, null, id, DetailKind.PROGRAM) to resolveProgramme(id, detail).withUpNext(detail.upNext).startingAt(positionMs, fromStart)
                     }
                 }
             }.onSuccess { (entry, src) ->
@@ -800,7 +801,8 @@ class MainViewModel(
     }
 
     // Where the phone was, rather than this TV's own resume point.
-    private fun PlaybackSource.startingAt(positionMs: Long) = if (positionMs > 0) copy(startPositionMs = positionMs) else this
+    private fun PlaybackSource.startingAt(positionMs: Long, fromStart: Boolean) =
+        if (positionMs > 0 || fromStart) copy(startPositionMs = positionMs.coerceAtLeast(0)) else this
 
     /**
      * Plays the on-demand copy of the live programme on the detail page ([ProgramDetail.replay]) from
@@ -813,7 +815,7 @@ class MainViewModel(
         navLaunch {
             runCatchingNav {
                 val detail = repo.fetchProgramDetail(vodId, DetailKind.PROGRAM)
-                val source = resolveProgramme(vodId, detail).copy(startPositionMs = 0L).withUpNext(detail.upNext)
+                val source = resolveProgramme(vodId, detail).copy(startPositionMs = 0L, fromStart = true).withUpNext(detail.upNext)
                 DetailEntry(detail, null, vodId, DetailKind.PROGRAM) to source
             }.onSuccess { (entry, src) ->
                 _state.update { it.copy(busy = false, playing = src, detailStack = it.detailStack + entry) }

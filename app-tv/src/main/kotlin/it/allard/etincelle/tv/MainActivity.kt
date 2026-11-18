@@ -434,7 +434,10 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                 val id = message.optString(RemoteMessages.ID).takeIf { it.isNotEmpty() } ?: return
                 remoteRequest = message.optLong(RemoteMessages.REQUEST)
                 remotePlayAt = SystemClock.elapsedRealtime()
-                viewModel.playFromRemote(kind, id, message.optLong(RemoteMessages.POSITION), message.optLong(RemoteMessages.REWIND))
+                viewModel.playFromRemote(
+                    kind, id, message.optLong(RemoteMessages.POSITION), message.optLong(RemoteMessages.REWIND),
+                    message.optBoolean(RemoteMessages.FROM_START),
+                )
             }
             RemoteMessages.PAUSE -> {
                 player.playWhenReady = false
