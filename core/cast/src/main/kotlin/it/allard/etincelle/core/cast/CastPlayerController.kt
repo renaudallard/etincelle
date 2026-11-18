@@ -1180,8 +1180,9 @@ class CastPlayerController(
     override fun onSessionDisconnected() {
         // "No Play Services session" says nothing about a direct cast or a TV app, which end through their
         // own paths (that clear their session first). Without this, coming back to the foreground, where
-        // start() reports no Play Services session, would wipe the state of one still playing.
-        if (directConnected || tvConnected) return
+        // start() reports no Play Services session, would wipe the state of one still playing, or of a
+        // TV app being connected to, whose remote screen would close on it.
+        if (directConnected || tvSession != null) return
         val lostDevice = endingDevice.takeIf { !endingOnPurpose }
         endingDevice = null
         endingOnPurpose = false
