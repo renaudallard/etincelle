@@ -153,7 +153,13 @@ open class CastController(
             listening = true
         }
         refreshDevices()
-        castContext.sessionManager.currentCastSession?.let(::onSessionConnected) ?: onSessionDisconnected()
+        val session = castContext.sessionManager.currentCastSession
+        when {
+            session == null -> onSessionDisconnected()
+            // One that is still starting is not yet one to load anything on, and what was sent to it
+            // would be lost: its listener says how the start ends.
+            session.isConnected -> onSessionConnected(session)
+        }
         discoveryScope?.cancel()
         discoveryScope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob()).also { scope ->
             scope.launch { rediscoverWhileIdle() }
