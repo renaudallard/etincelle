@@ -221,41 +221,46 @@ class TvRemoteServer(
     // The handshake with the phone behind [socket]: its link once it has proved the account key, or null
     // with the connection closed.
     private suspend fun greet(socket: Socket): RemoteLink? {
-        // The phone waits a few seconds for the greeting: past a short wait for a newer key, the one in
-        // hand serves, and the newer one the next connection.
-        val refresh = scope?.launch { refreshKey() }
-        withTimeoutOrNull(KEY_WAIT_MS) { refresh?.join() }
-        val key = key
-        val account = accounts
-        if (key == null) {
-            runCatching { socket.close() }
-            return null
-        }
-        // Its read timeout only bounds each read: a device trickling bytes must not hold a thread for long.
+        // Counted from here, the wait for the key included: a device opening connections while the key
+        // is being worked out must not have them, and what each sets off, pile up meanwhile.
         val address = socket.inetAddress
         if (handshakes.size >= MAX_HANDSHAKES || !handshakes.add(address)) {
             runCatching { socket.close() }
             return null
         }
-        val deadline = scope?.launch {
-            delay(HANDSHAKE_DEADLINE_MS)
-            runCatching { socket.close() }
-        }
-        // Not cancellable, so the handshake under way is seen through. Its link is not handed back to a
-        // server stopped meanwhile, which closed the connection itself.
-        val phone = try {
-            runCatching { withContext(Dispatchers.IO + NonCancellable) { RemoteLink.accept(socket, key) } }
-                .onFailure { if (it is RemoteAuthException) keyRefused() }
-                .getOrNull()
+        try {
+            // The phone waits a few seconds for the greeting: past a short wait for a newer key, the one
+            // in hand serves, and the newer one the next connection.
+            val refresh = scope?.launch { refreshKey() }
+            withTimeoutOrNull(KEY_WAIT_MS) { refresh?.join() }
+            val key = key
+            val account = accounts
+            if (key == null) {
+                runCatching { socket.close() }
+                return null
+            }
+            // Its read timeout only bounds each read: a device trickling bytes must not hold a thread for long.
+            val deadline = scope?.launch {
+                delay(HANDSHAKE_DEADLINE_MS)
+                runCatching { socket.close() }
+            }
+            // Not cancellable, so the handshake under way is seen through. Its link is not handed back to
+            // a server stopped meanwhile, which closed the connection itself.
+            val phone = try {
+                runCatching { withContext(Dispatchers.IO + NonCancellable) { RemoteLink.accept(socket, key) } }
+                    .onFailure { if (it is RemoteAuthException) keyRefused() }
+                    .getOrNull()
+            } finally {
+                deadline?.cancel()
+            } ?: return null
+            if (account != accounts) {
+                phone.close()
+                return null
+            }
+            return phone
         } finally {
             handshakes.remove(address)
-            deadline?.cancel()
-        } ?: return null
-        if (account != accounts) {
-            phone.close()
-            return null
         }
-        return phone
     }
 
     // Works the account key out again once it is no longer current.
