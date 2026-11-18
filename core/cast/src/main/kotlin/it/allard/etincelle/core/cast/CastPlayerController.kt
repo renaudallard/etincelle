@@ -155,6 +155,9 @@ class CastPlayerController(
     private var tvStarted = false
     // Numbers the play requests sent to the TV app, which says in its status which one failed.
     private var tvRequests = 0L
+    // Where the phone was in what it handed over to the TV app, until the TV has started it: playback
+    // comes back there should the TV fail to. -1 when nothing was handed over.
+    private var tvHandoverMs = -1L
     // The TV went on by itself from what this phone sent (the next episode, another channel) and has
     // played ever since: the notification still drives it.
     private var tvMovedOn = false
@@ -507,7 +510,9 @@ class CastPlayerController(
                 // Casting out a rewound live stream: resume the TV that far behind the edge.
                 val isLive = (item.localConfiguration?.tag as? PlaybackSource)?.isLive == true
                 val rewind = if (isLive && phonePlays) LivePlayback.castRewindOffsetMs(localPlayer, liveWindow) else 0L
-                playOnTv(item, if (phonePlays) localPlayer.currentPosition else handoffPositionMs, rewind)
+                val position = if (phonePlays) localPlayer.currentPosition else handoffPositionMs
+                playOnTv(item, position, rewind)
+                if (phonePlays) tvHandoverMs = position
                 runCatching { localPlayer.stop() }
             } else {
                 clearConnecting()
@@ -529,6 +534,7 @@ class CastPlayerController(
         tvStarted = false
         tvMovedOn = false
         tvRestingSince = 0L
+        tvHandoverMs = -1L
         tvPlayer.setItem(item)
         _currentPlayer.value = tvPlayer
         session.send(message)
@@ -550,6 +556,7 @@ class CastPlayerController(
         if (playing != null && sent != null) {
             if (playing == sent) {
                 tvStarted = true
+                tvHandoverMs = -1L
             } else if (tvStarted) {
                 // The TV moved on: what the phone sent no longer plays there, so sending it again plays it.
                 tvStarted = false
@@ -561,6 +568,16 @@ class CastPlayerController(
         // The TV could not start what was sent: say why, rather than "Connexion à …" for ever.
         val error = message.optString(RemoteMessages.ERROR)
         if (!tvStarted && currentItem != null && error.isNotEmpty() && message.optLong(RemoteMessages.REQUEST) == tvRequests) {
+            // Handed over from the phone, which stopped for it: playback comes back to the phone where
+            // it was, and the TV is let go of. Not aloud with the app away: it waits there, paused.
+            val item = currentItem
+            val back = tvHandoverMs
+            if (item != null && back >= 0) {
+                stopTvSession(stopTv = false)
+                onError?.invoke(error)
+                loadResolved(localPlayer, item, back, fromPlayWhenReady = awaySince == 0L)
+                return
+            }
             currentItem = null
             tvPlayer.showTvContent()
             clearConnecting()
@@ -651,6 +668,7 @@ class CastPlayerController(
         tvStarted = false
         tvMovedOn = false
         tvRestingSince = 0L
+        tvHandoverMs = -1L
         if (_currentPlayer.value === tvPlayer) _currentPlayer.value = localPlayer
     }
 
