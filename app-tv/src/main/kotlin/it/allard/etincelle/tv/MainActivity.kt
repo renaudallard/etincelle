@@ -119,7 +119,15 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 Intent.ACTION_DREAMING_STARTED -> dreaming = true
-                Intent.ACTION_DREAMING_STOPPED -> dreaming = false
+                Intent.ACTION_DREAMING_STOPPED -> {
+                    dreaming = false
+                    // The screensaver may have ended on another app: this one is then left for good,
+                    // which nothing else would notice. Coming back to it cancels this.
+                    if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                        handler.removeCallbacks(stopRemoteUnlessDreaming)
+                        handler.postDelayed(stopRemoteUnlessDreaming, DREAM_GRACE_MS)
+                    }
+                }
                 Intent.ACTION_SCREEN_OFF -> {
                     dreaming = false
                     if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) leave()
