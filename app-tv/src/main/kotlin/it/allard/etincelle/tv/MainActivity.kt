@@ -366,6 +366,8 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                     else -> return
                 }
                 val id = message.optString(RemoteMessages.ID).takeIf { it.isNotEmpty() } ?: return
+                // What was paused as the app was left is not what plays on return.
+                pausedForBackground = false
                 remoteRequest = message.optLong(RemoteMessages.REQUEST)
                 remotePlayAt = SystemClock.elapsedRealtime()
                 viewModel.playFromRemote(kind, id, message.optLong(RemoteMessages.POSITION), message.optLong(RemoteMessages.REWIND))
@@ -381,7 +383,10 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                 val position = message.optLong(RemoteMessages.POSITION, -1)
                 if (position < 0) player.seekToDefaultPosition() else player.seekTo(position)
             }
-            RemoteMessages.STOP -> viewModel.stopPlaying()
+            RemoteMessages.STOP -> {
+                pausedForBackground = false
+                viewModel.stopPlaying()
+            }
             RemoteMessages.KEY -> {
                 val name = message.optString(RemoteMessages.KEY_NAME)
                 when {
