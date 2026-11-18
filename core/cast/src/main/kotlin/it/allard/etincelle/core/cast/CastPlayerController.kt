@@ -300,6 +300,10 @@ class CastPlayerController(
     private var watchedClient: RemoteMediaClient? = null
     private var receiverFailed = false
     private var receiverPositionMs = 0L
+    // How far behind the live edge the receiver plays, as its status says: the cast player has no live
+    // window to measure it in, and a recovery or a switch to another device read it as none, bringing a
+    // rewound live stream back to the edge.
+    private var receiverRewindMs = 0L
     private val receiverStatusCallback = object : RemoteMediaClient.Callback() {
         override fun onStatusUpdated() {
             val client = watchedClient ?: return
@@ -325,7 +329,20 @@ class CastPlayerController(
         val state = client.mediaStatus?.playerState ?: return
         if (state == MediaStatus.PLAYER_STATE_IDLE || state == MediaStatus.PLAYER_STATE_UNKNOWN) return
         client.approximateStreamPosition.takeIf { it > 0 }?.let { receiverPositionMs = it }
+        // Both as the status gave them: its range stands still between two statuses while the position
+        // worked out since goes on, which would eat into the rewind.
+        client.mediaStatus?.let { status ->
+            status.liveSeekableRange?.let { receiverRewindMs = (it.endTime - status.streamPosition).coerceAtLeast(0) }
+        }
     }
+
+    // How far behind the live edge the Play Services cast plays, for what is loaded next to resume
+    // there: by its player when that knows, else as the receiver last said. Close to the edge is the
+    // edge, as for the phone's own player.
+    private fun castLiveRewindMs(): Long =
+        LivePlayback.castRewindOffsetMs(castPlayer, liveWindow).takeIf { it > 0 }
+            ?: receiverRewindMs.takeIf { it > LivePlayback.LIVE_REWIND_THRESHOLD_MS }
+            ?: 0L
 
     private fun watchReceiver(session: CastSession?) {
         val client = session?.remoteMediaClient
@@ -336,6 +353,7 @@ class CastPlayerController(
         watchedClient = client
         receiverFailed = false
         receiverPositionMs = 0L
+        receiverRewindMs = 0L
         client?.registerCallback(receiverStatusCallback)
         client?.addProgressListener(receiverProgressListener, RECEIVER_PROGRESS_MS)
         queueStatusAsked = false
@@ -451,7 +469,7 @@ class CastPlayerController(
         val playWhenReady = if (willTransfer) castPlayer.playWhenReady else true
         // Capture the live rewind now, while the outgoing cast player still has a timeline, so a
         // rewound live stream keeps its position across the device switch.
-        val rewind = if (willTransfer) LivePlayback.castRewindOffsetMs(castPlayer, liveWindow) else 0L
+        val rewind = if (willTransfer) castLiveRewindMs() else 0L
         val twin = if (willTransfer) null else scannedTwin(routeId)
         val selected = super.connectTo(routeId)
         if (selected) {
@@ -1451,7 +1469,10 @@ class CastPlayerController(
         val isLive = (item.localConfiguration?.tag as? PlaybackSource)?.isLive == true
         // A new item on the receiver: the last position it reported was the previous item's. Until it
         // reports one, it is where this load starts, so a load failing before it plays retries there.
-        if (player === castPlayer) receiverPositionMs = if (isLive) 0L else positionMs.coerceAtLeast(0)
+        if (player === castPlayer) {
+            receiverPositionMs = if (isLive) 0L else positionMs.coerceAtLeast(0)
+            receiverRewindMs = (item.localConfiguration?.tag as? PlaybackSource)?.liveRewindOffsetMs ?: 0L
+        }
         // CastPlayer loads live DASH at the start of the receiver's DVR window (currentTime=0); ask
         // for a position well past the window so the receiver clamps to the live edge. ExoPlayer
         // already starts live at the edge, so it keeps the caller's position.
@@ -1524,7 +1545,11 @@ class CastPlayerController(
         // Capture the live rewind from the failing player before re-resolving so recovery resumes the
         // viewer's position on the receiver instead of snapping to the live edge (0 if not applicable
         // or its timeline is already gone).
-        val rewind = if (target !== localPlayer && source.isLive) LivePlayback.castRewindOffsetMs(target, liveWindow) else 0L
+        val rewind = when {
+            !source.isLive || target === localPlayer -> 0L
+            target === castPlayer -> castLiveRewindMs()
+            else -> LivePlayback.castRewindOffsetMs(target, liveWindow)
+        }
         reResolveJob?.cancel()
         reResolveJob = scope.launch {
             if (backoff > 0) delay(backoff)
