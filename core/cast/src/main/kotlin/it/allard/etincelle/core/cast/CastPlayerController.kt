@@ -959,7 +959,9 @@ class CastPlayerController(
             // Stand down while suspended: the CastPlayer freezes its state across a suspend, so a frozen
             // "buffering" would otherwise be mistaken for a wedge and tear down a cast about to resume.
             val remote = _currentPlayer.value
-            if (suspended || !castingRemotely) {
+            // Nor for a cast only joined, as after the app was restarted under it: there is nothing to
+            // load again, and giving up on it would stop the TV.
+            if (suspended || !castingRemotely || currentItem == null) {
                 bufferingForMs = 0L
                 continue
             }
