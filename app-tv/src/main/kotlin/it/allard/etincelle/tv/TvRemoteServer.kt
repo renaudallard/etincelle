@@ -199,10 +199,13 @@ class TvRemoteServer(
         try {
             while (true) {
                 val message = withContext(Dispatchers.IO) { link.receive() }
-                if (driver !== phone) {
+                if (waiting === phone) {
                     driver?.link?.close()
                     driver = phone
-                    if (waiting === phone) waiting = null
+                    waiting = null
+                } else if (driver !== phone) {
+                    // Another phone took its place while this command was on its way: it goes with it.
+                    break
                 }
                 runCatching { JSONObject(message) }.getOrNull()?.let(onCommand)
             }
