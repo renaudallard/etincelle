@@ -480,6 +480,14 @@ class CastPlayerController(
             returnToThisDevice()
             return true
         }
+        if (toDirect && transferring) {
+            // A switch between two Chromecasts was still waiting for the second, which is given up for
+            // this device: through the phone as from any Chromecast, from where the first one was.
+            // Left to its wait, it fell back to the phone later, which then played along with the TV.
+            transferring = false
+            transferFallbackJob?.cancel()
+            swapTo(localPlayer, transferPosition, false)
+        }
         if (toDirect) return connectPicked(routeId)
         val willTransfer = _currentPlayer.value === castPlayer && castContext.sessionManager.currentCastSession != null
         val position = if (willTransfer) castPositionMs() else 0L
