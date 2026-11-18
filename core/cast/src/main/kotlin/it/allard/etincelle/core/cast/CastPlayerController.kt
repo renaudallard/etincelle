@@ -73,6 +73,10 @@ private const val CAST_RETRY_BACKOFF_MS = 1500L
 private const val CAST_RETRY_MAX_BACKOFF_MS = 2000L
 // The phone's own player waits this long before its second attempt, and twice as long before each next.
 private const val LOCAL_RETRY_BACKOFF_MS = 2000L
+
+// How long, and how often, a live stream loaded again on the phone is watched for its window, to seek in.
+private const val LOCAL_LIVE_SEEK_POLL_MS = 250L
+private const val LOCAL_LIVE_SEEK_TRIES = 120
 // Failures more than this far apart are separate incidents, not one burst: restore the retry budget so
 // a long cast that self-heals occasionally is never eventually refused recovery.
 private const val CAST_RETRY_RESET_MS = 60_000L
@@ -241,6 +245,10 @@ class CastPlayerController(
     // The duration the phone's own player had when it last failed: a reload that has not loaded yet
     // leaves it without one, and with it no way to tell where to resume from.
     private var failedDurationMs = C.TIME_UNSET
+    // The time of day (epoch ms) the phone's own live playback is to come back to once loaded again
+    // after an error, kept until it has: an attempt that fails before its stream is ready no longer
+    // knows it. Null at the live point.
+    private var localLiveAtMs: Long? = null
     private var reResolveJob: Job? = null
 
     // True only when the user explicitly asked to bring playback back to this phone ("Cet appareil"):
@@ -300,7 +308,8 @@ class CastPlayerController(
     // Per-player so onPlaybackError knows WHICH player failed: a local-player error during a cast-out
     // hand-off (while the cast player is already current) must not be misread as a cast failure.
     private fun errorListenerFor(player: Player) = object : Player.Listener {
-        override fun onPlayerError(error: PlaybackException) = onPlaybackError(player)
+        override fun onPlayerError(error: PlaybackException) =
+            onPlaybackError(player, error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW)
     }
     private val localErrorListener = errorListenerFor(localPlayer)
     private val castErrorListener = errorListenerFor(castPlayer)
@@ -421,6 +430,7 @@ class CastPlayerController(
     /** Load + play [item] on whichever player is current (phone or cast). */
     fun play(item: MediaItem, startPositionMs: Long) {
         failedDurationMs = C.TIME_UNSET
+        localLiveAtMs = null
         // Nominally on the cast player but the session is gone (e.g. an abandoned transfer): drop back
         // to local first so the load below does not target a dead CastPlayer.
         if (_currentPlayer.value === castPlayer && castContext.sessionManager.currentCastSession == null) {
@@ -1615,10 +1625,16 @@ class CastPlayerController(
         client.seek(MediaSeekOptions.Builder().setPosition(target.coerceAtLeast(0)).build())
     }
 
-    private fun onPlaybackError(failedPlayer: Player) {
+    // [leftLiveWindow]: what the phone was playing is no longer in the stream's rewind window.
+    private fun onPlaybackError(failedPlayer: Player, leftLiveWindow: Boolean = false) {
         // Ignore an error from a player that is no longer current (e.g. the local player being torn
         // down during a cast-out hand-off): recovering would reload the wrong, now-current player.
         if (failedPlayer !== _currentPlayer.value) return
+        // On the phone, a live programme watched behind the live point comes back at the same time of
+        // day, as on the TV (see PlaybackRecovery): loaded again, a stream starts at its live point.
+        if (failedPlayer === localPlayer) {
+            localLiveAtMs = if (leftLiveWindow) null else LivePlayback.rewoundAt(localPlayer, liveWindow, localLiveAtMs)
+        }
         val source = currentItem?.localConfiguration?.tag as? PlaybackSource
         val resolver = reResolve
         // A failure long after the previous one is a fresh incident, not part of a burst: restore the
@@ -1658,7 +1674,7 @@ class CastPlayerController(
         }
         // A receiver stopped on an error may no longer report where it was: fall back to the position
         // it last reported while playing.
-        val position = when {
+        val failedAt = when {
             target === localPlayer -> target.currentPosition
             target === directPlayer -> target.currentPosition.takeIf { it > 0 } ?: directPositionMs
             else -> castPositionMs()
@@ -1682,6 +1698,8 @@ class CastPlayerController(
             ensureActive()
             // Bail if a swap/stop superseded this stream while we were resolving.
             if (target !== _currentPlayer.value || currentItem == null) return@launch
+            // On the phone, where playback is now: a seek made during the wait counts.
+            val position = if (target === localPlayer) localPlayer.currentPosition.coerceAtLeast(0) else failedAt
             if (fresh == null) {
                 // The re-resolve itself failed - usually a transient blip (a Wi-Fi hiccup, a 5xx, the
                 // documented 528), not a permanently dead stream. Retry within the budget rather than
@@ -1699,6 +1717,17 @@ class CastPlayerController(
                 if (loadDirect(direct, freshItem, position, resolve = false, rewindMs = rewind, recovering = true) == false) onPlaybackError(target)
             } else {
                 loadOn(target, freshItem, if (fresh.isLive) 0 else position)
+            }
+            val at = localLiveAtMs ?: return@launch
+            if (target !== localPlayer || !fresh.isLive) return@launch
+            // No longer than a stream takes to come back. A failure meanwhile starts all this again,
+            // the time to come back to still noted.
+            repeat(LOCAL_LIVE_SEEK_TRIES) {
+                if (LivePlayback.seekToTimeIfReady(localPlayer, liveWindow, at)) {
+                    localLiveAtMs = null
+                    return@launch
+                }
+                delay(LOCAL_LIVE_SEEK_POLL_MS)
             }
         }
     }

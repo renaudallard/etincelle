@@ -73,14 +73,7 @@ class PlaybackRecovery(
     // Sets [liveAt] from where a live programme is being watched. A player between two streams, its
     // reload not loaded yet, says nothing of it: what was noted before stands.
     private fun noteLiveTime() {
-        if (toLivePoint) {
-            liveAt = null
-            return
-        }
-        // Fills [window] when a live stream is loaded.
-        val behind = LivePlayback.behindLiveEdgeMs(player, window)
-        if (!player.isCurrentMediaItemLive || window.windowStartTimeMs == C.TIME_UNSET) return
-        liveAt = (window.windowStartTimeMs + player.currentPosition).takeIf { behind > LivePlayback.LIVE_REWIND_THRESHOLD_MS }
+        liveAt = if (toLivePoint) null else LivePlayback.rewoundAt(player, window, liveAt)
     }
 
     override fun onPlaybackStateChanged(playbackState: Int) {

@@ -61,6 +61,18 @@ object LivePlayback {
     }
 
     /**
+     * The time of day (epoch ms) a live programme watched behind the live point is at, for a reload to
+     * come back to, or null at the live point. A player between two streams, its reload not loaded yet,
+     * says nothing of it: what was [known] stands. [window] is a caller-owned scratch instance to fill.
+     */
+    fun rewoundAt(player: Player, window: Timeline.Window, known: Long?): Long? {
+        if (!player.isCurrentMediaItemLive || player.currentTimeline.isEmpty) return known
+        val behind = behindLiveEdgeMs(player, window)
+        if (!window.isLive() || window.windowStartTimeMs == C.TIME_UNSET) return known
+        return (window.windowStartTimeMs + player.currentPosition).takeIf { behind > LIVE_REWIND_THRESHOLD_MS }
+    }
+
+    /**
      * The offset (ms) to hand a Chromecast so it resumes at [player]'s content position, or 0 when the
      * viewer is effectively at the live edge (rewound less than [LIVE_REWIND_THRESHOLD_MS]).
      *
