@@ -59,7 +59,11 @@ class RemoteLink private constructor(
 
     @Synchronized
     fun send(payload: String) {
-        writeFrame(output, cipher(Cipher.ENCRYPT_MODE, sendDirection, sendSeq++).doFinal(payload.toByteArray()))
+        val bytes = payload.toByteArray()
+        // Refused before it takes its place in the sequence: a number used up for a message that never
+        // left would put every later one out of step for the other end.
+        if (bytes.size + TAG_BITS / 8 > MAX_FRAME) throw IOException("message too long")
+        writeFrame(output, cipher(Cipher.ENCRYPT_MODE, sendDirection, sendSeq++).doFinal(bytes))
     }
 
     /** The next message; throws once the connection ends or a message fails its check. */
