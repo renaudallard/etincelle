@@ -152,7 +152,8 @@ sur le téléviseur y ferme aussitôt la télécommande des téléphones de ce c
 l'application du téléphone, il ne reste relié au téléviseur que tant que celui-ci lit ce que le
 téléphone a lancé (ou ce que le téléviseur a enchaîné ensuite), pour que la notification continue de
 le piloter ; sinon il referme la liaison pour ménager sa batterie, et la rétablit de lui-même au
-retour dans l'application.
+retour dans l'application. Pour la même raison, le téléviseur ne tient le téléphone au courant que
+lorsque quelque chose change, et toutes les dix secondes sinon.
 
 L'application TV peut rester joignable **à tout moment**, comme un Chromecast : ouverte ou non, derrière
 l'économiseur d'écran ou une autre application, téléviseur en veille s'il garde alors sa connexion au

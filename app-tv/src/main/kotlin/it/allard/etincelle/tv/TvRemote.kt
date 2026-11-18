@@ -5,8 +5,10 @@ package it.allard.etincelle.tv
 
 import android.content.Context
 import android.content.Intent
+import android.os.SystemClock
 import android.provider.Settings
 import it.allard.etincelle.core.remote.RemoteMessages
+import it.allard.etincelle.core.remote.StatusPacer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -15,7 +17,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
-// How often the phone driving this app hears how playback goes.
+// How often what the phone driving this app is to hear of playback is looked at (see StatusPacer).
 private const val STATUS_MS = 1_000L
 
 /**
@@ -35,6 +37,7 @@ class TvRemote(private val app: EtincelleTvApp) {
     }
 
     private val server = TvRemoteServer(app, ::accountKey, ::onCommand)
+    private val pacer = StatusPacer()
     private var scope: CoroutineScope? = null
     private var screen: Screen? = null
 
@@ -50,8 +53,14 @@ class TvRemote(private val app: EtincelleTvApp) {
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate).also {
             // Also with no screen, or behind the screensaver: a phone left without news drops the connection.
             it.launch {
+                var phones = server.phones
                 while (true) {
-                    if (server.connected) server.send(screen?.remoteStatus() ?: idle())
+                    if (server.connected) {
+                        // A phone just let in knows nothing yet.
+                        if (phones != server.phones) pacer.reset()
+                        phones = server.phones
+                        tell(screen?.remoteStatus() ?: idle())
+                    }
                     delay(STATUS_MS)
                 }
             }
@@ -90,8 +99,27 @@ class TvRemote(private val app: EtincelleTvApp) {
         return repository.remoteKey()
     }
 
+    // Sends [status] to the phone when it is worth it (see StatusPacer).
+    private fun tell(status: JSONObject) {
+        val live = status.optBoolean(RemoteMessages.LIVE)
+        // The window of a live stream slides: its start and length change all the time, the wall-clock
+        // time of what plays in it does not while paused.
+        val what = JSONObject(status.toString()).apply {
+            remove(RemoteMessages.POSITION)
+            remove(RemoteMessages.WINDOW_START)
+            if (live) remove(RemoteMessages.DURATION)
+        }.toString()
+        val clock = status.optLong(RemoteMessages.POSITION) + if (live) status.optLong(RemoteMessages.WINDOW_START) else 0L
+        val playing = status.optString(RemoteMessages.STATE) == RemoteMessages.STATE_PLAYING
+        // One that did not leave is to be sent again.
+        if (pacer.due(what, clock, playing, SystemClock.elapsedRealtime()) && !server.send(status)) pacer.reset()
+    }
+
     private fun onCommand(message: JSONObject) {
         val type = message.optString(RemoteMessages.TYPE)
+        // The phone shows what it asked for at once, and is to hear what came of it even when nothing
+        // did. Keys and volume leave it nothing to wait for.
+        if (type != RemoteMessages.KEY && type != RemoteMessages.VOLUME) pacer.reset()
         // What is asked now replaces the programme still waiting for its screen.
         if (type == RemoteMessages.PLAY || type == RemoteMessages.STOP) asked = null
         screen?.let { return it.onRemoteCommand(message) }

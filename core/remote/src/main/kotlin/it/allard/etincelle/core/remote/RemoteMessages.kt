@@ -11,7 +11,8 @@ package it.allard.etincelle.core.remote
  * [SEEK] (pos ms in the stream, or -1 for the live edge), [STOP], [KEY] (k: up, down, left, right, ok,
  * back), [VOLUME] (dir: up, down, or mute).
  *
- * TV to phone: [STATUS], about once a second: state (idle, buffering, playing, paused, ended), title,
+ * TV to phone: [STATUS], when what it says changes and every ten seconds otherwise (see [StatusPacer]):
+ * state (idle, buffering, playing, paused, ended), title,
  * subtitle, pos and dur in ms (on a live stream, within its rewind window, whose wall-clock start is
  * ws), live, the kind and id of what plays, the req of the last play handled and, when nothing plays,
  * the error that stopped it.

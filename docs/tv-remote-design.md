@@ -56,7 +56,7 @@ the phone it plays on instead.
 With no activity nothing has read the saved sign-in, so the server reads it itself before working out the
 account key, which it works out again every five minutes at most, as the profiles it is made of may
 change while it runs; sooner after a phone was refused, which is what a phone holding a newer key looks
-like, but then no more than every ten seconds. Signing out drops the key and the connected phone at once. The status keeps going to the phone, idle when there is no activity: its 15 s read
+like, but then no more than every ten seconds. Signing out drops the key and the connected phone at once. The status keeps going to the phone, idle when there is no activity: its read
 timeout would otherwise drop a silent TV.
 
 Without the permission the server only runs while the activity is started or behind the screensaver:
@@ -95,15 +95,22 @@ JSON objects with a type `t` (see `RemoteMessages`). The phone sends `play` (kin
 recording, id, position, rewind behind live), `pause`, `resume`, `seek`, `stop`, `key` (up, down, left,
 right, ok, dispatched through the TV activity as remote presses; back, handed to the back navigation,
 which a Back key event no longer reaches on Android 16) and `volume` (up, down, mute).
-The TV sends `status` every second, one at a time (none is queued while the last has not left): state
+The TV works its `status` out every second but only sends it when it tells the phone something new
+(`StatusPacer`): another state, title or programme, a position that is not where playback would have
+taken it (a seek), or what came of a command of the phone, even nothing. Otherwise one goes every ten
+seconds, and the phone takes a TV silent for thirty as gone. Each status received keeps the phone from
+sleeping, which is why they are spared: once a second, Android ended up restricting the phone app for
+its battery use. They go one at a time (none is queued while the last has not left, and one that could
+not leave is sent again at the next look): state
 (buffering, not idle, while what it plays is loading or being brought back after an error), title, position and duration (within the rewind window on a
 live stream), live, what plays, the number of the last `play` it handled (each `play` carries one) and,
 when nothing plays, the error that stopped it, so the phone can tell a failed request from a stale error.
 
 The TV resolves streams with its own sign-in, so nothing is passed but ids; it shows a programme's page
 under the player and plays the next episode itself, so the phone shows no next-episode slate for it.
-On the phone, `TvRemotePlayer` turns the statuses into a media3 player, so the cast controller, the
-notification and the lock screen drive the TV unchanged, and the cast bar opens a remote screen.
+On the phone, `TvRemotePlayer` turns the statuses into a media3 player, working out where playback has
+got to between two of them, so the cast controller, the notification and the lock screen drive the TV
+unchanged, and the cast bar opens a remote screen.
 
 The link costs the phone battery for as long as it is up, and the TV app may run for days. So when the
 phone app leaves the screen, the link is only kept while the TV plays what the phone started (what it

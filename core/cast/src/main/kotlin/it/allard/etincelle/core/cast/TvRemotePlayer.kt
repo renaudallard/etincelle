@@ -21,7 +21,9 @@ import org.json.JSONObject
  * A media3 [Player] for the etincelle TV app driven by [TvRemoteSession], so the player screen, its
  * controls and the media notification drive the TV as they drive a Chromecast. State comes from the
  * TV's status messages, commands go back as pause, resume and seek. On a live stream the TV reports
- * its position within the rewind window, which this player shows as a dynamic window. Main thread only.
+ * its position within the rewind window, which this player shows as a dynamic window. The TV only
+ * sends a status when something changed or after a while (see StatusPacer): in between, this player
+ * works out where playback has got to by itself. Main thread only.
  */
 @UnstableApi
 internal class TvRemotePlayer : SimpleBasePlayer(Looper.getMainLooper()) {
@@ -38,7 +40,7 @@ internal class TvRemotePlayer : SimpleBasePlayer(Looper.getMainLooper()) {
     private var windowStartMs = -1L
     private var updatedAt = 0L
 
-    // Statuses come every second; refresh the state between them so the position keeps moving.
+    // Statuses are seconds apart; refresh the state between them so the position keeps moving.
     private val handler = Handler(Looper.getMainLooper())
     private val ticker = object : Runnable {
         override fun run() {
@@ -109,18 +111,20 @@ internal class TvRemotePlayer : SimpleBasePlayer(Looper.getMainLooper()) {
         val metadata = item.mediaMetadata.buildUpon().setTitle(title).build()
         val data = MediaItemData.Builder(item).setMediaItem(item).setMediaMetadata(metadata).setIsSeekable(true)
         val position: Long
+        val elapsed = SystemClock.elapsedRealtime() - updatedAt
+        val playing = state == RemoteMessages.STATE_PLAYING
         if (live && durationMs > 0) {
-            // The window slides with the playhead on a live stream: the position in it barely moves.
+            // The window of a live stream slides with the clock: the position in it stays put while
+            // playing, and falls back while paused.
             data.setLiveConfiguration(MediaItem.LiveConfiguration.UNSET)
                 .setIsDynamic(true)
                 .setDurationUs(durationMs * 1000)
                 .setDefaultPositionUs(durationMs * 1000)
-                .setWindowStartTimeMs(if (windowStartMs > 0) windowStartMs else System.currentTimeMillis() - durationMs)
-            position = positionMs.coerceAtMost(durationMs)
+                .setWindowStartTimeMs(if (windowStartMs > 0) windowStartMs + elapsed else System.currentTimeMillis() - durationMs)
+            position = (if (playing) positionMs else positionMs - elapsed).coerceIn(0L, durationMs)
         } else {
             if (durationMs > 0) data.setDurationUs(durationMs * 1000)
-            val elapsed = if (state == RemoteMessages.STATE_PLAYING) SystemClock.elapsedRealtime() - updatedAt else 0L
-            position = (positionMs + elapsed).let { if (durationMs > 0) it.coerceAtMost(durationMs) else it }
+            position = (if (playing) positionMs + elapsed else positionMs).let { if (durationMs > 0) it.coerceAtMost(durationMs) else it }
         }
         builder.setPlaylist(listOf(data.build())).setContentPositionMs(position)
         when (state) {
@@ -136,8 +140,7 @@ internal class TvRemotePlayer : SimpleBasePlayer(Looper.getMainLooper()) {
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
         val session = session ?: return Futures.immediateVoidFuture()
         // Show the change at once; the TV confirms in its next status.
-        positionMs = currentPosition
-        updatedAt = SystemClock.elapsedRealtime()
+        settle()
         state = if (playWhenReady) RemoteMessages.STATE_PLAYING else RemoteMessages.STATE_PAUSED
         session.send(JSONObject().put(RemoteMessages.TYPE, if (playWhenReady) RemoteMessages.RESUME else RemoteMessages.PAUSE))
         return Futures.immediateVoidFuture()
@@ -148,9 +151,17 @@ internal class TvRemotePlayer : SimpleBasePlayer(Looper.getMainLooper()) {
         // An unset position is the default one: the live edge, or the start of on-demand content.
         val target = if (positionMs == C.TIME_UNSET) -1L else positionMs.coerceAtLeast(0)
         session.send(JSONObject().put(RemoteMessages.TYPE, RemoteMessages.SEEK).put(RemoteMessages.POSITION, target))
+        settle()
         this.positionMs = if (target < 0) durationMs.coerceAtLeast(0) else target
-        updatedAt = SystemClock.elapsedRealtime()
         return Futures.immediateVoidFuture()
+    }
+
+    // Takes where playback was worked out to be by now as what the TV last said, before changing it.
+    private fun settle() {
+        val now = SystemClock.elapsedRealtime()
+        positionMs = currentPosition
+        if (live && windowStartMs > 0) windowStartMs += now - updatedAt
+        updatedAt = now
     }
 
     override fun handleRelease(): ListenableFuture<*> {

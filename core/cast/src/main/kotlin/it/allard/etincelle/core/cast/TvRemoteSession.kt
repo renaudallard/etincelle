@@ -6,6 +6,7 @@ package it.allard.etincelle.core.cast
 import android.net.Network
 import it.allard.etincelle.core.remote.RemoteLink
 import it.allard.etincelle.core.remote.RemoteTv
+import it.allard.etincelle.core.remote.StatusPacer
 import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Socket
@@ -50,7 +51,8 @@ internal class TvRemoteSession(
             try {
                 socket.connect(InetSocketAddress(tv.host, tv.port), CONNECT_TIMEOUT_MS)
                 val connected = RemoteLink.connect(socket, accountKey)
-                // The TV says how playback goes every second: silence this long means it is gone.
+                // The TV says how playback goes every ten seconds at least (see StatusPacer): silence
+                // this long means it is gone.
                 socket.soTimeout = READ_TIMEOUT_MS
                 synchronized(this@TvRemoteSession) {
                     if (closed) {
@@ -106,6 +108,7 @@ internal class TvRemoteSession(
 
     private companion object {
         const val CONNECT_TIMEOUT_MS = 5_000
-        const val READ_TIMEOUT_MS = 15_000
+        // Room for a status held up on the way, as while the phone moves to another access point.
+        const val READ_TIMEOUT_MS = 3 * StatusPacer.KEEP_ALIVE_MS.toInt()
     }
 }

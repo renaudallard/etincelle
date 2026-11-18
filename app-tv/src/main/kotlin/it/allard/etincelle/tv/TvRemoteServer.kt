@@ -84,6 +84,10 @@ class TvRemoteServer(
     /** A phone is connected. */
     val connected: Boolean get() = link != null
 
+    /** How many phones were let in so far: one more tells a new phone from the one before. */
+    var phones = 0
+        private set
+
     fun start() {
         if (scope != null) return
         // Bound here, so stop() always finds them to close (binding sends nothing on the network).
@@ -141,11 +145,12 @@ class TvRemoteServer(
         keyUntil = 0
     }
 
-    fun send(message: JSONObject) {
-        val link = link ?: return
+    /** Sends [message] to the phone; false when it does not leave, for want of a phone or with the last one still leaving. */
+    fun send(message: JSONObject): Boolean {
+        val link = link ?: return false
         // One at a time: each tells how playback goes now and makes the one before moot, and a phone that
         // stopped reading while keeping its connection must not have them pile up for days.
-        if (!sending.compareAndSet(false, true)) return
+        if (!sending.compareAndSet(false, true)) return false
         val text = message.toString()
         val queued = runCatching {
             writer?.execute {
@@ -158,7 +163,9 @@ class TvRemoteServer(
                 }
             }
         }
-        if (queued.getOrNull() == null) sending.set(false)
+        val leaving = queued.getOrNull() != null
+        if (!leaving) sending.set(false)
+        return leaving
     }
 
     // One phone: the handshake, then its commands until it leaves. A newer phone takes over.
@@ -171,6 +178,7 @@ class TvRemoteServer(
         } ?: return
         link?.close()
         link = phone
+        phones++
         try {
             while (true) {
                 val message = withContext(Dispatchers.IO) { phone.receive() }
