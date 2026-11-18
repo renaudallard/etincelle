@@ -251,8 +251,8 @@ class MainViewModel(
         val challenge = _state.value.mfa ?: return
         if (code.isBlank() || _state.value.busy) return
         _state.update { it.copy(busy = true, error = null, info = null) }
-        viewModelScope.launch {
-            runCatching { repo.verifyCode(challenge, code) }
+        codeJob = viewModelScope.launch {
+            runCatchingNav { repo.verifyCode(challenge, code) }
                 .onSuccess { enterHome() }
                 .onFailure { e -> applyFailure(e, "Code refusé") }
         }
@@ -263,15 +263,26 @@ class MainViewModel(
         val challenge = _state.value.mfa ?: return
         if (_state.value.busy) return
         _state.update { it.copy(busy = true, error = null, info = null) }
-        viewModelScope.launch {
-            runCatching { repo.resendCode(challenge) }
+        codeJob = viewModelScope.launch {
+            runCatchingNav { repo.resendCode(challenge) }
                 .onSuccess { next -> _state.update { it.copy(busy = false, mfa = next, info = "Nouveau code envoyé") } }
                 .onFailure { e -> applyFailure(e, "Échec de l'envoi du code") }
         }
     }
 
-    /** Leaves the code screen, back to the sign-in form. */
-    fun cancelCode() = _state.update { it.copy(mfa = null, busy = false, error = null, info = null) }
+    // The code being checked, or sent again.
+    private var codeJob: Job? = null
+
+    /**
+     * Leaves the code screen, back to the sign-in form. A request still out is dropped with it: its
+     * answer would bring this screen back, or sign in someone who has just declined to.
+     */
+    fun cancelCode() {
+        // The code was taken: signed in already, with the home page on its way.
+        if (_state.value.mfa != null && repo.currentSession() != null) return
+        codeJob?.cancel()
+        _state.update { it.copy(mfa = null, busy = false, error = null, info = null) }
+    }
 
     private var pairingJob: Job? = null
     private var confirmJob: Job? = null

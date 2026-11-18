@@ -403,7 +403,7 @@ class MainViewModelTest {
     fun anUpdateIsNotInstalledOverASignInWaitingForItsCode() = withUpdate { store, info ->
         val repo = FakeRepo()
         repo.restore = { false }
-        repo.signIn = { LoginResult.CodeRequired(MfaChallenge("token", "Code", null, "Code", "code", 6, "Valider", "u", emptyMap(), null, null)) }
+        repo.signIn = { LoginResult.CodeRequired(CHALLENGE) }
         val vm = MainViewModel(repo, CHECKER, store)
         vm.take(info)
         waitFor { store.file.exists() }
@@ -413,6 +413,37 @@ class MainViewModelTest {
         vm.installFetchedUpdate { _, _ -> error("installed over a sign-in") }
 
         assertTrue(store.file.exists())
+    }
+
+    @Test
+    fun leavingTheCodeScreenDropsTheRequestStillOut() {
+        val repo = FakeRepo()
+        repo.restore = { false }
+        repo.session = null
+        repo.signIn = { LoginResult.CodeRequired(CHALLENGE) }
+        val vm = MainViewModel(repo, CHECKER)
+        vm.login("a@b.c", "password")
+        val again = CompletableDeferred<MfaChallenge>()
+        repo.resend = { again.await() }
+
+        vm.resendCode()
+        vm.cancelCode()
+        again.complete(CHALLENGE)
+
+        assertNull(vm.state.value.mfa)
+        assertNull(vm.state.value.info)
+        assertFalse(vm.state.value.busy)
+
+        // The same for a code being checked.
+        vm.login("a@b.c", "password")
+        val checked = CompletableDeferred<Unit>()
+        repo.verify = { checked.await() }
+        vm.verifyCode("123456")
+        vm.cancelCode()
+        checked.complete(Unit)
+
+        assertNull(vm.state.value.mfa)
+        assertFalse(vm.state.value.loggedIn)
     }
 
     @Test
@@ -565,6 +596,13 @@ class MainViewModelTest {
         override suspend fun restoreSession() = restore()
         var signIn: suspend () -> LoginResult = { LoginResult.SignedIn(session!!) }
         override suspend fun login(email: String, password: String): LoginResult = signIn()
+        var resend: suspend () -> MfaChallenge = { CHALLENGE }
+        override suspend fun resendCode(challenge: MfaChallenge) = resend()
+        var verify: suspend () -> Unit = {}
+        override suspend fun verifyCode(challenge: MfaChallenge, code: String): UserSession {
+            verify()
+            return UserSession("access", "refresh", "user", "profile").also { session = it }
+        }
         override fun currentSession() = session
         override suspend fun loadHome() = home()
         override suspend fun loadPage(url: String) = page(url)
@@ -602,6 +640,7 @@ class MainViewModelTest {
         ) { _, method, _ -> throw UnsupportedOperationException(method.name) } as MolotovRepository
 
         val HOME = ContentPage("Accueil", emptyList())
+        val CHALLENGE = MfaChallenge("token", "Code", null, "Code", "code", 6, "Valider", "u", emptyMap(), null, null)
         // A page with a programme now on a channel, as the backend tags it.
         val ON_AIR = ContentPage(
             "Accueil",
