@@ -5,6 +5,8 @@ package it.allard.etincelle.core.network
 
 import it.allard.etincelle.core.model.UserSession
 import java.io.IOException
+import java.net.SocketTimeoutException
+import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -143,6 +145,20 @@ class InterceptorTest {
         assertEquals(200, response.code)
         response.close()
         assertEquals(2, server.requestCount)
+    }
+
+    @Test
+    fun `a GET that timed out is not asked again`() {
+        val retryClient = OkHttpClient.Builder().addInterceptor(RetryInterceptor())
+            .readTimeout(300, TimeUnit.MILLISECONDS).build()
+        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE))
+        server.enqueue(MockResponse().setBody("{}"))
+        val request = Request.Builder().url(server.url("/x")).build()
+
+        val error = runCatching { retryClient.newCall(request).execute().close() }.exceptionOrNull()
+
+        assertTrue(error is SocketTimeoutException)
+        assertEquals(1, server.requestCount)
     }
 
     @Test

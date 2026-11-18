@@ -3,6 +3,7 @@
 
 package it.allard.etincelle.core.network
 
+import java.net.SocketTimeoutException
 import okhttp3.Interceptor
 import okhttp3.RequestBody
 import okhttp3.Response
@@ -132,7 +133,10 @@ class RetryInterceptor(
             } catch (e: IOException) {
                 // Only replay idempotent GETs; replaying a POST/PUT could duplicate a recording or
                 // a sign-in if the request actually reached the server before the failure.
-                if (request.method != "GET" || networkAttempt >= maxNetworkRetries) throw e
+                // Nor one that timed out: it has had its fifteen or thirty seconds already, and three
+                // of those in a row keep a page waiting a minute and a half for an answer that is not
+                // coming.
+                if (request.method != "GET" || e is SocketTimeoutException || networkAttempt >= maxNetworkRetries) throw e
                 networkAttempt++
                 backoff(chain, networkAttempt)
                 continue
