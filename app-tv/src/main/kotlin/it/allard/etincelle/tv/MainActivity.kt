@@ -445,9 +445,12 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
             RemoteMessages.RESUME -> if (inFront) player.playWhenReady = true else pausedForBackground = true
             RemoteMessages.SEEK -> {
                 // Asked for while the programme waits to be loaded again: that is where it goes, not
-                // back to where it was left.
-                resumeLiveAtMs = null
+                // back to where it was left. In a live stream the phone names a position in the window
+                // read as the app was left, which will have moved on by then: it is kept as the time of
+                // day it stands for.
                 val position = message.optLong(RemoteMessages.POSITION, -1)
+                val start = unloadedWindowStartMs
+                resumeLiveAtMs = if (unloaded && stoppedAway && position >= 0 && start != C.TIME_UNSET) start + position else null
                 if (position < 0) player.seekToDefaultPosition() else player.seekTo(position)
             }
             RemoteMessages.STOP -> viewModel.stopPlaying()
@@ -632,22 +635,34 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
         reloadJob?.cancel()
         reloadJob = lifecycleScope.launch {
             val window = Timeline.Window()
-            // No longer than a stream takes to come back, and not over another programme chosen meanwhile.
-            repeat(RELOAD_SEEK_TRIES) {
-                if (viewModel.state.value.playing !== source) return@launch
-                val timeline = player.currentTimeline
-                if (!timeline.isEmpty) {
-                    timeline.getWindow(player.currentMediaItemIndex, window)
-                    val fresh = window.windowStartTimeMs != C.TIME_UNSET && window.windowStartTimeMs != staleStart
-                    if (fresh && at < window.windowStartTimeMs) {
-                        // Away for longer than the stream can be rewound: what was airing is gone, and
-                        // the oldest point still held, hours back, is no place to come back to.
-                        player.seekToDefaultPosition()
-                        return@launch
-                    }
-                    if (fresh && LivePlayback.seekToTimeIfReady(player, window, at)) return@launch
+            // A seek made meanwhile, with the remote or from the phone, is where playback goes instead.
+            var seeked = false
+            val seeks = object : Player.Listener {
+                override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
+                    if (reason == Player.DISCONTINUITY_REASON_SEEK) seeked = true
                 }
-                delay(RELOAD_SEEK_POLL_MS)
+            }
+            player.addListener(seeks)
+            try {
+                // No longer than a stream takes to come back, and not over another programme chosen meanwhile.
+                repeat(RELOAD_SEEK_TRIES) {
+                    if (seeked || viewModel.state.value.playing !== source) return@launch
+                    val timeline = player.currentTimeline
+                    if (!timeline.isEmpty) {
+                        timeline.getWindow(player.currentMediaItemIndex, window)
+                        val fresh = window.windowStartTimeMs != C.TIME_UNSET && window.windowStartTimeMs != staleStart
+                        if (fresh && at < window.windowStartTimeMs) {
+                            // Away for longer than the stream can be rewound: what was airing is gone, and
+                            // the oldest point still held, hours back, is no place to come back to.
+                            player.seekToDefaultPosition()
+                            return@launch
+                        }
+                        if (fresh && LivePlayback.seekToTimeIfReady(player, window, at)) return@launch
+                    }
+                    delay(RELOAD_SEEK_POLL_MS)
+                }
+            } finally {
+                player.removeListener(seeks)
             }
         }
     }
