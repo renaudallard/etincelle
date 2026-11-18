@@ -74,6 +74,7 @@ import it.allard.etincelle.core.model.ProgramWindow
 import it.allard.etincelle.core.player.AdaptiveLoadControl
 import it.allard.etincelle.core.player.LiveBarGeometry
 import it.allard.etincelle.core.player.LivePlayback
+import it.allard.etincelle.core.player.LiveProgramme
 import it.allard.etincelle.core.player.MediaItemFactory
 import it.allard.etincelle.core.player.PlaybackProgress
 import it.allard.etincelle.core.player.PlaybackRecovery
@@ -776,7 +777,7 @@ private fun TvPlayerSurface(
     player: ExoPlayer,
     onSavePosition: (String?, Long) -> Unit,
     onReportProgress: (PlaybackSource, Long, Long) -> Unit,
-    fetchProgramWindow: suspend (String) -> ProgramWindow?,
+    fetchProgramWindow: suspend (String, Long) -> ProgramWindow?,
     reResolve: suspend (PlaybackSource) -> PlaybackSource?,
     onPlaybackFailed: (PlaybackSource) -> Unit,
     onPlayNext: () -> Unit = {},
@@ -825,6 +826,9 @@ private fun TvPlayerSurface(
     // does not restart the stream. The TV bar is a position indicator (the remote scrubs with the
     // rewind/forward buttons), so it carries no seek callback.
     var programWindow by remember(source) { mutableStateOf(source.programWindow) }
+    val programme = remember(source) {
+        LiveProgramme(source.programWindow) { at -> source.originChannelId?.let { fetchProgramWindow(it, at) } }
+    }
     var barGeometry by remember { mutableStateOf<LiveBarGeometry?>(null) }
     // A "depuis le début" start, or a rewound programme handed over by the phone, asks playback to begin
     // that far behind the live edge; the player joins at the edge first, so seek back to what aired then
@@ -896,20 +900,13 @@ private fun TvPlayerSurface(
             return@LaunchedEffect
         }
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            var nextRolloverMs = 0L
             while (true) {
                 behindLive = LivePlayback.behindLiveEdgeMs(player, liveWindow) > LivePlayback.LIVE_REWIND_THRESHOLD_MS
-                barGeometry = LivePlayback.liveBarGeometry(player, liveWindow, programWindow)
                 if (pendingRewind && LivePlayback.seekToTimeIfReady(player, liveWindow, rewindTo)) pendingRewind = false
-                val pw = programWindow
-                val edge = LivePlayback.liveEdgeEpochMs(player, liveWindow)
-                val now = System.currentTimeMillis()
-                if (pw != null && edge != null && edge >= pw.endMs && now >= nextRolloverMs) {
-                    nextRolloverMs = now + 15_000
-                    source.originChannelId?.let { channelId ->
-                        fetchProgramWindow(channelId)?.takeIf { it.endMs > pw.endMs }?.let { programWindow = it }
-                    }
-                }
+                // The show playback is in, which follows it past the show's end or back into the one
+                // before, as when it was handed over rewound (see LiveProgramme).
+                programWindow = programme.current(player, liveWindow)
+                barGeometry = LivePlayback.liveBarGeometry(player, liveWindow, programWindow)
                 delay(1000)
             }
         }

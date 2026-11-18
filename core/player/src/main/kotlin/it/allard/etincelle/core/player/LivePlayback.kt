@@ -216,16 +216,13 @@ object LivePlayback {
     /** [epochMs] as a local wall-clock "HH:mm", for the programme's start and end on the live bar. */
     fun clockLabel(epochMs: Long): String = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(epochMs))
 
-    /** The live edge as wall-clock epoch ms, or null when the window carries no epoch anchor. Used to
-     * tell when the live edge has crossed the current programme's end and the bar must re-scope. */
-    fun liveEdgeEpochMs(player: Player, window: Timeline.Window): Long? {
+    /** The time of day (epoch ms) live playback is at, or null when the window carries no epoch anchor. */
+    fun playheadEpochMs(player: Player, window: Timeline.Window): Long? {
         if (!player.isCurrentMediaItemLive) return null
         val timeline = player.currentTimeline
         if (timeline.isEmpty) return null
         timeline.getWindow(player.currentMediaItemIndex, window)
-        if (!window.isLive()) return null
-        val windowStart = window.windowStartTimeMs
-        if (windowStart == C.TIME_UNSET) return null
-        return windowStart + window.defaultPositionMs
+        if (!window.isLive() || window.windowStartTimeMs == C.TIME_UNSET) return null
+        return window.windowStartTimeMs + player.currentPosition
     }
 }

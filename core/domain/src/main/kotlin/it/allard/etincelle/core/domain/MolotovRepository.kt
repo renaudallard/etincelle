@@ -109,9 +109,11 @@ interface MolotovRepository {
     suspend fun resolveLiveChannel(channelId: String): PlaybackSource
     suspend fun resolveVod(vodId: String): PlaybackSource
 
-    /** The current programme's air-window for a live channel, so the live seek bar can mark the show
-     * on screen and re-scope when it rolls over to the next programme; null when no times are given. */
-    suspend fun liveProgramWindow(channelId: String): ProgramWindow?
+    /** The air-window of the programme on a live channel, so the live seek bar can mark the show on
+     * screen and re-scope when playback moves into another: the one on now, or with [atMs] the one that
+     * was on at that time (epoch ms), where a stream watched behind the live point is. Null when no
+     * times are given. */
+    suspend fun liveProgramWindow(channelId: String, atMs: Long? = null): ProgramWindow?
 
     /** Resolves a DVR recording [assetId] to a playable stream. */
     suspend fun resolveRecording(assetId: String): PlaybackSource

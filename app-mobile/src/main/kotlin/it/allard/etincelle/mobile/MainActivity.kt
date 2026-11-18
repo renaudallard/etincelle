@@ -98,6 +98,7 @@ import it.allard.etincelle.core.model.ProgramWindow
 import it.allard.etincelle.core.player.AdaptiveLoadControl
 import it.allard.etincelle.core.player.LiveBarGeometry
 import it.allard.etincelle.core.player.LivePlayback
+import it.allard.etincelle.core.player.LiveProgramme
 import it.allard.etincelle.core.player.MediaItemFactory
 import it.allard.etincelle.core.player.PlaybackProgress
 import it.allard.etincelle.core.player.PlaybackRecovery
@@ -914,7 +915,7 @@ private fun PlayerSurface(
     onCastConnect: (String) -> Unit,
     onCastDisconnect: () -> Unit,
     onCastActiveScan: (Boolean) -> Unit,
-    fetchProgramWindow: suspend (String) -> ProgramWindow?,
+    fetchProgramWindow: suspend (String, Long) -> ProgramWindow?,
     secure: Boolean = true,
     onPlayNext: () -> Unit = {},
     upNextSlate: UpNextSlateState? = null,
@@ -944,6 +945,9 @@ private fun PlayerSurface(
     // (which do report one) get the programme bar.
     val showBar = source.isLive && (secure || currentPlayer !is LiveSkipCastPlayer)
     var programWindow by remember(source) { mutableStateOf(source.programWindow) }
+    val programme = remember(source) {
+        LiveProgramme(source.programWindow) { at -> source.originChannelId?.let { fetchProgramWindow(it, at) } }
+    }
     var barGeometry by remember { mutableStateOf<LiveBarGeometry?>(null) }
     // A "depuis le début" start asks playback to begin at the current show's start; the local player
     // joins at the live edge first, so seek back once the live window has loaded, then stop retrying.
@@ -975,23 +979,13 @@ private fun PlayerSurface(
             return@LaunchedEffect
         }
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            var nextRolloverMs = 0L
             while (true) {
                 behindLive = LivePlayback.behindLiveEdgeMs(currentPlayer, liveWindow) > LivePlayback.LIVE_REWIND_THRESHOLD_MS
                 if (showBar) {
+                    // The show playback is in, which follows it past the show's end or back into the
+                    // one before (see LiveProgramme).
+                    programWindow = programme.current(currentPlayer, liveWindow)
                     barGeometry = LivePlayback.liveBarGeometry(currentPlayer, liveWindow, programWindow)
-                    // Rollover: once the live edge passes the show's end, re-scope to the now-current
-                    // programme. Throttled, and only adopted when it actually advances, so a backend that
-                    // lags the boundary is not polled every second.
-                    val pw = programWindow
-                    val edge = LivePlayback.liveEdgeEpochMs(currentPlayer, liveWindow)
-                    val now = System.currentTimeMillis()
-                    if (pw != null && edge != null && edge >= pw.endMs && now >= nextRolloverMs) {
-                        nextRolloverMs = now + 15_000
-                        source.originChannelId?.let { channelId ->
-                            fetchProgramWindow(channelId)?.takeIf { it.endMs > pw.endMs }?.let { programWindow = it }
-                        }
-                    }
                 }
                 delay(1000)
             }

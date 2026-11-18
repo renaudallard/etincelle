@@ -23,6 +23,24 @@ class LivePlaybackTest {
     private val oneHourShow = ProgramWindow(programStart, programStart + hour)
 
     @Test
+    fun `the bar's programme is the one playback is in`() {
+        val before = ProgramWindow(programStart - hour, programStart + 60_000L) // ends a minute into the next
+        val known = listOf(before, oneHourShow)
+        // In it, and a seek to its beginning that lands a second short of it.
+        assertEquals(oneHourShow, LiveProgramme.pick(known, oneHourShow, programStart + 10 * 60_000L))
+        assertEquals(oneHourShow, LiveProgramme.pick(listOf(oneHourShow), oneHourShow, programStart - 1_000L))
+        // Where the guide's hours overlap, the one that has just begun.
+        assertEquals(oneHourShow, LiveProgramme.pick(known, before, programStart + 30_000L))
+        // Rewound into the one before.
+        assertEquals(before, LiveProgramme.pick(known, oneHourShow, programStart - 10 * 60_000L))
+        // Past its end with the next not known yet: still shown for a moment, then none.
+        assertEquals(oneHourShow, LiveProgramme.pick(listOf(oneHourShow), oneHourShow, programStart + hour + 60_000L))
+        assertNull(LiveProgramme.pick(listOf(oneHourShow), oneHourShow, programStart + hour + 10 * 60_000L))
+        // Rewound to before anything known.
+        assertNull(LiveProgramme.pick(listOf(oneHourShow), oneHourShow, programStart - 10 * 60_000L))
+    }
+
+    @Test
     fun `scales the bar to the programme with the live edge part-way`() {
         val g = LivePlayback.liveBarGeometry(
             currentPositionMs = window4h, // playhead at the live edge

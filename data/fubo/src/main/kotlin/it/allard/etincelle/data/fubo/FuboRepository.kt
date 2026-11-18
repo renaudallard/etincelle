@@ -582,18 +582,21 @@ class FuboRepository(
         }
     }
 
-    override suspend fun liveProgramWindow(channelId: String): ProgramWindow? = withRefresh {
+    override suspend fun liveProgramWindow(channelId: String, atMs: Long?): ProgramWindow? = withRefresh {
+        // What was on at another time is the guide's alone to say: the stream's own window is that of
+        // what is on now.
+        if (atMs != null) return@withRefresh onAirWindow(channelId, atMs)
         onAirWindow(channelId) ?: api.playbackAsset(channelId = channelId, type = "live").accessRightsV2?.live?.toProgramWindow()
     }
 
     /**
-     * The air-window of the programme on [channelId] now as the guide has it, which is where "depuis le
-     * début" must start: the stream's own window starts with the planned slot, up to a quarter of an hour
+     * The air-window of the programme on [channelId] now, or at [at], as the guide has it, which is where
+     * "depuis le début" must start: the stream's own window starts with the planned slot, up to a quarter of an hour
      * before the programme does. Best-effort: null when the guide cannot be read or is slow to answer,
      * leaving that window, as a channel must not wait for it to start.
      */
-    private suspend fun onAirWindow(channelId: String): ProgramWindow? = try {
-        val now = System.currentTimeMillis()
+    private suspend fun onAirWindow(channelId: String, at: Long = System.currentTimeMillis()): ProgramWindow? = try {
+        val now = at
         withTimeoutOrNull(ON_AIR_WAIT_MS) {
             api.epg(startTime = rfc3339Utc(now), endTime = rfc3339Utc(now + ON_AIR_SPAN_MS), limit = 1, stationId = channelId)
         }?.onAirWindow(channelId, now)

@@ -429,6 +429,26 @@ class FuboRepositoryTest {
     }
 
     @Test
+    fun `the programme that was on earlier is the guide's to say, not the stream's`() = runBlocking {
+        val now = System.currentTimeMillis()
+        val earlier = now - 90 * 60_000
+        val began = rfc3339Utc(earlier - 20 * 60_000)
+        val ended = rfc3339Utc(earlier + 10 * 60_000)
+        val guide = """{"response":[{"data":{"channel":{"id":"600048","name":"RMC Story"},"programsWithAssets":[
+            {"program":{"title":"P"},"assets":[{"accessRights":{"startTime":"$began","endTime":"$ended"}}]}]}}]}"""
+
+        liveChannel(rfc3339Utc(now - 30 * 60_000), rfc3339Utc(now + 60 * 60_000), MockResponse().setBody(guide))
+        assertEquals(
+            ProgramWindow(rfc3339UtcToEpochMillis(began)!!, rfc3339UtcToEpochMillis(ended)!!),
+            repo.liveProgramWindow("600048", earlier),
+        )
+
+        // Unknown to the guide: none, rather than the window of what is on now.
+        liveChannel(rfc3339Utc(now - 30 * 60_000), rfc3339Utc(now + 60 * 60_000), MockResponse().setBody("""{"response":[]}"""))
+        assertNull(repo.liveProgramWindow("600048", earlier))
+    }
+
+    @Test
     fun `savePlaybackPosition stores a position and clears it at zero`() = runTest {
         session.session = UserSession("AT", "RT", "u1", "p1")
         repo.savePlaybackPosition("VOD_7", 30_000L)

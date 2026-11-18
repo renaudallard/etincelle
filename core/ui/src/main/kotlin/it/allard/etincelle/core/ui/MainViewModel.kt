@@ -1147,8 +1147,8 @@ class MainViewModel(
 
     /** The on-screen programme's air-window for a live channel, for the player's programme-scoped seek
      * bar; best-effort, so a failed lookup just leaves the bar spanning the full window. */
-    suspend fun liveProgramWindow(channelId: String): ProgramWindow? =
-        runCatching { repo.liveProgramWindow(channelId) }.getOrNull()
+    suspend fun liveProgramWindow(channelId: String, atMs: Long): ProgramWindow? =
+        runCatching { repo.liveProgramWindow(channelId, atMs) }.getOrNull()
 
     // Without the error of the page left: the settings screen shows what fails there.
     fun openSettings() = _state.update { it.copy(settings = true, updateStatus = null, error = null) }
