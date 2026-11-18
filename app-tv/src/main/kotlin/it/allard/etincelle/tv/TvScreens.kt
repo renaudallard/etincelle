@@ -346,7 +346,16 @@ fun TvBrowseScreen(
                 )
             }
             item {
-                TvTab(label = "Paramètres", selected = false, onClick = onSettings)
+                // Back from the settings comes back here: the current tab may be off the screen by then,
+                // the bar having scrolled to this end, and nothing would have the focus.
+                TvTab(
+                    label = "Paramètres", selected = false,
+                    onClick = {
+                        returnFocus.save(SETTINGS_FOCUS)
+                        onSettings()
+                    },
+                    modifier = returnFocus.target(SETTINGS_FOCUS),
+                )
             }
         }
         Spacer(Modifier.height(16.dp))
@@ -1315,6 +1324,9 @@ private fun Modifier.dpadLeavesField(focusManager: FocusManager, cursorAtEnd: ()
  * the detail covering the page.
  */
 @Stable
+// What the settings' entry in the tab bar is noted as, to come back to.
+private const val SETTINGS_FOCUS = "settings"
+
 private class ReturnFocus(private val saved: MutableState<String?>) {
     private val requester = FocusRequester()
 
