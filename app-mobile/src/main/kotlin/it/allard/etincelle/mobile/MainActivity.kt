@@ -923,16 +923,18 @@ private fun PlayerSurface(
     onStartedOver: () -> Unit = {},
 ) {
     val view = LocalView.current
-    DisposableEffect(secure, currentPlayer) {
-        // Keep the screen awake while playing, here or on what the cast controller drives. For local
-        // playback also block screenshots/recording (FLAG_SECURE); the cast controller (secure=false)
-        // renders no video here, so it does not need it.
+    // The cast controller draws no video, save for the moments it is handed the phone's own player,
+    // as while another Chromecast picked from it has not taken the stream yet.
+    val shielded = secure || currentPlayer is ExoPlayer
+    DisposableEffect(shielded, currentPlayer) {
+        // Keep the screen awake while playing, here or on what the cast controller drives. Wherever
+        // the phone's own picture shows, also block screenshots/recording (FLAG_SECURE).
         val window = (view.context as? Activity)?.window
-        if (secure) window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        if (shielded) window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         val letScreenSleep = keepScreenOnWhilePlaying(window, currentPlayer)
         onDispose {
             letScreenSleep()
-            if (secure) window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+            if (shielded) window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         }
     }
     // Track how far behind the live edge we are, so a "back to live" pill can appear once the viewer
