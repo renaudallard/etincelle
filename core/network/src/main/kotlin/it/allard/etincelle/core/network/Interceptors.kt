@@ -4,8 +4,10 @@
 package it.allard.etincelle.core.network
 
 import okhttp3.Interceptor
+import okhttp3.RequestBody
 import okhttp3.Response
 import java.io.IOException
+import okio.BufferedSink
 
 /** Adds the static Molotov client + device headers to every request. */
 class FuboHeadersInterceptor(private val device: DeviceInfo) : Interceptor {
@@ -88,6 +90,27 @@ private val ACCOUNT_HEADERS = listOf("authorization", MFA_TOKEN_HEADER, "x-user-
 fun String.isTrustedApiHost(): Boolean {
     val h = lowercase()
     return h == "fubo.tv" || h.endsWith(".fubo.tv") || h == "molotov.tv" || h.endsWith(".molotov.tv")
+}
+
+/**
+ * Marks the body of anything but a GET as to be sent once. On a connection that fails OkHttp sends a
+ * request again by itself, also one the server had already received in full when its answer was lost:
+ * a recording is then scheduled twice, a profile created twice, a sign-in code spent.
+ */
+class SendOnceInterceptor : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val request = chain.request()
+        val body = request.body
+        if (request.method == "GET" || body == null || body.isOneShot()) return chain.proceed(request)
+        return chain.proceed(request.newBuilder().method(request.method, Once(body)).build())
+    }
+
+    private class Once(private val body: RequestBody) : RequestBody() {
+        override fun contentType() = body.contentType()
+        override fun contentLength() = body.contentLength()
+        override fun writeTo(sink: BufferedSink) = body.writeTo(sink)
+        override fun isOneShot() = true
+    }
 }
 
 /**

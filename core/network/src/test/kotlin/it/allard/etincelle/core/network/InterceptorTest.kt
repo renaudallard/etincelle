@@ -4,12 +4,16 @@
 package it.allard.etincelle.core.network
 
 import it.allard.etincelle.core.model.UserSession
+import java.io.IOException
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.SocketPolicy
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -138,6 +142,22 @@ class InterceptorTest {
         val response = retryClient.newCall(request).execute()
         assertEquals(200, response.code)
         response.close()
+        assertEquals(2, server.requestCount)
+    }
+
+    @Test
+    fun `a POST the server received is not sent again when its answer is lost`() {
+        val once = OkHttpClient.Builder().addInterceptor(SendOnceInterceptor()).build()
+        fun post() = once.newCall(Request.Builder().url(server.url("/x")).post("{}".toRequestBody()).build()).execute()
+        // The first leaves a connection open, which the second goes out on and loses.
+        server.enqueue(MockResponse().setBody("{}"))
+        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
+        server.enqueue(MockResponse().setBody("{}"))
+        post().close()
+
+        val error = runCatching { post().close() }.exceptionOrNull()
+
+        assertTrue(error is IOException)
         assertEquals(2, server.requestCount)
     }
 }
