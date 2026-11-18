@@ -963,7 +963,8 @@ class CastPlayerController(
 
     override fun disconnect() {
         val phonePlays = phoneStillPlays
-        if (stopTvSession(stopTv = true) || stopDirect()) {
+        // As for endCast: what a TV app plays of its own accord is not this phone's to stop.
+        if (stopTvSession(stopTv = _currentPlayer.value === tvPlayer && currentItem != null) || stopDirect()) {
             // Nothing of it is left to send to the next device picked, unless the phone still plays it
             // (the device had not taken over yet).
             if (!phonePlays) currentItem = null
