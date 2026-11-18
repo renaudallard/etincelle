@@ -142,8 +142,13 @@ pendant une diffusion. Le téléviseur lit alors ce que l'on choisit sur le tél
 (direct, rattrapage, enregistrement) avec sa propre connexion, là où en était le téléphone, y compris
 dans un direct rembobiné, enchaîne lui-même l'épisode suivant,
 et se pilote depuis la barre de diffusion, la notification ou les touches de volume du téléphone.
+Si le téléviseur ne parvient pas à lire ce que le téléphone lui passe, la lecture revient sur le
+téléphone, là où elle en était. La barre de diffusion indique « Lecture sur » le téléviseur quand il
+lit, « Connecté à » quand rien n'y passe.
 Toucher la barre de diffusion ouvre une **télécommande** : ce qui passe, lecture/pause, recul de
-10 s, avance de 30 s, et les flèches, OK et Retour pour naviguer dans l'application TV. Seul un
+10 s, avance de 30 s, et les flèches, OK et Retour pour naviguer dans l'application TV. Tant qu'on la
+pilote ainsi, le téléviseur ne lance pas son économiseur d'écran, et OK ou Retour répondent à sa
+proposition de mise à jour quand elle est affichée. Seul un
 téléphone connecté au **même compte** Molotov peut piloter le téléviseur, et réciproquement : chacun
 le prouve à l'autre à partir du compte, sans que la télécommande n'envoie le moindre identifiant sur
 le réseau local, et leurs échanges sont chiffrés. Le téléphone et le téléviseur doivent utiliser la
@@ -167,7 +172,8 @@ joignable que lorsqu'elle est à l'écran ou derrière l'**économiseur d'écran
 démarre dès que l'on réveille le téléviseur avec sa télécommande.
 
 Sur téléphone, la **lecture continue en arrière-plan** et écran verrouillé (le son seul, la vidéo
-reprenant au retour dans l'application), avec une **notification de lecture** et des **commandes sur
+reprenant au retour dans l'application), le point de reprise étant enregistré dès que l'on quitte
+l'application, en lecture comme en pause, avec une **notification de lecture** et des **commandes sur
 l'écran de verrouillage** : lecture/pause, recul de 10 s et avance de 30 s. Elles pilotent le
 téléphone, ou le Chromecast pendant une diffusion, direct compris (dans la limite de la fenêtre de
 rembobinage), comme les boutons de la télécommande plein écran qui s'ouvre en touchant la barre de
@@ -187,8 +193,8 @@ etincelle une fois la mise à jour installée : rouvrez-la depuis l'écran d'acc
 
 Avec le réglage **Mises à jour automatiques** (dans **Paramètres**, désactivé par défaut, proposé à
 partir d'Android 12), etincelle ne demande plus rien : elle télécharge la nouvelle version en silence et
-l'installe quand on quitte l'application alors que rien n'est lu ni diffusé, puisque l'installation
-ferme l'application. Sur le téléviseur, l'économiseur d'écran ne compte pas comme quitter
+l'installe quand on quitte l'application alors que rien n'est lu, diffusé ou en cours de chargement,
+ni aucune connexion au compte en attente de son code, puisque l'installation ferme l'application. Sur le téléviseur, l'économiseur d'écran ne compte pas comme quitter
 l'application : le téléphone peut toujours la piloter. etincelle doit déjà être autorisée à installer
 des applications, ce dont une première mise à jour à la main se charge. Google Play Protect peut
 encore afficher sa propre demande pour une version qu'il ne connaît pas ; et si Android réclame
