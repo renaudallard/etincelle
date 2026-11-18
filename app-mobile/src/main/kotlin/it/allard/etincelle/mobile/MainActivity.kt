@@ -964,7 +964,8 @@ private fun PlayerSurface(
     }
     // Follow the player controls' show/hide so the cast button and the back-to-live pill fade with the
     // position bar (tap to bring them back) instead of sitting permanently over the video.
-    var controlsVisible by remember { mutableStateOf(true) }
+    // They start hidden, and what the player view does as it is given its player is heard below.
+    var controlsVisible by remember { mutableStateOf(false) }
     // The cast menu open, or the programme bar under a finger: the controls stay up meanwhile. They hide
     // after five seconds otherwise, which closed the menu being read and dropped the drag under way.
     var castMenuOpen by remember { mutableStateOf(false) }
@@ -983,6 +984,13 @@ private fun PlayerSurface(
         AndroidView(
             factory = { context ->
                 PlayerView(context).apply {
+                    // Before the player is set: the view shows its controls then or leaves them hidden,
+                    // and says so only as it changes them.
+                    setControllerVisibilityListener(
+                        PlayerView.ControllerVisibilityListener { visibility ->
+                            controlsVisible = visibility == View.VISIBLE
+                        },
+                    )
                     player = currentPlayer
                     playerView = this
                     if (!secure) {
@@ -994,11 +1002,6 @@ private fun PlayerSurface(
                     // The live programme bar replaces the default time bar (which spans the bare 4h
                     // DVR window with no show markers), so hide the built-in one for the local player.
                     LivePlayback.useProgramBar(this, showBar)
-                    setControllerVisibilityListener(
-                        PlayerView.ControllerVisibilityListener { visibility ->
-                            controlsVisible = visibility == View.VISIBLE
-                        },
-                    )
                 }
             },
             update = {
