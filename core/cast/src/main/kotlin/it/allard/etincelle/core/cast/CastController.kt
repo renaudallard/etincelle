@@ -302,9 +302,16 @@ open class CastController(
         _state.value = _state.value.copy(devices = routes.map { CastDevice(it.id, it.name) } + scanned + tvs)
     }
 
-    // Matched by Cast device id, or by name in case the two ids differ.
-    private fun DirectCastDevice.isBehind(route: MediaRouter.RouteInfo): Boolean =
-        id == PlayServicesCastDevice.getFromBundle(route.extras)?.deviceId || name == route.name
+    // Matched by Cast device id, or by name in case the two ids differ. By name only at the same
+    // address when the route gives one: two Chromecasts given one name are two devices, and taken for
+    // one, the second was hidden from the list, or cast onto in place of the first.
+    private fun DirectCastDevice.isBehind(route: MediaRouter.RouteInfo): Boolean {
+        val cast = PlayServicesCastDevice.getFromBundle(route.extras)
+        if (id == cast?.deviceId) return true
+        // An IPv6 address says nothing against our IPv4 one.
+        val address = cast?.inetAddress?.hostAddress?.takeUnless { ':' in it }
+        return name == route.name && (address == null || address == host)
+    }
 
     /** The Chromecast from our own scan that is behind the Play Services route [routeId], if any. */
     protected fun scannedTwin(routeId: String): DirectCastDevice? {
