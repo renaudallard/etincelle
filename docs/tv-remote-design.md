@@ -140,6 +140,10 @@ under the player and plays the next episode itself, so the phone shows no next-e
 A recording the phone plays from the page of its episode is asked for as that page: the TV finds the
 recording there as the phone did, and with it the episode that follows, which the recording alone does
 not name. Its status then names the recording, which the phone takes for what it asked for.
+A programme handed over from the phone comes back to it, in pause, when the link ends before the TV
+has played it, as it does when the TV says it cannot play it. A live programme watched behind the
+live point keeps its place when it is brought back to the phone or moved to another TV app: the
+phone notes how far behind the TV was, and passes that on.
 On the phone, `TvRemotePlayer` turns the statuses into a media3 player, working out where playback has
 got to between two of them, so the cast controller, the notification and the lock screen drive the TV
 unchanged, and the cast bar opens a remote screen.

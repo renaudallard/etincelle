@@ -19,8 +19,10 @@ contenus directement sur l'appareil avec le **DRM Widevine** via AndroidX Media3
 
 Elle donne accès au **direct**, au **guide des programmes** (EPG), à la **recherche**, au
 **rattrapage** et à la **VOD**. Le **direct** se **rembobine** : la barre de progression du lecteur
-épouse le **programme en cours** (du début à la fin de sa diffusion, heures de début et de fin
-affichées à ses extrémités), le bord du direct se situant en
+épouse le **programme regardé** (du début à la fin de sa diffusion, heures de début et de fin
+affichées à ses extrémités), qui n'est pas celui à l'antenne quand on regarde en différé : la barre
+suit alors le programme où l'on se trouve, et couvre toute la fenêtre de rembobinage là où le guide
+ne sait plus ce qui passait. Le bord du direct se situe en
 cours de route et la portion pas encore diffusée formant la fin de la barre ; la partie trop ancienne
 pour être rembobinée y est tracée dans une couleur distincte, et un bouton **Revenir au direct**
 apparaît dès que l'on s'éloigne du bord pour y ramener d'un appui (sur le téléviseur, il s'affiche
@@ -107,7 +109,7 @@ ligne. Sur
 téléphone, vous pouvez **diffuser** le flux en cours vers un **Chromecast** et transférer la lecture
 d'un appareil à l'autre. Si le direct a été **rembobiné** avant la diffusion, le Chromecast reprend au
 même endroit dans le différé plutôt qu'au bord du direct, et y revient aussi quand le flux doit être
-rechargé en cours de diffusion ou que l'on change de Chromecast. D'un Chromecast vers l'application TV, ou vers un Chromecast joint directement, la lecture passe par le téléphone, qui en garde la place sans rien jouer. Une **coupure Wi-Fi** passagère du téléphone n'arrête pas
+rechargé en cours de diffusion ou que l'on change de Chromecast. D'un Chromecast vers l'application TV, ou vers un Chromecast joint directement, la lecture passe par le téléphone, qui en garde la place sans rien jouer. Un direct regardé en différé garde aussi sa place en revenant sur le téléphone (« Cet appareil ») et en passant d'un téléviseur à un autre. Une **coupure Wi-Fi** passagère du téléphone n'arrête pas
 la diffusion : le téléphone reprend la main sur le Chromecast, qui joue sans interruption. Un programme diffusé garde son **point de reprise** sur le
 téléphone, même arrêté depuis le téléviseur : il reprend ensuite là où la diffusion s'est arrêtée. Le **programme en cours** est aussi repéré
 sur la barre du téléviseur pendant la diffusion. Pendant la diffusion, l'application **reste sur la fiche du programme** : une
@@ -143,8 +145,8 @@ pendant une diffusion. Le téléviseur lit alors ce que l'on choisit sur le tél
 (direct, rattrapage, enregistrement) avec sa propre connexion, là où en était le téléphone, y compris
 dans un direct rembobiné, enchaîne lui-même l'épisode suivant,
 et se pilote depuis la barre de diffusion, la notification ou les touches de volume du téléphone.
-Si le téléviseur ne parvient pas à lire ce que le téléphone lui passe, la lecture revient sur le
-téléphone, là où elle en était. La barre de diffusion indique « Lecture sur » le téléviseur quand il
+Si le téléviseur ne parvient pas à lire ce que le téléphone lui passe, ou si la liaison se perd avant
+qu'il ne l'ait lu, la lecture revient sur le téléphone, là où elle en était. La barre de diffusion indique « Lecture sur » le téléviseur quand il
 lit, « Connecté à » quand rien n'y passe.
 Toucher la barre de diffusion ouvre une **télécommande** : ce qui passe, lecture/pause, recul de
 10 s, avance de 30 s, et les flèches, OK et Retour pour naviguer dans l'application TV. Tant qu'on la
@@ -198,7 +200,10 @@ Avec le réglage **Mises à jour automatiques** (dans **Paramètres**, désactiv
 partir d'Android 12), etincelle ne demande plus rien : elle télécharge la nouvelle version en silence et
 l'installe quand on quitte l'application alors que rien n'est lu, diffusé ou en cours de chargement,
 ni aucune connexion au compte en attente de son code, puisque l'installation ferme l'application. Sur le téléviseur, l'économiseur d'écran ne compte pas comme quitter
-l'application : le téléphone peut toujours la piloter. etincelle doit déjà être autorisée à installer
+l'application : le téléphone peut toujours la piloter ; et comme un téléviseur se quitte le plus
+souvent depuis le lecteur, la mise à jour s'y installe aussi une fois l'application quittée depuis une
+heure sur un programme, dont la place est déjà enregistrée. Une version déjà téléchargée n'est pas
+téléchargée de nouveau au démarrage suivant. etincelle doit déjà être autorisée à installer
 des applications, ce dont une première mise à jour à la main se charge. Google Play Protect peut
 encore afficher sa propre demande pour une version qu'il ne connaît pas ; et si Android réclame
 malgré tout une confirmation, ou si l'installation échoue, la version est proposée comme d'habitude
