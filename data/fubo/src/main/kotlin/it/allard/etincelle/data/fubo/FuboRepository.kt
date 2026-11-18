@@ -45,6 +45,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import retrofit2.HttpException
 import java.io.IOException
 
@@ -552,7 +553,7 @@ class FuboRepository(
 
     override suspend fun resolveRecording(assetId: String): PlaybackSource = withRefresh {
         // A DVR recording is seekable VOD-like content, so remember and resume its position like VOD.
-        api.playbackAsset(id = assetId, type = "dvr").toPlaybackSource()
+        api.playbackAsset(id = assetId, type = "dvr").toPlaybackSource(ownHost)
             .copy(resumeKey = assetId, startPositionMs = resumePosition(assetId), originRecordingAssetId = assetId)
     }
 
@@ -560,7 +561,7 @@ class FuboRepository(
         coroutineScope {
             val onAir = async { onAirWindow(channelId) }
             val resp = api.playbackAsset(channelId = channelId, type = "live")
-            resp.toPlaybackSource().copy(
+            resp.toPlaybackSource(ownHost).copy(
                 originChannelId = channelId,
                 programWindow = onAir.await() ?: resp.accessRightsV2?.live?.toProgramWindow(),
             )
@@ -589,7 +590,7 @@ class FuboRepository(
     }
 
     override suspend fun resolveVod(vodId: String): PlaybackSource = withRefresh {
-        api.playbackAsset(id = vodId, type = "vod").toPlaybackSource()
+        api.playbackAsset(id = vodId, type = "vod").toPlaybackSource(ownHost)
             .copy(resumeKey = vodId, startPositionMs = resumePosition(vodId), originVodId = vodId)
     }
 
@@ -794,7 +795,7 @@ internal fun AccessRightsV2WindowDto.toProgramWindow(): ProgramWindow? {
     return if (start != null && end != null && end > start) ProgramWindow(start, end) else null
 }
 
-internal fun PlaybackResponse.toPlaybackSource(): PlaybackSource {
+internal fun PlaybackResponse.toPlaybackSource(ownHost: (String) -> Boolean = String::isTrustedApiHost): PlaybackSource {
     val manifest = stream?.url ?: throw AppError.Unknown("Playback response has no stream url")
     val licenseUrl = drmV2?.license?.url ?: drm?.licenseUrl
     val drmSpec = if (stream.drmProtected == true && licenseUrl != null) {
@@ -813,7 +814,9 @@ internal fun PlaybackResponse.toPlaybackSource(): PlaybackSource {
         title = program?.heading ?: program?.title,
         heartbeatUrl = heartbeat?.url,
         concurrencyHeartbeatUrl = concurrency?.heartbeatUrl,
-        progressUrl = playhead?.url,
+        // Only on the service's own hosts: it is posted to with the account's token, by this app and, on
+        // a cast, by the receiver, which is handed that token along with it.
+        progressUrl = playhead?.url?.takeIf { url -> url.toHttpUrlOrNull()?.host?.let(ownHost) == true },
         progressPayload = playhead?.payload,
     )
 }

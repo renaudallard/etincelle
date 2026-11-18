@@ -89,12 +89,23 @@ class MapperTest {
         val response = PlaybackResponse(
             stream = StreamDto("https://cdn/m.mpd", "dash", drmProtected = false, live = false),
             drmV2 = null, drm = null, heartbeat = null, concurrency = null,
-            playhead = PlayHeadDto("POST", "https://api/playhead/v2", mapOf("assetId" to "175982", "lastOffset" to "@")),
+            playhead = PlayHeadDto("POST", "https://api-eu.fubo.tv/playhead/v2", mapOf("assetId" to "175982", "lastOffset" to "@")),
             type = "vod", program = null,
         )
         val source = response.toPlaybackSource()
-        assertEquals("https://api/playhead/v2", source.progressUrl)
+        assertEquals("https://api-eu.fubo.tv/playhead/v2", source.progressUrl)
         assertEquals("175982", source.progressPayload?.get("assetId"))
+    }
+
+    @Test
+    fun `a playhead on another host is not kept`() {
+        val response = PlaybackResponse(
+            stream = StreamDto("https://cdn/m.mpd", "dash", drmProtected = false, live = false),
+            drmV2 = null, drm = null, heartbeat = null, concurrency = null,
+            playhead = PlayHeadDto("POST", "https://fubo.tv.example.net/playhead/v2", mapOf("assetId" to "175982")),
+            type = "vod", program = null,
+        )
+        assertNull(response.toPlaybackSource().progressUrl)
     }
 
     @Test
