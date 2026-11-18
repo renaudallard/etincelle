@@ -249,7 +249,8 @@ internal data class ReceiverTimes(val time: Double, val start: Double, val end: 
 
     /** The receiver time to seek to for [positionMs] in the live window; unset means the live edge. */
     fun liveSeekTarget(positionMs: Long): Double =
-        if (positionMs == C.TIME_UNSET) end else (start + positionMs / 1000.0).coerceIn(start, end)
+        // A range the receiver gave the wrong way round, or only one end of, has no inside to seek in.
+        if (positionMs == C.TIME_UNSET || end <= start) end else (start + positionMs / 1000.0).coerceIn(start, end)
 
     private companion object {
         // As REWIND_JOIN_MARGIN in the receiver.

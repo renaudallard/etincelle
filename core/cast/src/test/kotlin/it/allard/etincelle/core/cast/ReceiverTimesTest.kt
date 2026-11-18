@@ -63,4 +63,11 @@ class ReceiverTimesTest {
         assertEquals(live.end, live.liveSeekTarget(live.windowMs + 30_000), 0.0)
         assertEquals(live.start, live.liveSeekTarget(-10_000), 0.0)
     }
+
+    @Test
+    fun aRangeGivenTheWrongWayRoundSeeksToItsEnd() {
+        // Only its start given, the end read as 0: nothing to clamp into.
+        val odd = ReceiverTimes(0.0, 30.0, 0.0)
+        assertEquals(0.0, odd.liveSeekTarget(10_000), 0.0)
+    }
 }
