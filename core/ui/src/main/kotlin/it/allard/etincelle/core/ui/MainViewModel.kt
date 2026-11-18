@@ -430,7 +430,7 @@ class MainViewModel(
         // Clear any open player/settings too, so the deep-linked show surfaces instead of being
         // stranded behind them.
         _state.update {
-            it.copy(busy = true, error = null, detailStack = emptyList(), playing = null, settings = false)
+            it.copy(busy = true, error = null, info = null, detailStack = emptyList(), playing = null, settings = false)
         }
         navLaunch {
             runCatchingNav { repo.fetchProgramDetail(id, kind) }
@@ -799,7 +799,7 @@ class MainViewModel(
      */
     fun watchReplay() {
         val vodId = _state.value.detail?.replay?.vodId ?: return
-        _state.update { it.copy(busy = true, error = null) }
+        _state.update { it.copy(busy = true, error = null, info = null) }
         navLaunch {
             runCatchingNav {
                 val detail = repo.fetchProgramDetail(vodId, DetailKind.PROGRAM)
@@ -911,7 +911,13 @@ class MainViewModel(
         }
     }
 
-    fun closeProfiles() = _state.update { it.copy(profileScreen = null, profileEditor = null) }
+    /**
+     * Closes the profiles screen. What it said goes with it, save for the question asked at the start,
+     * under which the message may be the home page's own.
+     */
+    fun closeProfiles() = _state.update {
+        it.copy(profileScreen = null, profileEditor = null, error = if (it.profileScreen?.asking == true) it.error else null, info = null)
+    }
 
     /** Opens the editor on [profile], or on a new profile when null. */
     fun editProfile(profile: Profile?) = _state.update { it.copy(profileEditor = ProfileEditor(profile), error = null) }
@@ -1028,7 +1034,7 @@ class MainViewModel(
         }
     }
 
-    fun closeFavoriteOrder() = _state.update { it.copy(favoriteOrder = null) }
+    fun closeFavoriteOrder() = _state.update { it.copy(favoriteOrder = null, error = null, info = null) }
 
     /** Closes the detail page, back to browsing. */
     /** Closes the top detail page: back to its parent detail if any, otherwise back to browsing. */
@@ -1121,7 +1127,7 @@ class MainViewModel(
     // Without the error of the page left: the settings screen shows what fails there.
     fun openSettings() = _state.update { it.copy(settings = true, updateStatus = null, error = null) }
 
-    fun closeSettings() = _state.update { it.copy(settings = false) }
+    fun closeSettings() = _state.update { it.copy(settings = false, error = null, info = null) }
 
     /** Hides or shows locked (unentitled) cards across the content lists; see [UiState.visibleRails]. */
     fun setHideLocked(hide: Boolean) = _state.update { it.copy(hideLocked = hide) }
