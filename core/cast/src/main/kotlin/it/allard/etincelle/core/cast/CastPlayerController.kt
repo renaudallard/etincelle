@@ -526,7 +526,7 @@ class CastPlayerController(
     // Has the TV app play [item] from [positionMs] (on demand) or [rewindMs] behind the live edge.
     private fun playOnTv(item: MediaItem, positionMs: Long, rewindMs: Long) {
         val session = tvSession ?: return
-        val (kind, id) = remoteTarget(item) ?: return
+        val (kind, id) = remoteTargets(item).firstOrNull() ?: return
         val message = JSONObject().put(RemoteMessages.TYPE, RemoteMessages.PLAY).put(RemoteMessages.KIND, kind).put(RemoteMessages.ID, id)
         if (kind == RemoteMessages.KIND_LIVE) message.put(RemoteMessages.REWIND, rewindMs) else message.put(RemoteMessages.POSITION, positionMs)
         message.put(RemoteMessages.REQUEST, ++tvRequests)
@@ -540,21 +540,17 @@ class CastPlayerController(
         session.send(message)
     }
 
-    // What [item] is for the TV app: its kind and id, as the play message and the TV's status name it.
-    private fun remoteTarget(item: MediaItem?): Pair<String, String>? {
-        val source = item?.localConfiguration?.tag as? PlaybackSource ?: return null
-        return source.originChannelId?.let { RemoteMessages.KIND_LIVE to it }
-            ?: source.originRecordingAssetId?.let { RemoteMessages.KIND_RECORDING to it }
-            ?: source.originVodId?.let { RemoteMessages.KIND_VOD to it }
-    }
+    // What [item] is for the TV app: the kinds and ids the play message and the TV's status name it by.
+    private fun remoteTargets(item: MediaItem?): List<Pair<String, String>> =
+        (item?.localConfiguration?.tag as? PlaybackSource)?.remoteTargets().orEmpty()
 
     private fun onTvMessage(message: JSONObject) {
         if (message.optString(RemoteMessages.TYPE) != RemoteMessages.STATUS) return
         tvPlayer.onStatus(message)
         val playing = message.optString(RemoteMessages.ID).takeIf { it.isNotEmpty() }?.let { message.optString(RemoteMessages.KIND) to it }
-        val sent = remoteTarget(currentItem)
-        if (playing != null && sent != null) {
-            if (playing == sent) {
+        val sent = remoteTargets(currentItem)
+        if (playing != null && sent.isNotEmpty()) {
+            if (playing in sent) {
                 tvStarted = true
                 tvHandoverMs = -1L
             } else if (tvStarted) {

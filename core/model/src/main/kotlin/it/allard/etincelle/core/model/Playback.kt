@@ -49,6 +49,9 @@ data class PlaybackSource(
     val originChannelId: String? = null,
     val originVodId: String? = null,
     val originRecordingAssetId: String? = null,
+    /** The page of the episode a recording was played from, which knows the episode that follows it
+     * when the recording itself does not. Null for a recording played by itself, and for anything else. */
+    val originPageVodId: String? = null,
     /** Server session keep-alive endpoints to ping while playing (may be null). */
     val heartbeatUrl: String? = null,
     val concurrencyHeartbeatUrl: String? = null,

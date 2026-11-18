@@ -118,6 +118,9 @@ that programme on.
 
 The TV resolves streams with its own sign-in, so nothing is passed but ids; it shows a programme's page
 under the player and plays the next episode itself, so the phone shows no next-episode slate for it.
+A recording the phone plays from the page of its episode is asked for as that page: the TV finds the
+recording there as the phone did, and with it the episode that follows, which the recording alone does
+not name. Its status then names the recording, which the phone takes for what it asked for.
 On the phone, `TvRemotePlayer` turns the statuses into a media3 player, working out where playback has
 got to between two of them, so the cast controller, the notification and the lock screen drive the TV
 unchanged, and the cast bar opens a remote screen.

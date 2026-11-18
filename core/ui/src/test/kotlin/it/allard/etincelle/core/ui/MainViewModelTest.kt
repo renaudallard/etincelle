@@ -311,7 +311,7 @@ class MainViewModelTest {
         vm.watchDetail()
 
         assertEquals(listOf("LIVE_1"), repo.resolvedRecordings)
-        assertEquals(SOURCE, vm.state.value.playing)
+        assertEquals(SOURCE.copy(originPageVodId = "LIVE_1"), vm.state.value.playing)
     }
 
     @Test
@@ -324,6 +324,8 @@ class MainViewModelTest {
         vm.watchDetail()
 
         assertEquals(next, vm.state.value.playing?.upNext)
+        // The page it was played from goes with it: a TV asked for it finds the next episode there.
+        assertEquals("LIVE_1", vm.state.value.playing?.originPageVodId)
     }
 
     @Test

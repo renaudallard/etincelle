@@ -624,12 +624,15 @@ class MainViewModel(
 
     /**
      * Plays a DVR recording by its dvr asset id (from a recording card or a detail's recordings list),
-     * offering [upNext] at its end when it is known (from the episode's own page).
+     * offering [upNext] at its end when it is known (from the episode's own page, [pageVodId] when
+     * that page names the recording itself: see PlaybackSource.originPageVodId).
      */
-    fun watchRecording(assetId: String, upNext: UpNext? = null) {
+    fun watchRecording(assetId: String, upNext: UpNext? = null, pageVodId: String? = null) {
         _state.update { it.copy(busy = true, error = null, info = null) }
         navLaunch {
-            runCatchingNav { repo.resolveRecording(assetId).let { if (upNext != null) it.withUpNext(upNext) else it } }
+            runCatchingNav {
+                repo.resolveRecording(assetId).copy(originPageVodId = pageVodId).let { if (upNext != null) it.withUpNext(upNext) else it }
+            }
                 .onSuccess { src -> _state.update { it.copy(busy = false, playing = src) } }
                 .onFailure { e -> applyFailure(e, "Échec de lecture") }
         }
@@ -672,7 +675,14 @@ class MainViewModel(
         val d = _state.value.detail ?: return
         // A detail opened from a recording, or whose page says it is one, plays that recording: its
         // catch-up stream does not exist.
-        (_state.value.detailRecordingAssetId ?: d.recordingAssetId)?.let { watchRecording(it, d.upNext); return }
+        (_state.value.detailRecordingAssetId ?: d.recordingAssetId)?.let { asset ->
+            // A page that names the recording itself leads a TV to it as well; one opened from a
+            // recording does not, and is not given as where it came from.
+            val entry = _state.value.detailStack.lastOrNull()
+            val page = entry?.id?.takeIf { d.recordingAssetId == asset && entry.kind == DetailKind.PROGRAM }
+            watchRecording(asset, d.upNext, page)
+            return
+        }
         // A series has no stream of its own (its vodId is the series id, not a playable asset); the UI
         // hides the Watch button for it, but guard here too so a stray caller cannot mis-resolve it.
         if (d.isSeries) return
@@ -732,7 +742,7 @@ class MainViewModel(
     // The stream of programme [id], from the DVR when its page says it is a recording (it then has no
     // catch-up stream).
     private suspend fun resolveProgramme(id: String, detail: ProgramDetail): PlaybackSource =
-        detail.recordingAssetId?.let { repo.resolveRecording(it) } ?: repo.resolveVod(id)
+        detail.recordingAssetId?.let { repo.resolveRecording(it).copy(originPageVodId = id) } ?: repo.resolveVod(id)
 
     /**
      * Plays what a phone of this account sent to this TV (see core/remote): [id] as [kind], from
@@ -1073,7 +1083,8 @@ class MainViewModel(
         when {
             channelId != null -> repo.resolveLiveChannel(channelId)
             vodId != null -> repo.resolveVod(vodId)
-            recordingAssetId != null -> repo.resolveRecording(recordingAssetId)
+            // A fresh stream of the same recording, from the same page.
+            recordingAssetId != null -> repo.resolveRecording(recordingAssetId).copy(originPageVodId = source.originPageVodId)
             else -> null
         }
     } catch (c: CancellationException) {

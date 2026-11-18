@@ -4,7 +4,9 @@
 package it.allard.etincelle.core.cast
 
 import android.net.Network
+import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.remote.RemoteLink
+import it.allard.etincelle.core.remote.RemoteMessages
 import it.allard.etincelle.core.remote.RemoteTv
 import it.allard.etincelle.core.remote.StatusPacer
 import java.io.IOException
@@ -20,6 +22,19 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+
+/**
+ * What this is to a TV app, as the kinds and ids that name it (see RemoteMessages): the first is the
+ * one to ask for, and the TV may name what it plays by any of them. A recording played from the page of
+ * its episode is asked for by that page, which is where the TV finds the episode that follows, and comes
+ * back named as the recording the page led to.
+ */
+internal fun PlaybackSource.remoteTargets(): List<Pair<String, String>> = listOfNotNull(
+    originChannelId?.let { RemoteMessages.KIND_LIVE to it },
+    originPageVodId?.let { RemoteMessages.KIND_VOD to it },
+    originRecordingAssetId?.let { RemoteMessages.KIND_RECORDING to it },
+    originVodId?.let { RemoteMessages.KIND_VOD to it },
+)
 
 /**
  * A connection from the phone to an etincelle TV app (see core/remote), to drive it as a Chromecast is.
