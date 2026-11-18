@@ -668,8 +668,11 @@ class FuboRepository(
         } catch (e: HttpException) {
             if (e.code() != 401) throw e
             // The pages name some urls themselves, and one outside the app's own hosts is not sent the
-            // session: its 401 says nothing about it.
-            val host = e.response()?.raw()?.request?.url?.host
+            // session: its 401 says nothing about it. Judged by the address first asked: sent on from
+            // there to one of the app's hosts, the request still went without the session.
+            var first = e.response()?.raw()
+            while (first?.priorResponse != null) first = first.priorResponse
+            val host = first?.request?.url?.host
             if (host != null && !ownHost(host)) throw e
             // Nobody is signed in here, as when the saved session could not be read just now: the 401
             // says no more than that, and what is saved is not to be cleared over it.
