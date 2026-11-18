@@ -8,6 +8,9 @@ import it.allard.etincelle.core.model.UserSession
 /** Persistent storage for the authenticated session (implemented by [TokenStore]). */
 interface SessionStore {
     suspend fun read(): UserSession?
+
+    /** A session is saved, whether or not it can be read just now ([read] answers null for both). */
+    suspend fun holds(): Boolean = read() != null
     suspend fun save(session: UserSession)
     suspend fun clear()
 

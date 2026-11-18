@@ -39,6 +39,8 @@ class TokenStore(private val context: Context) : SessionStore {
         UserSession(access, refresh, userId, profileId)
     }
 
+    override suspend fun holds(): Boolean = context.dataStore.data.first()[ACCESS] != null
+
     override suspend fun save(session: UserSession) {
         withContext(Dispatchers.IO) {
             context.dataStore.edit { prefs ->

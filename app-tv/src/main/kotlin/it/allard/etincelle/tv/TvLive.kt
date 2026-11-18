@@ -70,10 +70,8 @@ object TvLive {
 
     /** Writes the channels and their programmes for the input; signed out, removes them. */
     suspend fun sync(context: Context, repo: MolotovRepository) = lock.withLock {
-        // A saved session that cannot be read, or a restore cut short by the job being stopped, is not a
-        // sign-out: leave the guide as it is.
-        if (repo.currentSession() == null && runCatching { repo.restoreSession() }.isFailure) return@withLock
-        if (repo.currentSession() == null) {
+        val signedIn = repo.signedIn() ?: return@withLock
+        if (!signedIn) {
             context.contentResolver.delete(TvContract.buildChannelsUriForInput(inputId(context)), null, null)
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(SYNCED_AT).remove(SYNCED_FOR).apply()
             return@withLock

@@ -35,6 +35,12 @@ interface MolotovRepository {
     /** Asks for a new code; the returned challenge replaces [challenge]. */
     suspend fun resendCode(challenge: MfaChallenge): MfaChallenge
     suspend fun restoreSession(): Boolean
+
+    /**
+     * A session is saved on this device, readable or not. [restoreSession] answers false for none saved
+     * and for one the Keystore cannot give back just now alike, which is no sign-out.
+     */
+    suspend fun sessionSaved(): Boolean
     suspend fun logout()
 
     /** Starts the TV "connect my TV" flow: returns a code to display while the user confirms it. */

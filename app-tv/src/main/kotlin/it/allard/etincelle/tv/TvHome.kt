@@ -35,10 +35,8 @@ object TvHome {
 
     /** Brings the row and Watch Next up to date. Runs off the main thread (it does disk and network IO). */
     suspend fun sync(context: Context, repo: MolotovRepository) = lock.withLock {
-        // A saved session that cannot be read, or a restore cut short by the job being stopped, is not a
-        // sign-out: leave the row as it is.
-        if (repo.currentSession() == null && runCatching { repo.restoreSession() }.isFailure) return@withLock
-        if (repo.currentSession() == null) {
+        val signedIn = repo.signedIn() ?: return@withLock
+        if (!signedIn) {
             replaceRow(context, emptyList())
             replaceWatchNext(context, emptyList())
             return@withLock
@@ -143,4 +141,17 @@ object TvHome {
             icon.draw(Canvas(it))
         }
     }
+}
+
+/**
+ * Whether someone is signed in, the saved session read if need be; null when that cannot be told. A
+ * saved session that cannot be read (the Keystore fails now and then), or a restore cut short by its
+ * job being stopped, is no sign-out: what the system shows of the account is then left as it is,
+ * rather than wiped to be written again later.
+ */
+internal suspend fun MolotovRepository.signedIn(): Boolean? {
+    if (currentSession() != null) return true
+    val restored = runCatching { restoreSession() }.getOrNull() ?: return null
+    if (restored) return true
+    return if (runCatching { sessionSaved() }.getOrDefault(true)) null else false
 }

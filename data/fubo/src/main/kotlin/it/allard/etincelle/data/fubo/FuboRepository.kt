@@ -225,6 +225,8 @@ class FuboRepository(
         api.confirmSignInCode(SignInCodePollRequest(code)).close()
     }
 
+    override suspend fun sessionSaved(): Boolean = store.holds()
+
     /** Loads a persisted session into memory; returns true if one was present. */
     override suspend fun restoreSession(): Boolean = refreshMutex.withLock {
         // Read under the lock a sign-out clears it under: read before that and put back after it, the
