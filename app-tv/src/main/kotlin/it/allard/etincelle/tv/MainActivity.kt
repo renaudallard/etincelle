@@ -831,7 +831,10 @@ private fun TvPlayerSurface(
     // once the live window has loaded, then stop retrying.
     var pendingRewind by remember(source) { mutableStateOf(source.isLive && source.liveRewindOffsetMs > 0L) }
     val rewindTo = remember(source) { System.currentTimeMillis() - source.liveRewindOffsetMs }
-    var controlsVisible by remember { mutableStateOf(true) }
+    // The programme bar and the back-to-live pill go with the player's controls. They start hidden, and
+    // what the player view does as it is given its player is heard below: taken as shown from the
+    // start, with a view that left them hidden, they stayed on screen until a key was pressed.
+    var controlsVisible by remember { mutableStateOf(false) }
     // The remote only reaches the PlayerView (OK or a direction shows the controls) while that view
     // holds the Android focus; otherwise the keys stop at Compose and the controls cannot be brought
     // back once hidden. A Compose focus request does not move the focus into the embedded view, so ask
@@ -918,17 +921,19 @@ private fun TvPlayerSurface(
                     override fun dispatchKeyEvent(event: KeyEvent): Boolean =
                         remoteKey(event) || super.dispatchKeyEvent(event)
                 }.apply {
-                    this.player = player
-                    playerView = this
-                    // The programme bar replaces the default time bar, which spans the bare 4h DVR
-                    // window with no show markers.
-                    LivePlayback.useProgramBar(this, source.isLive)
+                    // Before the player is set: the view shows its controls then or leaves them hidden,
+                    // and says so only as it changes them.
                     setControllerVisibilityListener(
                         PlayerView.ControllerVisibilityListener { visibility ->
                             controlsVisible = visibility == View.VISIBLE
                             if (!controlsVisible) post { requestFocus() }
                         },
                     )
+                    this.player = player
+                    playerView = this
+                    // The programme bar replaces the default time bar, which spans the bare 4h DVR
+                    // window with no show markers.
+                    LivePlayback.useProgramBar(this, source.isLive)
                 }
             },
             update = { LivePlayback.useProgramBar(it, source.isLive) },
