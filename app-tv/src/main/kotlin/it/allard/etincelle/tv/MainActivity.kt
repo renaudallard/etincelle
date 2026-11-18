@@ -105,6 +105,9 @@ private const val RELOAD_SEEK_TRIES = 120
 // How long the screen is kept on after a key from the phone: about what a TV waits before its screensaver.
 private const val PHONE_KEY_AWAKE_MS = 5 * 60_000L
 
+// The key the sign-in screen keeps its state under.
+private const val LOGIN_STATE = "LOGIN"
+
 class MainActivity : ComponentActivity(), TvRemote.Screen {
 
     private val viewModel: MainViewModel by viewModels {
@@ -236,6 +239,7 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                     // below): not for a later search to start from, nor for the next account.
                     LaunchedEffect(state.loggedIn, state.tab) {
                         if (!state.loggedIn || state.tab != Tab.SEARCH) contentStateHolder.removeState("SEARCH")
+                        if (state.loggedIn) contentStateHolder.removeState(LOGIN_STATE)
                     }
                     val detailKeys = rememberStackStateKeys(contentStateHolder, state.detailStack.map { it.id })
                     val favoriteOrder = state.favoriteOrder
@@ -343,10 +347,14 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                             TvCodeScreen(mfa, state.busy, state.error, state.info, viewModel::verifyCode, viewModel::resendCode, viewModel::cancelCode)
                         }
 
-                        else -> TvLoginScreen(
-                            state.pairingCode, state.busy, state.error,
-                            viewModel::loginWithCode, viewModel::stopPairingPoll, viewModel::cancelCodeLogin, viewModel::login,
-                        )
+                        // Annuler on the code screen comes back to the form it was sent from, the
+                        // address still in it, not to a new pairing code.
+                        else -> contentStateHolder.SaveableStateProvider(LOGIN_STATE) {
+                            TvLoginScreen(
+                                state.pairingCode, state.busy, state.error,
+                                viewModel::loginWithCode, viewModel::stopPairingPoll, viewModel::cancelCodeLogin, viewModel::login,
+                            )
+                        }
                     }
                     state.update?.takeIf { !it.quiet }?.let { up ->
                         TvUpdateDialog(

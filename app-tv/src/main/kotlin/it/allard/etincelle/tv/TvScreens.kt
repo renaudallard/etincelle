@@ -137,7 +137,8 @@ fun TvLoginScreen(
     onCancelPairing: () -> Unit,
     onEmailLogin: (String, String) -> Unit,
 ) {
-    var emailMode by remember { mutableStateOf(false) }
+    // Kept with the screen (see where it is shown) while the code of a two-step sign-in is asked for.
+    var emailMode by rememberSaveable { mutableStateOf(false) }
     if (emailMode) {
         TvEmailLoginScreen(busy, error, onEmailLogin, onUseCode = { emailMode = false })
     } else {
@@ -207,7 +208,7 @@ private fun TvCodeLoginScreen(code: String?, busy: Boolean, error: String?, onSt
 
 @Composable
 private fun TvEmailLoginScreen(busy: Boolean, error: String?, onLogin: (String, String) -> Unit, onUseCode: () -> Unit) {
-    var email by remember { mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     val first = remember { FocusRequester() }
     val passwordField = remember { FocusRequester() }
