@@ -758,6 +758,9 @@ class MainViewModel(
                     val stack = if (onEpisodePage(st)) st.detailStack.dropLast(1) + entry else st.detailStack
                     st.copy(busy = if (busy) false else st.busy, playing = src, detailStack = stack)
                 }
+                // Left in its credits, the episode before is watched: it starts over next time. On a
+                // cast nothing else says so, the phone only having sampled where it was now and then.
+                if (_state.value.playing === src) savePlaybackPosition(current.resumeKey, 0)
             }.onFailure { e ->
                 // Stopped, or something else chosen, meanwhile: nobody waits for this episode any more,
                 // and only the spinner it put up is taken down.
