@@ -377,15 +377,18 @@ class MainActivity : ComponentActivity() {
         castController?.stop()
         // Playback goes on in the background, sound only: no video decoding for a screen nobody sees.
         player?.let {
-            if (it.isPlaying) {
-                // Persist the resume point now too: the player surface only saves on dispose, which a
-                // kill of the backgrounded process skips, losing the position. Only ever save a real
-                // position here, never clear (positionToSave returns 0 near the start/end), so a
-                // background blip cannot wipe a valid resume point; clearing is the dispose path's job.
-                // (No-op while casting: the local player is idle, so isPlaying is false.)
+            if (it.playbackState == Player.STATE_READY || it.playbackState == Player.STATE_BUFFERING) {
+                // Persist the resume point now too, playing or paused, and tell the server: the player
+                // surface only does so on dispose, which a kill of the backgrounded process skips,
+                // losing the position. Only ever save a real position here, never clear (positionToSave
+                // returns 0 near the start/end), so a background blip cannot wipe a valid resume point;
+                // clearing is the dispose path's job. (No-op while casting: the local player is idle.)
                 viewModel.state.value.playing?.let { src ->
                     val pos = PlaybackProgress.positionToSave(src, it.currentPosition, it.duration)
-                    if (pos > 0) viewModel.savePlaybackPosition(src.resumeKey, pos)
+                    if (pos > 0) {
+                        viewModel.savePlaybackPosition(src.resumeKey, pos)
+                        viewModel.reportProgress(src, it.currentPosition, it.duration)
+                    }
                 }
             }
             it.trackSelectionParameters = it.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, true).build()
