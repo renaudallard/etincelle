@@ -52,5 +52,7 @@ sealed class AppError(message: String) : Exception(message) {
     data object GeoBlocked : AppError("Non disponible dans votre région")
     data object NotEntitled : AppError("Réservé aux abonnés")
     data class Network(val reason: String) : AppError(reason)
+    // Refused or not understood, with nothing more known of why: what was being done says it better.
+    data object Unspecified : AppError("Chargement impossible, réessayez")
     data class Unknown(val reason: String) : AppError(reason)
 }

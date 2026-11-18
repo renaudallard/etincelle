@@ -577,7 +577,7 @@ class FuboRepositoryTest {
 
         val error = runCatching { repo.loadHome() }.exceptionOrNull()
 
-        assertTrue(error is AppError.Unknown)
+        assertTrue(error is AppError.Unspecified)
         assertEquals("Chargement impossible, réessayez", error?.message)
     }
 

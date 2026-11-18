@@ -56,7 +56,6 @@ private const val GUIDE_PAGE_SIZE = 100
 // Bounds the paging should the backend ever hand back an offset that does not move on.
 private const val GUIDE_MAX_PAGES = 10
 // What the user reads when a page could not be loaded for a reason of no use to them.
-private const val LOAD_FAILED = "Chargement impossible, réessayez"
 // The stretch of guide asked for to learn what is on air on a channel.
 private const val ON_AIR_SPAN_MS = 60_000L
 // How long a channel about to play waits for it.
@@ -757,7 +756,7 @@ class FuboRepository(
     } catch (e: JsonDataException) {
         // An answer not shaped as expected: the parser's own words ("Expected BEGIN_OBJECT but was
         // STRING at path $.content...") are nothing to show.
-        throw AppError.Unknown(LOAD_FAILED)
+        throw AppError.Unspecified
     }
 }
 
@@ -825,7 +824,7 @@ private fun HttpException.toAppError(): AppError = when (code()) {
     404 -> AppError.Unknown("Contenu introuvable")
     451 -> blockedError(backendError())
     in 500..599 -> AppError.Network("Service indisponible, réessayez")
-    else -> AppError.Unknown(LOAD_FAILED)
+    else -> AppError.Unspecified
 }
 
 /** The programme air-window in epoch ms, preferring the ms form; null unless both bounds are sane. */

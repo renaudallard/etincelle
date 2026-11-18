@@ -438,7 +438,9 @@ class MainViewModel(
             lastQuery = null
             _state.update { UiState(checking = false, error = e.message, hideLocked = it.hideLocked, update = it.update) }
         } else {
-            _state.update { it.copy(busy = false, refreshing = false, error = e.message ?: fallback) }
+            // An error that says nothing of its own is told by what was being done.
+            val message = e.message.takeUnless { e is AppError.Unspecified } ?: fallback
+            _state.update { it.copy(busy = false, refreshing = false, error = message) }
         }
     }
 
