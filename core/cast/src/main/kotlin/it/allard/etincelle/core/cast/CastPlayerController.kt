@@ -177,6 +177,10 @@ class CastPlayerController(
     val tvIdle: Boolean
         get() = tvConnected && currentItem == null && !tvMovedOn
 
+    // A direct session exists, or is about to: a reconnection has none yet in its first second.
+    private val directPending: Boolean
+        get() = directSession != null || rejoinJob?.isActive == true
+
     // The direct session is connected (not just starting).
     private val directConnected: Boolean
         get() = directSession != null && state.value.connectedRouteId?.startsWith(DIRECT_ROUTE_PREFIX) == true
@@ -425,7 +429,7 @@ class CastPlayerController(
         // still connecting is given up the same way.
         val toDirect = routeId.startsWith(DIRECT_ROUTE_PREFIX) || routeId.startsWith(TV_ROUTE_PREFIX)
         directFallback = null
-        if (directSession != null || tvSession != null) returnToThisDevice()
+        if (directPending || tvSession != null) returnToThisDevice()
         if (toDirect && super.isCastSessionActive) {
             // The Play Services cast ends asynchronously; connect once it is back on the phone.
             pendingDirectRoute = routeId
@@ -816,10 +820,14 @@ class CastPlayerController(
 
     // End the direct session and stop the receiver; true when there was one.
     private fun stopDirect(): Boolean {
+        val rejoining = rejoinJob?.isActive == true
         rejoinJob?.cancel()
-        val session = directSession ?: return false
+        val session = directSession
+        // A reconnection has no session yet in its first second: the direct player is left all the
+        // same, or it would stay the current one with nothing behind it.
+        if (session == null && !rejoining) return false
         directSession = null
-        session.stop()
+        session?.stop()
         leaveDirectPlayer()
         onSessionDisconnected()
         return true
@@ -930,7 +938,7 @@ class CastPlayerController(
         }
         // Direct session: stop the TV and play on the phone again, where the TV was (or where the phone
         // still is, when the TV has not taken over yet).
-        if (directSession != null) {
+        if (directPending) {
             if (phoneStillPlays) {
                 stopDirect()
                 return
