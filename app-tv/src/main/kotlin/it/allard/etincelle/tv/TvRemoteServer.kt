@@ -39,10 +39,12 @@ import org.json.JSONObject
 /**
  * Lets a phone signed in to the same account drive this TV app (see docs/tv-remote-design.md). It takes
  * connections on a port of its own, announces itself as it starts and answers the phones looking for TV apps
- * (see [RemoteDiscovery]) with the TV's name, and keeps the latest phone that proves the account key: its
- * commands reach [onCommand] on the main thread, and [send] tells it how playback goes. It may run for
- * days (see [TvRemote]), so nothing short of [stop] ends it. [start], [stop] and [send] are main-thread
- * calls.
+ * (see [RemoteDiscovery]) with the TV's name, and lets in the phones that prove the account key. One
+ * drives the TV, the latest to have asked for something: its commands reach [onCommand] on the main
+ * thread. The latest let in since is kept beside it and takes its place by asking for something, not by
+ * connecting: a phone app coming back to this TV by itself as it is reopened must not take the TV from
+ * the phone someone is driving it with. [send] tells both how playback goes. It may run for days (see
+ * [TvRemote]), so nothing short of [stop] ends it. [start], [stop] and [send] are main-thread calls.
  */
 class TvRemoteServer(
     private val context: Context,
@@ -52,14 +54,18 @@ class TvRemoteServer(
     private var scope: CoroutineScope? = null
     private var server: ServerSocket? = null
     private var discovery: DatagramSocket? = null
-    // Messages to the phone leave in order, off the main thread, while the server runs.
+    // Messages to the phones leave off the main thread while the server runs, on a thread for each of
+    // the two kept, so that one that stopped reading does not hold up the other's.
     private var writer: ExecutorService? = null
 
-    @Volatile
-    private var link: RemoteLink? = null
+    // A phone let in, and whether a message to it is waiting to leave or leaving.
+    private class Phone(val link: RemoteLink) {
+        val sending = AtomicBoolean()
+    }
 
-    // A message to the phone is waiting to leave or leaving.
-    private val sending = AtomicBoolean()
+    // The phone driving this TV, and the latest let in that has asked for nothing yet (main thread).
+    private var driver: Phone? = null
+    private var waiting: Phone? = null
 
     // The account key and until when it is taken as current (main thread). A connection must cost no call
     // to the backend, or any device on the network could flood the app's own calls with them; yet the
@@ -82,7 +88,7 @@ class TvRemoteServer(
     private val opening = HashSet<Socket>()
 
     /** A phone is connected. */
-    val connected: Boolean get() = link != null
+    val connected: Boolean get() = driver != null || waiting != null
 
     /** How many phones were let in so far: one more tells a new phone from the one before. */
     var phones = 0
@@ -102,7 +108,7 @@ class TvRemoteServer(
         }.getOrNull()
         this.server = server
         this.discovery = discovery
-        writer = Executors.newSingleThreadExecutor()
+        writer = Executors.newFixedThreadPool(2)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate).also { scope = it }
         // Ready before the first phone connects.
         scope.launch { refreshKey() }
@@ -121,8 +127,7 @@ class TvRemoteServer(
         discovery = null
         runCatching { server?.close() }
         server = null
-        link?.close()
-        link = null
+        dropPhones()
         opening.forEach { runCatching { it.close() } }
         opening.clear()
         scope?.cancel()
@@ -134,61 +139,79 @@ class TvRemoteServer(
     }
 
     /**
-     * The account was signed out: its key no longer opens this TV, and the phone it let in is let go.
+     * The account was signed out: its key no longer opens this TV, and the phones it let in are let go.
      * The key of the account signed in next is worked out as its first phone connects.
      */
     fun forgetAccount() {
         accounts++
-        link?.close()
-        link = null
+        dropPhones()
         key = null
         keyUntil = 0
     }
 
-    /** Sends [message] to the phone; false when it does not leave, for want of a phone or with the last one still leaving. */
+    private fun dropPhones() {
+        driver?.link?.close()
+        driver = null
+        waiting?.link?.close()
+        waiting = null
+    }
+
+    /**
+     * Sends [message] to the phones; false when it leaves for none, for want of a phone or with the
+     * last one still leaving.
+     */
     fun send(message: JSONObject): Boolean {
-        val link = link ?: return false
-        // One at a time: each tells how playback goes now and makes the one before moot, and a phone that
-        // stopped reading while keeping its connection must not have them pile up for days.
-        if (!sending.compareAndSet(false, true)) return false
         val text = message.toString()
-        val queued = runCatching {
-            writer?.execute {
-                try {
-                    link.send(text)
-                } catch (e: Exception) {
-                    // The phone left: its reader ends the link.
-                } finally {
-                    sending.set(false)
+        var leaving = false
+        for (phone in listOfNotNull(driver, waiting)) {
+            // One at a time: each tells how playback goes now and makes the one before moot, and a phone
+            // that stopped reading while keeping its connection must not have them pile up for days.
+            if (!phone.sending.compareAndSet(false, true)) continue
+            val queued = runCatching {
+                writer?.execute {
+                    try {
+                        phone.link.send(text)
+                    } catch (e: Exception) {
+                        // The phone left: its reader ends the link.
+                    } finally {
+                        phone.sending.set(false)
+                    }
                 }
             }
+            if (queued.getOrNull() != null) leaving = true else phone.sending.set(false)
         }
-        val leaving = queued.getOrNull() != null
-        if (!leaving) sending.set(false)
         return leaving
     }
 
-    // One phone: the handshake, then its commands until it leaves. A newer phone takes over.
+    // One phone: the handshake, then its commands until it leaves. It waits beside the phone driving the
+    // TV, in the place of the one that waited there, and drives the TV from the first thing it asks for.
     private suspend fun serve(socket: Socket) {
         opening.add(socket)
-        val phone = try {
+        val link = try {
             greet(socket)
         } finally {
             opening.remove(socket)
         } ?: return
-        link?.close()
-        link = phone
+        val phone = Phone(link)
+        waiting?.link?.close()
+        waiting = phone
         phones++
         try {
             while (true) {
-                val message = withContext(Dispatchers.IO) { phone.receive() }
+                val message = withContext(Dispatchers.IO) { link.receive() }
+                if (driver !== phone) {
+                    driver?.link?.close()
+                    driver = phone
+                    if (waiting === phone) waiting = null
+                }
                 runCatching { JSONObject(message) }.getOrNull()?.let(onCommand)
             }
         } catch (e: Exception) {
             // The phone left, or broke the protocol: drop it.
         } finally {
-            phone.close()
-            if (link === phone) link = null
+            link.close()
+            if (driver === phone) driver = null
+            if (waiting === phone) waiting = null
         }
     }
 

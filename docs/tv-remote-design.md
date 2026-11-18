@@ -83,7 +83,15 @@ Each side checks the other's proof, so neither talks to a device of another acco
 is encrypted with AES-256-GCM under `HMAC(key, "session|tvNonce|phoneNonce")`, its 12-byte nonce made of
 the direction (1 from the TV, 2 from the phone) and the message's sequence number, which is not sent: a
 message can be neither read by others on the network, nor forged, altered, replayed or reordered. The TV
-keeps the latest phone that proves the key, and takes one handshake at a time per address (four in all).
+takes one handshake at a time per address (four in all).
+
+One phone drives the TV: the latest to have asked for something. A phone that proves the key waits
+beside it, in the place of the one that waited there before, hears the status like the driving one, and
+takes its place with its first command, not by connecting. A phone app reconnects to the TV by itself
+when it is reopened (see below), and would otherwise take the TV from the phone someone is driving it
+with, whose cast bar and notification would go while the TV played on. Each of the two has its own
+sending thread, so that one that stopped reading while keeping its connection does not hold up the
+status of the other.
 
 This is version 2 of the protocol. Version 1 (2026.11.0 to 2026.11.4) sent `seq\nmac\npayload` in the
 clear, authenticated but readable on the network. The version is in the discovery answer and in the
