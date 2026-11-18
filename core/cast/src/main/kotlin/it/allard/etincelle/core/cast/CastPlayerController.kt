@@ -142,6 +142,10 @@ class CastPlayerController(
     private var rejoinJob: Job? = null
     // Counts the direct loads, so a load overtaken by a newer one leaves the receiver and the UI to it.
     private var directLoads = 0
+    // As receiverFailed and receiverPositionMs do for Play Services: the direct receiver stopped on an
+    // error that was acted on already, and where it last played (it says 0 while it loads).
+    private var directFailed = false
+    private var directPositionMs = 0L
 
     // An etincelle TV app driven by etincelle's own remote control, and its player for the UI.
     private var tvSession: TvRemoteSession? = null
@@ -718,6 +722,7 @@ class CastPlayerController(
         val freshItem = MediaItemFactory.create(fresh.copy(liveRewindOffsetMs = rewindMs))
         currentItem = freshItem
         directPlayer.setItem(freshItem, if (fresh.isLive) rewindMs else 0L)
+        directPositionMs = if (fresh.isLive) 0L else positionMs.coerceAtLeast(0)
         val media = CastLoadData.media(appContext, freshItem, sessionProvider())
         // A live stream asks for a position past the DVR window so the receiver clamps to the edge (it
         // then applies live_rewind_sec); on demand resumes where the phone was.
@@ -732,6 +737,8 @@ class CastPlayerController(
         }
         if (!current()) return null
         if (loaded) {
+            // Whatever the receiver says from here on is about this load.
+            directFailed = false
             _currentPlayer.value = directPlayer
             // The phone stops once the TV has the stream, whichever load got it there.
             runCatching { localPlayer.stop() }
@@ -747,12 +754,20 @@ class CastPlayerController(
 
     private fun onDirectMediaStatus(status: org.json.JSONObject) {
         directPlayer.onStatus(status)
-        when (status.optString("playerState")) {
+        val state = status.optString("playerState")
+        if (state == "PLAYING" || state == "PAUSED" || state == "BUFFERING") {
+            directPlayer.currentPosition.takeIf { it > 0 }?.let { directPositionMs = it }
+        }
+        when (state) {
             "PLAYING" -> setReceiverPlaying(true)
             "PAUSED" -> setReceiverPlaying(false)
-            // The receiver cannot refresh its stream tokens itself: recover from here, as for Play Services.
-            "IDLE" -> if (status.optString("idleReason") == "ERROR") onPlaybackError(directPlayer)
         }
+        // The receiver cannot refresh its stream tokens itself: recover from here, as for Play Services,
+        // and once per failure. It says the same again to every status asked for, and each would drop
+        // the recovery under way and use up one of its attempts.
+        val failed = state == "IDLE" && status.optString("idleReason") == "ERROR"
+        if (failed && !directFailed) onPlaybackError(directPlayer)
+        directFailed = failed
     }
 
     private fun newDirectSession(device: DirectCastDevice): DirectCastSession {
@@ -943,7 +958,8 @@ class CastPlayerController(
                 stopDirect()
                 return
             }
-            val position = directPlayer.currentPosition
+            // A receiver still loading says 0: where it was asked to start, then.
+            val position = directPlayer.currentPosition.takeIf { it > 0 } ?: directPositionMs
             val playWhenReady = directPlayer.playWhenReady
             stopDirect()
             currentItem?.let { loadResolved(localPlayer, it, position, playWhenReady) }
@@ -1478,7 +1494,11 @@ class CastPlayerController(
         }
         // A receiver stopped on an error may no longer report where it was: fall back to the position
         // it last reported while playing.
-        val position = (target.currentPosition.takeIf { it > 0 || target !== castPlayer } ?: receiverPositionMs).coerceAtLeast(0)
+        val position = when {
+            target === localPlayer -> target.currentPosition
+            target === directPlayer -> target.currentPosition.takeIf { it > 0 } ?: directPositionMs
+            else -> target.currentPosition.takeIf { it > 0 } ?: receiverPositionMs
+        }.coerceAtLeast(0)
         // Capture the live rewind from the failing player before re-resolving so recovery resumes the
         // viewer's position on the receiver instead of snapping to the live edge (0 if not applicable
         // or its timeline is already gone).
@@ -1506,7 +1526,9 @@ class CastPlayerController(
             val freshItem = MediaItemFactory.create(fresh.copy(liveRewindOffsetMs = rewind))
             val direct = directSession
             if (target === directPlayer && direct != null) {
-                loadDirect(direct, freshItem, position, resolve = false, rewindMs = rewind)
+                // A load the receiver refuses is the same failure still: on to the next attempt, as
+                // its status, unchanged, will not ask for one.
+                if (loadDirect(direct, freshItem, position, resolve = false, rewindMs = rewind) == false) onPlaybackError(target)
             } else {
                 loadOn(target, freshItem, if (fresh.isLive) 0 else position)
             }
