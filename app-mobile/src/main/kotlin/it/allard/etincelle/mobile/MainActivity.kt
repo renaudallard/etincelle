@@ -110,6 +110,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -239,13 +240,16 @@ class MainActivity : ComponentActivity() {
         // The next episode follows from here, not from the slate on screen: the UI stops updating while
         // the app is away, so the slate would go on counting down the episode it last showed and the
         // second episode in the background would never follow. An etincelle TV app plays it itself.
+        // Only while what plays has one: this wakes the app four times a second, in the background too.
         lifecycleScope.launch {
-            while (true) {
-                delay(UP_NEXT_TICK_MS)
-                val upNext = viewModel.state.value.playing?.upNext ?: continue
-                if (controller?.state?.value?.toTvApp == true) continue
-                val p = playerFlow.value
-                if (upNextSlates.of(upNext).tick(upNext, p.currentPosition, p.duration)) viewModel.playUpNext()
+            viewModel.state.map { it.playing?.upNext }.distinctUntilChanged().collectLatest { upNext ->
+                if (upNext == null) return@collectLatest
+                while (true) {
+                    delay(UP_NEXT_TICK_MS)
+                    if (controller?.state?.value?.toTvApp == true) continue
+                    val p = playerFlow.value
+                    if (upNextSlates.of(upNext).tick(upNext, p.currentPosition, p.duration)) viewModel.playUpNext()
+                }
             }
         }
 
