@@ -268,7 +268,7 @@ internal data class ReceiverTimes(val time: Double, val start: Double, val end: 
         // A range the receiver gave the wrong way round, or only one end of, has no inside to seek in.
         if (positionMs == C.TIME_UNSET || end <= start) end else (start + positionMs / 1000.0).coerceIn(start, end)
 
-    private companion object {
+    internal companion object {
         // As REWIND_JOIN_MARGIN in the receiver.
         const val JOIN_MARGIN_S = 5.0
     }

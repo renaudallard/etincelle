@@ -353,7 +353,13 @@ class CastPlayerController(
         // Both as the status gave them: its range stands still between two statuses while the position
         // worked out since goes on, which would eat into the rewind.
         client.mediaStatus?.let { status ->
-            status.liveSeekableRange?.let { receiverRewindMs = (it.endTime - status.streamPosition).coerceAtLeast(0) }
+            status.liveSeekableRange?.let { range ->
+                // Not while the receiver stands at the start of its window, where a stream being loaded
+                // plays for a moment before it joins the live point: read as a rewind, that is the whole
+                // window, hours, which a reload made just then would take the stream back by.
+                val joined = status.streamPosition > range.startTime + (ReceiverTimes.JOIN_MARGIN_S * 1000).toLong()
+                if (joined) receiverRewindMs = (range.endTime - status.streamPosition).coerceAtLeast(0)
+            }
         }
     }
 
