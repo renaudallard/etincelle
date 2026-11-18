@@ -348,6 +348,10 @@ class CastPlayerController(
         }
     }
 
+    // Where the Play Services cast is. A receiver still loading, or stopped on an error, says 0: where
+    // it last said it was then, which a load starts at where it was asked to begin.
+    private fun castPositionMs(): Long = castPlayer.currentPosition.takeIf { it > 0 } ?: receiverPositionMs
+
     // How far behind the live edge the Play Services cast plays, for what is loaded next to resume
     // there: by its player when that knows, else as the receiver last said. Close to the edge is the
     // edge, as for the phone's own player.
@@ -478,7 +482,7 @@ class CastPlayerController(
         }
         if (toDirect) return connectPicked(routeId)
         val willTransfer = _currentPlayer.value === castPlayer && castContext.sessionManager.currentCastSession != null
-        val position = if (willTransfer) castPlayer.currentPosition else 0L
+        val position = if (willTransfer) castPositionMs() else 0L
         val playWhenReady = if (willTransfer) castPlayer.playWhenReady else true
         // Capture the live rewind now, while the outgoing cast player still has a timeline, so a
         // rewound live stream keeps its position across the device switch.
@@ -1315,7 +1319,7 @@ class CastPlayerController(
 
     override fun onSessionEndingInternal(session: CastSession) {
         // The cast player's position is unreadable once the session has fully ended, so grab it now.
-        endingPosition = castPlayer.currentPosition
+        endingPosition = castPositionMs()
         endingPlayWhenReady = castPlayer.playWhenReady
         endingCaptured = true
         endingDevice = session.castDevice?.let { cast ->
@@ -1389,7 +1393,13 @@ class CastPlayerController(
             // The user asked to continue on this phone ("Cet appareil"): resume locally and re-surface
             // the player. Re-resolve gives a fresh (live edge) URL since the cast may have run a while.
             returnToPhoneOnEnd = false
-            swapTo(localPlayer, endingPosition, endingPlayWhenReady)
+            if (deferStopSource === localPlayer && localPlayer.playbackState != Player.STATE_IDLE) {
+                // The receiver had not started yet, and the phone went on playing for it: it simply
+                // goes on. Loaded again, it would start where the receiver was, which is nowhere yet.
+                keepPhonePlaying()
+            } else {
+                swapTo(localPlayer, endingPosition, endingPlayWhenReady)
+            }
             pendingDirectRoute?.let {
                 pendingDirectRoute = null
                 connectPicked(it)
@@ -1530,6 +1540,19 @@ class CastPlayerController(
         target.addListener(listener)
     }
 
+    // Gives up a hand-over to the cast player that the phone was still playing through: the phone
+    // stays the player, as if nothing had been asked.
+    private fun keepPhonePlaying() {
+        deferStopListener?.let { deferStopTarget?.removeListener(it) }
+        deferStopSource = null
+        deferStopTarget = null
+        deferStopListener = null
+        reResolveJob?.cancel()
+        runCatching { castPlayer.stop() }
+        castRetryCount = 0
+        _currentPlayer.value = localPlayer
+    }
+
     // Cut the pending source now (the target started, or a new swap superseded this one).
     private fun clearDeferredStop() {
         deferStopListener?.let { deferStopTarget?.removeListener(it) }
@@ -1615,7 +1638,7 @@ class CastPlayerController(
         val position = when {
             target === localPlayer -> target.currentPosition
             target === directPlayer -> target.currentPosition.takeIf { it > 0 } ?: directPositionMs
-            else -> target.currentPosition.takeIf { it > 0 } ?: receiverPositionMs
+            else -> castPositionMs()
         }.coerceAtLeast(0)
         // Capture the live rewind from the failing player before re-resolving so recovery resumes the
         // viewer's position on the receiver instead of snapping to the live edge (0 if not applicable
