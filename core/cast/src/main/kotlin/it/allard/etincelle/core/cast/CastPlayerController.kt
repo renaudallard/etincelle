@@ -250,6 +250,41 @@ class CastPlayerController(
     // after an error, kept until it has: an attempt that fails before its stream is ready no longer
     // knows it. Null at the live point.
     private var localLiveAtMs: Long? = null
+    private var localSeekJob: Job? = null
+    // How far behind the live point a Play Services cast was as its session ended.
+    private var endingRewindMs = 0L
+    // The rewind the TV app was last asked for, which is where a live programme is until the TV takes it.
+    private var tvSentRewindMs = 0L
+
+    // How far behind the live point the phone's own playback is, or is about to be taken, for the
+    // device it is handed to next.
+    private fun localRewindMs(): Long =
+        localLiveAtMs?.let { (System.currentTimeMillis() - it).coerceAtLeast(0) } ?: LivePlayback.castRewindOffsetMs(localPlayer, liveWindow)
+
+    // A live programme comes back from a device that played it [rewindMs] behind the live point. The
+    // phone, which loads a stream at its live point, is to be taken that far back once loaded (see
+    // seekLocalWhenLoaded): played live instead, a programme being watched an hour late becomes the
+    // one after it, here and on the device it is moved to next.
+    private fun bringBackRewound(rewindMs: Long) {
+        localLiveAtMs = if (rewindMs > 0) System.currentTimeMillis() - rewindMs else null
+    }
+
+    // Takes the phone's own player, loading a live stream, to the time of day noted for it once its
+    // window is read. No longer than a stream takes to come back.
+    private fun seekLocalWhenLoaded() {
+        localSeekJob?.cancel()
+        val at = localLiveAtMs ?: return
+        localSeekJob = scope.launch {
+            repeat(LOCAL_LIVE_SEEK_TRIES) {
+                if (localLiveAtMs != at) return@launch
+                if (LivePlayback.seekToTimeIfReady(localPlayer, liveWindow, at, liveIfGone = true)) {
+                    localLiveAtMs = null
+                    return@launch
+                }
+                delay(LOCAL_LIVE_SEEK_POLL_MS)
+            }
+        }
+    }
     private var reResolveJob: Job? = null
 
     // True only when the user explicitly asked to bring playback back to this phone ("Cet appareil"):
@@ -437,6 +472,7 @@ class CastPlayerController(
     /** Load + play [item] on whichever player is current (phone or cast). */
     fun play(item: MediaItem, startPositionMs: Long) {
         failedDurationMs = C.TIME_UNSET
+        localSeekJob?.cancel()
         localLiveAtMs = null
         heldForMove = false
         // Nominally on the cast player but the session is gone (e.g. an abandoned transfer): drop back
@@ -507,6 +543,7 @@ class CastPlayerController(
             // The second Chromecast may still answer: it is ended as it comes up, not cast onto.
             giveUpStarting()
             heldForMove = transferPlayWhenReady
+            bringBackRewound(transferRewindMs)
             swapTo(localPlayer, transferPosition, false)
         }
         if (toDirect) return connectPicked(routeId)
@@ -576,7 +613,7 @@ class CastPlayerController(
             if (item != null) {
                 // Casting out a rewound live stream: resume the TV that far behind the edge.
                 val isLive = (item.localConfiguration?.tag as? PlaybackSource)?.isLive == true
-                val rewind = if (isLive && phonePlays) LivePlayback.castRewindOffsetMs(localPlayer, liveWindow) else 0L
+                val rewind = if (isLive) localRewindMs() else 0L
                 val position = if (phonePlays) localPlayer.currentPosition else handoffPositionMs
                 playOnTv(item, position, rewind)
                 if (phonePlays) tvHandoverMs = position
@@ -596,6 +633,7 @@ class CastPlayerController(
         val (kind, id) = remoteTargets(item).firstOrNull() ?: return
         val message = JSONObject().put(RemoteMessages.TYPE, RemoteMessages.PLAY).put(RemoteMessages.KIND, kind).put(RemoteMessages.ID, id)
         if (kind == RemoteMessages.KIND_LIVE) message.put(RemoteMessages.REWIND, rewindMs) else message.put(RemoteMessages.POSITION, positionMs)
+        tvSentRewindMs = if (kind == RemoteMessages.KIND_LIVE) rewindMs else 0L
         // From 0 because that was asked, not for want of a resume point here: the TV's own is not to be used.
         if ((item.localConfiguration?.tag as? PlaybackSource)?.fromStart == true && positionMs <= 0) message.put(RemoteMessages.FROM_START, true)
         message.put(RemoteMessages.REQUEST, ++tvRequests)
@@ -645,8 +683,10 @@ class CastPlayerController(
             val item = currentItem
             val back = tvHandoverMs
             if (item != null && back >= 0) {
+                val rewind = tvSentRewindMs
                 stopTvSession(stopTv = false)
                 onError?.invoke(error)
+                bringBackRewound(rewind)
                 loadResolved(localPlayer, item, back, fromPlayWhenReady = awaySince == 0L)
                 return
             }
@@ -780,7 +820,7 @@ class CastPlayerController(
             val item = currentItem ?: run { clearConnecting(); return@launch }
             // Casting out a rewound live stream: resume the TV that far behind the edge.
             val isLive = (item.localConfiguration?.tag as? PlaybackSource)?.isLive == true
-            val rewind = if (isLive) LivePlayback.castRewindOffsetMs(localPlayer, liveWindow) else 0L
+            val rewind = if (isLive) localRewindMs() else 0L
             // Where the phone is, or was asked to start when it has not loaded yet.
             val position = if (phoneStillPlays) localPlayer.currentPosition else handoffPositionMs
             if (loadDirect(session, item, position, resolve = true, rewindMs = rewind) == false && directSession === session) {
@@ -1065,8 +1105,10 @@ class CastPlayerController(
             val playsOnTv = onTv && currentItem != null
             // A TV that has not taken the programme yet still says where what it had before was.
             val position = if (tvStarted) tvPlayer.currentPosition else tvSentMs
+            val rewind = if (tvStarted) LivePlayback.castRewindOffsetMs(tvPlayer, liveWindow) else tvSentRewindMs
             stopTvSession(stopTv = playsOnTv)
             if (playsOnTv) {
+                bringBackRewound(rewind)
                 currentItem?.let { loadResolved(localPlayer, it, position, true) }
             } else if (!onTv) {
                 resumeHeld()
@@ -1089,7 +1131,9 @@ class CastPlayerController(
             // A receiver still loading says 0: where it was asked to start, then.
             val position = directPlayer.currentPosition.takeIf { it > 0 } ?: directPositionMs
             val playWhenReady = directPlayer.playWhenReady
+            val rewind = LivePlayback.castRewindOffsetMs(directPlayer, liveWindow)
             stopDirect()
+            bringBackRewound(rewind)
             currentItem?.let { loadResolved(localPlayer, it, position, playWhenReady) }
             return
         }
@@ -1101,6 +1145,7 @@ class CastPlayerController(
                 transferFallbackJob?.cancel()
                 // Held in pause when it is on its way to another device (see heldForMove).
                 heldForMove = transferPlayWhenReady && pendingDirectRoute != null
+                bringBackRewound(transferRewindMs)
                 swapTo(localPlayer, transferPosition, transferPlayWhenReady && pendingDirectRoute == null)
             }
             return
@@ -1406,6 +1451,7 @@ class CastPlayerController(
         // The cast player's position is unreadable once the session has fully ended, so grab it now.
         endingPosition = castPositionMs()
         endingPlayWhenReady = castPlayer.playWhenReady
+        endingRewindMs = castLiveRewindMs()
         endingCaptured = true
         endingDevice = session.castDevice?.let { cast ->
             cast.inetAddress?.hostAddress?.let { DirectCastDevice(cast.deviceId, cast.friendlyName ?: cast.deviceId, it, cast.servicePort) }
@@ -1474,6 +1520,7 @@ class CastPlayerController(
         if (!endingCaptured) {
             endingPosition = castPlayer.currentPosition
             endingPlayWhenReady = castPlayer.playWhenReady
+            endingRewindMs = castLiveRewindMs()
         }
         endingCaptured = false
         if (returnToPhoneOnEnd) {
@@ -1489,6 +1536,7 @@ class CastPlayerController(
                 // meanwhile, it would be heard for those seconds, and go on aloud with the app left
                 // should that device not answer.
                 heldForMove = endingPlayWhenReady && pendingDirectRoute != null
+                bringBackRewound(endingRewindMs)
                 swapTo(localPlayer, endingPosition, endingPlayWhenReady && pendingDirectRoute == null)
             }
             pendingDirectRoute?.let {
@@ -1541,7 +1589,11 @@ class CastPlayerController(
         // Casting out a rewound live stream: carry how far behind the edge the phone is so the
         // receiver resumes there instead of clamping to the live edge.
         val isLive = (item.localConfiguration?.tag as? PlaybackSource)?.isLive == true
-        val castRewindMs = if (target === castPlayer && isLive) LivePlayback.castRewindOffsetMs(from, liveWindow) else 0L
+        val castRewindMs = when {
+            target !== castPlayer || !isLive -> 0L
+            from === localPlayer -> localRewindMs()
+            else -> LivePlayback.castRewindOffsetMs(from, liveWindow)
+        }
         loadResolved(target, item, fromPosition, fromPlayWhenReady, castRewindMs)
         deferStop(from, target)
     }
@@ -1601,10 +1653,12 @@ class CastPlayerController(
                 }
                 loadOn(target, freshItem, if ((fresh ?: source).isLive) 0 else position)
                 target.playWhenReady = fromPlayWhenReady
+                if (target === localPlayer && (fresh ?: source).isLive) seekLocalWhenLoaded()
             }
         } else {
             loadOn(target, item, position)
             target.playWhenReady = fromPlayWhenReady
+            if (target === localPlayer && source?.isLive == true) seekLocalWhenLoaded()
         }
     }
 
@@ -1650,6 +1704,8 @@ class CastPlayerController(
     // elsewhere, and which Play on it, or on a headset, would start on the phone with no screen for it
     // and nothing able to stop it. What may come back here is in currentItem.
     private fun stopPhonePlayer() {
+        localSeekJob?.cancel()
+        localLiveAtMs = null
         runCatching {
             localPlayer.stop()
             localPlayer.clearMediaItems()
@@ -1794,17 +1850,8 @@ class CastPlayerController(
                 loadOn(target, freshItem, if (fresh.isLive) 0 else position)
                 if (paused) localPlayer.playWhenReady = false
             }
-            val at = localLiveAtMs ?: return@launch
-            if (target !== localPlayer || !fresh.isLive) return@launch
-            // No longer than a stream takes to come back. A failure meanwhile starts all this again,
-            // the time to come back to still noted.
-            repeat(LOCAL_LIVE_SEEK_TRIES) {
-                if (LivePlayback.seekToTimeIfReady(localPlayer, liveWindow, at, liveIfGone = true)) {
-                    localLiveAtMs = null
-                    return@launch
-                }
-                delay(LOCAL_LIVE_SEEK_POLL_MS)
-            }
+            // A failure meanwhile starts all this again, the time to come back to still noted.
+            if (target === localPlayer && fresh.isLive) seekLocalWhenLoaded()
         }
     }
 }
