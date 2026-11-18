@@ -14,8 +14,8 @@ package it.allard.etincelle.core.remote
  * TV to phone: [STATUS], when what it says changes and every ten seconds otherwise (see [StatusPacer]):
  * state (idle, buffering, playing, paused, ended), title,
  * subtitle, pos and dur in ms (on a live stream, within its rewind window, whose wall-clock start is
- * ws), live, the kind and id of what plays, the req of the last play handled and, when nothing plays,
- * the error that stopped it.
+ * ws), live, the kind and id of what plays, the req of the last play handled and the error it ended
+ * on, if any, whether something else plays or not.
  */
 object RemoteMessages {
     const val TYPE = "t"

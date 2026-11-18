@@ -398,7 +398,8 @@ class CastPlayerController(
         // stream that has ended there.
         val newSource = item.localConfiguration?.tag as? PlaybackSource
         val remoteState = _currentPlayer.value.playbackState
-        if ((castingRemotely || tvConnected) &&
+        // On a TV app, only once it has started it: until then nothing says it ever will.
+        if ((castingRemotely || (tvConnected && tvStarted)) &&
             sameContent(currentItem, item) &&
             remoteState != Player.STATE_IDLE && remoteState != Player.STATE_ENDED &&
             (newSource?.liveRewindOffsetMs ?: 0L) <= 0L
@@ -1039,6 +1040,8 @@ class CastPlayerController(
     fun castProgress(): Triple<PlaybackSource, Long, Long>? {
         val player = _currentPlayer.value
         if (player === localPlayer || player.playbackState != Player.STATE_READY) return null
+        // A TV app may still be playing what it had before, which is not this item's position.
+        if (player === tvPlayer && !tvStarted) return null
         val item = currentItem ?: return null
         val source = item.localConfiguration?.tag as? PlaybackSource ?: return null
         if (source.resumeKey == null || player.currentMediaItem?.localConfiguration?.uri != item.localConfiguration?.uri) return null

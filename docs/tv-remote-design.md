@@ -111,8 +111,10 @@ sleeping, which is why they are spared: once a second, Android ended up restrict
 its battery use. They go one at a time (none is queued while the last has not left, and one that could
 not leave is sent again at the next look): state
 (buffering, not idle, while what it plays is loading or being brought back after an error), title, position and duration (within the rewind window on a
-live stream), live, what plays, the number of the last `play` it handled (each `play` carries one) and,
-when nothing plays, the error that stopped it, so the phone can tell a failed request from a stale error.
+live stream), live, what plays, the number of the last `play` it handled (each `play` carries one) and
+the error it ended on, if any, so the phone can tell a failed request from a stale error. The error is
+given whether something else plays or not: a request that fails over a programme still playing leaves
+that programme on.
 
 The TV resolves streams with its own sign-in, so nothing is passed but ids; it shows a programme's page
 under the player and plays the next episode itself, so the phone shows no next-episode slate for it.

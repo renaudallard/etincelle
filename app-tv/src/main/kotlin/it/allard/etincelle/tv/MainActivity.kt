@@ -421,10 +421,10 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
         val state = viewModel.state.value
         val source = state.playing
         val player = player
-        if (source == null || player == null) {
-            state.error?.let { status.put(RemoteMessages.ERROR, it) }
-            return status.put(RemoteMessages.STATE, RemoteMessages.STATE_IDLE)
-        }
+        // Also while something plays: what the phone asked for may have failed over it, and the phone
+        // would wait for it for good.
+        state.error?.let { status.put(RemoteMessages.ERROR, it) }
+        if (source == null || player == null) return status.put(RemoteMessages.STATE, RemoteMessages.STATE_IDLE)
         val playback = when (player.playbackState) {
             Player.STATE_BUFFERING -> RemoteMessages.STATE_BUFFERING
             Player.STATE_READY -> if (player.playWhenReady) RemoteMessages.STATE_PLAYING else RemoteMessages.STATE_PAUSED
