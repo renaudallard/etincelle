@@ -54,10 +54,11 @@ gives the system the programmes it suggests, the ones you started and its
 channel list, so that the TV's launcher and channel guide can show them.
 This stays on the TV.
 
-**The speech recogniser of your device, when you dictate a search.** The
-microphone button of the search opens the speech recognition your device
-already has (Google's, on most phones and on Google TV), which listens and
-hands etincelle the words it understood. What you say goes to that
+**The speech recogniser of your device, when you dictate a search.** On the
+phone, the microphone button of the search opens the speech recognition
+your device already has (Google's, on most phones), which listens and
+hands etincelle the words it understood. On a TV, the remote's own
+microphone button does the same without etincelle asking for it. What you say goes to that
 recogniser, under its own privacy policy, and nowhere else; etincelle does
 not record sound and does not ask for the microphone. The words are then
 sent to the Molotov service as a search, like a search you type.
@@ -153,10 +154,11 @@ d'accueil et le guide des chaînes du téléviseur puissent les afficher.
 Cela reste sur le téléviseur.
 
 **La reconnaissance vocale de votre appareil, quand vous dictez une
-recherche.** Le bouton au micro de la recherche ouvre la reconnaissance
-vocale dont votre appareil dispose déjà (celle de Google, sur la plupart
-des téléphones et sur Google TV), qui écoute et rend à etincelle les mots
-qu'elle a compris. Ce que vous dites va à cette reconnaissance vocale, selon
+recherche.** Sur téléphone, le bouton au micro de la recherche ouvre la
+reconnaissance vocale dont votre appareil dispose déjà (celle de Google,
+sur la plupart des téléphones), qui écoute et rend à etincelle les mots
+qu'elle a compris. Sur un téléviseur, la touche micro de la télécommande
+fait de même sans qu'etincelle le demande. Ce que vous dites va à cette reconnaissance vocale, selon
 sa propre politique de confidentialité, et nulle part ailleurs ; etincelle
 n'enregistre aucun son et ne demande pas l'accès au micro. Les mots sont
 ensuite envoyés au service Molotov comme une recherche, de même qu'une

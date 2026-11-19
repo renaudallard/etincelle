@@ -25,13 +25,6 @@
         android:name="android.software.live_tv"
         android:required="false" />
 
-    <!-- The search may be said: the device's speech recogniser is looked for, then asked (VoiceSearch). -->
-    <queries>
-        <intent>
-            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
-        </intent>
-    </queries>
-
     <application
         android:name=".EtincelleTvApp"
         android:allowBackup="false"

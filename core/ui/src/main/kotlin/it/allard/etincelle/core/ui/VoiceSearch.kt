@@ -11,15 +11,16 @@ import android.speech.RecognizerIntent
 /**
  * Saying a search instead of typing it: the device's own speech recogniser is asked to listen, with
  * its own screen, and hands back what it heard. Nothing is recorded by this app, which needs no
- * permission for it: the recogniser does the listening. On a phone that is Google's speech service;
- * on a Google TV its voice input, which listens through the remote's microphone.
+ * permission for it: the recogniser does the listening. For the phone: on a Google TV the remote's
+ * own microphone button serves the search, and a button on screen that opened the TV's voice input
+ * looked as if it did nothing.
  */
 object VoiceSearch {
     /**
      * What asks the recogniser to listen for a search, in French as the service's titles are; null
      * when this device has none (the manifest names the request among its queries, to be let see
-     * them). Where several answer, as on a Google TV, the first in the system's order is asked,
-     * rather than the viewer which one, each time.
+     * them). Where several answer, the first in the system's order is asked, rather than the user
+     * which one, each time.
      */
     fun request(context: Context): Intent? {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
