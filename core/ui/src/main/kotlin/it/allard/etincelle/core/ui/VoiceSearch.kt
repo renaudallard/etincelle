@@ -32,8 +32,13 @@ object VoiceSearch {
         return intent.setClassName(first.packageName, first.name)
     }
 
-    /** What was heard, from the recogniser's answer; null when nothing was, or it was given up. */
-    fun heard(resultCode: Int, data: Intent?): String? =
+    /**
+     * What was heard, from the recogniser's answer; null when nothing was, or it was given up. The
+     * answer is another app's: one that cannot be read, or holds something else than text, is nothing
+     * heard rather than a crash.
+     */
+    fun heard(resultCode: Int, data: Intent?): String? = runCatching {
         data?.takeIf { resultCode == Activity.RESULT_OK }
             ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.trim()?.takeIf { it.isNotEmpty() }
+    }.getOrNull()
 }
