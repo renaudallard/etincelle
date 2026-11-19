@@ -87,6 +87,8 @@ internal object CastLoadData {
             source?.liveThumbnails?.takeIf { source.isLive && it.intervalSec == LIVE_PICTURE_EVERY_S }?.let {
                 put("live_thumbnails_url", it.baseUrl)
             }
+            // A recording, which has ad breaks to look for, as a replay does not.
+            if (source?.originRecordingAssetId != null) put("recording", true)
             if (!licenseUrl.isNullOrEmpty() && !token.isNullOrEmpty()) {
                 put("license_url", licenseUrl)
                 put("drm_token", token)
