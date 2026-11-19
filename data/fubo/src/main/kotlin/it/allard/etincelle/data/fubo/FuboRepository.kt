@@ -873,9 +873,9 @@ internal fun PlaybackResponse.toPlaybackSource(ownHost: (String) -> Boolean = St
         progressUrl = playhead?.url?.takeIf { url -> url.toHttpUrlOrNull()?.host?.let(ownHost) == true },
         progressPayload = playhead?.payload,
         // Asked for with no session: any host will do, as long as it is asked safely.
-        liveThumbnails = thumbnails?.takeIf { live && it.type == "timestamp" }?.let { t ->
-            val url = t.baseUrl?.takeIf { it.toHttpUrlOrNull()?.isHttps == true }
-            val every = t.interval?.takeIf { it in 1..60 }
+        liveThumbnails = (thumbnails as? Map<*, *>)?.takeIf { live && it["type"] == "timestamp" }?.let { t ->
+            val url = (t["base_url"] as? String)?.takeIf { it.toHttpUrlOrNull()?.isHttps == true }
+            val every = (t["interval"] as? Number)?.toDouble()?.takeIf { it in 1.0..60.0 && it == Math.floor(it) }?.toInt()
             if (url != null && every != null) LiveThumbnails(url, every) else null
         },
     )

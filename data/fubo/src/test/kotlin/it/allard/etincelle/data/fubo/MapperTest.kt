@@ -5,6 +5,7 @@ package it.allard.etincelle.data.fubo
 
 import it.allard.etincelle.core.model.CardShape
 import it.allard.etincelle.core.model.DrmSpec
+import it.allard.etincelle.core.model.LiveThumbnails
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -26,6 +27,28 @@ class MapperTest {
         val drm = source.drm as DrmSpec.Widevine
         assertEquals("https://lic", drm.licenseUrl)
         assertEquals("tok", drm.licenseHeaders["x-dt-auth-token"])
+    }
+
+    private fun live(thumbnails: Any?, type: String = "live") = PlaybackResponse(
+        stream = StreamDto("https://cdn/manifest.mpd", "dash", drmProtected = false, live = true),
+        drmV2 = null, drm = null, heartbeat = null, concurrency = null, playhead = null, type = type, program = null,
+        thumbnails = thumbnails,
+    ).toPlaybackSource().liveThumbnails
+
+    @Test
+    fun `a live channel's pictures are taken from the answer, whatever else it holds there`() {
+        // As the JSON comes out of the parser: numbers are doubles.
+        val asServed = mapOf("type" to "timestamp", "base_url" to "https://thumbs.example/thumbnail/m6/", "interval" to 4.0)
+        assertEquals(LiveThumbnails("https://thumbs.example/thumbnail/m6/", 4), live(asServed))
+        // Not for a recording, nor over plain http, nor of another kind or shape.
+        assertNull(live(asServed, type = "dvr"))
+        assertNull(live(asServed + ("base_url" to "http://thumbs.example/thumbnail/m6/")))
+        assertNull(live(asServed + ("type" to "sprite")))
+        assertNull(live(asServed + ("interval" to 2.5)))
+        assertNull(live(asServed - "interval"))
+        assertNull(live("https://thumbs.example/"))
+        assertNull(live(listOf(asServed)))
+        assertNull(live(null))
     }
 
     @Test
