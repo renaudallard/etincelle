@@ -14,9 +14,10 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  * An ad break of a live stream, as positions (ms) in the player's window: from [startMs] to [endMs].
  * The window slides and takes those along, at each reading of the manifest; [id], the time of day
  * the break began (epoch ms), stays. [skippable] when there is somewhere to skip to: it has ended
- * before the live point, and is not on its last second.
+ * before the live point, and is not on its last second. [guessed] when the stream does not say it
+ * is one, as in a recording (see [RecordingBreaks]): for a button to offer, never to skip unasked.
  */
-data class AdBreak(val startMs: Long, val endMs: Long, val id: Long, val skippable: Boolean)
+data class AdBreak(val startMs: Long, val endMs: Long, val id: Long, val skippable: Boolean, val guessed: Boolean = false)
 
 /**
  * Finds the ad breaks of the live stream a player plays, from its DASH manifest, so that one being
@@ -33,19 +34,29 @@ data class AdBreak(val startMs: Long, val endMs: Long, val id: Long, val skippab
  * - The M6 channels, and every recording, are one unbroken period with no marker, in the manifest or
  *   in the segments: nothing is found there.
  *
+ * A recording is told its breaks from outside, with [recorded]: its stream marks none, and they are
+ * guessed from what it carries (see [RecordingBreaks]).
+ *
  * One instance per player screen: the breaks are worked out again only when the manifest changes.
  */
 class AdBreaks {
     private var manifest: Any? = null
     private var found: List<LongRange> = emptyList()
 
+    /** The breaks of the recording being played, as positions (ms) in it, once they are known. */
+    var recorded: List<LongRange> = emptyList()
+
     /**
      * The break playback is in, whether or not it can be skipped yet, or null. [window] is a
      * caller-owned scratch instance to fill.
      */
     fun current(player: Player, window: Timeline.Window): AdBreak? {
+        if (!player.isCurrentMediaItemLive) {
+            val at = player.currentPosition
+            return recorded.firstOrNull { at >= it.first && at < it.last }
+                ?.let { AdBreak(it.first, it.last, it.first, skippable = at < it.last - LAST_MOMENT_MS, guessed = true) }
+        }
         val dash = player.currentManifest as? DashManifest ?: return null
-        if (!player.isCurrentMediaItemLive) return null
         val timeline = player.currentTimeline
         if (timeline.isEmpty) return null
         timeline.getWindow(player.currentMediaItemIndex, window)

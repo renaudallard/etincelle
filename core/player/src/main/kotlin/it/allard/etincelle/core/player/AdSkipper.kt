@@ -45,6 +45,11 @@ class AdSkipper(private val auto: Boolean) : Player.Listener {
         if (readyAt != 0L && SystemClock.elapsedRealtime() - readyAt >= SETTLING_MS) rewound = true
     }
 
+    /** The breaks of the recording being played, once found (see [RecordingBreaks]). */
+    fun recorded(found: List<LongRange>) {
+        breaks.recorded = found
+    }
+
     /** The seek just made was the screen's own, not the viewer's. */
     fun ownSeek() {
         rewound = false
@@ -67,7 +72,8 @@ class AdSkipper(private val auto: Boolean) : Player.Listener {
         kept = back || (kept && ad.id == inBreak)
         inBreak = ad.id
         if (!ad.skippable) return null
-        if (!auto || kept) return ad
+        // A guessed break is only ever offered: skipped unasked, a wrong guess would lose programme.
+        if (!auto || kept || ad.guessed) return ad
         player.seekTo(ad.endMs)
         return null
     }

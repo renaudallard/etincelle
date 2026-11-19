@@ -106,6 +106,7 @@ import it.allard.etincelle.core.player.LiveProgramme
 import it.allard.etincelle.core.player.MediaItemFactory
 import it.allard.etincelle.core.player.PlaybackProgress
 import it.allard.etincelle.core.player.PlaybackRecovery
+import it.allard.etincelle.core.player.followRecording
 import it.allard.etincelle.core.player.keepScreenOnWhilePlaying
 import it.allard.etincelle.core.ui.installFetchedUpdate
 import it.allard.etincelle.core.ui.installUpdate
@@ -991,6 +992,11 @@ private fun PlayerSurface(
             behindLive = false
             barGeometry = null
             adBreak = null
+            // A recording's ad breaks are looked for in it, and offered as playback comes into one.
+            val recording = source.originRecordingAssetId ?: return@LaunchedEffect
+            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                adSkipper.followRecording(currentPlayer, recording, liveWindow) { adBreak = it }
+            }
             return@LaunchedEffect
         }
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
