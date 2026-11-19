@@ -45,27 +45,28 @@ object TvHome {
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(ROW_WRITTEN).remove(NEXT_WRITTEN).apply()
             return@withLock
         }
-        runCatching { repo.homeRecommendations() }.onSuccess { if (changed(context, ROW_WRITTEN, it)) replaceRow(context, it) }
-        runCatching { repo.continueWatching() }.onSuccess { if (changed(context, NEXT_WRITTEN, it)) replaceWatchNext(context, it) }
+        runCatching { repo.homeRecommendations() }.onSuccess { writeChanged(context, ROW_WRITTEN, it) { replaceRow(context, it) } }
+        runCatching { repo.continueWatching() }.onSuccess { writeChanged(context, NEXT_WRITTEN, it) { replaceWatchNext(context, it) } }
     }
 
-    // Whether [programs] differ from those last written under [key], noting them as written. The row
-    // and Watch Next are brought up to date each time the app is left, and writing them means taking
-    // every card away and putting new ones in: with nothing new to show, that emptied and filled the
-    // row under the eyes of whoever had just come back to the home screen.
-    private fun changed(context: Context, key: String, programs: List<HomeProgram>): Boolean {
+    // Has [write] put [programs] in, unless they are those last written under [key]. The row and Watch
+    // Next are brought up to date each time the app is left, and writing them means taking every card
+    // away and putting new ones in: with nothing new to show, that emptied and filled the row under
+    // the eyes of whoever had just come back to the home screen. Noted as written only once [write]
+    // says they all are: what was refused or failed is tried again at the next leave.
+    private inline fun writeChanged(context: Context, key: String, programs: List<HomeProgram>, write: () -> Boolean) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         // Their text, which is the same from one run of the app to the next, where a hash of them is not.
         val now = programs.toString()
-        if (prefs.getString(key, null) == now) return false
-        prefs.edit().putString(key, now).apply()
-        return true
+        if (prefs.getString(key, null) == now) return
+        if (write()) prefs.edit().putString(key, now).apply() else prefs.edit().remove(key).apply()
     }
 
-    private fun replaceRow(context: Context, programs: List<HomeProgram>) {
+    // False when the row could not be had, or not all of [programs] put in it.
+    private fun replaceRow(context: Context, programs: List<HomeProgram>): Boolean {
         val helper = PreviewChannelHelper(context)
         val existing = helper.allChannels.firstOrNull { it.internalProviderId == CHANNEL_KEY }
-        if (existing == null && programs.isEmpty()) return
+        if (existing == null && programs.isEmpty()) return true
         // A provider that refuses the channel answers no row, which the helper cannot parse.
         val channelId = existing?.id ?: runCatching {
             helper.publishChannel(
@@ -80,7 +81,7 @@ object TvHome {
         }.getOrNull()?.also {
             // Only the app's first channel may ask to be shown; the user can still hide it.
             runCatching { TvContractCompat.requestChannelBrowsable(context, it) }
-        } ?: return
+        } ?: return false
         idsOf(context, TvContractCompat.buildPreviewProgramsUriForChannel(channelId)).forEach { helper.deletePreviewProgram(it) }
         for (p in programs) {
             val builder = PreviewProgram.Builder()
@@ -94,11 +95,13 @@ object TvHome {
                 .setInternalProviderId(p.assetId)
             p.durationSec?.let { builder.setDurationMillis((it * 1000).toInt()) }
             if (p.liveStartMs != null) builder.setLive(true)
-            if (!insert(context, TvContractCompat.PreviewPrograms.CONTENT_URI, builder.build().toContentValues())) break
+            if (!insert(context, TvContractCompat.PreviewPrograms.CONTENT_URI, builder.build().toContentValues())) return false
         }
+        return true
     }
 
-    private fun replaceWatchNext(context: Context, programs: List<HomeProgram>) {
+    // False when not all of [programs] were put in.
+    private fun replaceWatchNext(context: Context, programs: List<HomeProgram>): Boolean {
         // The provider only returns this app's own Watch Next entries.
         idsOf(context, TvContractCompat.WatchNextPrograms.CONTENT_URI).forEach {
             context.contentResolver.delete(TvContractCompat.buildWatchNextProgramUri(it), null, null)
@@ -122,8 +125,9 @@ object TvHome {
                 .setInternalProviderId(p.assetId)
             position?.let { builder.setLastPlaybackPositionMillis((it * 1000).toInt()) }
             p.durationSec?.let { builder.setDurationMillis((it * 1000).toInt()) }
-            if (!insert(context, TvContractCompat.WatchNextPrograms.CONTENT_URI, builder.build().toContentValues())) break
+            if (!insert(context, TvContractCompat.WatchNextPrograms.CONTENT_URI, builder.build().toContentValues())) return false
         }
+        return true
     }
 
     // Some launchers' providers refuse the rows (Google TV turns Watch Next inserts down as "database
