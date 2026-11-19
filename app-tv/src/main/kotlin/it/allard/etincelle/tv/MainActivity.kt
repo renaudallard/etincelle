@@ -287,6 +287,7 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                                 playing, exo, viewModel::savePlaybackPosition, viewModel::reportProgress,
                                 viewModel::liveProgramWindow, viewModel::reResolve, viewModel::playbackFailed, viewModel::playUpNext,
                                 away = { unloaded },
+                                onAdBreak = { skipAdBreak = it },
                             )
                         }
 
@@ -501,6 +502,8 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                         "ok" -> installUpdate(viewModel) { lifecycle.withResumed {} }
                         "back" -> if (viewModel.state.value.updateProgress == null) viewModel.dismissUpdate()
                     }
+                    // The ad break on offer, whatever the controls are doing.
+                    name == RemoteMessages.KEY_SKIP -> skipAdBreak?.invoke()
                     // Straight to what handles Back: from Android 16 an activity no longer turns a Back
                     // key event into it for an app built for that version.
                     name == "back" -> onBackPressedDispatcher.onBackPressed()
@@ -534,6 +537,9 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
         "ok" -> KeyEvent.KEYCODE_DPAD_CENTER
         else -> null
     }
+
+    // Skips the ad break the player screen offers to skip; null when it offers none.
+    private var skipAdBreak: (() -> Unit)? = null
 
     override fun remoteStatus(): JSONObject {
         val status = JSONObject().put(RemoteMessages.TYPE, RemoteMessages.STATUS).put(RemoteMessages.REQUEST, remoteRequest)
@@ -575,6 +581,7 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
             timeline.getWindow(player.currentMediaItemIndex, remoteWindow)
             if (remoteWindow.windowStartTimeMs != C.TIME_UNSET) status.put(RemoteMessages.WINDOW_START, remoteWindow.windowStartTimeMs)
         }
+        if (skipAdBreak != null) status.put(RemoteMessages.SKIP, true)
         return status.putProgramme(source)
     }
 
@@ -810,6 +817,8 @@ private fun TvPlayerSurface(
     onPlayNext: () -> Unit = {},
     // The app was left: nothing is to be loaded until it is back.
     away: () -> Boolean = { false },
+    // Told what skips the ad break on offer, for a phone to ask for it too, and null when there is none.
+    onAdBreak: ((() -> Unit)?) -> Unit = {},
 ) {
     val view = LocalView.current
     val scope = rememberCoroutineScope()
@@ -893,6 +902,11 @@ private fun TvPlayerSurface(
     fun skipAd() {
         adSkipper.skip(player, liveWindow)
         adBreak = null
+    }
+    val offered = adBreak != null
+    DisposableEffect(offered) {
+        onAdBreak(if (offered) { { skipAd() } } else null)
+        onDispose { onAdBreak(null) }
     }
     // OK while the break on screen can be skipped and says so, the controls being hidden (shown, OK
     // is theirs): the press skips. Its release is taken along, and neither brings the controls up.

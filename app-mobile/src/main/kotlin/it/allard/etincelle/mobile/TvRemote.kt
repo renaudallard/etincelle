@@ -38,8 +38,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.Player
+import it.allard.etincelle.core.cast.AdBreakOffer
+import it.allard.etincelle.core.designsystem.SkipAdsButton
 import it.allard.etincelle.core.designsystem.theme.BrandBlack
 import it.allard.etincelle.core.designsystem.theme.BrandYellow
+import it.allard.etincelle.core.remote.RemoteMessages
 import kotlinx.coroutines.delay
 
 /**
@@ -52,6 +55,8 @@ fun TvRemoteScreen(player: Player, tvName: String, onKey: (String) -> Unit, onCl
     var title by remember { mutableStateOf("") }
     var playing by remember { mutableStateOf(false) }
     var hasMedia by remember { mutableStateOf(false) }
+    // The TV is in an ad break it offers to skip.
+    var adBreak by remember { mutableStateOf(false) }
     // Only while the app is on screen.
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(player, lifecycle) {
@@ -60,6 +65,7 @@ fun TvRemoteScreen(player: Player, tvName: String, onKey: (String) -> Unit, onCl
                 hasMedia = player.playbackState != Player.STATE_IDLE
                 title = player.mediaMetadata.title?.toString().orEmpty()
                 playing = player.playWhenReady
+                adBreak = (player as? AdBreakOffer)?.adBreakOffered == true
                 delay(REFRESH_MS)
             }
         }
@@ -88,6 +94,10 @@ fun TvRemoteScreen(player: Player, tvName: String, onKey: (String) -> Unit, onCl
                 PadButton(if (playing) "❚❚" else "▶", primary = true, onClick = { player.playWhenReady = !player.playWhenReady })
                 PadButton("+30", onClick = { player.seekForward() })
             }
+        }
+        if (hasMedia && adBreak) {
+            Spacer(Modifier.height(16.dp))
+            SkipAdsButton(onClick = { onKey(RemoteMessages.KEY_SKIP) })
         }
         Spacer(Modifier.weight(1f))
         // The arrows and OK of the TV remote, laid out as on it.

@@ -27,7 +27,7 @@ import org.json.JSONObject
  * works out where playback has got to by itself. Main thread only.
  */
 @UnstableApi
-internal class TvRemotePlayer : SimpleBasePlayer(Looper.getMainLooper()) {
+internal class TvRemotePlayer : SimpleBasePlayer(Looper.getMainLooper()), AdBreakOffer {
 
     private var session: TvRemoteSession? = null
     private var item: MediaItem? = null
@@ -40,6 +40,9 @@ internal class TvRemotePlayer : SimpleBasePlayer(Looper.getMainLooper()) {
     private var live = false
     private var windowStartMs = -1L
     private var updatedAt = 0L
+
+    override var adBreakOffered = false
+        private set
 
     // Statuses are seconds apart; refresh the state between them so the position keeps moving.
     private val handler = Handler(Looper.getMainLooper())
@@ -98,6 +101,7 @@ internal class TvRemotePlayer : SimpleBasePlayer(Looper.getMainLooper()) {
         durationMs = status.optLong(RemoteMessages.DURATION, -1)
         live = status.optBoolean(RemoteMessages.LIVE)
         windowStartMs = status.optLong(RemoteMessages.WINDOW_START, -1)
+        adBreakOffered = status.optBoolean(RemoteMessages.SKIP)
         updatedAt = SystemClock.elapsedRealtime()
         invalidateState()
     }

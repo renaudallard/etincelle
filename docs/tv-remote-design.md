@@ -116,7 +116,8 @@ JSON objects with a type `t` (see `RemoteMessages`). The phone sends `play` (kin
 recording, id, position, rewind behind live; a position of 0 lets the TV use its own resume point,
 unless `start` says the programme was asked for from its beginning), `pause`, `resume`, `seek`, `stop`, `key` (up, down, left,
 right, ok, dispatched through the TV activity as remote presses; back, handed to the back navigation,
-which a Back key event no longer reaches on Android 16) and `volume` (up, down, mute).
+which a Back key event no longer reaches on Android 16; skip, for the ad break the TV offers to skip,
+which its status says with `skip`) and `volume` (up, down, mute).
 The TV works its `status` out every second but only sends it when it tells the phone something new
 (`StatusPacer`): another state, title or programme, a position that is not where playback would have
 taken it (a seek), or what came of a command of the phone, even nothing. Otherwise one goes every ten
