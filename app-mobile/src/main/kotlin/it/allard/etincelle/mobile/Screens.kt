@@ -47,7 +47,10 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -110,6 +113,7 @@ import it.allard.etincelle.core.ui.PROFILE_NAME_MAX
 import it.allard.etincelle.core.ui.ProfileEditor
 import it.allard.etincelle.core.ui.ProfileScreen
 import it.allard.etincelle.core.ui.UpdateInfo
+import it.allard.etincelle.core.ui.VoiceSearch
 import kotlin.math.roundToInt
 
 @Composable
@@ -951,12 +955,33 @@ fun SearchScreen(
     var searchedFor by rememberSaveable { mutableStateOf("") }
     val results = rememberSaveableStateHolder()
     val keyboard = LocalSoftwareKeyboardController.current
+    // The search may be said rather than typed, where the device has something to listen with.
+    val context = LocalContext.current
+    val canListen = remember { VoiceSearch.request(context) != null }
+    val listen = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        VoiceSearch.heard(result.resultCode, result.data)?.let { heard ->
+            query = heard
+            searchedFor = heard
+            onSubmit(heard)
+        }
+    }
     Column(modifier.fillMaxSize()) {
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
             label = { Text("Rechercher une chaîne, un film, une série…") },
             singleLine = true,
+            trailingIcon = if (!canListen) null else {
+                {
+                    IconButton(onClick = {
+                        keyboard?.hide()
+                        // The recogniser may have gone since it was looked for.
+                        runCatching { VoiceSearch.request(context)?.let(listen::launch) }
+                    }) {
+                        Icon(painterResource(DesignR.drawable.ic_micro), contentDescription = "Recherche vocale")
+                    }
+                }
+            },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             // The keyboard would hide the results: close it once the search is sent.
             keyboardActions = KeyboardActions(onSearch = {

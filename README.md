@@ -85,7 +85,11 @@ tous en grille. Un même programme proposé sur plusieurs chaînes n'y apparaît
 préférence sur une chaîne incluse dans votre abonnement, avec le logo de la chaîne sur la vignette, et
 le nombre affiché en tête de rangée en tient compte. Une recherche sans résultat l'indique par
 « Aucun résultat trouvé », et sur téléphone le clavier se ferme dès la recherche lancée pour laisser
-voir les résultats.
+voir les résultats. La recherche peut aussi se **dicter** : le bouton au micro, dans le champ de
+recherche du téléphone et à côté de **Rechercher** sur le téléviseur, ouvre la reconnaissance vocale
+de l'appareil (sur un Google TV, elle écoute par le micro de la télécommande) et lance la recherche
+de ce qui a été entendu. L'application n'enregistre rien elle-même et ne demande pas l'accès au
+micro ; le bouton n'apparaît que si l'appareil a une reconnaissance vocale.
 La grille de **toutes les chaînes** (TNT, chaînes thématiques Molotov…) s'ouvre avec l'onglet
 **Chaînes** sur la TV, et sur téléphone avec **Tout voir** de la rangée *Chaînes en direct* de
 l'accueil (sa place dans la barre du bas revient aux enregistrements), pour les parcourir directement ; ouvrir une chaîne propose son **direct** ainsi que ses **replays** et

@@ -40,6 +40,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -84,6 +86,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextRange
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -120,6 +123,7 @@ import it.allard.etincelle.core.ui.ProfileScreen
 import it.allard.etincelle.core.ui.Tab
 import it.allard.etincelle.core.ui.UiState
 import it.allard.etincelle.core.ui.UpdateInfo
+import it.allard.etincelle.core.ui.VoiceSearch
 
 private val OVERSCAN = 48.dp
 
@@ -418,6 +422,16 @@ private fun TvSearchContent(
     // passing through. It stays read-only, with no keyboard, until OK is pressed on it.
     var editing by remember { mutableStateOf(false) }
     LaunchedEffect(editing) { if (editing) keyboard?.show() }
+    // The search may be said rather than typed, where the device has something to listen with: on a
+    // Google TV, through the microphone of its remote.
+    val context = LocalContext.current
+    val canListen = remember { VoiceSearch.request(context) != null }
+    val listen = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        VoiceSearch.heard(result.resultCode, result.data)?.let { heard ->
+            query = TextFieldValue(heard, TextRange(heard.length))
+            onSubmit(heard)
+        }
+    }
     // "Tout voir" and Back swap the rows and the grid under the focused item, which would hand the
     // focus to the first tab: carry it into the grid, or back to the item that opened it.
     val isGrid = state.current?.isGrid == true
@@ -466,6 +480,12 @@ private fun TvSearchContent(
                     },
             )
             TvButton(onClick = { onSubmit(query.text) }, enabled = query.text.isNotBlank()) { Text("Rechercher") }
+            if (canListen) {
+                // The recogniser may have gone since it was looked for.
+                TvButton(onClick = { runCatching { VoiceSearch.request(context)?.let(listen::launch) } }) {
+                    Icon(painterResource(DesignR.drawable.ic_micro), contentDescription = "Recherche vocale")
+                }
+            }
         }
         Spacer(Modifier.height(16.dp))
         val page = state.current
