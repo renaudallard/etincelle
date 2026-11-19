@@ -42,6 +42,9 @@ object RecordingBreaks {
     // No recording has more segments: one that says so is not read.
     private const val MAX_SEGMENTS = 10_000L
 
+    // Nor more strips of thumbnails: eleven hours of them, and what is kept of each is memory.
+    private const val MAX_STRIPS = 400
+
     // A strip of thumbnails is decoded at half its size, which the logo survives.
     private const val SAMPLE = 2
     private const val KNOWN = 20
@@ -55,7 +58,12 @@ object RecordingBreaks {
      */
     suspend fun find(key: String, manifest: DashManifest): List<LongRange> {
         synchronized(known) { known[key] }?.let { return it }
-        val found = withContext(Dispatchers.IO) { read(manifest) }
+        // What could not be read is not remembered as nothing found: asked again another time.
+        val found = try {
+            withContext(Dispatchers.IO) { read(manifest) }
+        } catch (e: IOException) {
+            return emptyList()
+        }
         synchronized(known) {
             known[key] = found
             if (known.size > KNOWN) known.remove(known.keys.first())
@@ -113,20 +121,26 @@ object RecordingBreaks {
         if (segments.isEmpty()) return null
         val spoken = each(segments, CAPTIONS_AT_ONCE) { _, segment -> fetch(segment.uri)?.let(BreakGuess::speaks) }
         // Too many that could not be read say nothing of the recording.
-        if (spoken.count { it == null } * 20 > spoken.size) return null
-        return BreakGuess.captionBreaks(BooleanArray(spoken.size) { spoken[it] == true }, segments[0].timeMs, segments[0].durationMs)
+        if (spoken.count { it == null } * 20 > spoken.size) throw IOException("captions unread")
+        // One that could not be read counts as spoken: it can hide a break, not make one.
+        return BreakGuess.captionBreaks(BooleanArray(spoken.size) { spoken[it] != false }, segments[0].timeMs, segments[0].durationMs)
     }
 
     private suspend fun logoBreaks(representation: Representation, lengthMs: Long): List<LongRange>? {
         val across = representation.format.tileCountHorizontal
         val down = representation.format.tileCountVertical
         if (across == Format.NO_VALUE || down == Format.NO_VALUE || across <= 0 || down <= 0) return null
+        // Strips numbered rather than timed, as older recordings have them, start before the video
+        // by an amount the player library does not account for (about 95 s on those seen): their
+        // pictures would be taken for later ones. Left alone until that is measured.
+        if (representation.index?.isExplicit != true) return null
         val strips = segments(representation, lengthMs)
-        if (strips.isEmpty()) return null
+        if (strips.isEmpty() || strips.size > MAX_STRIPS) return null
         val perStrip = across * down
         var track: LogoTrack? = null
         var width = 0
         var height = 0
+        var tooBig = false
         val lock = Any()
         // Gives the track the pictures of the strips [wanted]; false when one could not be had.
         suspend fun give(wanted: List<Int>): Boolean = each(wanted, STRIPS_AT_ONCE) { _, i ->
@@ -135,10 +149,16 @@ object RecordingBreaks {
                 val w = bitmap.width / across
                 val h = bitmap.height / down
                 val logo = synchronized(lock) {
-                    if (track == null) {
+                    if (track == null && !tooBig) {
                         width = w
                         height = h
-                        track = LogoTrack(strips.size * perStrip, w, h)
+                        // Some megabytes for an hour: a device short of them does without the logo.
+                        track = try {
+                            LogoTrack(strips.size * perStrip, w, h)
+                        } catch (e: OutOfMemoryError) {
+                            tooBig = true
+                            null
+                        }
                     }
                     track.takeIf { w == width && h == height && w > 0 && h > 0 }
                 } ?: return@each false
@@ -160,11 +180,12 @@ object RecordingBreaks {
         // Every other strip first: a break is longer than the one between two of them, so it shows
         // in at least one. Then those next to a strip with the logo gone, for the break's edges.
         // A strip missing where it was wanted would pass for a break, or hide one: nothing then.
-        if (!give(strips.indices.filter { it % 2 == 0 })) return null
+        fun unread(): Nothing? = if (tooBig) null else throw IOException("thumbnails unread")
+        if (!give(strips.indices.filter { it % 2 == 0 })) return unread()
         val logo = track ?: return null
         val gone = logo.gone() ?: return null
         fun suspect(strip: Int) = strip in strips.indices && (strip * perStrip until (strip + 1) * perStrip).any { gone[it] }
-        if (!give(strips.indices.filter { it % 2 == 1 && (suspect(it - 1) || suspect(it + 1)) })) return null
+        if (!give(strips.indices.filter { it % 2 == 1 && (suspect(it - 1) || suspect(it + 1)) })) return unread()
         return logo.breaks(strips[0].timeMs, strips[0].durationMs / perStrip)
     }
 
