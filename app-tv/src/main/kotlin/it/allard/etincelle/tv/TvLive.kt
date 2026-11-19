@@ -171,6 +171,13 @@ object TvLive {
 class TvLiveInputService : TvInputService() {
     override fun onCreateSession(inputId: String): Session = LiveSession(this)
 
+    companion object {
+        // The sessions the system holds, each a channel of its guide played in this process: an
+        // update installed meanwhile would cut it. Main thread only.
+        var sessions = 0
+            private set
+    }
+
     private inner class LiveSession(context: Context) : Session(context) {
         private val player = ExoPlayer.Builder(context).build()
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -178,6 +185,7 @@ class TvLiveInputService : TvInputService() {
         private var recovery: PlaybackRecovery? = null
 
         init {
+            sessions++
             player.addListener(object : Player.Listener {
                 override fun onPlaybackStateChanged(state: Int) {
                     when (state) {
@@ -250,6 +258,7 @@ class TvLiveInputService : TvInputService() {
         override fun onSetCaptionEnabled(enabled: Boolean) = Unit
 
         override fun onRelease() {
+            sessions--
             dropRecovery()
             scope.cancel()
             player.release()

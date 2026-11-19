@@ -151,8 +151,12 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
     private var dreaming = false
     private val handler = Handler(Looper.getMainLooper())
     private val stopRemoteUnlessDreaming = Runnable { if (!dreaming) leave() }
-    private val installOnceAway = Runnable {
-        if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) installFetchedUpdate(viewModel)
+    private val installOnceAway = object : Runnable {
+        override fun run() {
+            if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return
+            // Not under a channel being watched from the system's guide: later, then.
+            if (TvLiveInputService.sessions > 0) handler.postDelayed(this, AWAY_INSTALL_MS) else installFetchedUpdate(viewModel)
+        }
     }
     // A key from the phone is no activity to Android, which would start the screensaver over someone
     // browsing with the phone alone: the screen is kept on for a while after each.
