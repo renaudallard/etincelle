@@ -570,6 +570,18 @@ fun TvSettingsScreen(
                 Text(if (autoUpdate) "Mises à jour automatiques : oui" else "Mises à jour automatiques : non")
             }
         }
+        // In time shift, on the channels whose stream says where its ad breaks are: skipped without
+        // asking, or offered with a pill and OK.
+        var autoSkipAds by remember { mutableStateOf(TvPrefs.autoSkipAds(context)) }
+        TvButton(
+            onClick = {
+                autoSkipAds = !autoSkipAds
+                TvPrefs.setAutoSkipAds(context, autoSkipAds)
+            },
+            highlighted = false,
+        ) {
+            Text(if (autoSkipAds) "Passer les publicités automatiquement : oui" else "Passer les publicités automatiquement : non")
+        }
         Text("Vignettes par ligne : $gridColumns", style = MaterialTheme.typography.titleMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for (n in TvPrefs.MIN_GRID_COLUMNS..TvPrefs.MAX_GRID_COLUMNS) {

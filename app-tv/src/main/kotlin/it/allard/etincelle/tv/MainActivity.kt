@@ -64,6 +64,7 @@ import androidx.media3.ui.PlayerView
 import it.allard.etincelle.core.designsystem.LiveProgramBar
 import it.allard.etincelle.core.designsystem.LiveProgramBarBottomOffset
 import it.allard.etincelle.core.designsystem.ReturnToLiveButton
+import it.allard.etincelle.core.designsystem.SkipAdsButton
 import it.allard.etincelle.core.designsystem.rememberStackStateKeys
 import it.allard.etincelle.core.designsystem.theme.EtincelleTheme
 import it.allard.etincelle.core.designsystem.UpNextSlate
@@ -73,6 +74,8 @@ import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.isSameProgramme
 import it.allard.etincelle.core.model.ProgramWindow
 import it.allard.etincelle.core.player.AdaptiveLoadControl
+import it.allard.etincelle.core.player.AdBreak
+import it.allard.etincelle.core.player.AdSkipper
 import it.allard.etincelle.core.player.LiveBarGeometry
 import it.allard.etincelle.core.player.LivePlayback
 import it.allard.etincelle.core.player.LiveProgramme
@@ -874,6 +877,31 @@ private fun TvPlayerSurface(
     // key or the controls hiding leaves the pill. Up from the time bar of a catch-up is left to the
     // view, whose own search goes up to the main row from there.
     var pillSelected by remember { mutableStateOf(false) }
+    // The ad break playback is in, when the stream's manifest gives it away and it can be skipped.
+    val adSkipper = remember(source) { AdSkipper(TvPrefs.autoSkipAds(view.context)) }
+    var adBreak by remember(source) { mutableStateOf<AdBreak?>(null) }
+    DisposableEffect(adSkipper) {
+        player.addListener(adSkipper)
+        onDispose { player.removeListener(adSkipper) }
+    }
+    fun skipAd() {
+        adBreak?.let { player.seekTo(it.endMs) }
+        adBreak = null
+    }
+    // OK while the break on screen can be skipped and says so, the controls being hidden (shown, OK
+    // is theirs): the press skips. Its release is taken along, and neither brings the controls up.
+    var skipPressed by remember { mutableStateOf(false) }
+    fun skipKey(event: KeyEvent): Boolean {
+        val ok = event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER || event.keyCode == KeyEvent.KEYCODE_ENTER ||
+            event.keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
+        if (!ok) return false
+        if (event.action != KeyEvent.ACTION_DOWN) return skipPressed.also { skipPressed = false }
+        if (event.repeatCount > 0) return skipPressed
+        if (controlsVisible || adBreak == null) return false
+        skipPressed = true
+        skipAd()
+        return true
+    }
     LaunchedEffect(behindLive, controlsVisible) { if (!behindLive || !controlsVisible) pillSelected = false }
     fun remoteKeyUsed(event: KeyEvent): Boolean {
         val down = event.action == KeyEvent.ACTION_DOWN
@@ -906,7 +934,7 @@ private fun TvPlayerSurface(
     }
     // Called by the player view before its own key handling; true when the key was used here. Such a
     // key never reaches the controls, so restart their hide timer by hand.
-    fun remoteKey(event: KeyEvent): Boolean = remoteKeyUsed(event).also { if (it) playerView?.showController() }
+    fun remoteKey(event: KeyEvent): Boolean = skipKey(event) || remoteKeyUsed(event).also { if (it) playerView?.showController() }
     // Per source, not per kind: another live channel has its own programme, rewind and channel to ask.
     // Only while the app is on screen: it draws the bar, and asks the guide for the programme that follows.
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -915,12 +943,20 @@ private fun TvPlayerSurface(
         if (!source.isLive) {
             behindLive = false
             barGeometry = null
+            adBreak = null
             return@LaunchedEffect
         }
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             while (true) {
                 behindLive = LivePlayback.behindLiveEdgeMs(player, liveWindow) > LivePlayback.LIVE_REWIND_THRESHOLD_MS
-                if (pendingRewind && LivePlayback.seekToTimeIfReady(player, liveWindow, rewindTo)) pendingRewind = false
+                // An ad break being watched behind the live point, where its end is known: skipped at
+                // once when the settings say so, each break once, and offered with a pill otherwise
+                // (as is one gone back into with the remote).
+                adBreak = adSkipper.tick(player, liveWindow)
+                if (pendingRewind && LivePlayback.seekToTimeIfReady(player, liveWindow, rewindTo)) {
+                    pendingRewind = false
+                    adSkipper.ownSeek()
+                }
                 // The show playback is in, which follows it past the show's end or back into the one
                 // before, as when it was handed over rewound (see LiveProgramme).
                 programWindow = programme.current(player, liveWindow)
@@ -972,6 +1008,15 @@ private fun TvPlayerSurface(
                     endLabel = pw?.let { LivePlayback.clockLabel(it.endMs) },
                 )
             }
+        }
+        // With or without the controls, for as long as the break can be skipped. A click is for a
+        // mouse or a touch screen: the remote's OK is taken above.
+        if (adBreak != null) {
+            SkipAdsButton(
+                onClick = { skipAd() },
+                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 48.dp),
+                label = if (controlsVisible) "Passer la pub" else "Passer la pub : OK",
+            )
         }
         if (behindLive && controlsVisible) {
             // Shown with the controls, like the bar, and selected from them (see above) rather than

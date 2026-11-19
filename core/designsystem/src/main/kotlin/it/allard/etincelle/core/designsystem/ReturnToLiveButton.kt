@@ -24,7 +24,20 @@ import androidx.compose.ui.unit.dp
  * tap jumps playback to the live edge. Hidden by the caller when already at the edge.
  */
 @Composable
-fun ReturnToLiveButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun ReturnToLiveButton(onClick: () -> Unit, modifier: Modifier = Modifier) =
+    PlayerPill("Revenir au direct", Color(0xFFE53935), onClick, modifier)
+
+/**
+ * A "skip the ads" pill, shown over a live player while what plays, behind the live point, is an ad
+ * break whose end is known (see AdBreaks in core:player); the tap jumps to that end. [label] lets a
+ * TV say which key does it.
+ */
+@Composable
+fun SkipAdsButton(onClick: () -> Unit, modifier: Modifier = Modifier, label: String = "Passer la pub") =
+    PlayerPill(label, Color(0xFFFFC107), onClick, modifier)
+
+@Composable
+private fun PlayerPill(label: String, dot: Color, onClick: () -> Unit, modifier: Modifier) {
     Surface(
         onClick = onClick,
         modifier = modifier,
@@ -37,8 +50,8 @@ fun ReturnToLiveButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Box(Modifier.size(10.dp).background(Color(0xFFE53935), CircleShape))
-            Text("Revenir au direct")
+            Box(Modifier.size(10.dp).background(dot, CircleShape))
+            Text(label)
         }
     }
 }

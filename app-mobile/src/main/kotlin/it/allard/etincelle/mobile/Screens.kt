@@ -723,6 +723,7 @@ fun SettingsScreen(
     var tvCode by remember { mutableStateOf("") }
     val context = LocalContext.current
     var mono by remember { mutableStateOf(AppIcon.isMono(context)) }
+    var autoSkipAds by remember { mutableStateOf(LocalPrefs.autoSkipAds(context)) }
     var officialReceiver by remember { mutableStateOf(CastReceiver.isOfficial(context)) }
     // statusBarsPadding keeps the Retour button below the status bar so it stays tappable. The page
     // scrolls: it is longer than a small screen.
@@ -753,6 +754,16 @@ fun SettingsScreen(
             subtitle = "Cache les programmes non inclus dans votre abonnement",
             checked = hideLocked,
             onCheckedChange = { LocalPrefs.setHideLocked(context, it); onHideLocked(it) },
+        )
+        HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+        SettingToggle(
+            title = "Passer les publicités automatiquement",
+            subtitle = "En différé, sur les chaînes qui signalent leurs coupures. Sinon, un bouton le propose.",
+            checked = autoSkipAds,
+            onCheckedChange = {
+                LocalPrefs.setAutoSkipAds(context, it)
+                autoSkipAds = it
+            },
         )
         HorizontalDivider(Modifier.padding(horizontal = 16.dp))
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {

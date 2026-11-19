@@ -26,7 +26,14 @@ ne sait plus ce qui passait. Le bord du direct se situe en
 cours de route et la portion pas encore diffusée formant la fin de la barre ; la partie trop ancienne
 pour être rembobinée y est tracée dans une couleur distincte, et un bouton **Revenir au direct**
 apparaît dès que l'on s'éloigne du bord pour y ramener d'un appui (sur le téléviseur, il s'affiche
-avec les commandes du lecteur et s'atteint avec la flèche **Haut**). Cliquer sur un programme ouvre d'abord sa **fiche détaillée**
+avec les commandes du lecteur et s'atteint avec la flèche **Haut**). En différé, quand ce que l'on
+regarde est une **coupure publicitaire** dont le flux indique la fin, un bouton **Passer la pub**
+apparaît (sur le téléviseur, **OK** suffit) et mène à la fin de la coupure ; le réglage **Passer les
+publicités automatiquement** (dans **Paramètres**, désactivé par défaut) le fait sans rien demander,
+sauf pour une coupure dans laquelle on est revenu en arrière. Cela vaut pour les chaînes dont le flux
+signale ses coupures : celles des groupes TF1 et France Télévisions exactement, celles du groupe RMC
+d'après la forme de leurs coupures. Les chaînes du groupe M6 ne signalent rien, pas plus que les
+enregistrements, et au direct il n'y a nulle part où sauter. Cliquer sur un programme ouvre d'abord sa **fiche détaillée**
 (synopsis, casting, année, classification) plutôt que de le lire aussitôt, et la fiche regroupe ses
 autres diffusions disponibles. Comme dans l'application officielle, la fiche indique au-dessus du titre
 quand le programme a été **diffusé** (« Diffusé: 12 févr. ») ou jusqu'à quand il reste disponible

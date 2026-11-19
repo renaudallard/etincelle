@@ -86,6 +86,7 @@ import it.allard.etincelle.core.designsystem.LiveProgramBar
 import it.allard.etincelle.core.designsystem.LiveProgramBarBottomOffset
 import it.allard.etincelle.core.designsystem.R as DesignR
 import it.allard.etincelle.core.designsystem.ReturnToLiveButton
+import it.allard.etincelle.core.designsystem.SkipAdsButton
 import it.allard.etincelle.core.designsystem.rememberStackStateKeys
 import it.allard.etincelle.core.designsystem.theme.BrandBlack
 import it.allard.etincelle.core.designsystem.theme.BrandYellow
@@ -97,6 +98,8 @@ import it.allard.etincelle.core.domain.DetailKind
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramWindow
 import it.allard.etincelle.core.player.AdaptiveLoadControl
+import it.allard.etincelle.core.player.AdBreak
+import it.allard.etincelle.core.player.AdSkipper
 import it.allard.etincelle.core.player.LiveBarGeometry
 import it.allard.etincelle.core.player.LivePlayback
 import it.allard.etincelle.core.player.LiveProgramme
@@ -952,6 +955,13 @@ private fun PlayerSurface(
         LiveProgramme(source.programWindow) { at -> source.originChannelId?.let { fetchProgramWindow(it, at) } }
     }
     var barGeometry by remember { mutableStateOf<LiveBarGeometry?>(null) }
+    // The ad break playback is in, when the stream's manifest gives it away and it can be skipped.
+    val adSkipper = remember(currentPlayer, source) { AdSkipper(LocalPrefs.autoSkipAds(view.context)) }
+    var adBreak by remember(currentPlayer, source) { mutableStateOf<AdBreak?>(null) }
+    DisposableEffect(adSkipper) {
+        currentPlayer.addListener(adSkipper)
+        onDispose { currentPlayer.removeListener(adSkipper) }
+    }
     // A "depuis le début" start asks playback to begin at the current show's start; the local player
     // joins at the live edge first, so seek back once the live window has loaded, then stop retrying.
     // Local only: a cast is told where to start in its LOAD, and opening the cast controls later must
@@ -964,6 +974,7 @@ private fun PlayerSurface(
         val window = Timeline.Window()
         while (pendingStartOver) {
             if (LivePlayback.seekToProgramStartIfReady(currentPlayer, window, programWindow)) {
+                adSkipper.ownSeek()
                 pendingStartOver = false
                 onStartedOver()
             } else {
@@ -979,11 +990,16 @@ private fun PlayerSurface(
         if (!source.isLive) {
             behindLive = false
             barGeometry = null
+            adBreak = null
             return@LaunchedEffect
         }
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             while (true) {
                 behindLive = LivePlayback.behindLiveEdgeMs(currentPlayer, liveWindow) > LivePlayback.LIVE_REWIND_THRESHOLD_MS
+                // An ad break being watched behind the live point, where its end is known: skipped at
+                // once when the settings say so, each break once, and offered with a button otherwise
+                // (as is one gone back into by hand).
+                adBreak = adSkipper.tick(currentPlayer, liveWindow)
                 if (showBar) {
                     // The show playback is in, which follows it past the show's end or back into the
                     // one before (see LiveProgramme).
@@ -1061,6 +1077,16 @@ private fun PlayerSurface(
             ReturnToLiveButton(
                 onClick = { currentPlayer.seekToDefaultPosition() },
                 modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 12.dp),
+            )
+        }
+        // With or without the controls: it is there for as long as the break can be skipped.
+        adBreak?.let { ad ->
+            SkipAdsButton(
+                onClick = {
+                    currentPlayer.seekTo(ad.endMs)
+                    adBreak = null
+                },
+                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp),
             )
         }
         barGeometry?.let { bar ->
