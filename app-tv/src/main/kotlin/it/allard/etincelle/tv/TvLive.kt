@@ -72,31 +72,36 @@ object TvLive {
     fun inputId(context: Context): String =
         TvContract.buildInputId(ComponentName(context, TvLiveInputService::class.java))
 
-    /** Writes the channels and their programmes for the input; signed out, removes them. */
-    suspend fun sync(context: Context, repo: MolotovRepository) = lock.withLock {
-        val signedIn = repo.signedIn() ?: return@withLock
+    /**
+     * Writes the channels and their programmes for the input; signed out, removes them. True when the
+     * input has its channels afterwards. [asked] for by someone, as from the input's setup, it is not
+     * put off for having failed a moment ago.
+     */
+    suspend fun sync(context: Context, repo: MolotovRepository, asked: Boolean = false): Boolean = lock.withLock {
+        val signedIn = repo.signedIn() ?: return@withLock false
         if (!signedIn) {
             context.contentResolver.delete(TvContract.buildChannelsUriForInput(inputId(context)), null, null)
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
                 .remove(SYNCED_AT).remove(SYNCED_FOR).remove(TRIED_AT).remove(TRIED_FOR).apply()
-            return@withLock
+            return@withLock false
         }
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()
         val account = repo.currentSession()?.userId
         val fresh = now - prefs.getLong(SYNCED_AT, 0) < REFRESH_MS && prefs.getString(SYNCED_FOR, null) == account
-        if (fresh && hasChannels(context)) return@withLock
+        if (fresh && hasChannels(context)) return@withLock true
         // Tried not long ago for this account without getting there, as where the system refuses the
         // rows or has no guide to write to: not at every opening and leaving of the app, each a download
         // of the whole feed.
         val tried = now - prefs.getLong(TRIED_AT, 0)
-        if (tried in 0 until RETRY_MS && prefs.getString(TRIED_FOR, null) == account) return@withLock
+        if (!asked && tried in 0 until RETRY_MS && prefs.getString(TRIED_FOR, null) == account) return@withLock false
         prefs.edit().putLong(TRIED_AT, now).putString(TRIED_FOR, account).apply()
         val channels = repo.liveChannels(GUIDE_HOURS)
         if (channels.isNotEmpty()) {
             write(context, channels)
             prefs.edit().putLong(SYNCED_AT, now).putString(SYNCED_FOR, account).apply()
         }
+        hasChannels(context)
     }
 
     private fun hasChannels(context: Context): Boolean =
@@ -266,7 +271,7 @@ class TvLiveSetupActivity : ComponentActivity() {
         }
         lifecycleScope.launch {
             val repo = (application as EtincelleTvApp).container.repository
-            val synced = withContext(Dispatchers.IO) { runCatching { TvLive.sync(applicationContext, repo) }.isSuccess }
+            val synced = withContext(Dispatchers.IO) { runCatching { TvLive.sync(applicationContext, repo, asked = true) }.getOrDefault(false) }
             val signedIn = repo.currentSession() != null
             val ok = synced && signedIn
             if (!ok) {
