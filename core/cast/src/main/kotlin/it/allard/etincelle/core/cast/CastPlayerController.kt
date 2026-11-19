@@ -757,7 +757,7 @@ class CastPlayerController(
         return true
     }
 
-    /** Sends a remote-control key to the etincelle TV app (up, down, left, right, ok, back). */
+    /** Sends a remote-control key to the etincelle TV app (up, down, left, right, ok, back, skip). */
     fun sendTvKey(key: String) {
         tvSession?.takeIf { tvConnected }?.send(JSONObject().put(RemoteMessages.TYPE, RemoteMessages.KEY).put(RemoteMessages.KEY_NAME, key))
     }

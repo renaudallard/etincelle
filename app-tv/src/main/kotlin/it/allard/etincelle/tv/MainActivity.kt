@@ -502,8 +502,9 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                         "ok" -> installUpdate(viewModel) { lifecycle.withResumed {} }
                         "back" -> if (viewModel.state.value.updateProgress == null) viewModel.dismissUpdate()
                     }
-                    // The ad break on offer, whatever the controls are doing.
-                    name == RemoteMessages.KEY_SKIP -> skipAdBreak?.invoke()
+                    // The ad break on offer, whatever the controls are doing. Not while the programme
+                    // is being loaded again: the place to skip to was read in the stream as it was.
+                    name == RemoteMessages.KEY_SKIP -> if (reloadJob?.isActive != true) skipAdBreak?.invoke()
                     // Straight to what handles Back: from Android 16 an activity no longer turns a Back
                     // key event into it for an app built for that version.
                     name == "back" -> onBackPressedDispatcher.onBackPressed()
@@ -967,26 +968,36 @@ private fun TvPlayerSurface(
             // A recording's ad breaks are looked for in it, and offered as playback comes into one.
             val recording = source.originRecordingAssetId ?: return@LaunchedEffect
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                adSkipper.followRecording(player, recording, liveWindow) { adBreak = it }
+                try {
+                    adSkipper.followRecording(player, recording, liveWindow) { adBreak = it }
+                } finally {
+                    // Not looked at while the app is away: no break is on offer then.
+                    adBreak = null
+                }
             }
             return@LaunchedEffect
         }
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) {
-                behindLive = LivePlayback.behindLiveEdgeMs(player, liveWindow) > LivePlayback.LIVE_REWIND_THRESHOLD_MS
-                // An ad break being watched behind the live point, where its end is known: skipped at
-                // once when the settings say so, each break once, and offered with a pill otherwise
-                // (as is one gone back into with the remote).
-                adBreak = adSkipper.tick(player, liveWindow)
-                if (pendingRewind && LivePlayback.seekToTimeIfReady(player, liveWindow, rewindTo)) {
-                    pendingRewind = false
-                    adSkipper.ownSeek()
+            try {
+                while (true) {
+                    behindLive = LivePlayback.behindLiveEdgeMs(player, liveWindow) > LivePlayback.LIVE_REWIND_THRESHOLD_MS
+                    // An ad break being watched behind the live point, where its end is known: skipped at
+                    // once when the settings say so, each break once, and offered with a pill otherwise
+                    // (as is one gone back into with the remote).
+                    adBreak = adSkipper.tick(player, liveWindow)
+                    if (pendingRewind && LivePlayback.seekToTimeIfReady(player, liveWindow, rewindTo)) {
+                        pendingRewind = false
+                        adSkipper.ownSeek()
+                    }
+                    // The show playback is in, which follows it past the show's end or back into the one
+                    // before, as when it was handed over rewound (see LiveProgramme).
+                    programWindow = programme.current(player, liveWindow)
+                    barGeometry = LivePlayback.liveBarGeometry(player, liveWindow, programWindow)
+                    delay(1000)
                 }
-                // The show playback is in, which follows it past the show's end or back into the one
-                // before, as when it was handed over rewound (see LiveProgramme).
-                programWindow = programme.current(player, liveWindow)
-                barGeometry = LivePlayback.liveBarGeometry(player, liveWindow, programWindow)
-                delay(1000)
+            } finally {
+                // Not looked at while the app is away: no break is on offer then, to the phone either.
+                adBreak = null
             }
         }
     }
