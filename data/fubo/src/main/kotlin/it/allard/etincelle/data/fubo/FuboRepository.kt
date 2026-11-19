@@ -604,7 +604,8 @@ class FuboRepository(
     override suspend fun liveProgramWindow(channelId: String, atMs: Long?): ProgramWindow? = withRefresh {
         // What was on at another time is the guide's alone to say: the stream's own window is that of
         // what is on now.
-        if (atMs != null) return@withRefresh onAirWindow(channelId, atMs)
+        // Asked on its own all through a long watch, with nothing else to notice a session run out.
+        if (atMs != null) return@withRefresh onAirWindow(channelId, atMs, renew = true)
         onAirWindow(channelId) ?: api.playbackAsset(channelId = channelId, type = "live").accessRightsV2?.live?.toProgramWindow()
     }
 
@@ -614,7 +615,7 @@ class FuboRepository(
      * before the programme does. Best-effort: null when the guide cannot be read or is slow to answer,
      * leaving that window, as a channel must not wait for it to start.
      */
-    private suspend fun onAirWindow(channelId: String, at: Long = System.currentTimeMillis()): ProgramWindow? = try {
+    private suspend fun onAirWindow(channelId: String, at: Long = System.currentTimeMillis(), renew: Boolean = false): ProgramWindow? = try {
         val now = at
         withTimeoutOrNull(ON_AIR_WAIT_MS) {
             api.epg(startTime = rfc3339Utc(now), endTime = rfc3339Utc(now + ON_AIR_SPAN_MS), limit = 1, stationId = channelId)
@@ -622,6 +623,8 @@ class FuboRepository(
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
+        // With [renew], a session refused is the caller's to renew (see withRefresh).
+        if (renew && e is HttpException && e.code() == 401) throw e
         null
     }
 
