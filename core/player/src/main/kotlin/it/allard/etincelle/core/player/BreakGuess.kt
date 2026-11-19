@@ -81,13 +81,24 @@ internal object BreakGuess {
         }
     }
 
-    // The share of its usual score under which a picture is without the logo, the pictures either
-    // side it is smoothed with, the pictures with the logo a break may hold (an advert with something
-    // in that corner), and the pictures of programme wanted on each side of one.
+    // The share of its usual score under which a picture is without the logo, and the pictures
+    // either side it is smoothed with.
     private const val GONE = 0.5
     private const val SMOOTH = 2
+
+    // Fewer pictures than this without the logo are a stray, a bright scene or a badge put over the
+    // logo for a moment, and count for nothing.
+    private const val SOLID = 5
+
+    // The pictures with the logo a break may hold (an advert with something in that corner). No
+    // more: the programme often comes back with a badge over its logo within a minute, and bridged
+    // to that, the break would run on into it.
     const val BRIDGE = 7
+
+    // The pictures that must be known on each side of a break, and how many of them at least must
+    // have the logo: it is between two parts of the programme, not at the edge of what was read.
     const val AROUND = 15
+    private const val MOSTLY = 8
 
     /**
      * Of each picture, whether it is without the logo, from what each has of it ([score], [usual]
@@ -99,13 +110,21 @@ internal object BreakGuess {
             .let { it[it.size / 2] } < GONE * usual
     }
 
+    /** [gone] without its strays. */
+    fun solid(gone: BooleanArray): BooleanArray {
+        val out = BooleanArray(gone.size)
+        for (run in runs(gone, 0)) if (run.last - run.first + 1 >= SOLID) for (i in run) out[i] = true
+        return out
+    }
+
     /**
      * The stretches of [gone] that have the programme on both sides, as breaks; the first picture
      * being at [firstMs] and each [pictureMs] after the one before.
      */
     fun logoBreaks(gone: BooleanArray, firstMs: Long, pictureMs: Long): List<LongRange> {
-        fun programme(from: Int, to: Int) = from >= 0 && to <= gone.size && (from until to).none { gone[it] }
-        return runs(gone, BRIDGE).mapNotNull { run ->
+        val solid = solid(gone)
+        fun programme(from: Int, to: Int) = from >= 0 && to <= solid.size && (from until to).count { !solid[it] } >= MOSTLY
+        return runs(solid, BRIDGE).mapNotNull { run ->
             val start = firstMs + run.first * pictureMs
             val end = firstMs + (run.last + 1) * pictureMs
             val between = programme(run.first - AROUND, run.first) && programme(run.last + 1, run.last + 1 + AROUND)

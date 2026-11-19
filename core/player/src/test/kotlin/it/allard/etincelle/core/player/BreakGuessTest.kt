@@ -144,6 +144,29 @@ class BreakGuessTest {
         assertEquals(emptyList<LongRange>(), BreakGuess.logoBreaks(flags(5, 90, 20), 1_000_000_000L, 4_000))
     }
 
+    // Pictures from stretches given as a number of them and whether they are without the logo.
+    private fun gone(vararg stretches: Pair<Int, Boolean>) = stretches.flatMap { (count, gone) -> List(count) { gone } }.toBooleanArray()
+
+    @Test
+    fun `a few pictures without the logo near a break neither end it late nor undo it`() {
+        // Three pictures of a bright scene, five or ten pictures after the adverts.
+        assertEquals(listOf(80_000L..440_000L), BreakGuess.logoBreaks(gone(20 to false, 90 to true, 5 to false, 3 to true, 30 to false), 0, 4_000))
+        assertEquals(listOf(80_000L..440_000L), BreakGuess.logoBreaks(gone(20 to false, 90 to true, 10 to false, 3 to true, 30 to false), 0, 4_000))
+    }
+
+    @Test
+    fun `a badge over the logo a minute after the adverts is not more of them`() {
+        // The programme is back for 12 pictures, then has a badge over its logo for 11.
+        assertEquals(listOf(80_000L..440_000L), BreakGuess.logoBreaks(gone(20 to false, 90 to true, 12 to false, 11 to true, 30 to false), 0, 4_000))
+    }
+
+    @Test
+    fun `an advert with something in the logo's corner is bridged when short, and splits the break when long`() {
+        assertEquals(listOf(80_000L..460_000L), BreakGuess.logoBreaks(gone(20 to false, 30 to true, 7 to false, 58 to true, 30 to false), 0, 4_000))
+        // Nine pictures of it: the first part is too short to be offered, the second is.
+        assertEquals(listOf(236_000L..448_000L), BreakGuess.logoBreaks(gone(20 to false, 30 to true, 9 to false, 53 to true, 30 to false), 0, 4_000))
+    }
+
     @Test
     fun `pictures with nothing that stays say nothing`() {
         val track = LogoTrack(120, width, height)
