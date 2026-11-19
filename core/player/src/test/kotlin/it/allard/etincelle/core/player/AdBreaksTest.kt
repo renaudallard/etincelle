@@ -57,6 +57,14 @@ class AdBreaksTest {
     }
 
     @Test
+    fun `a break with no length ends at the mark that closes it`() {
+        val marks = listOf(Mark(10 * minute, null, true), Mark(13 * minute, null, false))
+        val period = Stretch(0, 60 * minute, marks, signalled = true)
+
+        assertEquals(listOf(10 * minute..13 * minute), AdBreaks.breaks(listOf(period)))
+    }
+
+    @Test
     fun `a stream that marks nothing gives its breaks away by their shape`() {
         fun plain(from: Long, to: Long?) = Stretch(from, to, emptyList(), signalled = false)
         // 10 min of programme, 3 min, 5 s, 3 min, then programme: as on RMC Story.

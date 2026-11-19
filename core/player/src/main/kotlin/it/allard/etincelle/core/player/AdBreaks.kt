@@ -107,8 +107,11 @@ class AdBreaks {
             val raw = if (stretches.any { it.signalled }) {
                 stretches.flatMap { stretch ->
                     stretch.marks.filter { it.opens }.mapNotNull { mark ->
-                        // As long as it says; a mark with no length covers the rest of its period.
-                        val end = mark.durationMs?.let { mark.atMs + it } ?: stretch.endMs ?: return@mapNotNull null
+                        // As long as it says; a mark with no length goes on to the next mark of its
+                        // period, which closes it or opens another, or to the period's end.
+                        val end = mark.durationMs?.let { mark.atMs + it }
+                            ?: stretch.marks.filter { it.atMs > mark.atMs }.minOfOrNull { it.atMs }
+                            ?: stretch.endMs ?: return@mapNotNull null
                         (mark.atMs..end).takeIf { end > mark.atMs }
                     }
                 }
