@@ -14,8 +14,10 @@ import kotlin.math.abs
  *   no captions, where only the adverts have some.
  * - Logo: the programme shows a logo in a corner, its own or the channel's, and the adverts do not.
  *   What stays put in a corner through most of the recording is taken for it, without knowing any
- *   logo beforehand, and a break is a stretch without it. An advert with something of its own in
- *   that corner can pass for the programme.
+ *   logo beforehand, and a break is a stretch without it. The channel's, in an upper corner, comes
+ *   first: a show's own, lower, is missing from its titles and from the short programmes around
+ *   it, which would pass for adverts. An advert with something of its own in the logo's corner can
+ *   pass for the programme.
  *
  * They fail in different places, so a break is kept where both see one, and on the word of one alone
  * only when the other has nothing to go by. Its edges are the logo's, the sharper of the two: the
@@ -183,7 +185,7 @@ internal class LogoTrack(private val pictures: Int, private val width: Int, priv
     private val edgesHigh = cornerHeight - 1
     private val size = edgesWide * edgesHigh
 
-    // The left and top of each corner.
+    // The left and top of each corner, the upper ones first.
     private val origins = arrayOf(0 to 0, width - cornerWidth to 0, 0 to height - cornerHeight, width - cornerWidth to height - cornerHeight)
     private val edges = Array(origins.size) { ByteArray(if (size > 0) pictures * size else 0) }
     private val given = BooleanArray(pictures)
@@ -222,6 +224,8 @@ internal class LogoTrack(private val pictures: Int, private val width: Int, priv
         var keptMask = IntArray(0)
         var strongest = 0.0
         for ((c, corner) in edges.withIndex()) {
+            // The lower corners are looked at only when no upper one holds a logo.
+            if (c == UPPER && strongest >= STRONG) break
             // What each point of the corner mostly is: the logo where there is one, nothing where
             // the picture behind keeps changing.
             val median = IntArray(size) { p ->
@@ -284,5 +288,8 @@ internal class LogoTrack(private val pictures: Int, private val width: Int, priv
 
         // The least a logo's edges must stand out.
         const val STRONG = 25.0
+
+        // How many of the corners, the first ones, are the upper ones.
+        const val UPPER = 2
     }
 }
