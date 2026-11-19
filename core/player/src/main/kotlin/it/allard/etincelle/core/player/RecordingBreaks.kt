@@ -92,8 +92,15 @@ object RecordingBreaks {
         val count = index.getSegmentCount(lengthUs)
         if (count !in 1..MAX_SEGMENTS) return emptyList()
         val first = index.firstSegmentNum
+        // Segments that are numbered rather than timed, as older recordings have them, are timed by
+        // the player library from the start of the recording, though the first may begin before it:
+        // a recording's strips of thumbnails do, by a minute and a half. Where the first begins is in
+        // its number and the track's offset, as the manifest's own eptDelta has it. Never a whole
+        // segment before, nor after: that would be numbers that do not count from the same start.
+        val length = index.getDurationUs(first, lengthUs)
+        val early = if (index.isExplicit) 0L else ((first - 1) * length - representation.presentationTimeOffsetUs).takeIf { it < 0 && -it < length } ?: 0L
         return (first until first + count).map { n ->
-            Segment(Util.usToMs(index.getTimeUs(n)), Util.usToMs(index.getDurationUs(n, lengthUs)), index.getSegmentUrl(n).resolveUri(base))
+            Segment(Util.usToMs(index.getTimeUs(n) + early), Util.usToMs(index.getDurationUs(n, lengthUs)), index.getSegmentUrl(n).resolveUri(base))
         }
     }
 
@@ -130,10 +137,6 @@ object RecordingBreaks {
         val across = representation.format.tileCountHorizontal
         val down = representation.format.tileCountVertical
         if (across == Format.NO_VALUE || down == Format.NO_VALUE || across <= 0 || down <= 0) return null
-        // Strips numbered rather than timed, as older recordings have them, start before the video
-        // by an amount the player library does not account for (about 95 s on those seen): their
-        // pictures would be taken for later ones. Left alone until that is measured.
-        if (representation.index?.isExplicit != true) return null
         val strips = segments(representation, lengthMs)
         if (strips.isEmpty() || strips.size > MAX_STRIPS) return null
         val perStrip = across * down
