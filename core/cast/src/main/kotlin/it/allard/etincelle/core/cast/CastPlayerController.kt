@@ -759,6 +759,7 @@ class CastPlayerController(
         // Handed over from this phone, which stopped for it, and not played by the TV as far as it
         // said: with the link gone nothing says it ever will be.
         val back = tvHandoverMs
+        val rewind = tvSentRewindMs
         tvSession = null
         leaveTvPlayer()
         onSessionDisconnected()
@@ -768,6 +769,7 @@ class CastPlayerController(
             // It comes back here where it was rather than closing without a word, as when the TV says
             // it cannot play it. In pause: the TV may be playing it all the same, out of reach.
             onError?.invoke(TV_LOST_MESSAGE)
+            bringBackRewound(rewind)
             loadResolved(localPlayer, item, back, fromPlayWhenReady = false)
             return
         }
@@ -1510,6 +1512,7 @@ class CastPlayerController(
                     // then swaps onto its content from here instead of becoming an idle session.
                     transferring = false
                     clearConnecting()
+                    bringBackRewound(transferRewindMs)
                     swapTo(localPlayer, transferPosition, transferPlayWhenReady)
                 }
             }
