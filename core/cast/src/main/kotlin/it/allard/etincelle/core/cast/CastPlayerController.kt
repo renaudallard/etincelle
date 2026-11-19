@@ -190,6 +190,11 @@ class CastPlayerController(
     // the phone has started it again.
     private var handoffPositionMs = 0L
 
+    // Where the phone is in the programme its player holds, playing or stopped on an error. Emptied
+    // for a device that took over and not loaded again yet, it holds none: where it is to resume.
+    private fun phonePositionMs(): Long =
+        if (localPlayer.currentMediaItem != null) localPlayer.currentPosition else handoffPositionMs
+
     // The TV app is connected (not just connecting).
     private val tvConnected: Boolean
         get() = tvSession != null && state.value.toTvApp
@@ -619,7 +624,7 @@ class CastPlayerController(
                 // Casting out a rewound live stream: resume the TV that far behind the edge.
                 val isLive = (item.localConfiguration?.tag as? PlaybackSource)?.isLive == true
                 val rewind = if (isLive) localRewindMs() else 0L
-                val position = if (phonePlays) localPlayer.currentPosition else handoffPositionMs
+                val position = phonePositionMs()
                 playOnTv(item, position, rewind)
                 if (phonePlays) tvHandoverMs = position
                 stopPhonePlayer()
@@ -828,8 +833,7 @@ class CastPlayerController(
             // Casting out a rewound live stream: resume the TV that far behind the edge.
             val isLive = (item.localConfiguration?.tag as? PlaybackSource)?.isLive == true
             val rewind = if (isLive) localRewindMs() else 0L
-            // Where the phone is, or was asked to start when it has not loaded yet.
-            val position = if (phoneStillPlays) localPlayer.currentPosition else handoffPositionMs
+            val position = phonePositionMs()
             if (loadDirect(session, item, position, resolve = true, rewindMs = rewind) == false && directSession === session) {
                 // The TV did not take it: end the session, the phone keeps playing.
                 stopDirect()
@@ -1423,7 +1427,7 @@ class CastPlayerController(
             transferring = false
             transferFallbackJob?.cancel()
             castSessionId = session.sessionId
-            swapTo(castPlayer, localPlayer.currentPosition, localPlayer.playWhenReady)
+            swapTo(castPlayer, phonePositionMs(), localPlayer.playWhenReady)
             return
         }
         // Already on the cast player. The same session resuming needs no reload; a different session id
