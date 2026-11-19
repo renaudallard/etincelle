@@ -49,6 +49,9 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
     // What each picture read has of the logo, by its time (s since 1970, a multiple of the step).
     private val scores = TreeMap<Long, Double>()
 
+    // The pictures that could not be had, with how many times each was asked for.
+    private val missed = HashMap<Long, Int>()
+
     /**
      * The breaks around the playhead, at [atMs] with the live point at [liveMs] (ms since 1970), as
      * far as they are known, in the same time. Reads the pictures it still needs: for an IO thread.
@@ -64,13 +67,15 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
         // A stretch without the logo is followed to where the programme is back, or was before it.
         for (more in 0 until MORE_TIMES) {
             val (first, gone) = known(logo, at)
-            val runs = BreakGuess.runs(gone, BreakGuess.BRIDGE)
+            val runs = BreakGuess.runs(BreakGuess.solid(gone), BreakGuess.BRIDGE)
             val until = first + gone.size * step
             val open = runs.any { it.last + BreakGuess.AROUND >= gone.size && (gone.size - it.first) * step <= FAR_S }
             val begun = runs.any { it.first < BreakGuess.AROUND && (it.last + 1) * step <= FAR_S }
             if (open && until <= last) {
                 read(logo, until, minOf(last, until + MORE_S))
-            } else if (begun) {
+            } else if (begun && first > at - FAR_S) {
+                // No further back than a break the playhead is in can have begun: what is read
+                // beyond is of no use, and is forgotten below only to be read again.
                 read(logo, first - MORE_S, first - step)
             } else {
                 break
@@ -78,6 +83,7 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
         }
         val (first, gone) = known(logo, at)
         scores.headMap(at - KEPT_S).clear()
+        missed.keys.removeAll { it < at - KEPT_S }
         return BreakGuess.logoBreaks(gone, first * 1000, step * 1000)
     }
 
@@ -93,24 +99,32 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
     }
 
     // Reads the pictures from [from] to [to] that are not known yet. One that cannot be had counts
-    // as showing the logo: it ends a break rather than making one.
+    // as showing the logo, which ends a break rather than making one, and is asked for again the
+    // next times, a few of them.
     private suspend fun read(logo: Logo, from: Long, to: Long) {
-        val wanted = (from..to step step).filter { it !in scores }
+        val wanted = (from..to step step).filter { it !in scores || (missed[it] ?: TRIES) < TRIES }
         if (wanted.isEmpty()) return
-        val got = each(wanted) { time -> luma(time)?.let(logo::score) ?: logo.usual }
-        wanted.forEachIndexed { i, time -> scores[time] = got[i] }
+        val got = each(wanted) { time -> luma(time)?.let(logo::score) }
+        wanted.forEachIndexed { i, time ->
+            val score = got[i]
+            if (score == null) missed[time] = (missed[time] ?: 0) + 1 else missed.remove(time)
+            scores[time] = score ?: logo.usual
+        }
     }
 
     private suspend fun learn(at: Long, last: Long) {
         learntAt = at
         logo = null
         scores.clear()
+        missed.clear()
         val times = (at - LEARN_SPAN_S..minOf(last, at + LEARN_SPAN_S) step LEARN_EVERY_S).toList()
         val pictures = each(times) { luma(it) }.filterNotNull()
         if (pictures.isEmpty()) return
         val track = LogoTrack(pictures.size, width, height)
         pictures.forEachIndexed { i, picture -> track.add(i, picture) }
         logo = track.logo()
+        // Nothing learnt, as when the pictures could not be had: tried again a little further on.
+        if (logo == null) learntAt = at - LEARN_AGAIN_S + LEARN_RETRY_S
     }
 
     private suspend fun <R> each(times: List<Long>, work: (Long) -> R): List<R> = coroutineScope {
@@ -158,6 +172,7 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
 
     private companion object {
         const val AT_ONCE = 6
+        const val TRIES = 3
         const val SAMPLE = 2
         const val MIN_SIDE = 32
 
@@ -169,6 +184,7 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
         const val LEARN_SPAN_S = 1200L
         const val LEARN_EVERY_S = 28L
         const val LEARN_AGAIN_S = 900L
+        const val LEARN_RETRY_S = 120L
 
         // Read around the playhead at all times, and more at a time, up to MORE_TIMES in a go,
         // while a stretch without the logo goes on, for as far as a break may (FAR_S).
@@ -186,6 +202,7 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
 // How far behind the live point a break is looked for: at it there is nowhere to skip to.
 private const val BEHIND_MS = 60_000L
 private const val LOOK_EVERY_MS = 4_000L
+private const val PICTURE_EVERY_S = 4
 
 /**
  * Has this skipper follow the live channel [player] plays, whose pictures are at [thumbnails]: while
@@ -194,6 +211,8 @@ private const val LOOK_EVERY_MS = 4_000L
  * with the screen.
  */
 suspend fun AdSkipper.followLive(player: Player, thumbnails: LiveThumbnails, window: Timeline.Window) {
+    // The rule counts in pictures four seconds apart, as the service keeps them.
+    if (thumbnails.intervalSec != PICTURE_EVERY_S) return
     val breaks = LiveBreaks(thumbnails)
     while (true) {
         val at = LivePlayback.playheadEpochMs(player, window)
