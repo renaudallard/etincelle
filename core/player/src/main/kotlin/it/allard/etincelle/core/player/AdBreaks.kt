@@ -12,9 +12,11 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * An ad break of a live stream, as positions (ms) in the player's window: from [startMs] to [endMs].
- * The window slides and takes those along; [id], the time of day the break began (epoch ms), stays.
+ * The window slides and takes those along, at each reading of the manifest; [id], the time of day
+ * the break began (epoch ms), stays. [skippable] when there is somewhere to skip to: it has ended
+ * before the live point, and is not on its last second.
  */
-data class AdBreak(val startMs: Long, val endMs: Long, val id: Long)
+data class AdBreak(val startMs: Long, val endMs: Long, val id: Long, val skippable: Boolean)
 
 /**
  * Finds the ad breaks of the live stream a player plays, from its DASH manifest, so that one being
@@ -38,8 +40,8 @@ class AdBreaks {
     private var found: List<LongRange> = emptyList()
 
     /**
-     * The break playback is in, when it can be skipped: one that has ended before the live point, and
-     * is not on its last second. Null otherwise. [window] is a caller-owned scratch instance to fill.
+     * The break playback is in, whether or not it can be skipped yet, or null. [window] is a
+     * caller-owned scratch instance to fill.
      */
     fun current(player: Player, window: Timeline.Window): AdBreak? {
         val dash = player.currentManifest as? DashManifest ?: return null
@@ -57,8 +59,10 @@ class AdBreaks {
         val shift = zero - window.windowStartTimeMs
         val at = player.currentPosition
         val live = window.defaultPositionMs
-        return found.firstOrNull { at >= it.first + shift && at < it.last + shift - LAST_MOMENT_MS && it.last + shift <= live - LIVE_MARGIN_MS }
-            ?.let { AdBreak(it.first + shift, it.last + shift, zero + it.first) }
+        return found.firstOrNull { at >= it.first + shift && at < it.last + shift }?.let {
+            val end = it.last + shift
+            AdBreak(it.first + shift, end, zero + it.first, skippable = at < end - LAST_MOMENT_MS && end <= live - LIVE_MARGIN_MS)
+        }
     }
 
     /** One period of a manifest, as far as its ads go; times in ms from the manifest's time zero. */

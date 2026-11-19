@@ -889,7 +889,7 @@ private fun TvPlayerSurface(
         onDispose { player.removeListener(adSkipper) }
     }
     fun skipAd() {
-        adBreak?.let { player.seekTo(it.endMs) }
+        adSkipper.skip(player, liveWindow)
         adBreak = null
     }
     // OK while the break on screen can be skipped and says so, the controls being hidden (shown, OK

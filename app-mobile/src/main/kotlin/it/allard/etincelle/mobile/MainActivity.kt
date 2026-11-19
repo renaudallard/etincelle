@@ -1080,10 +1080,10 @@ private fun PlayerSurface(
             )
         }
         // With or without the controls: it is there for as long as the break can be skipped.
-        adBreak?.let { ad ->
+        if (adBreak != null) {
             SkipAdsButton(
                 onClick = {
-                    currentPlayer.seekTo(ad.endMs)
+                    adSkipper.skip(currentPlayer, liveWindow)
                     adBreak = null
                 },
                 modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp),
