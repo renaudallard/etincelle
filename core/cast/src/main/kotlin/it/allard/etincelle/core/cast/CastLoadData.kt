@@ -13,6 +13,10 @@ import it.allard.etincelle.core.model.coerceWholeNumbers
 import org.json.JSONObject
 
 internal const val DRM_HEADER_TOKEN = "x-dt-auth-token"
+
+// The spacing of a live channel's pictures the receiver's rule counts in, as this app's does.
+private const val LIVE_PICTURE_EVERY_S = 4
+
 private const val HLS = "application/x-mpegurl"
 private const val VAPI_URL = "https://api-eu.fubo.tv/"
 
@@ -77,6 +81,11 @@ internal object CastLoadData {
             source?.programWindow?.takeIf { source.isLive }?.let {
                 put("program_start_ms", it.startMs)
                 put("program_end_ms", it.endMs)
+            }
+            // Where the service keeps pictures of the channel, one every four seconds: the receiver
+            // looks in them for the ad breaks the stream does not mark, as this app does (LiveBreaks).
+            source?.liveThumbnails?.takeIf { source.isLive && it.intervalSec == LIVE_PICTURE_EVERY_S }?.let {
+                put("live_thumbnails_url", it.baseUrl)
             }
             if (!licenseUrl.isNullOrEmpty() && !token.isNullOrEmpty()) {
                 put("license_url", licenseUrl)

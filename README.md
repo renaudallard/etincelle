@@ -43,7 +43,9 @@ cherchées à l'ouverture, d'après ses vignettes de la même façon et ses sous
 parle pendant des minutes, une publicité quelques secondes) : le bouton apparaît dans la coupure,
 une dizaine de secondes après le début de la lecture sur un réseau domestique, le temps de la
 recherche (une quinzaine de Mo par heure d'enregistrement, soit un centième de ce que demande sa
-lecture), là aussi sans rien sauter automatiquement. Cliquer sur un programme ouvre d'abord sa **fiche détaillée**
+lecture), là aussi sans rien sauter automatiquement. Sur un **Chromecast**, c'est le récepteur qui
+cherche les coupures de la même façon et affiche **Passer la pub : OK** sur le téléviseur : la
+touche OK de sa télécommande y mène à la fin de la coupure. Cliquer sur un programme ouvre d'abord sa **fiche détaillée**
 (synopsis, casting, année, classification) plutôt que de le lire aussitôt, et la fiche regroupe ses
 autres diffusions disponibles. Comme dans l'application officielle, la fiche indique au-dessus du titre
 quand le programme a été **diffusé** (« Diffusé: 12 févr. ») ou jusqu'à quand il reste disponible
