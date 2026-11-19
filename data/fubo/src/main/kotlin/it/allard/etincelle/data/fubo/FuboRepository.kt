@@ -16,6 +16,7 @@ import it.allard.etincelle.core.model.DrmSpec
 import it.allard.etincelle.core.model.FavoriteOrder
 import it.allard.etincelle.core.model.HomeProgram
 import it.allard.etincelle.core.model.LiveChannel
+import it.allard.etincelle.core.model.LiveThumbnails
 import it.allard.etincelle.core.model.LoginResult
 import it.allard.etincelle.core.model.MfaChallenge
 import it.allard.etincelle.core.model.PlaybackSource
@@ -856,12 +857,13 @@ internal fun PlaybackResponse.toPlaybackSource(ownHost: (String) -> Boolean = St
     } else {
         DrmSpec.None
     }
+    val live = type != "dvr" && (stream.live ?: (type == "live"))
     return PlaybackSource(
         manifestUrl = manifest,
         drm = drmSpec,
         // A DVR recording plays from the start like VOD, never the live edge, even though its manifest
         // can report live=true; without this a cast clamps it to the live-edge position and fails.
-        isLive = type != "dvr" && (stream.live ?: (type == "live")),
+        isLive = live,
         // The show's name: on an episode the title is the episode's own.
         title = program?.heading ?: program?.title,
         heartbeatUrl = heartbeat?.url,
@@ -870,5 +872,11 @@ internal fun PlaybackResponse.toPlaybackSource(ownHost: (String) -> Boolean = St
         // a cast, by the receiver, which is handed that token along with it.
         progressUrl = playhead?.url?.takeIf { url -> url.toHttpUrlOrNull()?.host?.let(ownHost) == true },
         progressPayload = playhead?.payload,
+        // Asked for with no session: any host will do, as long as it is asked safely.
+        liveThumbnails = thumbnails?.takeIf { live && it.type == "timestamp" }?.let { t ->
+            val url = t.baseUrl?.takeIf { it.toHttpUrlOrNull()?.isHttps == true }
+            val every = t.interval?.takeIf { it in 1..60 }
+            if (url != null && every != null) LiveThumbnails(url, every) else null
+        },
     )
 }

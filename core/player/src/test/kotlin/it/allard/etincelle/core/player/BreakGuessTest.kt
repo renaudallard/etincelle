@@ -127,6 +127,24 @@ class BreakGuessTest {
     }
 
     @Test
+    fun `a logo learnt from some pictures is told in others`() {
+        val track = LogoTrack(60, width, height)
+        for (i in 0 until 60) track.add(i, picture(40 + i, logo = i % 10 != 0))
+        val logo = track.logo()!!
+        assertTrue(logo.score(picture(70, logo = true)) > 0.9 * logo.usual)
+        assertTrue(logo.score(picture(70, logo = false)) < 0.1 * logo.usual)
+    }
+
+    @Test
+    fun `a stretch without the logo is a break once the programme is seen on both sides`() {
+        fun flags(before: Int, without: Int, after: Int) = BooleanArray(before + without + after) { it in before until before + without }
+        assertEquals(listOf(1_000_080_000L..1_000_440_000L), BreakGuess.logoBreaks(flags(20, 90, 20), 1_000_000_000L, 4_000))
+        // Still going on, or begun before what is known: not yet.
+        assertEquals(emptyList<LongRange>(), BreakGuess.logoBreaks(flags(20, 90, 5), 1_000_000_000L, 4_000))
+        assertEquals(emptyList<LongRange>(), BreakGuess.logoBreaks(flags(5, 90, 20), 1_000_000_000L, 4_000))
+    }
+
+    @Test
     fun `pictures with nothing that stays say nothing`() {
         val track = LogoTrack(120, width, height)
         for (i in 0 until 120) track.add(i, picture(40 + i, logo = false))

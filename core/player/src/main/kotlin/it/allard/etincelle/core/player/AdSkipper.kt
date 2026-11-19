@@ -50,6 +50,11 @@ class AdSkipper(private val auto: Boolean) : Player.Listener {
         breaks.recorded = found
     }
 
+    /** The breaks of the live channel being played that its pictures give away (see [LiveBreaks]). */
+    fun guessed(found: List<LongRange>) {
+        breaks.guessed = found
+    }
+
     /** The seek just made was the screen's own, not the viewer's. */
     fun ownSeek() {
         rewound = false

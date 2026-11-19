@@ -15,7 +15,8 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  * The window slides and takes those along, at each reading of the manifest; [id], the time of day
  * the break began (epoch ms), stays. [skippable] when there is somewhere to skip to: it has ended
  * before the live point, and is not on its last second. [guessed] when the stream does not say it
- * is one, as in a recording (see [RecordingBreaks]): for a button to offer, never to skip unasked.
+ * is one, as in a recording (see [RecordingBreaks]) or by a live channel's pictures (see
+ * [LiveBreaks]): for a button to offer, never to skip unasked.
  */
 data class AdBreak(val startMs: Long, val endMs: Long, val id: Long, val skippable: Boolean, val guessed: Boolean = false)
 
@@ -35,7 +36,8 @@ data class AdBreak(val startMs: Long, val endMs: Long, val id: Long, val skippab
  *   in the segments: nothing is found there.
  *
  * A recording is told its breaks from outside, with [recorded]: its stream marks none, and they are
- * guessed from what it carries (see [RecordingBreaks]).
+ * guessed from what it carries (see [RecordingBreaks]). So is a live stream, with [guessed], for what
+ * it does not mark: the M6 channels' breaks, and the trailers and sponsors around a marked one.
  *
  * One instance per player screen: the breaks are worked out again only when the manifest changes.
  */
@@ -47,33 +49,44 @@ class AdBreaks {
     var recorded: List<LongRange> = emptyList()
 
     /**
+     * The breaks of the live channel being played that its pictures give away (see [LiveBreaks]), as
+     * times of day (ms since 1970): those the stream does not mark, or more of those it does.
+     */
+    var guessed: List<LongRange> = emptyList()
+
+    /**
      * The break playback is in, whether or not it can be skipped yet, or null. [window] is a
      * caller-owned scratch instance to fill.
      */
     fun current(player: Player, window: Timeline.Window): AdBreak? {
+        val at = player.currentPosition
         if (!player.isCurrentMediaItemLive) {
-            val at = player.currentPosition
             return recorded.firstOrNull { at >= it.first && at < it.last }
                 ?.let { AdBreak(it.first, it.last, it.first, skippable = at < it.last - LAST_MOMENT_MS, guessed = true) }
         }
-        val dash = player.currentManifest as? DashManifest ?: return null
         val timeline = player.currentTimeline
         if (timeline.isEmpty) return null
         timeline.getWindow(player.currentMediaItemIndex, window)
-        val zero = dash.availabilityStartTimeMs
-        if (zero == C.TIME_UNSET || window.windowStartTimeMs == C.TIME_UNSET) return null
-        if (dash !== manifest) {
-            manifest = dash
-            found = breaks(stretches(dash))
-        }
-        // From the manifest's own time to a position in the window.
-        val shift = zero - window.windowStartTimeMs
-        val at = player.currentPosition
+        val start = window.windowStartTimeMs
+        if (start == C.TIME_UNSET) return null
         val live = window.defaultPositionMs
-        return found.firstOrNull { at >= it.first + shift && at < it.last + shift }?.let {
-            val end = it.last + shift
-            AdBreak(it.first + shift, end, zero + it.first, skippable = at < end - LAST_MOMENT_MS && end <= live - LIVE_MARGIN_MS)
+        fun breakAt(from: Long, to: Long, id: Long, guessed: Boolean) =
+            AdBreak(from, to, id, skippable = at < to - LAST_MOMENT_MS && to <= live - LIVE_MARGIN_MS, guessed = guessed)
+        // What the stream marks is exact, and comes first.
+        val dash = player.currentManifest as? DashManifest
+        val zero = dash?.availabilityStartTimeMs ?: C.TIME_UNSET
+        if (dash != null && zero != C.TIME_UNSET) {
+            if (dash !== manifest) {
+                manifest = dash
+                found = breaks(stretches(dash))
+            }
+            // From the manifest's own time to a position in the window.
+            val shift = zero - start
+            found.firstOrNull { at >= it.first + shift && at < it.last + shift }
+                ?.let { return breakAt(it.first + shift, it.last + shift, zero + it.first, guessed = false) }
         }
+        return guessed.firstOrNull { at >= it.first - start && at < it.last - start }
+            ?.let { breakAt(it.first - start, it.last - start, it.first, guessed = true) }
     }
 
     /** One period of a manifest, as far as its ads go; times in ms from the manifest's time zero. */

@@ -149,7 +149,11 @@ data class PlaybackResponse(
     val program: ProgramDto?,
     @Json(name = "accessRightsV2") val accessRightsV2: AccessRightsV2Dto? = null,
     @Json(name = "nextProgramURL") val nextProgramUrl: String? = null,
+    val thumbnails: ThumbnailsDto? = null,
 )
+
+/** Where the pictures of a live channel are: by time ([type] "timestamp"), one every [interval] seconds. */
+data class ThumbnailsDto(val type: String? = null, @Json(name = "base_url") val baseUrl: String? = null, val interval: Int? = null)
 
 /** Per-mode air-windows and scrubbing rights on a live playback response; only [live] is used today. */
 data class AccessRightsV2Dto(val live: AccessRightsV2WindowDto?)

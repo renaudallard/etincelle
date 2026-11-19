@@ -64,7 +64,15 @@ data class PlaybackSource(
     val progressPayload: Map<String, Any?>? = null,
     /** The episode that follows, offered at the end of this one; null when nothing follows. */
     val upNext: UpNext? = null,
+    /** Live only: where the service keeps pictures of what the channel showed; null when it has none. */
+    val liveThumbnails: LiveThumbnails? = null,
 )
+
+/**
+ * The service's pictures of a live channel: one every [intervalSec], kept for as long as the channel
+ * can be rewound, each at [baseUrl] followed by its time in seconds since 1970.
+ */
+data class LiveThumbnails(val baseUrl: String, val intervalSec: Int)
 
 /**
  * This episode with the one that follows it. A resume point past the slate means the episode was

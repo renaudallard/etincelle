@@ -30,16 +30,20 @@ avec les commandes du lecteur et s'atteint avec la flèche **Haut**). En différ
 regarde est une **coupure publicitaire** dont le flux indique la fin, un bouton **Passer la pub**
 apparaît (sur le téléviseur, **OK** suffit) et mène à la fin de la coupure ; le réglage **Passer les
 publicités automatiquement** (dans **Paramètres**, désactivé par défaut) le fait sans rien demander,
-sauf pour une coupure dans laquelle on est revenu en arrière. Cela vaut pour les chaînes dont le flux
-signale ses coupures : celles des groupes TF1 et France Télévisions exactement, celles du groupe RMC
-d'après la forme de leurs coupures. Les chaînes du groupe M6 ne signalent rien, et au direct il n'y
-a nulle part où sauter. Dans un **enregistrement**, qui ne signale rien non plus, l'application
-cherche elle-même les coupures à l'ouverture, d'après ses sous-titres (une émission parle pendant
-des minutes, une publicité quelques secondes) et ses vignettes (le logo présent dans un coin pendant
-l'émission disparaît pendant la publicité) : le bouton apparaît alors dans la coupure, une dizaine
-de secondes après le début de la lecture sur un réseau domestique, le temps de la recherche (une
-quinzaine de Mo par heure d'enregistrement, soit un centième de ce que demande sa lecture). C'est
-une estimation, jamais sautée automatiquement. Cliquer sur un programme ouvre d'abord sa **fiche détaillée**
+sauf pour une coupure dans laquelle on est revenu en arrière. Le réglage vaut pour les chaînes dont
+le flux signale ses coupures : celles des groupes TF1 et France Télévisions exactement, celles du
+groupe RMC d'après la forme de leurs coupures. Ce que le flux ne signale pas (les coupures des
+chaînes du groupe M6 et des autres, mais aussi les bandes-annonces et les parrainages autour d'une
+coupure signalée), l'application le cherche elle-même dans les **vignettes** que le service garde de
+chaque chaîne : le logo présent dans un coin pendant l'émission disparaît pendant la publicité. Le
+bouton apparaît alors de la même façon, mais rien n'est sauté automatiquement : c'est une estimation,
+qu'une publicité portant son propre logo dans le même coin peut écourter. Au direct même, il n'y a
+nulle part où sauter. Dans un **enregistrement**, qui ne signale rien non plus, les coupures sont
+cherchées à l'ouverture, d'après ses vignettes de la même façon et ses sous-titres (une émission
+parle pendant des minutes, une publicité quelques secondes) : le bouton apparaît dans la coupure,
+une dizaine de secondes après le début de la lecture sur un réseau domestique, le temps de la
+recherche (une quinzaine de Mo par heure d'enregistrement, soit un centième de ce que demande sa
+lecture), là aussi sans rien sauter automatiquement. Cliquer sur un programme ouvre d'abord sa **fiche détaillée**
 (synopsis, casting, année, classification) plutôt que de le lire aussitôt, et la fiche regroupe ses
 autres diffusions disponibles. Comme dans l'application officielle, la fiche indique au-dessus du titre
 quand le programme a été **diffusé** (« Diffusé: 12 févr. ») ou jusqu'à quand il reste disponible

@@ -81,6 +81,38 @@ internal object BreakGuess {
         }
     }
 
+    // The share of its usual score under which a picture is without the logo, the pictures either
+    // side it is smoothed with, the pictures with the logo a break may hold (an advert with something
+    // in that corner), and the pictures of programme wanted on each side of one.
+    private const val GONE = 0.5
+    private const val SMOOTH = 2
+    const val BRIDGE = 7
+    const val AROUND = 15
+
+    /**
+     * Of each picture, whether it is without the logo, from what each has of it ([score], [usual]
+     * with it). One odd picture is no break, nor the end of one: each is taken with its neighbours.
+     * A picture not [given] has the logo, and is no neighbour.
+     */
+    fun gone(score: DoubleArray, usual: Double, given: BooleanArray): BooleanArray = BooleanArray(score.size) { i ->
+        given[i] && (maxOf(0, i - SMOOTH)..minOf(score.size - 1, i + SMOOTH)).filter { given[it] }.map { score[it] }.sorted()
+            .let { it[it.size / 2] } < GONE * usual
+    }
+
+    /**
+     * The stretches of [gone] that have the programme on both sides, as breaks; the first picture
+     * being at [firstMs] and each [pictureMs] after the one before.
+     */
+    fun logoBreaks(gone: BooleanArray, firstMs: Long, pictureMs: Long): List<LongRange> {
+        fun programme(from: Int, to: Int) = from >= 0 && to <= gone.size && (from until to).none { gone[it] }
+        return runs(gone, BRIDGE).mapNotNull { run ->
+            val start = firstMs + run.first * pictureMs
+            val end = firstMs + (run.last + 1) * pictureMs
+            val between = programme(run.first - AROUND, run.first) && programme(run.last + 1, run.last + 1 + AROUND)
+            (start..end).takeIf { between && end - start in MIN_MS..MAX_MS }
+        }
+    }
+
     /** What [captions] and [logo] agree on; either is null when it had nothing to go by. */
     fun combine(captions: List<LongRange>?, logo: List<LongRange>?): List<LongRange> {
         if (captions == null) return logo.orEmpty()
@@ -100,10 +132,30 @@ internal object BreakGuess {
 }
 
 /**
- * The corners of a recording's thumbnails, [pictures] of them [width] by [height], kept as the
- * strength of their edges: what is needed to find the logo and where it is gone (see [BreakGuess]).
- * Not every picture need be given: one left out counts as showing the logo, so those around a
- * stretch without it must be. Pictures may be added from several threads, each its own.
+ * A logo learnt from pictures (see [LogoTrack]): the points of a picture, [width] wide, where its
+ * edges are, with how strong each mostly is, and what a picture that shows it usually scores.
+ */
+internal class Logo(private val width: Int, private val points: IntArray, private val pattern: IntArray, val usual: Double) {
+    private val whole = pattern.sum().toDouble()
+
+    /** How much of the logo the picture of [luma], row by row, has: about [usual] with it, little without. */
+    fun score(luma: ByteArray): Double {
+        var sum = 0
+        for (k in points.indices) {
+            val p = points[k]
+            val here = luma[p].toInt() and 0xFF
+            val edge = abs((luma[p + 1].toInt() and 0xFF) - here) + abs((luma[p + width].toInt() and 0xFF) - here)
+            sum += minOf(edge, pattern[k])
+        }
+        return sum / whole
+    }
+}
+
+/**
+ * The corners of a run of thumbnails, [pictures] of them [width] by [height], kept as the strength
+ * of their edges: what is needed to find the logo and where it is gone (see [BreakGuess]). Not every
+ * picture need be given: one left out counts as showing the logo, so those around a stretch without
+ * it must be. Pictures may be added from several threads, each its own.
  */
 internal class LogoTrack(private val pictures: Int, private val width: Int, private val height: Int) {
     private val cornerWidth = (width * CORNER).toInt()
@@ -138,19 +190,19 @@ internal class LogoTrack(private val pictures: Int, private val width: Int, priv
         given[index] = true
     }
 
-    /**
-     * Of each picture, whether it was given and is without the logo. Null when no corner of those
-     * given holds anything that stays.
-     */
-    fun gone(): BooleanArray? {
+    // The corner that holds the logo, the points of it that are the logo with what each mostly is,
+    // and what each picture given has of it.
+    private class Learnt(val corner: Int, val mask: IntArray, val median: IntArray, val score: DoubleArray, val usual: Double)
+
+    private fun learn(): Learnt? {
         val read = (0 until pictures).filter { given[it] }.toIntArray()
-        if (size <= 0 || read.size < 2 * AROUND) return null
+        if (size <= 0 || read.size < 2 * BreakGuess.AROUND) return null
         val counts = IntArray(256)
-        var kept: ByteArray? = null
+        var kept = -1
         var keptMedian = IntArray(0)
         var keptMask = IntArray(0)
         var strongest = 0.0
-        for (corner in edges) {
+        for ((c, corner) in edges.withIndex()) {
             // What each point of the corner mostly is: the logo where there is one, nothing where
             // the picture behind keeps changing.
             val median = IntArray(size) { p ->
@@ -167,14 +219,13 @@ internal class LogoTrack(private val pictures: Int, private val width: Int, priv
             val strength = mask.sumOf { median[it] }.toDouble() / mask.size
             if (strength > strongest) {
                 strongest = strength
-                kept = corner
+                kept = c
                 keptMedian = median
                 keptMask = mask
             }
         }
-        val corner = kept
-        if (corner == null || strongest < STRONG) return null
-        // How much of the logo each picture has.
+        if (kept < 0 || strongest < STRONG) return null
+        val corner = edges[kept]
         val whole = keptMask.sumOf { keptMedian[it] }.toDouble()
         val score = DoubleArray(pictures)
         for (i in read) {
@@ -183,28 +234,28 @@ internal class LogoTrack(private val pictures: Int, private val width: Int, priv
             for (p in keptMask) sum += minOf(corner[o + p].toInt() and 0xFF, keptMedian[p])
             score[i] = sum / whole
         }
-        val usual = read.map { score[it] }.sorted()[read.size / 2]
-        // One odd picture is no break, nor the end of one: each is taken with its neighbours.
-        return BooleanArray(pictures) { i ->
-            given[i] && (maxOf(0, i - SMOOTH)..minOf(pictures - 1, i + SMOOTH)).filter { given[it] }.map { score[it] }.sorted()
-                .let { it[it.size / 2] } < GONE * usual
-        }
+        return Learnt(kept, keptMask, keptMedian, score, read.map { score[it] }.sorted()[read.size / 2])
+    }
+
+    /** The logo of the pictures given, to look for in others. Null when no corner holds anything that stays. */
+    fun logo(): Logo? {
+        val learnt = learn() ?: return null
+        val (left, top) = origins[learnt.corner]
+        val points = IntArray(learnt.mask.size) { k -> (top + learnt.mask[k] / edgesWide) * width + left + learnt.mask[k] % edgesWide }
+        return Logo(width, points, IntArray(learnt.mask.size) { learnt.median[learnt.mask[it]] }, learnt.usual)
+    }
+
+    /** Of each picture, whether it was given and is without the logo. Null as for [logo]. */
+    fun gone(): BooleanArray? {
+        val learnt = learn() ?: return null
+        return BreakGuess.gone(learnt.score, learnt.usual, given)
     }
 
     /**
      * The stretches without the logo that have the programme, with it, on both sides; the first
-     * picture being at [firstMs] and each [pictureMs] after the one before. Null as for [gone].
+     * picture being at [firstMs] and each [pictureMs] after the one before. Null as for [logo].
      */
-    fun breaks(firstMs: Long, pictureMs: Long): List<LongRange>? {
-        val gone = gone() ?: return null
-        fun programme(from: Int, to: Int) = from >= 0 && to <= pictures && (from until to).none { gone[it] }
-        return BreakGuess.runs(gone, BRIDGE).mapNotNull { run ->
-            val start = firstMs + run.first * pictureMs
-            val end = firstMs + (run.last + 1) * pictureMs
-            val between = programme(run.first - AROUND, run.first) && programme(run.last + 1, run.last + 1 + AROUND)
-            (start..end).takeIf { between && end - start in BreakGuess.MIN_MS..BreakGuess.MAX_MS }
-        }
-    }
+    fun breaks(firstMs: Long, pictureMs: Long): List<LongRange>? = gone()?.let { BreakGuess.logoBreaks(it, firstMs, pictureMs) }
 
     private companion object {
         // The share of a picture's width and height a corner takes, and of a corner's points, the
@@ -212,14 +263,7 @@ internal class LogoTrack(private val pictures: Int, private val width: Int, priv
         const val CORNER = 0.22
         const val MASK = 0.92
 
-        // The least a logo's edges must stand out, and the share of the usual below which it is gone.
+        // The least a logo's edges must stand out.
         const val STRONG = 25.0
-        const val GONE = 0.5
-
-        // Pictures either side a picture is smoothed with, pictures of the logo a break may hold
-        // (an advert with something in that corner), and pictures of programme wanted around one.
-        const val SMOOTH = 2
-        const val BRIDGE = 7
-        const val AROUND = 15
     }
 }

@@ -106,6 +106,7 @@ import it.allard.etincelle.core.player.LiveProgramme
 import it.allard.etincelle.core.player.MediaItemFactory
 import it.allard.etincelle.core.player.PlaybackProgress
 import it.allard.etincelle.core.player.PlaybackRecovery
+import it.allard.etincelle.core.player.followLive
 import it.allard.etincelle.core.player.followRecording
 import it.allard.etincelle.core.player.keepScreenOnWhilePlaying
 import it.allard.etincelle.core.ui.installFetchedUpdate
@@ -1015,6 +1016,12 @@ private fun PlayerSurface(
                 delay(1000)
             }
         }
+    }
+    // What a live channel does not mark of its ad breaks is looked for in the pictures the service
+    // keeps of it, while it is watched behind the live point.
+    LaunchedEffect(currentPlayer, source, lifecycle) {
+        val thumbnails = source.liveThumbnails?.takeIf { source.isLive } ?: return@LaunchedEffect
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { adSkipper.followLive(currentPlayer, thumbnails, Timeline.Window()) }
     }
     // Follow the player controls' show/hide so the cast button and the back-to-live pill fade with the
     // position bar (tap to bring them back) instead of sitting permanently over the video.

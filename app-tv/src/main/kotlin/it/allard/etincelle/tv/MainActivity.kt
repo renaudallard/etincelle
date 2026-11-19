@@ -82,6 +82,7 @@ import it.allard.etincelle.core.player.LiveProgramme
 import it.allard.etincelle.core.player.MediaItemFactory
 import it.allard.etincelle.core.player.PlaybackProgress
 import it.allard.etincelle.core.player.PlaybackRecovery
+import it.allard.etincelle.core.player.followLive
 import it.allard.etincelle.core.player.followRecording
 import it.allard.etincelle.core.player.keepScreenOnWhilePlaying
 import it.allard.etincelle.core.remote.RemoteMessages
@@ -974,6 +975,12 @@ private fun TvPlayerSurface(
                 delay(1000)
             }
         }
+    }
+    // What a live channel does not mark of its ad breaks is looked for in the pictures the service
+    // keeps of it, while it is watched behind the live point.
+    LaunchedEffect(source, lifecycle) {
+        val thumbnails = source.liveThumbnails?.takeIf { source.isLive } ?: return@LaunchedEffect
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { adSkipper.followLive(player, thumbnails, Timeline.Window()) }
     }
     Box(Modifier.fillMaxSize()) {
         AndroidView(
