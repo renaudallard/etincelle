@@ -261,6 +261,11 @@ class CastPlayerController(
     private fun localRewindMs(): Long =
         localLiveAtMs?.let { (System.currentTimeMillis() - it).coerceAtLeast(0) } ?: LivePlayback.castRewindOffsetMs(localPlayer, liveWindow)
 
+    // How far behind the live point a direct cast is. Until its receiver has joined the live point and
+    // been taken back, what it says is the live point or the start of its window: what it was asked.
+    private fun directRewindMs(): Long =
+        directPlayer.pendingRewindMs.takeIf { it > 0 } ?: LivePlayback.castRewindOffsetMs(directPlayer, liveWindow)
+
     // A live programme comes back from a device that played it [rewindMs] behind the live point. The
     // phone, which loads a stream at its live point, is to be taken that far back once loaded (see
     // seekLocalWhenLoaded): played live instead, a programme being watched an hour late becomes the
@@ -1107,7 +1112,8 @@ class CastPlayerController(
             val playsOnTv = onTv && currentItem != null
             // A TV that has not taken the programme yet still says where what it had before was.
             val position = if (tvStarted) tvPlayer.currentPosition else tvSentMs
-            val rewind = if (tvStarted) LivePlayback.castRewindOffsetMs(tvPlayer, liveWindow) else tvSentRewindMs
+            // Nor is a TV that has it, but does not play it yet, where it was asked to take it.
+            val rewind = if (tvPlayed) LivePlayback.castRewindOffsetMs(tvPlayer, liveWindow) else tvSentRewindMs
             stopTvSession(stopTv = playsOnTv)
             if (playsOnTv) {
                 bringBackRewound(rewind)
@@ -1133,7 +1139,7 @@ class CastPlayerController(
             // A receiver still loading says 0: where it was asked to start, then.
             val position = directPlayer.currentPosition.takeIf { it > 0 } ?: directPositionMs
             val playWhenReady = directPlayer.playWhenReady
-            val rewind = LivePlayback.castRewindOffsetMs(directPlayer, liveWindow)
+            val rewind = directRewindMs()
             stopDirect()
             bringBackRewound(rewind)
             currentItem?.let { loadResolved(localPlayer, it, position, playWhenReady) }
@@ -1595,6 +1601,7 @@ class CastPlayerController(
         val castRewindMs = when {
             target !== castPlayer || !isLive -> 0L
             from === localPlayer -> localRewindMs()
+            from === directPlayer -> directRewindMs()
             else -> LivePlayback.castRewindOffsetMs(from, liveWindow)
         }
         loadResolved(target, item, fromPosition, fromPlayWhenReady, castRewindMs)
@@ -1814,6 +1821,7 @@ class CastPlayerController(
         val rewind = when {
             !source.isLive || target === localPlayer -> 0L
             target === castPlayer -> castLiveRewindMs()
+            target === directPlayer -> directRewindMs()
             else -> LivePlayback.castRewindOffsetMs(target, liveWindow)
         }
         reResolveJob?.cancel()

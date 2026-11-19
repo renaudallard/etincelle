@@ -46,7 +46,8 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
     // How far behind the live edge (ms) a rewound live cast should resume. The receiver is told too
     // (live_rewind_sec), but a seek made before the player has joined the live edge is lost, so it is
     // done from here once the TV plays and has joined (see ReceiverTimes.joinedLive).
-    private var pendingRewindMs = 0L
+    var pendingRewindMs = 0L
+        private set
 
     private val handler = Handler(Looper.getMainLooper())
 
