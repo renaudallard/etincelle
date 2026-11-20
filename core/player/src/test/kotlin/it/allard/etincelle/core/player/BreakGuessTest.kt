@@ -175,13 +175,19 @@ class BreakGuessTest {
 
     @Test
     fun `a short piece held to either end of a break by the bridge is given up`() {
-        fun flags(vararg runs: Pair<Int, Boolean>) = runs.flatMap { (n, gone) -> List(n) { gone } }.toBooleanArray()
         // The logo back five pictures, then hidden eight: a bright scene after the break, not part of it.
-        assertEquals(listOf(80_000L..440_000L), BreakGuess.logoBreaks(flags(20 to false, 90 to true, 5 to false, 8 to true, 20 to false), 0, 4_000))
-        // The same before it.
-        assertEquals(listOf(132_000L..492_000L), BreakGuess.logoBreaks(flags(20 to false, 8 to true, 5 to false, 90 to true, 20 to false), 0, 4_000))
+        assertEquals(listOf(80_000L..440_000L), BreakGuess.logoBreaks(gone(20 to false, 90 to true, 5 to false, 8 to true, 20 to false), 0, 4_000))
+        // The same before it, and at both ends, and two of them in a row.
+        assertEquals(listOf(132_000L..492_000L), BreakGuess.logoBreaks(gone(20 to false, 8 to true, 5 to false, 90 to true, 20 to false), 0, 4_000))
+        assertEquals(listOf(132_000L..492_000L), BreakGuess.logoBreaks(gone(20 to false, 8 to true, 5 to false, 90 to true, 5 to false, 9 to true, 20 to false), 0, 4_000))
+        assertEquals(listOf(80_000L..440_000L), BreakGuess.logoBreaks(gone(20 to false, 90 to true, 5 to false, 6 to true, 4 to false, 6 to true, 20 to false), 0, 4_000))
         // Forty seconds and more is adverts again.
-        assertEquals(listOf(80_000L..500_000L), BreakGuess.logoBreaks(flags(20 to false, 90 to true, 5 to false, 10 to true, 20 to false), 0, 4_000))
+        assertEquals(listOf(80_000L..500_000L), BreakGuess.logoBreaks(gone(20 to false, 90 to true, 5 to false, 10 to true, 20 to false), 0, 4_000))
+        // Of short pieces only, the first is kept: something is left of every break found.
+        assertEquals(listOf(80_000L..116_000L), BreakGuess.logoBreaks(gone(20 to false, 9 to true, 5 to false, 9 to true, 5 to false, 9 to true, 5 to false, 9 to true, 20 to false), 0, 4_000))
+        // With a second logo, it is what is left without it that gives up its short end.
+        val second = gone(20 to true, 90 to true, 5 to true, 8 to true, 20 to true)
+        assertEquals(listOf(80_000L..440_000L), BreakGuess.logoBreaks(gone(20 to false, 103 to true, 20 to false), 0, 4_000, second.also { for (i in 110 until 115) it[i] = false }))
     }
 
     @Test
