@@ -39,7 +39,8 @@ chaque chaîne : le logo présent dans un coin pendant l'émission (celui de la 
 préférence à celui d'une émission, en bas, dont la présence suffit toutefois à reconnaître l'émission)
 disparaît pendant la publicité. Le
 bouton apparaît alors de la même façon, mais rien n'est sauté automatiquement : c'est une estimation,
-qu'une publicité portant son propre logo dans le même coin peut écourter. Au direct même, il n'y a
+qu'une publicité portant quelque chose à elle dans le coin d'un de ces logos peut écourter ou faire
+manquer. Au direct même, il n'y a
 nulle part où sauter. Dans un **enregistrement**, qui ne signale rien non plus, les coupures sont
 cherchées à l'ouverture, d'après ses vignettes de la même façon et ses sous-titres (une émission
 parle pendant des minutes, une publicité quelques secondes) : le bouton apparaît dans la coupure,

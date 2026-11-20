@@ -29,8 +29,8 @@ import kotlinx.coroutines.withContext
  * keeps of it ([LiveThumbnails]), by the logo that is in a corner through the programme and gone
  * during the adverts (see [BreakGuess]). It finds the whole interruption, with the trailers and the
  * sponsors' words that a stream's own markers leave out, and works where the stream marks nothing.
- * An advert with something of its own in the logo's corner can pass for the programme: the break then
- * ends early, in the adverts.
+ * An advert with something of its own in a logo's corner can pass for the programme: the break then
+ * ends early, in the adverts, or is not found.
  *
  * The logo is learnt from the pictures of the forty minutes around what is being watched, a show
  * having graphics of its own, and learnt again as playback moves on. Then the pictures around the
