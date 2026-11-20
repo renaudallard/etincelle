@@ -36,8 +36,9 @@ data class AdBreak(val startMs: Long, val endMs: Long, val id: Long, val skippab
  *   in the segments: nothing is found there.
  *
  * A recording is told its breaks from outside, with [recorded]: its stream marks none, and they are
- * guessed from what it carries (see [RecordingBreaks]). So is a live stream, with [guessed], for what
- * it does not mark: the M6 channels' breaks, and the trailers and sponsors around a marked one.
+ * guessed from what it carries (see [RecordingBreaks]). So is a live stream, with [guessed], on the
+ * channels that mark nothing or too little: the M6 channels' breaks, and those the RMC shape misses.
+ * A channel that marks its breaks is told nothing more: see PlaybackSource.breakPictures.
  *
  * One instance per player screen: the breaks are worked out again only when the manifest changes.
  */
@@ -50,7 +51,7 @@ class AdBreaks {
 
     /**
      * The breaks of the live channel being played that its pictures give away (see [LiveBreaks]), as
-     * times of day (ms since 1970): those the stream does not mark, or more of those it does.
+     * times of day (ms since 1970): those the stream does not mark.
      */
     var guessed: List<LongRange> = emptyList()
 

@@ -1001,8 +1001,8 @@ private fun TvPlayerSurface(
             }
         }
     }
-    // What a live channel does not mark of its ad breaks is looked for in the pictures the service
-    // keeps of it, while it is watched behind the live point.
+    // The ad breaks of a live channel that marks none, or too few, are looked for in the pictures the
+    // service keeps of it, while it is watched behind the live point.
     LaunchedEffect(source, lifecycle) {
         val thumbnails = source.breakPictures ?: return@LaunchedEffect
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { adSkipper.followLive(player, thumbnails, Timeline.Window()) }

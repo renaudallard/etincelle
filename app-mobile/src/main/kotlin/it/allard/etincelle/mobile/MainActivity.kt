@@ -1017,8 +1017,8 @@ private fun PlayerSurface(
             }
         }
     }
-    // What a live channel does not mark of its ad breaks is looked for in the pictures the service
-    // keeps of it, while it is watched behind the live point.
+    // The ad breaks of a live channel that marks none, or too few, are looked for in the pictures the
+    // service keeps of it, while it is watched behind the live point.
     LaunchedEffect(currentPlayer, source, lifecycle) {
         // The phone's own player only: what a cast says of its place is not exact enough.
         if (currentPlayer !is ExoPlayer) return@LaunchedEffect

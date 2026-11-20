@@ -76,8 +76,9 @@ data class PlaybackSource(
         get() = liveThumbnails?.takeIf { isLive && originChannelId !in NO_GUESS_CHANNELS }
 }
 
-// TF1, TMC, TFX, TF1 Séries Films, LCI, France 2, 3, 4 and 5, franceinfo: their streams mark their
-// breaks. Arte: it has none.
+// TF1, TMC, TFX, TF1 Séries Films, LCI, France 2, 3 and 5: their streams mark their breaks.
+// France 4, franceinfo and Arte: no advert break was ever seen on them, and what a guess offered
+// there was trailers, the weather or a short programme.
 private val NO_GUESS_CHANNELS = setOf("600046", "600036", "600040", "600067", "600005", "600019", "600049", "600018", "600042", "600136", "600034")
 
 /**

@@ -27,8 +27,9 @@ import kotlinx.coroutines.withContext
 /**
  * Finds the ad breaks of a live channel watched behind the live point, from the pictures the service
  * keeps of it ([LiveThumbnails]), by the logo that is in a corner through the programme and gone
- * during the adverts (see [BreakGuess]). It finds the whole interruption, with the trailers and the
- * sponsors' words that a stream's own markers leave out, and works where the stream marks nothing.
+ * during the adverts (see [BreakGuess]). It finds the whole interruption, trailers and sponsors'
+ * words included, and is for the channels whose stream marks nothing, or too little: it is not
+ * used on one that marks its breaks, where what it adds around them can run into the programme.
  * An advert with something of its own in a logo's corner can pass for the programme: the break then
  * ends early, in the adverts, or is not found.
  *
