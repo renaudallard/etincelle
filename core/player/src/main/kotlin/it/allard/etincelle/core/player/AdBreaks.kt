@@ -61,8 +61,8 @@ class AdBreaks {
     fun current(player: Player, window: Timeline.Window): AdBreak? {
         val at = player.currentPosition
         if (!player.isCurrentMediaItemLive) {
-            return recorded.firstOrNull { at >= it.first && at < it.last }
-                ?.let { AdBreak(it.first, it.last, it.first, skippable = at < it.last - LAST_MOMENT_MS, guessed = true) }
+            return recorded.firstOrNull { at >= it.first && at < it.last - GUESS_EARLY_MS }
+                ?.let { AdBreak(it.first, it.last - GUESS_EARLY_MS, it.first, skippable = at < it.last - GUESS_EARLY_MS - LAST_MOMENT_MS, guessed = true) }
         }
         val timeline = player.currentTimeline
         if (timeline.isEmpty) return null
@@ -85,8 +85,8 @@ class AdBreaks {
             found.firstOrNull { at >= it.first + shift && at < it.last + shift }
                 ?.let { return breakAt(it.first + shift, it.last + shift, zero + it.first, guessed = false) }
         }
-        return guessed.firstOrNull { at >= it.first - start && at < it.last - start }
-            ?.let { breakAt(it.first - start, it.last - start, it.first, guessed = true) }
+        return guessed.firstOrNull { at >= it.first - start && at < it.last - GUESS_EARLY_MS - start }
+            ?.let { breakAt(it.first - start, it.last - GUESS_EARLY_MS - start, it.first, guessed = true) }
     }
 
     /** One period of a manifest, as far as its ads go; times in ms from the manifest's time zero. */
@@ -100,6 +100,11 @@ class AdBreaks {
         // or nearly, is still being broadcast: there is nowhere to skip to.
         private const val LAST_MOMENT_MS = 1_000L
         private const val LIVE_MARGIN_MS = 2_000L
+
+        // A guessed break is taken to end this long before the logo is back: channels put their
+        // logo up again as much as half a minute after the programme, and skipping to it would cut
+        // that much of the show. The last adverts are left in instead.
+        private const val GUESS_EARLY_MS = 32_000L
 
         // Two breaks this close are one: the TF1 channels put three seconds of jingle between two halves.
         private const val MERGE_GAP_MS = 10_000L

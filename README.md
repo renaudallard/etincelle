@@ -42,7 +42,9 @@ préférence à celui d'une émission, en bas, dont la présence suffit toutefoi
 disparaît pendant la publicité. Le
 bouton apparaît alors de la même façon, mais rien n'est sauté automatiquement : c'est une estimation,
 qu'une publicité portant quelque chose à elle dans le coin d'un de ces logos peut écourter ou faire
-manquer. Au direct même, il n'y a
+manquer. Elle s'arrête une demi-minute avant le retour du logo, que les chaînes remettent parfois
+après la reprise de l'émission : mieux vaut voir les dernières publicités que perdre le début de
+l'émission. Au direct même, il n'y a
 nulle part où sauter. Dans un **enregistrement**, qui ne signale rien non plus, les coupures sont
 cherchées à l'ouverture, d'après ses vignettes de la même façon et ses sous-titres (une émission
 parle pendant des minutes, une publicité quelques secondes) : le bouton apparaît dans la coupure,
