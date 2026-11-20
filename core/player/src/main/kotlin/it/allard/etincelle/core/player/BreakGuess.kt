@@ -190,6 +190,10 @@ internal class LogoTrack(private val pictures: Int, private val width: Int, priv
     private val edges = Array(origins.size) { ByteArray(if (size > 0) pictures * size else 0) }
     private val given = BooleanArray(pictures)
 
+    // The corner the logo was found in, kept for what is learnt again once more pictures are given:
+    // those wanted next were told from that corner.
+    private var found = -1
+
     /** Picture [index], as its [luma] row by row. */
     fun add(index: Int, luma: ByteArray) {
         if (size <= 0 || index !in 0 until pictures || luma.size < width * height) return
@@ -224,8 +228,9 @@ internal class LogoTrack(private val pictures: Int, private val width: Int, priv
         var keptMask = IntArray(0)
         var strongest = 0.0
         for ((c, corner) in edges.withIndex()) {
+            if (found >= 0 && c != found) continue
             // The lower corners are looked at only when no upper one holds a logo.
-            if (c == UPPER && strongest >= STRONG) break
+            if (found < 0 && c == UPPER && strongest >= STRONG) break
             // What each point of the corner mostly is: the logo where there is one, nothing where
             // the picture behind keeps changing.
             val median = IntArray(size) { p ->
@@ -247,7 +252,8 @@ internal class LogoTrack(private val pictures: Int, private val width: Int, priv
                 keptMask = mask
             }
         }
-        if (kept < 0 || strongest < STRONG) return null
+        if (kept < 0 || (found < 0 && strongest < STRONG)) return null
+        found = kept
         val corner = edges[kept]
         val whole = keptMask.sumOf { keptMedian[it] }.toDouble()
         val score = DoubleArray(pictures)

@@ -77,13 +77,13 @@ class BreakGuessTest {
     private val height = 40
 
     // A picture of flat grey [shade], with a logo of stripes in its bottom left corner or not, and a
-    // fainter one in its top right corner or not.
-    private fun picture(shade: Int, logo: Boolean, upper: Boolean = false) = ByteArray(width * height) { p ->
+    // fainter one in its top right corner, [upper] above the grey (0 for none).
+    private fun picture(shade: Int, logo: Boolean, upper: Int = 0) = ByteArray(width * height) { p ->
         val x = p % width
         val y = p / width
         val inLogo = logo && x in 2..9 && y in height - 7 until height - 1
-        val inUpper = upper && x in width - 10 until width - 2 && y in 1..6
-        (if (inLogo && x % 2 == 0) 250 else if (inUpper && x % 2 == 0) shade + 60 else shade).toByte()
+        val inUpper = upper > 0 && x in width - 10 until width - 2 && y in 1..6
+        (if (inLogo && x % 2 == 0) 250 else if (inUpper && x % 2 == 0) shade + upper else shade).toByte()
     }
 
     // Pictures every 4 s: programme with its logo, then [adverts] pictures without, then programme.
@@ -127,8 +127,24 @@ class BreakGuessTest {
         // The channel's logo through the programme, and a show's own that comes a minute late after the
         // adverts: 100 pictures of programme, 90 of adverts, 15 with the upper logo only, 100 with both.
         val track = LogoTrack(305, width, height)
-        for (i in 0 until 305) track.add(i, picture(40 + i % 100, logo = i < 100 || i >= 205, upper = i !in 100 until 190))
+        for (i in 0 until 305) track.add(i, picture(40 + i % 100, logo = i < 100 || i >= 205, upper = if (i in 100 until 190) 0 else 60))
         assertEquals(listOf(400_000L..760_000L), track.breaks(0, 4_000))
+    }
+
+    @Test
+    fun `the corner found first is kept as more pictures are given`() {
+        // A faint upper logo, just strong enough in every other strip of 25: with the strips of adverts
+        // read next it no longer is, and the show's own, back a minute late, would be taken instead.
+        val track = LogoTrack(600, width, height)
+        fun give(strip: Int) = (strip * 25 until strip * 25 + 25).forEach { i ->
+            val adverts = i in 100 until 200
+            track.add(i, picture(40 + i % 100, logo = i < 100 || i >= 215, upper = if (adverts) 0 else if (i % 8 < 5) 26 else 22))
+        }
+        (0 until 24 step 2).forEach(::give)
+        val gone = track.gone()!!
+        assertEquals(setOf(4, 6), (0 until 24).filter { strip -> (strip * 25 until strip * 25 + 25).any { gone[it] } }.toSet())
+        listOf(3, 5, 7).forEach(::give)
+        assertEquals(listOf(400_000L..800_000L), track.breaks(0, 4_000))
     }
 
     @Test
