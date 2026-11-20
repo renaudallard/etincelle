@@ -76,14 +76,15 @@ class BreakGuessTest {
     private val width = 64
     private val height = 40
 
-    // A picture of flat grey [shade], with a logo of stripes in its bottom left corner or not, and a
-    // fainter one in its top right corner, [upper] above the grey (0 for none).
-    private fun picture(shade: Int, logo: Boolean, upper: Int = 0) = ByteArray(width * height) { p ->
+    // A picture of flat grey [shade], with a logo of stripes in its bottom left corner or not (white,
+    // or [faint] above the grey), and a fainter one in its top right corner, [upper] above the grey
+    // (0 for none).
+    private fun picture(shade: Int, logo: Boolean, upper: Int = 0, faint: Int = 0) = ByteArray(width * height) { p ->
         val x = p % width
         val y = p / width
         val inLogo = logo && x in 2..9 && y in height - 7 until height - 1
         val inUpper = upper > 0 && x in width - 10 until width - 2 && y in 1..6
-        (if (inLogo && x % 2 == 0) 250 else if (inUpper && x % 2 == 0) shade + upper else shade).toByte()
+        (if (inLogo && x % 2 == 0) (if (faint > 0) shade + faint else 250) else if (inUpper && x % 2 == 0) shade + upper else shade).toByte()
     }
 
     // Pictures every 4 s: programme with its logo, then [adverts] pictures without, then programme.
@@ -141,6 +142,35 @@ class BreakGuessTest {
         val late = LogoTrack(300, width, height)
         for (i in 0 until 300) late.add(i, picture(40 + i % 100, logo = i !in 100 until 190, upper = if (i in 100 until 200) 0 else 60))
         assertEquals(listOf(400_000L..760_000L), late.breaks(0, 4_000))
+    }
+
+    @Test
+    fun `the show's own logo counts in a recording read in two passes`() {
+        // Strips of 25: adverts in pictures 100 to 199, and four minutes too bright for the channel's
+        // logo from 300, the show's own still there.
+        val track = LogoTrack(600, width, height)
+        fun give(strip: Int) = (strip * 25 until strip * 25 + 25).forEach { i ->
+            track.add(i, picture(40 + i % 100, logo = i !in 100 until 200, upper = if (i in 100 until 200 || i in 300 until 360) 0 else 60))
+        }
+        (0 until 24 step 2).forEach(::give)
+        val gone = track.gone()!!
+        assertEquals(setOf(4, 6, 12, 14), (0 until 24).filter { strip -> (strip * 25 until strip * 25 + 25).any { gone[it] } }.toSet())
+        listOf(3, 5, 7, 11, 13, 15).forEach(::give)
+        assertEquals(listOf(400_000L..800_000L), track.breaks(0, 4_000))
+    }
+
+    @Test
+    fun `the logo learnt carries the show's own when it stands out enough`() {
+        val both = LogoTrack(60, width, height)
+        for (i in 0 until 60) both.add(i, picture(40 + i, logo = true, upper = 60))
+        val lower = both.logo()!!.lower!!
+        assertTrue(lower.score(picture(70, logo = true)) > 0.9 * lower.usual)
+        assertTrue(lower.score(picture(70, logo = false)) < 0.1 * lower.usual)
+        // Too faint a one is left out, and what the channel's logo says stands.
+        val faint = LogoTrack(260, width, height)
+        for (i in 0 until 260) faint.add(i, picture(40 + i % 100, logo = true, upper = if (i in 100 until 160) 0 else 60, faint = 20))
+        assertEquals(null, faint.logo()!!.lower)
+        assertEquals(listOf(400_000L..640_000L), faint.breaks(0, 4_000))
     }
 
     @Test
