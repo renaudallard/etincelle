@@ -103,6 +103,10 @@ internal object BreakGuess {
     const val AROUND = 15
     private const val MOSTLY = 8
 
+    // The pictures a piece at either end of a break must last to stay part of it when only the
+    // bridge holds it there.
+    private const val END_PIECE = 10
+
     /**
      * Of each picture, whether it is without the logo, from what each has of it ([score], [usual]
      * with it). One odd picture is no break, nor the end of one: each is taken with its neighbours.
@@ -127,13 +131,25 @@ internal object BreakGuess {
      * once the pictures that show the second logo are taken for the programme's.
      */
     fun logoBreaks(gone: BooleanArray, firstMs: Long, pictureMs: Long, lowerGone: BooleanArray? = null): List<LongRange> {
-        var found = breakRuns(gone, pictureMs)
+        var without = gone
+        var found = breakRuns(without, pictureMs)
         if (lowerGone != null) {
-            val both = BooleanArray(gone.size)
-            for (run in found) for (i in run) both[i] = gone[i] && lowerGone[i]
-            found = breakRuns(both, pictureMs)
+            without = BooleanArray(gone.size)
+            for (run in found) for (i in run) without[i] = gone[i] && lowerGone[i]
+            found = breakRuns(without, pictureMs)
         }
-        return found.map { firstMs + it.first * pictureMs..firstMs + (it.last + 1) * pictureMs }
+        val solid = solid(without)
+        return found.map { whole ->
+            // A short piece held to either end by the bridge is given up: the logo hidden for a
+            // moment just after a break, or before one, is a bright scene of the programme more
+            // often than a last advert, and the break would run into it.
+            val pieces = runs(BooleanArray(whole.last - whole.first + 1) { solid[whole.first + it] }, 0)
+            var from = 0
+            var to = pieces.lastIndex
+            while (to > from && pieces[to].last - pieces[to].first + 1 < END_PIECE) to--
+            while (from < to && pieces[from].last - pieces[from].first + 1 < END_PIECE) from++
+            firstMs + (whole.first + pieces[from].first) * pictureMs..firstMs + (whole.first + pieces[to].last + 1) * pictureMs
+        }
     }
 
     private fun breakRuns(gone: BooleanArray, pictureMs: Long): List<IntRange> {
