@@ -48,6 +48,8 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
 
     // What each picture read has of the logo, by its time (s since 1970, a multiple of the step).
     private val scores = TreeMap<Long, Double>()
+    // The same of the show's own logo, when one was learnt beside the channel's.
+    private val lowerScores = TreeMap<Long, Double>()
 
     // The pictures that could not be had, with how many times each was asked for.
     private val missed = HashMap<Long, Int>()
@@ -66,7 +68,7 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
         read(logo, at - BACK_S, minOf(last, at + AHEAD_S))
         // A stretch without the logo is followed to where the programme is back, or was before it.
         for (more in 0 until MORE_TIMES) {
-            val (first, gone) = known(logo, at)
+            val (first, gone) = known(logo, scores, at)
             val runs = BreakGuess.runs(BreakGuess.solid(gone), BreakGuess.BRIDGE)
             val until = first + gone.size * step
             val open = runs.any { it.last + BreakGuess.AROUND >= gone.size && (gone.size - it.first) * step <= FAR_S }
@@ -81,15 +83,18 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
                 break
             }
         }
-        val (first, gone) = known(logo, at)
+        val (first, gone) = known(logo, scores, at)
+        // Read at the same times as the first, so over the same pictures.
+        val lowerGone = logo.lower?.let { known(it, lowerScores, at).second }
         scores.headMap(at - KEPT_S).clear()
+        lowerScores.headMap(at - KEPT_S).clear()
         missed.keys.removeAll { it < at - KEPT_S }
-        return BreakGuess.logoBreaks(gone, first * 1000, step * 1000)
+        return BreakGuess.logoBreaks(gone, first * 1000, step * 1000, lowerGone)
     }
 
     // The pictures read, without a gap, around [at]: the time of the first, and whether each is
     // without the logo.
-    private fun known(logo: Logo, at: Long): Pair<Long, BooleanArray> {
+    private fun known(logo: Logo, scores: TreeMap<Long, Double>, at: Long): Pair<Long, BooleanArray> {
         var first = at
         while (scores.containsKey(first - step)) first -= step
         var end = at
@@ -104,11 +109,13 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
     private suspend fun read(logo: Logo, from: Long, to: Long) {
         val wanted = (from..to step step).filter { it !in scores || (missed[it] ?: TRIES) < TRIES }
         if (wanted.isEmpty()) return
-        val got = each(wanted) { time -> luma(time)?.let(logo::score) }
+        val lower = logo.lower
+        val got = each(wanted) { time -> luma(time)?.let { logo.score(it) to lower?.score(it) } }
         wanted.forEachIndexed { i, time ->
             val score = got[i]
             if (score == null) missed[time] = (missed[time] ?: 0) + 1 else missed.remove(time)
-            scores[time] = score ?: logo.usual
+            scores[time] = score?.first ?: logo.usual
+            if (lower != null) lowerScores[time] = score?.second ?: lower.usual
         }
     }
 
@@ -116,6 +123,7 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
         learntAt = at
         logo = null
         scores.clear()
+        lowerScores.clear()
         missed.clear()
         val times = (at - LEARN_SPAN_S..minOf(last, at + LEARN_SPAN_S) step LEARN_EVERY_S).toList()
         val pictures = each(times) { luma(it) }.filterNotNull()

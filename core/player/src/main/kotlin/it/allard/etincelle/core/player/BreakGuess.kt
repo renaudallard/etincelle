@@ -16,8 +16,9 @@ import kotlin.math.abs
  *   What stays put in a corner through most of the recording is taken for it, without knowing any
  *   logo beforehand, and a break is a stretch without it. The channel's, in an upper corner, comes
  *   first: a show's own, lower, is missing from its titles and from the short programmes around
- *   it, which would pass for adverts. An advert with something of its own in the logo's corner can
- *   pass for the programme.
+ *   it, which would pass for adverts. Where both are found, a picture with the show's is the
+ *   programme's all the same: the channel's, often white, does not show over a bright picture. An
+ *   advert with something of its own in a logo's corner can pass for the programme.
  *
  * They fail in different places, so a break is kept where both see one, and on the word of one alone
  * only when the other has nothing to go by. Its edges are the logo's, the sharper of the two: the
@@ -121,16 +122,26 @@ internal object BreakGuess {
 
     /**
      * The stretches of [gone] that have the programme on both sides, as breaks; the first picture
-     * being at [firstMs] and each [pictureMs] after the one before.
+     * being at [firstMs] and each [pictureMs] after the one before. With a second logo, [lowerGone]
+     * tells of each picture whether it is without that one: a break is then what is left of one
+     * once the pictures that show the second logo are taken for the programme's.
      */
-    fun logoBreaks(gone: BooleanArray, firstMs: Long, pictureMs: Long): List<LongRange> {
+    fun logoBreaks(gone: BooleanArray, firstMs: Long, pictureMs: Long, lowerGone: BooleanArray? = null): List<LongRange> {
+        var found = breakRuns(gone, pictureMs)
+        if (lowerGone != null) {
+            val both = BooleanArray(gone.size)
+            for (run in found) for (i in run) both[i] = gone[i] && lowerGone[i]
+            found = breakRuns(both, pictureMs)
+        }
+        return found.map { firstMs + it.first * pictureMs..firstMs + (it.last + 1) * pictureMs }
+    }
+
+    private fun breakRuns(gone: BooleanArray, pictureMs: Long): List<IntRange> {
         val solid = solid(gone)
         fun programme(from: Int, to: Int) = from >= 0 && to <= solid.size && (from until to).count { !solid[it] } >= MOSTLY
-        return runs(solid, BRIDGE).mapNotNull { run ->
-            val start = firstMs + run.first * pictureMs
-            val end = firstMs + (run.last + 1) * pictureMs
+        return runs(solid, BRIDGE).filter { run ->
             val between = programme(run.first - AROUND, run.first) && programme(run.last + 1, run.last + 1 + AROUND)
-            (start..end).takeIf { between && end - start in MIN_MS..MAX_MS }
+            between && (run.last + 1 - run.first) * pictureMs in MIN_MS..MAX_MS
         }
     }
 
@@ -156,7 +167,14 @@ internal object BreakGuess {
  * A logo learnt from pictures (see [LogoTrack]): the points of a picture, [width] wide, where its
  * edges are, with how strong each mostly is, and what a picture that shows it usually scores.
  */
-internal class Logo(private val width: Int, private val points: IntArray, private val pattern: IntArray, val usual: Double) {
+internal class Logo(
+    private val width: Int,
+    private val points: IntArray,
+    private val pattern: IntArray,
+    val usual: Double,
+    /** A show's own logo, lower down, found beside this one, the channel's. */
+    val lower: Logo? = null,
+) {
     private val whole = pattern.sum().toDouble()
 
     /** How much of the logo the picture of [luma], row by row, has: about [usual] with it, little without. */
@@ -215,64 +233,70 @@ internal class LogoTrack(private val pictures: Int, private val width: Int, priv
         given[index] = true
     }
 
-    // The corner that holds the logo, the points of it that are the logo with what each mostly is,
-    // and what each picture given has of it.
-    private class Learnt(val corner: Int, val mask: IntArray, val median: IntArray, val score: DoubleArray, val usual: Double)
+    // What stays put in a corner: the points of it that are a logo, what each mostly is, and how much
+    // they stand out.
+    private class Corner(val index: Int, val mask: IntArray, val median: IntArray, val strength: Double)
+
+    // A logo, with what each picture given has of it, and the show's own found beside the channel's.
+    private class Learnt(val corner: Corner, val score: DoubleArray, val usual: Double, val lower: Learnt? = null)
+
+    private fun corner(c: Int, read: IntArray, counts: IntArray): Corner? {
+        val edge = edges[c]
+        // What each point of the corner mostly is: the logo where there is one, nothing where the
+        // picture behind keeps changing.
+        val median = IntArray(size) { p ->
+            counts.fill(0)
+            for (i in read) counts[edge[i * size + p].toInt() and 0xFF]++
+            var below = 0
+            var value = 0
+            while (below + counts[value] <= read.size / 2) below += counts[value++]
+            value
+        }
+        val cut = maxOf(1, median.sorted()[(size * MASK).toInt()])
+        val mask = (0 until size).filter { median[it] >= cut }.toIntArray()
+        if (mask.isEmpty()) return null
+        return Corner(c, mask, median, mask.sumOf { median[it] }.toDouble() / mask.size)
+    }
+
+    private fun scored(corner: Corner, read: IntArray, lower: Learnt?): Learnt {
+        val edge = edges[corner.index]
+        val whole = corner.mask.sumOf { corner.median[it] }.toDouble()
+        val score = DoubleArray(pictures)
+        for (i in read) {
+            val o = i * size
+            var sum = 0
+            for (p in corner.mask) sum += minOf(edge[o + p].toInt() and 0xFF, corner.median[p])
+            score[i] = sum / whole
+        }
+        return Learnt(corner, score, read.map { score[it] }.sorted()[read.size / 2], lower)
+    }
 
     private fun learn(): Learnt? {
         val read = (0 until pictures).filter { given[it] }.toIntArray()
         if (size <= 0 || read.size < 2 * BreakGuess.AROUND) return null
         val counts = IntArray(256)
-        var kept = -1
-        var keptMedian = IntArray(0)
-        var keptMask = IntArray(0)
-        var strongest = 0.0
-        for ((c, corner) in edges.withIndex()) {
-            if (found >= 0 && c != found) continue
-            // The lower corners are looked at only when no upper one holds a logo.
-            if (found < 0 && c == UPPER && strongest >= STRONG) break
-            // What each point of the corner mostly is: the logo where there is one, nothing where
-            // the picture behind keeps changing.
-            val median = IntArray(size) { p ->
-                counts.fill(0)
-                for (i in read) counts[corner[i * size + p].toInt() and 0xFF]++
-                var below = 0
-                var value = 0
-                while (below + counts[value] <= read.size / 2) below += counts[value++]
-                value
-            }
-            val cut = maxOf(1, median.sorted()[(size * MASK).toInt()])
-            val mask = (0 until size).filter { median[it] >= cut }.toIntArray()
-            if (mask.isEmpty()) continue
-            val strength = mask.sumOf { median[it] }.toDouble() / mask.size
-            if (strength > strongest) {
-                strongest = strength
-                kept = c
-                keptMedian = median
-                keptMask = mask
-            }
-        }
-        if (kept < 0 || (found < 0 && strongest < STRONG)) return null
-        found = kept
-        val corner = edges[kept]
-        val whole = keptMask.sumOf { keptMedian[it] }.toDouble()
-        val score = DoubleArray(pictures)
-        for (i in read) {
-            val o = i * size
-            var sum = 0
-            for (p in keptMask) sum += minOf(corner[o + p].toInt() and 0xFF, keptMedian[p])
-            score[i] = sum / whole
-        }
-        return Learnt(kept, keptMask, keptMedian, score, read.map { score[it] }.sorted()[read.size / 2])
+        fun strongest(corners: IntRange) = corners.mapNotNull { corner(it, read, counts) }.maxByOrNull { it.strength }
+        val lower = strongest(UPPER until edges.size)
+        // The channel's logo, in an upper corner, when there is one, with the show's own beside it;
+        // a lower corner alone when no upper one holds a logo.
+        val upper = if (found < 0) strongest(0 until UPPER)?.takeIf { it.strength >= STRONG } else if (found < UPPER) corner(found, read, counts) else null
+        val main = upper
+            ?: (if (found < 0) lower?.takeIf { it.strength >= STRONG } else corner(found, read, counts))
+            ?: return null
+        found = main.index
+        val beside = lower?.takeIf { upper != null && it.strength >= STRONG }
+        return scored(main, read, beside?.let { scored(it, read, null) })
+    }
+
+    private fun logo(learnt: Learnt): Logo {
+        val (left, top) = origins[learnt.corner.index]
+        val mask = learnt.corner.mask
+        val points = IntArray(mask.size) { k -> (top + mask[k] / edgesWide) * width + left + mask[k] % edgesWide }
+        return Logo(width, points, IntArray(mask.size) { learnt.corner.median[mask[it]] }, learnt.usual, learnt.lower?.let(::logo))
     }
 
     /** The logo of the pictures given, to look for in others. Null when no corner holds anything that stays. */
-    fun logo(): Logo? {
-        val learnt = learn() ?: return null
-        val (left, top) = origins[learnt.corner]
-        val points = IntArray(learnt.mask.size) { k -> (top + learnt.mask[k] / edgesWide) * width + left + learnt.mask[k] % edgesWide }
-        return Logo(width, points, IntArray(learnt.mask.size) { learnt.median[learnt.mask[it]] }, learnt.usual)
-    }
+    fun logo(): Logo? = learn()?.let(::logo)
 
     /** Of each picture, whether it was given and is without the logo. Null as for [logo]. */
     fun gone(): BooleanArray? {
@@ -284,7 +308,11 @@ internal class LogoTrack(private val pictures: Int, private val width: Int, priv
      * The stretches without the logo that have the programme, with it, on both sides; the first
      * picture being at [firstMs] and each [pictureMs] after the one before. Null as for [logo].
      */
-    fun breaks(firstMs: Long, pictureMs: Long): List<LongRange>? = gone()?.let { BreakGuess.logoBreaks(it, firstMs, pictureMs) }
+    fun breaks(firstMs: Long, pictureMs: Long): List<LongRange>? {
+        val learnt = learn() ?: return null
+        val lowerGone = learnt.lower?.let { BreakGuess.gone(it.score, it.usual, given) }
+        return BreakGuess.logoBreaks(BreakGuess.gone(learnt.score, learnt.usual, given), firstMs, pictureMs, lowerGone)
+    }
 
     private companion object {
         // The share of a picture's width and height a corner takes, and of a corner's points, the

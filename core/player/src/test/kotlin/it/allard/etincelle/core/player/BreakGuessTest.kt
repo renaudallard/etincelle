@@ -132,6 +132,29 @@ class BreakGuessTest {
     }
 
     @Test
+    fun `a picture with the show's own logo is the programme's`() {
+        // Four minutes of programme too bright for the channel's logo to show, the show's own still there.
+        val bright = LogoTrack(260, width, height)
+        for (i in 0 until 260) bright.add(i, picture(40 + i % 100, logo = true, upper = if (i in 100 until 160) 0 else 60))
+        assertEquals(emptyList<LongRange>(), bright.breaks(0, 4_000))
+        // The show's logo back 40 s before the channel's: the break ends with the first of the two.
+        val late = LogoTrack(300, width, height)
+        for (i in 0 until 300) late.add(i, picture(40 + i % 100, logo = i !in 100 until 190, upper = if (i in 100 until 200) 0 else 60))
+        assertEquals(listOf(400_000L..760_000L), late.breaks(0, 4_000))
+    }
+
+    @Test
+    fun `a break is narrowed to the pictures without the second logo`() {
+        val gone = BooleanArray(130) { it in 20 until 110 }
+        assertEquals(listOf(80_000L..440_000L), BreakGuess.logoBreaks(gone, 0, 4_000))
+        assertEquals(listOf(80_000L..320_000L), BreakGuess.logoBreaks(gone, 0, 4_000, BooleanArray(130) { it in 20 until 80 }))
+        // Too little of it left for a break.
+        assertEquals(emptyList<LongRange>(), BreakGuess.logoBreaks(gone, 0, 4_000, BooleanArray(130) { it in 20 until 50 }))
+        // What the second logo misses outside a break of the first makes none.
+        assertEquals(emptyList<LongRange>(), BreakGuess.logoBreaks(BooleanArray(130), 0, 4_000, gone))
+    }
+
+    @Test
     fun `the corner found first is kept as more pictures are given`() {
         // A faint upper logo, just strong enough in every other strip of 25: with the strips of adverts
         // read next it no longer is, and the show's own, back a minute late, would be taken instead.

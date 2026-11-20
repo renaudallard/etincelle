@@ -36,7 +36,8 @@ groupe RMC d'après la forme de leurs coupures. Ce que le flux ne signale pas (l
 chaînes du groupe M6 et des autres, mais aussi les bandes-annonces et les parrainages autour d'une
 coupure signalée), l'application le cherche elle-même dans les **vignettes** que le service garde de
 chaque chaîne : le logo présent dans un coin pendant l'émission (celui de la chaîne, en haut, de
-préférence à celui d'une émission, en bas) disparaît pendant la publicité. Le
+préférence à celui d'une émission, en bas, dont la présence suffit toutefois à reconnaître l'émission)
+disparaît pendant la publicité. Le
 bouton apparaît alors de la même façon, mais rien n'est sauté automatiquement : c'est une estimation,
 qu'une publicité portant son propre logo dans le même coin peut écourter. Au direct même, il n'y a
 nulle part où sauter. Dans un **enregistrement**, qui ne signale rien non plus, les coupures sont
