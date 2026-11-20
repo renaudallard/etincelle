@@ -29,11 +29,25 @@ class MapperTest {
         assertEquals("tok", drm.licenseHeaders["x-dt-auth-token"])
     }
 
-    private fun live(thumbnails: Any?, type: String = "live") = PlaybackResponse(
+    private fun liveSource(thumbnails: Any?, type: String = "live") = PlaybackResponse(
         stream = StreamDto("https://cdn/manifest.mpd", "dash", drmProtected = false, live = true),
         drmV2 = null, drm = null, heartbeat = null, concurrency = null, playhead = null, type = type, program = null,
         thumbnails = thumbnails,
-    ).toPlaybackSource().liveThumbnails
+    ).toPlaybackSource()
+
+    private fun live(thumbnails: Any?, type: String = "live") = liveSource(thumbnails, type).liveThumbnails
+
+    @Test
+    fun `breaks are guessed from the pictures only where the stream marks none`() {
+        val source = liveSource(mapOf("type" to "timestamp", "base_url" to "https://thumbs.example/thumbnail/m6/", "interval" to 4.0))
+        // M6 marks nothing; TF1 and France 2 mark their breaks; Arte has none.
+        assertEquals(source.liveThumbnails, source.copy(originChannelId = "600045").breakPictures)
+        assertNull(source.copy(originChannelId = "600046").breakPictures)
+        assertNull(source.copy(originChannelId = "600019").breakPictures)
+        assertNull(source.copy(originChannelId = "600034").breakPictures)
+        // A channel not known by its id is guessed, as before.
+        assertEquals(source.liveThumbnails, source.breakPictures)
+    }
 
     @Test
     fun `a live channel's pictures are taken from the answer, whatever else it holds there`() {

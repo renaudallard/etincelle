@@ -1022,7 +1022,7 @@ private fun PlayerSurface(
     LaunchedEffect(currentPlayer, source, lifecycle) {
         // The phone's own player only: what a cast says of its place is not exact enough.
         if (currentPlayer !is ExoPlayer) return@LaunchedEffect
-        val thumbnails = source.liveThumbnails?.takeIf { source.isLive } ?: return@LaunchedEffect
+        val thumbnails = source.breakPictures ?: return@LaunchedEffect
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { adSkipper.followLive(currentPlayer, thumbnails, Timeline.Window()) }
     }
     // Follow the player controls' show/hide so the cast button and the back-to-live pill fade with the

@@ -66,7 +66,19 @@ data class PlaybackSource(
     val upNext: UpNext? = null,
     /** Live only: where the service keeps pictures of what the channel showed; null when it has none. */
     val liveThumbnails: LiveThumbnails? = null,
-)
+) {
+    /**
+     * The pictures to guess this live channel's ad breaks from. None on a channel whose stream marks
+     * its breaks, exact as marked, nor on one without adverts: a guess could only add what surrounds
+     * them, trailers and short programmes, and run into the show.
+     */
+    val breakPictures: LiveThumbnails?
+        get() = liveThumbnails?.takeIf { isLive && originChannelId !in NO_GUESS_CHANNELS }
+}
+
+// TF1, TMC, TFX, TF1 Séries Films, LCI, France 2, 3, 4 and 5, franceinfo: their streams mark their
+// breaks. Arte: it has none.
+private val NO_GUESS_CHANNELS = setOf("600046", "600036", "600040", "600067", "600005", "600019", "600049", "600018", "600042", "600136", "600034")
 
 /**
  * The service's pictures of a live channel: one every [intervalSec], kept for as long as the channel

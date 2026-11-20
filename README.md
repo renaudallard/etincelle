@@ -32,9 +32,11 @@ apparaît (sur le téléviseur, **OK** suffit) et mène à la fin de la coupure 
 publicités automatiquement** (dans **Paramètres**, désactivé par défaut) le fait sans rien demander,
 sauf pour une coupure dans laquelle on est revenu en arrière. Le réglage vaut pour les chaînes dont
 le flux signale ses coupures : celles des groupes TF1 et France Télévisions exactement, celles du
-groupe RMC d'après la forme de leurs coupures. Ce que le flux ne signale pas (les coupures des
-chaînes du groupe M6 et des autres, mais aussi les bandes-annonces et les parrainages autour d'une
-coupure signalée), l'application le cherche elle-même dans les **vignettes** que le service garde de
+groupe RMC d'après la forme de leurs coupures. Sur les chaînes qui signalent leurs coupures (groupe
+TF1, LCI, France Télévisions), rien d'autre n'est proposé : ce qui les entoure, bandes-annonces et
+parrainages, ne se distingue pas sûrement du début de l'émission. Sur les autres (groupe M6, groupe
+RMC, où le flux en manque beaucoup, CSTAR, CNEWS, BFMTV… ; pas Arte, qui n'a pas de publicité),
+l'application cherche les coupures elle-même dans les **vignettes** que le service garde de
 chaque chaîne : le logo présent dans un coin pendant l'émission (celui de la chaîne, en haut, de
 préférence à celui d'une émission, en bas, dont la présence suffit toutefois à reconnaître l'émission)
 disparaît pendant la publicité. Le

@@ -84,7 +84,8 @@ internal object CastLoadData {
             }
             // Where the service keeps pictures of the channel, one every four seconds: the receiver
             // looks in them for the ad breaks the stream does not mark, as this app does (LiveBreaks).
-            source?.liveThumbnails?.takeIf { source.isLive && it.intervalSec == LIVE_PICTURE_EVERY_S }?.let {
+            // Not sent for a channel whose breaks are not to be guessed.
+            source?.breakPictures?.takeIf { it.intervalSec == LIVE_PICTURE_EVERY_S }?.let {
                 put("live_thumbnails_url", it.baseUrl)
             }
             // A recording, which has ad breaks to look for, as a replay does not.
