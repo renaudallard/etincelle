@@ -114,7 +114,7 @@ ses programmes **les plus vus**. Les **chaînes favorites** ouvrent cette grille
 choisissez : sur téléphone, l'**étoile** d'une chaîne l'ajoute aux favoris ou l'en retire, et l'étoile
 de la barre du haut ouvre **Réorganiser les favoris** (▲ et ▼ déplacent une chaîne) ; sur la TV, un
 **appui long sur OK** fait de même, et le bouton **Réorganiser les favoris** permet de saisir une
-chaîne avec OK puis de la déplacer avec Haut et Bas. Le **guide** couvre toutes les chaînes de l'offre sur 24 heures et se rafraîchit à chaque ouverture ; un épisode y porte le nom de sa série, son propre titre en dessous.
+chaîne avec OK puis de la déplacer avec Haut et Bas. Le **guide** couvre toutes les chaînes de l'offre sur 24 heures ; rouvert dans la demi-heure, il s'affiche aussitôt tel qu'il était et ne se recharge que s'il a plus de 2 minutes ; un épisode y porte le nom de sa série, son propre titre en dessous.
 Ce qui passe **en ce moment** se périme avec l'heure : le guide et toute page qui montre des
 programmes en direct (l'accueil, **Direct**, les rangées « En direct ») se rechargent d'eux-mêmes,
 sans perdre la position dans la liste : toutes les 5 minutes tant qu'ils restent à l'écran, et dès

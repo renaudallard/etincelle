@@ -59,6 +59,9 @@ private const val UPDATE_INTERVAL_MS = 24 * 60 * 60 * 1000L
 private const val STALE_ON_RETURN_MS = 2 * 60 * 1000L
 private const val STALE_ON_SCREEN_MS = 5 * 60 * 1000L
 private const val STALE_CHECK_MS = 30 * 1000L
+// The guide, a day of every channel and megabytes to fetch, is shown again as it was when its tab is
+// chosen again within this time, and loaded again only if it has gone stale meanwhile.
+private const val GUIDE_KEPT_MS = 30 * 60 * 1000L
 // Signed in, but the first page did not come: the tabs are there to load one.
 private const val HOME_FAILED = "Échec du chargement de l'accueil"
 // The official app caps a profile name at 30 characters.
@@ -170,6 +173,10 @@ class MainViewModel(
 
     // When each page of the back stack was loaded, by instance: a page gets its time as it comes in.
     private val loadedAt = IdentityHashMap<ContentPage, Long>()
+
+    // The last guide loaded, when, and for which account and profile.
+    private class KeptGuide(val page: ContentPage, val at: Long, val user: String, val profile: String)
+    private var keptGuide: KeptGuide? = null
 
     init {
         viewModelScope.launch {
@@ -475,6 +482,15 @@ class MainViewModel(
             return
         }
         if (tab == Tab.GUIDE) {
+            val kept = keptGuide()
+            if (tab != _state.value.tab && kept != null) {
+                cancelNav()
+                // With the time it was loaded at, which the check below goes by.
+                loadedAt[kept.page] = kept.at
+                _state.update { it.copy(tab = tab, error = null, backStack = listOf(kept.page)) }
+                reloadIfStale(STALE_ON_RETURN_MS)
+                return
+            }
             // The guide is time-sensitive, so re-selecting it refreshes (silently when already loaded)
             // rather than keeping a stale snapshot.
             reloadGuide(silent = tab == _state.value.tab && _state.value.backStack.isNotEmpty())
@@ -501,10 +517,29 @@ class MainViewModel(
             else it.copy(tab = Tab.GUIDE, error = null, busy = true, backStack = emptyList())
         }
         navLaunch(refresh = silent) {
+            val asker = repo.currentSession()
             runCatchingNav { repo.loadGuide() }
-                .onSuccess { page -> _state.update { it.copy(busy = false, refreshing = false, backStack = listOf(page)) } }
+                .onSuccess { page ->
+                    // Not kept for the account or profile that took over while it was on its way.
+                    val now = repo.currentSession()
+                    keptGuide = if (asker != null && now?.userId == asker.userId && now.profileId == asker.profileId) {
+                        KeptGuide(page, clock(), asker.userId, asker.profileId)
+                    } else {
+                        null
+                    }
+                    _state.update { it.copy(busy = false, refreshing = false, backStack = listOf(page)) }
+                }
                 .onFailure { e -> reloadFailed(e, "Guide indisponible", quiet) }
         }
+    }
+
+    // The guide kept from the last load, while it is recent enough and of the account and profile in use.
+    private fun keptGuide(): KeptGuide? {
+        val kept = keptGuide ?: return null
+        val session = repo.currentSession()
+        val fresh = session?.userId == kept.user && session.profileId == kept.profile && clock() - kept.at in 0 until GUIDE_KEPT_MS
+        if (!fresh) keptGuide = null
+        return kept.takeIf { fresh }
     }
 
     private fun reloadHome(silent: Boolean, quiet: Boolean = false) {
