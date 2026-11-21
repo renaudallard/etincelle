@@ -40,6 +40,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -544,7 +545,11 @@ fun TvSettingsScreen(
     val focus = remember { FocusRequester() }
     val context = LocalContext.current
     LaunchedEffect(confirm) { runCatching { focus.requestFocus() } }
-    Column(Modifier.fillMaxSize().padding(OVERSCAN), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    // Taller than a TV screen: it scrolls, and the entry the remote moves to is brought into view.
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(OVERSCAN),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
         Text("Paramètres", style = MaterialTheme.typography.displaySmall)
         if (!confirm) {
             TvButton(onClick = { confirm = true }, modifier = Modifier.focusRequester(focus)) { Text("Déconnexion") }
