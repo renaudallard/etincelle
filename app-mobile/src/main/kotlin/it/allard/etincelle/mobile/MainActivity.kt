@@ -798,10 +798,13 @@ private fun AppRoot(
                                     "${state.tab.name}#${state.backStack.size}#${state.hideLocked}#" +
                                         (state.current?.reloadUrl ?: state.current?.title.orEmpty())
                                 }
+                                // Filtered again for a new page only: each change of the state copies it,
+                                // which would give new rails, all drawn again, for a spinner or a message.
+                                val rails = remember(state.current, state.hideLocked) { state.visibleRails }
                                 contentStateHolder.SaveableStateProvider(pageKey) {
                                     if (state.tab == Tab.SEARCH) {
                                         SearchScreen(
-                                            rails = state.visibleRails,
+                                            rails = rails,
                                             busy = state.busy,
                                             error = state.error,
                                             onSubmit = vm::search,
@@ -817,7 +820,7 @@ private fun AppRoot(
                                         )
                                     } else if (state.current?.isGrid == true) {
                                         GridContent(
-                                            rails = state.visibleRails,
+                                            rails = rails,
                                             busy = state.busy,
                                             error = state.error,
                                             onCardClick = vm::onCardClick,
@@ -829,7 +832,7 @@ private fun AppRoot(
                                         )
                                     } else {
                                         PageContent(
-                                            rails = state.visibleRails,
+                                            rails = rails,
                                             busy = state.busy,
                                             error = state.error,
                                             onCardClick = vm::onCardClick,
