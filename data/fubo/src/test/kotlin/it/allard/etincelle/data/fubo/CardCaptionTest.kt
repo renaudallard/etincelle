@@ -4,7 +4,6 @@
 package it.allard.etincelle.data.fubo
 
 import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import it.allard.etincelle.core.model.CardTag
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -12,7 +11,7 @@ import org.junit.Test
 
 /** The lines the backend puts under a card's title or above a programme's, and the tag on its image. */
 class CardCaptionTest {
-    private val adapter = Moshi.Builder().add(KotlinJsonAdapterFactory()).build().adapter(PageResponse::class.java)
+    private val adapter = Moshi.Builder().build().adapter(PageResponse::class.java)
 
     private fun page(json: String) = adapter.fromJson(json)!!
 

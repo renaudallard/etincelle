@@ -4,7 +4,6 @@
 package it.allard.etincelle.data.fubo
 
 import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -15,7 +14,7 @@ import org.junit.Test
  * series page carries a single record action-item directly. All must yield the right [RecordAction]s.
  */
 class RecordActionMapperTest {
-    private val adapter = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
+    private val adapter = Moshi.Builder().build()
         .adapter(PageResponse::class.java)
 
     private fun detail(json: String) = adapter.fromJson(json)!!.toProgramDetail(null, null, false)

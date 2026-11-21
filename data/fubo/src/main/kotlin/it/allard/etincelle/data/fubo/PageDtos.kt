@@ -4,6 +4,7 @@
 package it.allard.etincelle.data.fubo
 
 import com.squareup.moshi.Json
+import com.squareup.moshi.JsonClass
 import it.allard.etincelle.core.model.CardShape
 import it.allard.etincelle.core.model.CardTag
 import it.allard.etincelle.core.model.ContentCard
@@ -18,8 +19,10 @@ import it.allard.etincelle.core.model.UpNext
 
 // --- /papi/v1/page/* server-driven UI ---
 
+@JsonClass(generateAdapter = true)
 data class PageResponse(val title: TextDto?, val content: PageContentDto?)
 
+@JsonClass(generateAdapter = true)
 data class PageContentDto(
     val template: String?,
     val metadata: MetadataDto? = null,
@@ -29,6 +32,7 @@ data class PageContentDto(
 
 // For an upcoming (not-yet-aired) programme the detail's player block is not playable: is_upcoming is
 // true and title/subtitle carry the backend's own localized reason (e.g. "… en direct dans 4 jours.").
+@JsonClass(generateAdapter = true)
 data class PlayerDto(
     @Json(name = "is_upcoming") val isUpcoming: Boolean? = null,
     // Its play action names the stream to ask for: type=vod, type=live, or type=dvr for a recording.
@@ -40,8 +44,11 @@ data class PlayerDto(
 )
 
 // The end slate: at [position] seconds a show_video_slate action opens an "up-next" slate.
+@JsonClass(generateAdapter = true)
 data class EndSlateDto(val position: Long?, val actions: List<SlateActionDto>?)
+@JsonClass(generateAdapter = true)
 data class SlateActionDto(val type: String?, val content: UpNextDto?)
+@JsonClass(generateAdapter = true)
 data class UpNextDto(
     val type: String?,
     val title: TextDto?,
@@ -53,6 +60,7 @@ data class UpNextDto(
     // The buttons: play the next episode now, or watch the credits.
     val components: List<SlateButtonDto>?,
 )
+@JsonClass(generateAdapter = true)
 data class SlateButtonDto(val text: TextDto?, val style: String?)
 
 /** The next episode offered by the end slate, or null when nothing follows or the slate is unusable. */
@@ -79,6 +87,7 @@ fun PlayerDto.toUpNext(): UpNext? {
 
 private const val DEFAULT_SLATE_SEC = 10L
 
+@JsonClass(generateAdapter = true)
 data class MetadataDto(
     val id: String?,
     val title: TextDto?,
@@ -94,17 +103,26 @@ data class MetadataDto(
 // action-item (id "id-record-LIVE_…" or "id-record-series-…") on a programme/series page, or as the
 // items of a "record options" dropdown (id "id-record-options-…") on a live-channel page. Either way,
 // each carries the api_call (endpoint url + payload) that schedules the recording.
+@JsonClass(generateAdapter = true)
 data class CtaDto(@Json(name = "action_items") val actionItems: List<CtaActionItemDto>?)
+@JsonClass(generateAdapter = true)
 data class CtaActionItemDto(val text: TextDto?, val actions: CtaActionsDto?)
+@JsonClass(generateAdapter = true)
 data class CtaActionsDto(@Json(name = "on_click") val onClick: List<CtaOnClickDto>?)
+@JsonClass(generateAdapter = true)
 data class CtaOnClickDto(val type: String? = null, val content: CtaContentDto? = null, val endpoint: EndpointDto? = null)
+@JsonClass(generateAdapter = true)
 data class CtaContentDto(@Json(name = "menu_items") val menuItems: List<MenuItemDto>?)
+@JsonClass(generateAdapter = true)
 data class MenuItemDto(val text: TextDto? = null, val actions: CtaActionsDto? = null)
 
 // On a card, a tag sits on the image with its icon ("REC" on a recording, "DIRECT" on a live show).
+@JsonClass(generateAdapter = true)
 data class TagDto(val label: String?, @Json(name = "leading_icon") val leadingIcon: PictureDto? = null)
+@JsonClass(generateAdapter = true)
 data class AboutFieldDto(val label: TextDto?, val value: TextDto?)
 
+@JsonClass(generateAdapter = true)
 data class SectionDto(
     val title: TextDto?,
     @Json(name = "component_type") val componentType: String?,
@@ -113,8 +131,10 @@ data class SectionDto(
 )
 
 // A carousel's "see more" button; its navigation action points to the rail's full "see all" page.
+@JsonClass(generateAdapter = true)
 data class AuxButtonDto(val actions: ActionsDto?)
 
+@JsonClass(generateAdapter = true)
 data class ComponentDto(
     val id: String?,
     val type: String?,
@@ -142,23 +162,30 @@ data class ComponentDto(
 )
 
 // Live ("En direct à la TV") cards carry their show title in a footer rather than in title/heading.
+@JsonClass(generateAdapter = true)
 data class FooterDto(val title: TextDto?, val subtitle: TextDto?)
 
 // A poster card names the channel offering it with a logo, in its body or its header.
+@JsonClass(generateAdapter = true)
 data class BodyDto(
     val picture: PictureDto?,
     @Json(name = "station_logo") val stationLogo: PictureDto? = null,
     val tags: List<TagDto>? = null,
 )
+@JsonClass(generateAdapter = true)
 data class HeaderDto(@Json(name = "station_logo") val stationLogo: PictureDto? = null)
+@JsonClass(generateAdapter = true)
 data class StateDto(@Json(name = "is_locked") val isLocked: Boolean?)
+@JsonClass(generateAdapter = true)
 data class ActionsDto(
     @Json(name = "on_click") val onClick: List<ActionItemDto>?,
     // A channel card's favourite toggle: an api_call to favorite-channel or unfavorite-channel.
     @Json(name = "on_fav_icon_click") val onFavIconClick: List<ActionItemDto>? = null,
     @Json(name = "on_display") val onDisplay: List<ActionItemDto>? = null,
 )
+@JsonClass(generateAdapter = true)
 data class ActionItemDto(val endpoint: EndpointDto?, val type: String? = null)
+@JsonClass(generateAdapter = true)
 data class EndpointDto(
     val url: String?,
     val method: String?,
@@ -166,7 +193,9 @@ data class EndpointDto(
     // plain navigation endpoints.
     val payload: Map<String, @JvmSuppressWildcards Any?>? = null,
 )
+@JsonClass(generateAdapter = true)
 data class PictureDto(val url: String?)
+@JsonClass(generateAdapter = true)
 data class TextDto(val text: String?)
 
 // --- mapping to domain ---
@@ -414,14 +443,18 @@ private fun apiCall(items: List<ActionItemDto>, label: String): RecordAction? {
 
 // --- favourite channels order ---
 
+@JsonClass(generateAdapter = true)
 data class FavoriteOrderResponse(val content: FavoriteOrderContentDto?)
+@JsonClass(generateAdapter = true)
 data class FavoriteOrderContentDto(
     val title: TextDto?,
     val subtitle: TextDto?,
     val items: List<FavoriteItemDto>?,
     @Json(name = "submit_button") val submitButton: SubmitButtonDto?,
 )
+@JsonClass(generateAdapter = true)
 data class FavoriteItemDto(val id: String?, val name: TextDto?, @Json(name = "logo_dark") val logoDark: PictureDto?)
+@JsonClass(generateAdapter = true)
 data class SubmitButtonDto(val text: TextDto?, val actions: ActionsDto?)
 
 /** The favourite channels in their order, or null when the page carries no save action. */

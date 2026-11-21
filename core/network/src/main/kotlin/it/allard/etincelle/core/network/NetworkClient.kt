@@ -4,7 +4,6 @@
 package it.allard.etincelle.core.network
 
 import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -17,7 +16,8 @@ class NetworkClient(
     device: DeviceInfo = DeviceInfo(),
     debug: Boolean = false,
 ) {
-    val moshi: Moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
+    // The response types carry adapters generated at build time (@JsonClass): no reflection.
+    val moshi: Moshi = Moshi.Builder().build()
 
     private val okHttp: OkHttpClient = OkHttpClient.Builder()
         .addInterceptor(RetryInterceptor())

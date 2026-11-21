@@ -4,7 +4,6 @@
 package it.allard.etincelle.data.fubo
 
 import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -12,7 +11,7 @@ import org.junit.Test
 
 /** The device guide feed (/device-integrations/epg, shape seen live) mapped for the system's TV guide. */
 class LiveChannelsTest {
-    private val adapter = Moshi.Builder().add(KotlinJsonAdapterFactory()).build().adapter(EpgResponse::class.java)
+    private val adapter = Moshi.Builder().build().adapter(EpgResponse::class.java)
 
     private val json = """
         {"response":[

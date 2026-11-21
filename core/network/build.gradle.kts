@@ -28,7 +28,6 @@ dependencies {
     api(libs.retrofit)
     implementation(libs.retrofit.converter.moshi)
     api(libs.moshi)
-    implementation(libs.moshi.kotlin)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.datastore.preferences)
 

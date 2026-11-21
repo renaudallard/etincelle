@@ -4,7 +4,6 @@
 package it.allard.etincelle.data.fubo
 
 import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import it.allard.etincelle.core.model.UserSession
 import it.allard.etincelle.core.network.ProfilePick
 import it.allard.etincelle.core.network.ProgressStore
@@ -36,7 +35,7 @@ class ProfilesTest {
         server.start()
         val api = Retrofit.Builder()
             .baseUrl(server.url("/"))
-            .addConverterFactory(MoshiConverterFactory.create(Moshi.Builder().add(KotlinJsonAdapterFactory()).build()))
+            .addConverterFactory(MoshiConverterFactory.create(Moshi.Builder().build()))
             .build()
             .create(FuboApi::class.java)
         repo = FuboRepository(api, session, store, NoProgress, clock = { now })

@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -28,11 +29,11 @@ dependencies {
     implementation(project(":core:remote"))
     implementation(libs.retrofit)
     implementation(libs.moshi)
+    ksp(libs.moshi.kotlin.codegen)
     implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.retrofit.converter.moshi)
-    testImplementation(libs.moshi.kotlin)
 }

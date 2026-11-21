@@ -3,6 +3,7 @@
 
 package it.allard.etincelle.data.fubo
 
+import com.squareup.moshi.JsonClass
 import it.allard.etincelle.core.model.ContentCard
 import it.allard.etincelle.core.model.ContentPage
 import it.allard.etincelle.core.model.ContentRail
@@ -17,21 +18,27 @@ import java.util.TimeZone
 
 // --- /epg live guide ---
 
+@JsonClass(generateAdapter = true)
 data class EpgResponse(val response: List<EpgEntryDto>?, val metadata: List<EpgMetadataDto>? = null) {
     /** Where the next page of channels starts, or null on the last page. */
     val nextOffset: Int? get() = metadata?.firstOrNull { it.type == "paginationState" }?.data?.nextOffset
 }
 
+@JsonClass(generateAdapter = true)
 data class EpgMetadataDto(val type: String?, val data: EpgPaginationDto?)
+@JsonClass(generateAdapter = true)
 data class EpgPaginationDto(val nextOffset: Int?)
 
+@JsonClass(generateAdapter = true)
 data class EpgEntryDto(val data: EpgChannelDataDto?)
 
+@JsonClass(generateAdapter = true)
 data class EpgChannelDataDto(
     val channel: EpgChannelDto?,
     val programsWithAssets: List<EpgProgramWithAssetsDto>?,
 )
 
+@JsonClass(generateAdapter = true)
 data class EpgChannelDto(
     val id: String?,
     val name: String?,
@@ -39,11 +46,13 @@ data class EpgChannelDto(
     val logoOnDarkUrl: String?,
 )
 
+@JsonClass(generateAdapter = true)
 data class EpgProgramWithAssetsDto(
     val program: EpgProgramDto?,
     val assets: List<EpgAssetDto>?,
 )
 
+@JsonClass(generateAdapter = true)
 data class EpgProgramDto(
     val title: String?,
     val heading: String?,
@@ -57,8 +66,10 @@ data class EpgProgramDto(
     val type: String? = null,
 )
 
+@JsonClass(generateAdapter = true)
 data class EpgProgramMetadataDto(val seriesId: String?)
 
+@JsonClass(generateAdapter = true)
 data class EpgAssetDto(
     val accessRights: EpgAccessRightsDto?,
     val assetId: String? = null,
@@ -69,13 +80,17 @@ data class EpgAssetDto(
     val userProperties: EpgUserPropertiesDto? = null,
 )
 
+@JsonClass(generateAdapter = true)
 data class EpgUserPropertiesDto(val lastOffset: Long?, val lastOffsetTimeStamp: String?)
 
 // The Android TV home feeds (/recommendations/topshelf/v1, /continue-watching/topshelf/v1): the
 // same programme-with-assets entries as the guide, one per programme.
+@JsonClass(generateAdapter = true)
 data class TopshelfResponse(val response: List<TopshelfEntryDto>?)
+@JsonClass(generateAdapter = true)
 data class TopshelfEntryDto(val type: String?, val data: EpgProgramWithAssetsDto?)
 
+@JsonClass(generateAdapter = true)
 data class EpgAccessRightsDto(val startTime: String?, val endTime: String?)
 
 // --- time helpers (SimpleDateFormat is not thread-safe, so build one per call) ---

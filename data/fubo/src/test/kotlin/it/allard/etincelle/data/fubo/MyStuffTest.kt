@@ -4,7 +4,6 @@
 package it.allard.etincelle.data.fubo
 
 import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import it.allard.etincelle.core.model.CardShape
 import it.allard.etincelle.core.model.CardTag
 import org.junit.Assert.assertEquals
@@ -13,7 +12,7 @@ import org.junit.Test
 
 /** The recordings pages ("Mes vidéos"), shaped as captured in November 2026. */
 class MyStuffTest {
-    private val adapter = Moshi.Builder().add(KotlinJsonAdapterFactory()).build().adapter(PageResponse::class.java)
+    private val adapter = Moshi.Builder().build().adapter(PageResponse::class.java)
 
     private fun nav(path: String) =
         """{"on_click":[{"type":"navigation","endpoint":{"method":"GET","url":"https://api-eu.fubo.tv/papi/v1/$path?trkOp=x"}}]}"""

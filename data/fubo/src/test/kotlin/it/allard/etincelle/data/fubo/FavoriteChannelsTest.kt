@@ -4,7 +4,6 @@
 package it.allard.etincelle.data.fubo
 
 import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -13,7 +12,7 @@ import org.junit.Test
 
 /** Favourite channels, from shapes captured on the live backend (/page/channels, /favorite/channels). */
 class FavoriteChannelsTest {
-    private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
+    private val moshi = Moshi.Builder().build()
 
     private fun cards(json: String) = moshi.adapter(PageResponse::class.java).fromJson(json)!!.toRails().single().cards
 

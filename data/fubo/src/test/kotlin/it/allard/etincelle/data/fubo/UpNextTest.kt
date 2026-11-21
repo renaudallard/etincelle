@@ -4,7 +4,6 @@
 package it.allard.etincelle.data.fubo
 
 import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import it.allard.etincelle.core.model.UpNext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -12,7 +11,7 @@ import org.junit.Test
 
 /** The end slate of an episode page (shape captured on the live backend with auto_play_up_next). */
 class UpNextTest {
-    private val adapter = Moshi.Builder().add(KotlinJsonAdapterFactory()).build().adapter(PageResponse::class.java)
+    private val adapter = Moshi.Builder().build().adapter(PageResponse::class.java)
 
     private fun detail(player: String) =
         adapter.fromJson("""{"content":{"metadata":{"id":"id-metadata-12160446_39"},"player":$player}}""")!!

@@ -4,6 +4,7 @@
 package it.allard.etincelle.data.fubo
 
 import com.squareup.moshi.Json
+import com.squareup.moshi.JsonClass
 import it.allard.etincelle.core.model.Avatar
 import it.allard.etincelle.core.model.MfaChallenge
 import it.allard.etincelle.core.model.Profile
@@ -12,6 +13,7 @@ import it.allard.etincelle.core.model.Profiles
 // --- Auth ---
 
 /** The backend takes the account email in a `username` field. */
+@JsonClass(generateAdapter = true)
 data class SigninRequest(
     @Json(name = "username") val email: String,
     val password: String,
@@ -22,6 +24,7 @@ data class SigninRequest(
  * `refresh` and the pairing flow return them flat, so both shapes parse and [tokens] returns
  * whichever of the two actually carries them.
  */
+@JsonClass(generateAdapter = true)
 data class SigninResponse(
     @Json(name = "access_token") val accessToken: String?,
     @Json(name = "refresh_token") val refreshToken: String?,
@@ -41,18 +44,26 @@ data class SigninResponse(
 // --- Two-factor sign-in code page (/papi/v1/signin/mfa, template "mfa") ---
 // Labels are texts ({"text": …}) in the page API, read leniently in case a plain string comes instead.
 
+@JsonClass(generateAdapter = true)
 data class MfaPageResponse(val content: MfaContentDto?)
+@JsonClass(generateAdapter = true)
 data class MfaContentDto(
     val metadata: MfaMetadataDto?,
     val form: MfaFormDto?,
     @Json(name = "resend_code_label") val resendCodeLabel: Any?,
     @Json(name = "resend_code_button") val resendCodeButton: MfaButtonDto?,
 )
+@JsonClass(generateAdapter = true)
 data class MfaMetadataDto(val title: Any?, val subtitle: Any?, val description: Any?)
+@JsonClass(generateAdapter = true)
 data class MfaFormDto(val inputs: List<MfaInputDto>?, @Json(name = "submit_button") val submitButton: MfaButtonDto?)
+@JsonClass(generateAdapter = true)
 data class MfaInputDto(val name: String?, val label: Any?, val placeholder: Any?, val length: Int?)
+@JsonClass(generateAdapter = true)
 data class MfaButtonDto(val text: Any?, val actions: MfaActionsDto?)
+@JsonClass(generateAdapter = true)
 data class MfaActionsDto(@Json(name = "on_click") val onClick: List<MfaActionDto>?)
+@JsonClass(generateAdapter = true)
 data class MfaActionDto(val type: String?, val template: String?, val endpoint: EndpointDto?)
 
 private fun textOf(value: Any?): String? = when (value) {
@@ -91,39 +102,50 @@ fun MfaPageResponse.toChallenge(token: String): MfaChallenge? {
 // --- TV code/QR pairing (signin/code) ---
 
 /** Response of `GET signin/code`: a short code the user confirms on their phone, with its lifetime. */
+@JsonClass(generateAdapter = true)
 data class SignInCodeResponse(
     val code: String?,
     @Json(name = "issued_at") val issuedAt: Long?,
     @Json(name = "expires_at") val expiresAt: Long?,
 )
 
+@JsonClass(generateAdapter = true)
 data class SignInCodePollRequest(val code: String)
 
 /**
  * Response of `POST signin/code` while the TV polls: [status] is "CODE_VALIDATING" until the user
  * confirms, then [data] carries the tokens (same shape as a normal sign-in).
  */
+@JsonClass(generateAdapter = true)
 data class SignInCodeValidationResponse(
     val status: String?,
     val data: SigninResponse?,
 )
 
+@JsonClass(generateAdapter = true)
 data class UserResponse(val data: UserData?)
 
+@JsonClass(generateAdapter = true)
 data class UserData(val id: String?, val profiles: List<ProfileDto>?)
 
+@JsonClass(generateAdapter = true)
 data class ProfileDto(val id: String?, val name: String?)
 
 // --- Profiles (/profile) ---
 
+@JsonClass(generateAdapter = true)
 data class ProfilesResponse(
     val profiles: List<ProfileFullDto>?,
     val avatars: List<AvatarDto>?,
     @Json(name = "max_allowed") val maxAllowed: Int?,
 )
+@JsonClass(generateAdapter = true)
 data class ProfileFullDto(val id: String?, val name: String?, val avatar: AvatarDto?)
+@JsonClass(generateAdapter = true)
 data class AvatarDto(val id: Int?, val url: String?)
+@JsonClass(generateAdapter = true)
 data class ProfileRequest(val name: String, @Json(name = "avatar_id") val avatarId: Int?)
+@JsonClass(generateAdapter = true)
 data class ProfileResponse(val profile: ProfileFullDto?)
 
 fun ProfileFullDto.toProfile(): Profile? =
@@ -138,6 +160,7 @@ fun ProfilesResponse.toProfiles() = Profiles(
 
 // --- Playback (/vapi/asset/v1) ---
 
+@JsonClass(generateAdapter = true)
 data class PlaybackResponse(
     val stream: StreamDto?,
     @Json(name = "drm_v2") val drmV2: DrmV2Dto?,
@@ -158,6 +181,7 @@ data class PlaybackResponse(
 )
 
 /** Per-mode air-windows and scrubbing rights on a live playback response; only [live] is used today. */
+@JsonClass(generateAdapter = true)
 data class AccessRightsV2Dto(val live: AccessRightsV2WindowDto?)
 
 /**
@@ -165,6 +189,7 @@ data class AccessRightsV2Dto(val live: AccessRightsV2WindowDto?)
  * RFC3339-UTC strings ([startTime]/[endTime]) or as epoch-ms longs ([startTimeMs]/[endTimeMs]), so
  * both are parsed and the ms form is preferred.
  */
+@JsonClass(generateAdapter = true)
 data class AccessRightsV2WindowDto(
     val startTime: String? = null,
     val endTime: String? = null,
@@ -177,12 +202,14 @@ data class AccessRightsV2WindowDto(
  * [payload] is a template echoed back verbatim on the POST with its "lastOffset" entry replaced by
  * the position in seconds.
  */
+@JsonClass(generateAdapter = true)
 data class PlayHeadDto(
     val method: String?,
     val url: String?,
     val payload: Map<String, Any?>?,
 )
 
+@JsonClass(generateAdapter = true)
 data class StreamDto(
     val url: String?,
     val packagingProtocol: String?,
@@ -190,10 +217,13 @@ data class StreamDto(
     val live: Boolean?,
 )
 
+@JsonClass(generateAdapter = true)
 data class DrmV2Dto(val scheme: String?, val license: LicenseDto?)
 
+@JsonClass(generateAdapter = true)
 data class LicenseDto(val url: String?, val headers: Map<String, String>?)
 
+@JsonClass(generateAdapter = true)
 data class DrmV1Dto(
     val scheme: String?,
     val licenseUrl: String?,
@@ -201,8 +231,11 @@ data class DrmV1Dto(
     val token: String?,
 )
 
+@JsonClass(generateAdapter = true)
 data class UrlHolderDto(val url: String?)
 
+@JsonClass(generateAdapter = true)
 data class ConcurrencyDto(val heartbeatUrl: String?)
 
+@JsonClass(generateAdapter = true)
 data class ProgramDto(val title: String?, val heading: String? = null)

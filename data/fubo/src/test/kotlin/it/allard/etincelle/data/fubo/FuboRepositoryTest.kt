@@ -4,7 +4,6 @@
 package it.allard.etincelle.data.fubo
 
 import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import it.allard.etincelle.core.domain.DetailKind
 import it.allard.etincelle.core.model.AppError
 import it.allard.etincelle.core.model.DrmSpec
@@ -52,7 +51,7 @@ class FuboRepositoryTest {
         server.start()
         val api = Retrofit.Builder()
             .baseUrl(server.url("/"))
-            .addConverterFactory(MoshiConverterFactory.create(Moshi.Builder().add(KotlinJsonAdapterFactory()).build()))
+            .addConverterFactory(MoshiConverterFactory.create(Moshi.Builder().build()))
             .build()
             .create(FuboApi::class.java)
         repo = FuboRepository(api, session, store, progress)
@@ -221,7 +220,7 @@ class FuboRepositoryTest {
     fun `a 401 from a host that is not sent the session does not end it`() = runTest {
         val api = Retrofit.Builder()
             .baseUrl(server.url("/"))
-            .addConverterFactory(MoshiConverterFactory.create(Moshi.Builder().add(KotlinJsonAdapterFactory()).build()))
+            .addConverterFactory(MoshiConverterFactory.create(Moshi.Builder().build()))
             .build()
             .create(FuboApi::class.java)
         val guarded = FuboRepository(api, session, store, progress, ownHost = { false })
@@ -245,7 +244,7 @@ class FuboRepositoryTest {
         try {
             val api = Retrofit.Builder()
                 .baseUrl(elsewhere.url("/").newBuilder().host("127.0.0.1").build())
-                .addConverterFactory(MoshiConverterFactory.create(Moshi.Builder().add(KotlinJsonAdapterFactory()).build()))
+                .addConverterFactory(MoshiConverterFactory.create(Moshi.Builder().build()))
                 .build()
                 .create(FuboApi::class.java)
             val own = server.url("/home").newBuilder().host("localhost").build()
@@ -273,7 +272,7 @@ class FuboRepositoryTest {
         try {
             val api = Retrofit.Builder()
                 .baseUrl(server.url("/").newBuilder().host("localhost").build())
-                .addConverterFactory(MoshiConverterFactory.create(Moshi.Builder().add(KotlinJsonAdapterFactory()).build()))
+                .addConverterFactory(MoshiConverterFactory.create(Moshi.Builder().build()))
                 .build()
                 .create(FuboApi::class.java)
             val other = elsewhere.url("/home").newBuilder().host("127.0.0.1").build()

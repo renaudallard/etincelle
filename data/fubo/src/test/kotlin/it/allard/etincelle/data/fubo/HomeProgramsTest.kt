@@ -4,7 +4,6 @@
 package it.allard.etincelle.data.fubo
 
 import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import it.allard.etincelle.core.model.HomeProgram
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -12,7 +11,7 @@ import org.junit.Test
 
 /** The Android TV home feeds (shapes seen live on /continue-watching/topshelf/v1 and the recommendations). */
 class HomeProgramsTest {
-    private val adapter = Moshi.Builder().add(KotlinJsonAdapterFactory()).build().adapter(TopshelfResponse::class.java)
+    private val adapter = Moshi.Builder().build().adapter(TopshelfResponse::class.java)
 
     private val json = """
         {"response":[

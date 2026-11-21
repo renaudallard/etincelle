@@ -4,14 +4,13 @@
 package it.allard.etincelle.data.fubo
 
 import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
 /** A programme page names the stream its player plays; for a recording that is the DVR one. */
 class RecordingPlaybackTest {
-    private val adapter = Moshi.Builder().add(KotlinJsonAdapterFactory()).build().adapter(PageResponse::class.java)
+    private val adapter = Moshi.Builder().build().adapter(PageResponse::class.java)
 
     private fun detail(playUrl: String) = adapter.fromJson(
         """{"content":{"metadata":{"id":"m","title":{"text":"Jack Hunter"}},
