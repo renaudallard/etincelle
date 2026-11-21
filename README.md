@@ -221,6 +221,9 @@ rembobinage), comme les boutons de la télécommande plein écran qui s'ouvre en
 diffusion. Toucher la notification ramène dans l'application. Si l'application est relancée pendant
 une diffusion passant par les services Google, elle la retrouve et la notification en reprend aussitôt
 le titre.
+Sur le téléviseur, l'application TV signale au système ce qu'elle lit (titre, position), qui peut
+la mettre en pause, la reprendre ou s'y déplacer, par exemple à la voix avec l'Assistant ; il ne
+peut ni y lancer autre chose, ni passer à un autre programme.
 
 etincelle **vérifie les mises à jour** sur GitHub à chaque démarrage, puis une fois par jour tant
 qu'elle reste ouverte, et propose d'installer la dernière version lorsqu'une plus récente est

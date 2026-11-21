@@ -63,6 +63,8 @@ import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.session.MediaSession
+import androidx.media3.session.SessionCommands
 import androidx.media3.ui.PlayerView
 import it.allard.etincelle.core.designsystem.LiveProgramBar
 import it.allard.etincelle.core.designsystem.LiveProgramBarBottomOffset
@@ -102,6 +104,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.json.JSONObject
+import java.util.UUID
 
 // How long a TV set may take to settle once the phone's programme woke it.
 private const val TV_WAKING_MS = 30_000L
@@ -123,12 +126,26 @@ private const val AWAY_INSTALL_MS = 60 * 60_000L
 // The key the sign-in screen keeps its state under.
 private const val LOGIN_STATE = "LOGIN"
 
+// What the media session lets others do with the player: see what plays, pause, resume, and seek in it.
+private val SESSION_COMMANDS = Player.Commands.Builder().addAll(
+    Player.COMMAND_PLAY_PAUSE,
+    Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM,
+    Player.COMMAND_SEEK_BACK,
+    Player.COMMAND_SEEK_FORWARD,
+    Player.COMMAND_SEEK_TO_DEFAULT_POSITION,
+    Player.COMMAND_GET_CURRENT_MEDIA_ITEM,
+    Player.COMMAND_GET_TIMELINE,
+    Player.COMMAND_GET_METADATA,
+    Player.COMMAND_GET_AUDIO_ATTRIBUTES,
+).build()
+
 class MainActivity : ComponentActivity(), TvRemote.Screen {
 
     private val viewModel: MainViewModel by viewModels {
         MainViewModelFactory((application as EtincelleTvApp).container.repository, UpdateChecker(BuildConfig.VERSION_NAME, "tv"), AutoUpdate(this).takeIf { BuildConfig.SELF_UPDATE })
     }
     private var player: ExoPlayer? = null
+    private var session: MediaSession? = null
     private var loadControl: AdaptiveLoadControl? = null
     private var pausedForBackground = false
     // The programme held in pause was let go of when the app was left (see unload), to be loaded again
@@ -218,6 +235,20 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
             }
         })
         player = exo
+        // What plays, for the system and the Assistant, which can then pause it, resume it or seek in it
+        // by voice. Nothing more: a stream is a single item, and no other app is to load one.
+        // A new id for each activity: Android may create the next before it has destroyed this one,
+        // and two sessions under one id are refused with an exception.
+        session = MediaSession.Builder(this, exo)
+            .setId(UUID.randomUUID().toString())
+            .setCallback(object : MediaSession.Callback {
+                override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo) =
+                    MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+                        .setAvailablePlayerCommands(SESSION_COMMANDS)
+                        .setAvailableSessionCommands(SessionCommands.EMPTY)
+                        .build()
+            })
+            .build()
         remote.attach(this)
         // Opening the app turns the screen on (see the manifest), which older versions only take from here.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) turnScreenOn(true)
@@ -802,6 +833,8 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
         val shown = remote.shows(this)
         remote.detach(this)
         if (shown && !remote.always) stopRemote()
+        session?.release()
+        session = null
         player?.release()
         player = null
         loadControl = null
