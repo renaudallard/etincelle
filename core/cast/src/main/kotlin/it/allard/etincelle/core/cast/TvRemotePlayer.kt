@@ -41,12 +41,16 @@ internal class TvRemotePlayer : SimpleBasePlayer(Looper.getMainLooper()), AdBrea
     private var windowStartMs = -1L
     private var updatedAt = 0L
 
+    // When the state last given out was worked out (elapsedRealtime ms): the live positions asked for are
+    // in the window it had then, which the TV's own has slid on from since.
+    private var shownAt = 0L
+
     override var adBreakOffered = false
         private set
 
-    // Statuses are seconds apart. On-demand content moves on by itself between them; a live window moves
-    // with the clock, and its state is refreshed every second while someone may look at it. Each refresh
-    // is a new timeline, which the media notification is rebuilt for.
+    // Statuses are seconds apart. The position moves on by itself between them while playing (media3 does
+    // it); a live window moves with the clock, and its state is refreshed every second while someone may
+    // look at it. Each refresh is a new timeline, which the media notification is rebuilt for.
     private val handler = Handler(Looper.getMainLooper())
     private val ticker = object : Runnable {
         override fun run() {
@@ -130,7 +134,8 @@ internal class TvRemotePlayer : SimpleBasePlayer(Looper.getMainLooper()), AdBrea
         val metadata = item.mediaMetadata.buildUpon().setTitle(title).build()
         val data = MediaItemData.Builder(item).setMediaItem(item).setMediaMetadata(metadata).setIsSeekable(true)
         val position: Long
-        val elapsed = SystemClock.elapsedRealtime() - updatedAt
+        shownAt = SystemClock.elapsedRealtime()
+        val elapsed = shownAt - updatedAt
         val playing = state == RemoteMessages.STATE_PLAYING
         if (live && durationMs > 0) {
             // The window of a live stream slides with the clock: the position in it stays put while
@@ -145,10 +150,7 @@ internal class TvRemotePlayer : SimpleBasePlayer(Looper.getMainLooper()), AdBrea
             if (durationMs > 0) data.setDurationUs(durationMs * 1000)
             position = (if (playing) positionMs + elapsed else positionMs).let { if (durationMs > 0) it.coerceAtMost(durationMs) else it }
         }
-        // On-demand content moves on by itself while playing; a live position stays in its window, which
-        // the refreshes move.
-        val supplier = if (live || !playing) PositionSupplier.getConstant(position) else PositionSupplier.getExtrapolating(position, 1f)
-        builder.setPlaylist(listOf(data.build())).setContentPositionMs(supplier)
+        builder.setPlaylist(listOf(data.build())).setContentPositionMs(position)
         when (state) {
             RemoteMessages.STATE_PLAYING -> builder.setPlaybackState(STATE_READY).setPlayWhenReady(true, PLAY_WHEN_READY_CHANGE_REASON_REMOTE)
             RemoteMessages.STATE_PAUSED -> builder.setPlaybackState(STATE_READY).setPlayWhenReady(false, PLAY_WHEN_READY_CHANGE_REASON_REMOTE)
@@ -174,19 +176,27 @@ internal class TvRemotePlayer : SimpleBasePlayer(Looper.getMainLooper()), AdBrea
         // TV would take as the start of its window, four hours back.
         val liveItem = live || (item?.localConfiguration?.tag as? PlaybackSource)?.isLive == true
         if (liveItem && durationMs <= 0 && positionMs != C.TIME_UNSET) return Futures.immediateVoidFuture()
-        // An unset position is the default one: the live edge, or the start of on-demand content.
-        val target = if (positionMs == C.TIME_UNSET) -1L else positionMs.coerceAtLeast(0)
+        // An unset position is the default one: the live edge, or the start of on-demand content. A live
+        // position is in the window last given out, which the TV's has slid on from since.
+        val slid = if (live && durationMs > 0) SystemClock.elapsedRealtime() - shownAt else 0L
+        val target = if (positionMs == C.TIME_UNSET) -1L else (positionMs - slid).coerceAtLeast(0)
         session.send(JSONObject().put(RemoteMessages.TYPE, RemoteMessages.SEEK).put(RemoteMessages.POSITION, target))
         settle()
         this.positionMs = if (target < 0) durationMs.coerceAtLeast(0) else target
         return Futures.immediateVoidFuture()
     }
 
-    // Takes where playback was worked out to be by now as what the TV last said, before changing it.
+    // Takes where playback was worked out to be by now as what the TV last said, before changing it:
+    // a live window slid on to where the TV's is, with the position in it, from the TV's own figures.
     private fun settle() {
         val now = SystemClock.elapsedRealtime()
-        positionMs = currentPosition
-        if (live && windowStartMs > 0) windowStartMs += now - updatedAt
+        val elapsed = now - updatedAt
+        if (live && durationMs > 0) {
+            if (windowStartMs > 0) windowStartMs += elapsed
+            if (state != RemoteMessages.STATE_PLAYING) positionMs = (positionMs - elapsed).coerceIn(0L, durationMs)
+        } else {
+            positionMs = currentPosition
+        }
         updatedAt = now
     }
 

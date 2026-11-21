@@ -26,8 +26,8 @@ import org.json.JSONObject
  * On a live stream the receiver counts time from an arbitrary origin and reports the seekable window
  * as `liveSeekableRange`, whose end is the live edge. Positions here are relative to the start of that
  * window, and the window's wall-clock start is estimated from the phone's clock, the edge being now.
- * On-demand content moves on by itself between statuses; a live window is moved on every second while
- * the app is on screen ([onScreen]), and with each status otherwise. Main thread only.
+ * The position moves on by itself while playing (media3 does it); a live window is moved on every
+ * second while the app is on screen ([onScreen]), and with each status otherwise. Main thread only.
  */
 @UnstableApi
 internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
@@ -43,6 +43,10 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
     private var live = false
     private var duration = 0.0
     private var updatedAt = 0L
+
+    // Where the live window the player last gave out started, in the receiver's seconds: the positions
+    // asked for are in it.
+    private var shownStart = 0.0
 
     // How far behind the live edge (ms) a rewound live cast should resume. The receiver is told too
     // (live_rewind_sec), but a seek made before the player has joined the live edge is lost, so it is
@@ -177,6 +181,7 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
             return builder.setPlaybackState(STATE_IDLE).build()
         }
         val now = advanced(SystemClock.elapsedRealtime())
+        shownStart = now.start
         val data = MediaItemData.Builder(item).setMediaItem(item).setIsSeekable(true)
         val positionMs: Long
         if (live && now.windowMs > 0) {
@@ -191,11 +196,7 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
             if (duration > 0) data.setDurationUs((duration * 1_000_000).toLong())
             positionMs = (now.time * 1000).toLong().coerceAtLeast(0)
         }
-        // On-demand content moves on by itself while playing; a live position stays in its window, which
-        // the refreshes move.
-        val playing = playerState == "PLAYING"
-        val position = if (live || !playing) PositionSupplier.getConstant(positionMs) else PositionSupplier.getExtrapolating(positionMs, 1f)
-        builder.setPlaylist(listOf(data.build())).setContentPositionMs(position)
+        builder.setPlaylist(listOf(data.build())).setContentPositionMs(positionMs)
 
         when (playerState) {
             "PLAYING" -> builder.setPlaybackState(STATE_READY).setPlayWhenReady(true, PLAY_WHEN_READY_CHANGE_REASON_REMOTE)
@@ -232,8 +233,10 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
         // Where the viewer chose to go, not back to the rewind the cast was started with, should that
         // still wait for the receiver to play.
         pendingRewindMs = 0
-        // An unset position is the default one: the live edge, or the start of on-demand content.
+        // An unset position is the default one: the live edge, or the start of on-demand content. A live
+        // position is in the window last given out, which a moving window has left since.
         val target = when {
+            live && positionMs != C.TIME_UNSET -> times.liveSeekTarget(positionMs - ((times.start - shownStart) * 1000).toLong())
             live -> times.liveSeekTarget(positionMs)
             positionMs == C.TIME_UNSET -> 0.0
             else -> positionMs / 1000.0
