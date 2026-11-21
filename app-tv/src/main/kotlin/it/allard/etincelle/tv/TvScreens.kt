@@ -930,8 +930,6 @@ fun TvProgramDetailScreen(
     val shown = seasons.getOrNull(season.coerceIn(0, (seasons.size - 1).coerceAtLeast(0)))?.second.orEmpty()
     // With no "Regarder" and no recordings above, initial focus goes to the first episode.
     val firstFocus = if (showWatch || detail.recordings.isNotEmpty()) null else watchFocus
-    // The detail focus was first given for: the header asks once, not each time it scrolls back in.
-    val focusGiven = remember { mutableStateOf<Any?>(null) }
     Box(Modifier.fillMaxSize()) {
         // The programme's artwork (16:9, like the screen) is the page's background, as in the official
         // app: faded into the page on the left, under the text, and at the bottom. It fades out as the
@@ -961,15 +959,6 @@ fun TvProgramDetailScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item(key = "header", contentType = "header") {
-                // Re-keyed on the shown detail so focus is re-established when navigating detail -> detail,
-                // not only for the first detail page.
-                val shownDetail = listOf(detail.vodId, detail.channelId, detail.title)
-                LaunchedEffect(shownDetail) {
-                    if (focusGiven.value != shownDetail) {
-                        focusGiven.value = shownDetail
-                        runCatching { watchFocus.requestFocus() }
-                    }
-                }
                 TvDetailHeader(
                     detail, busy, error, info, showWatch, watchFocus, onWatch, onStartOver, onWatchReplay, onRecord,
                     onWatchRecording, seasons, season, onSeason = { season = it },
@@ -997,15 +986,23 @@ fun TvProgramDetailScreen(
             }
         }
     }
-    // Once, as the page comes back, and after the rows have asked for theirs: a season chosen later
-    // must not send the focus to that episode again. The row is brought on screen first, as one off it
-    // is not laid out and cannot take the focus.
-    LaunchedEffect(Unit) {
-        val target = opened ?: return@LaunchedEffect
-        val row = shown.indexOfFirst { it.id == target }.takeIf { it >= 0 }?.plus(1) ?: return@LaunchedEffect
-        if (list.layoutInfo.visibleItemsInfo.none { it.index == row }) list.scrollToItem(row)
+    // Focus is given here, once per detail shown (re-keyed so detail -> detail gets it too), and not by
+    // the rows: a lazy row asks again each time it scrolls back in, and one off screen, as on a page come
+    // back to scrolled down, is not there to ask. Coming back from an episode opened here it goes to that
+    // episode, else to the header's first action, the first episode or the list itself (see watchFocus).
+    // A season chosen later does not move it. The row is brought on screen first, as one off it is not
+    // laid out and cannot take the focus.
+    val shownDetail = listOf(detail.vodId, detail.channelId, detail.title)
+    LaunchedEffect(shownDetail) {
+        // Laid out, with the scroll the page comes back with.
         withFrameNanos { }
-        runCatching { openedFocus.requestFocus() }
+        val openedRow = opened?.let { id -> shown.indexOfFirst { it.id == id } }?.takeIf { it >= 0 }?.plus(1)
+        val row = openedRow ?: if (firstFocus != null) 1 else 0
+        if (!nothingFocusable && list.layoutInfo.visibleItemsInfo.none { it.index == row }) {
+            list.scrollToItem(row)
+            withFrameNanos { }
+        }
+        runCatching { (if (openedRow != null) openedFocus else watchFocus).requestFocus() }
     }
 }
 
@@ -1152,7 +1149,6 @@ private fun TvEpisodeRow(
     modifier: Modifier = Modifier,
 ) {
     var focused by remember { mutableStateOf(false) }
-    if (focus != null) LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     Row(
         modifier.fillMaxWidth()
             .then(if (focus != null) Modifier.focusRequester(focus) else Modifier)
@@ -1196,7 +1192,6 @@ private fun TvEpisodeRow(
 /** One DVR recording on the TV detail: its subtitle/channel plus a "Regarder l'enregistrement" action. */
 @Composable
 private fun TvRecordingRow(recording: Recording, enabled: Boolean, onWatch: () -> Unit, focus: FocusRequester? = null) {
-    if (focus != null) LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     // The episode and the day it was recorded ("S16 E6 Agde • Enregistré: 30 sept.").
     val label = listOfNotNull(recording.title, recording.subtitle).joinToString(" • ")
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
