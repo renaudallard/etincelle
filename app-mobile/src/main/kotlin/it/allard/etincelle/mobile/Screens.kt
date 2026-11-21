@@ -318,7 +318,7 @@ fun GridContent(
             rails.forEach { rail ->
                 val header = rail.title?.takeIf { it.isNotBlank() && it != pageTitle }
                 if (header != null) {
-                    item(span = { GridItemSpan(maxLineSpan) }, key = "h-${rail.id}") {
+                    item(span = { GridItemSpan(maxLineSpan) }, key = "h-${rail.id}", contentType = "header") {
                         Text(header, style = MaterialTheme.typography.titleMedium)
                     }
                 }
@@ -328,9 +328,9 @@ fun GridContent(
                 rail.cards.forEachIndexed { i, card ->
                     val key = "${rail.id}-${card.id}#$i"
                     if (card.shape == CardShape.ROW) {
-                        item(span = { GridItemSpan(maxLineSpan) }, key = key) { EpisodeRow(card, enabled = true) { onCardClick(card) } }
+                        item(span = { GridItemSpan(maxLineSpan) }, key = key, contentType = "row") { EpisodeRow(card, enabled = true) { onCardClick(card) } }
                     } else {
-                        item(key = key) { GridCard(card, onCardClick) }
+                        item(key = key, contentType = "card") { GridCard(card, onCardClick) }
                     }
                 }
             }

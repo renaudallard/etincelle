@@ -1275,7 +1275,7 @@ private fun TvGridContent(
         rails.forEach { rail ->
             val header = rail.title?.takeIf { multiSection && it.isNotBlank() }
             if (header != null) {
-                item(span = { GridItemSpan(maxLineSpan) }, key = "h-${rail.id}") {
+                item(span = { GridItemSpan(maxLineSpan) }, key = "h-${rail.id}", contentType = "header") {
                     Text(header, style = MaterialTheme.typography.titleMedium, color = Color.White)
                 }
             }
@@ -1284,11 +1284,11 @@ private fun TvGridContent(
             rail.cards.forEachIndexed { i, card ->
                 val key = "${rail.id}|${card.id}"
                 if (card.shape == CardShape.ROW) {
-                    item(span = { GridItemSpan(maxLineSpan) }, key = "${rail.id}-${card.id}#$i") {
+                    item(span = { GridItemSpan(maxLineSpan) }, key = "${rail.id}-${card.id}#$i", contentType = "row") {
                         TvEpisodeRow(card, enabled = true, onClick = { returnFocus.save(key); onCardClick(card) }, modifier = returnFocus.target(key))
                     }
                 } else {
-                    item(key = "${rail.id}-${card.id}#$i") { TvCard(card, { returnFocus.save(key); onCardClick(it) }, returnFocus.target(key)) }
+                    item(key = "${rail.id}-${card.id}#$i", contentType = "card") { TvCard(card, { returnFocus.save(key); onCardClick(it) }, returnFocus.target(key)) }
                 }
             }
         }
