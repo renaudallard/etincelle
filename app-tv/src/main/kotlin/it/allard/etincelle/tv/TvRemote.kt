@@ -19,6 +19,9 @@ import org.json.JSONObject
 
 // How often what the phone driving this app is to hear of playback is looked at (see StatusPacer).
 private const val STATUS_MS = 1_000L
+// What of a status changes as playback goes on, and what more of a live one.
+private val MOVING = setOf(RemoteMessages.POSITION, RemoteMessages.WINDOW_START)
+private val MOVING_LIVE = MOVING + RemoteMessages.DURATION
 
 /**
  * The phone's remote control of this TV app, one for the process: the server a phone finds and connects
@@ -110,11 +113,8 @@ class TvRemote(private val app: EtincelleTvApp) {
         val live = status.optBoolean(RemoteMessages.LIVE)
         // The window of a live stream slides: its start and length change all the time, the wall-clock
         // time of what plays in it does not while paused.
-        val what = JSONObject(status.toString()).apply {
-            remove(RemoteMessages.POSITION)
-            remove(RemoteMessages.WINDOW_START)
-            if (live) remove(RemoteMessages.DURATION)
-        }.toString()
+        val moving = if (live) MOVING_LIVE else MOVING
+        val what = JSONObject(status, status.keys().asSequence().filter { it !in moving }.toList().toTypedArray()).toString()
         val clock = status.optLong(RemoteMessages.POSITION) + if (live) status.optLong(RemoteMessages.WINDOW_START) else 0L
         val playing = status.optString(RemoteMessages.STATE) == RemoteMessages.STATE_PLAYING
         // One that did not leave is to be sent again.
