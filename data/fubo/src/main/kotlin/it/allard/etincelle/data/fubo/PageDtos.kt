@@ -353,8 +353,10 @@ private fun SectionDto.seeAllUrl(): String? = auxButton?.actions?.onClick.orEmpt
     .firstOrNull { it.type == "navigation" }?.endpoint?.url
 
 // Poster cards carry no title field; their display name rides in the action's trkOriginElement param.
+private val TRK_TITLE_REGEX = Regex("""[?&]trkOriginElement=([^&]+)""")
+
 private fun trkTitle(url: String): String? =
-    Regex("""[?&]trkOriginElement=([^&]+)""").find(url)?.groupValues?.get(1)
+    TRK_TITLE_REGEX.find(url)?.groupValues?.get(1)
         ?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrNull() }
         ?.takeIf { it.isNotBlank() }
 
