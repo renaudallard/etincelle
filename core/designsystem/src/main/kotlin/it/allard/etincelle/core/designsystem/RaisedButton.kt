@@ -80,9 +80,9 @@ fun RaisedButton(
     val face = if (enabled) color else RaisedButtonDefaults.DisabledFace
     val ink = if (enabled) contentColor else RaisedButtonDefaults.DisabledContent
     val sunk = pressed && enabled
-    // The base takes the room below the face, so pressing moves nothing around the button. A width or
-    // size given to the button is the face's.
-    Box(modifier.padding(bottom = Depth), propagateMinConstraints = true) {
+    // A width or size given to the button is the face's; the base takes the room below it, so pressing
+    // moves nothing around the button.
+    Box(Modifier.padding(bottom = Depth).then(modifier), propagateMinConstraints = true) {
         Box(Modifier.matchParentSize().offset(y = Depth).background(lerp(face, Color.Black, 0.45f), shape))
         Box(
             Modifier
