@@ -358,7 +358,7 @@ class FuboRepository(
     }
 
     override suspend fun loadHome(): ContentPage = withRefresh {
-        val page = api.homePage().toPage()
+        val page = api.homePage().page()
         // The backend's home already has its "Vos enregistrements" row; add the broadcaster apps.
         val apps = appsRail() ?: return@withRefresh page
         page.copy(rails = listOf(apps) + page.rails)
@@ -368,11 +368,18 @@ class FuboRepository(
         // "Tout voir" on a recordings row points at the my-stuff landing page, which carries no
         // sections of its own; its recordings tab is the recordings page.
         if (url.contains("selectedTab=recordings")) {
-            api.pageByUrl(RECORDINGS_PATH).toPage()
+            api.pageByUrl(RECORDINGS_PATH).page()
         } else {
-            labelChannels(api.pageByUrl(url).toPage())
+            labelChannels(api.pageByUrl(url).page())
         }
     }
+
+    // The episodes a series' page lists, a hundred and more for some, off the caller's thread as a page.
+    private suspend fun PageResponse.episodes(): List<ContentCard> = withContext(Dispatchers.Default) { toEpisodes() }
+
+    // A page of the service as the app shows it. The home page alone is about a megabyte of JSON, and the
+    // caller's thread, the main one, is left to the screen.
+    private suspend fun PageResponse.page(): ContentPage = withContext(Dispatchers.Default) { toPage() }
 
     // The channels page, fetched once and cached; it carries both the channel directory and the
     // broadcaster "Apps" section surfaced on the home page.
@@ -443,7 +450,7 @@ class FuboRepository(
         withContext(Dispatchers.Default) { EpgResponse(entries).toGuidePage() }
     }
 
-    override suspend fun search(query: String): ContentPage = withRefresh { api.search(query).toPage().groupByTitle() }
+    override suspend fun search(query: String): ContentPage = withRefresh { api.search(query).page().groupByTitle() }
 
     /**
      * Search returns the same show several times (one per channel); keep one card per title, in the
@@ -497,7 +504,7 @@ class FuboRepository(
                     val recorded = async { recordingsOf(id) }
                     val resp = api.seriesDetail(id)
                     // Series with catch-up expose their episodes on a separate "Regarder maintenant" tab.
-                    if (resp.hasWatchNowTab()) episodes = api.seriesDetail(id, "id-tab-watch-now").toEpisodes()
+                    if (resp.hasWatchNowTab()) episodes = api.seriesDetail(id, "id-tab-watch-now").episodes()
                     matches = recorded.await()
                     resp.toProgramDetail(channelId = null, vodId = id, isLive = false)
                 }
@@ -554,7 +561,7 @@ class FuboRepository(
      */
     private suspend fun seriesEpisodes(seriesId: String): List<ContentCard> = try {
         val series = api.seriesDetail(seriesId)
-        if (series.hasWatchNowTab()) api.seriesDetail(seriesId, "id-tab-watch-now").toEpisodes() else emptyList()
+        if (series.hasWatchNowTab()) api.seriesDetail(seriesId, "id-tab-watch-now").episodes() else emptyList()
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
