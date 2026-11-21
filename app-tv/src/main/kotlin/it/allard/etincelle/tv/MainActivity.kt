@@ -978,20 +978,15 @@ private fun TvPlayerSurface(
     // longer it is held, and the bar shows where it lands meanwhile.
     var seekTarget by remember(source) { mutableStateOf<Long?>(null) }
     var seekShown by remember(source) { mutableStateOf<Long?>(null) }
-    var seekPresses by remember(source) { mutableIntStateOf(0) }
     var seekHeld by remember { mutableStateOf(false) }
     var seekDirection by remember { mutableIntStateOf(0) }
     var seekRepeats by remember { mutableIntStateOf(0) }
     val seekWindow = remember { Timeline.Window() }
-    LaunchedEffect(seekPresses) {
-        val target = seekTarget ?: return@LaunchedEffect
-        delay(SEEK_COMMIT_MS)
-        player.seekTo(target)
-        seekTarget = null
-        seekRepeats = 0
-        delay(SEEK_LINGER_MS)
-        seekShown = null
-    }
+    // Each press puts the seek off again, at once: an effect keyed on the presses would only be
+    // cancelled at the next frame, and could seek and drop the press in between.
+    val seekScope = rememberCoroutineScope()
+    var seekJob by remember { mutableStateOf<Job?>(null) }
+    DisposableEffect(source) { onDispose { seekJob?.cancel() } }
     fun seekKey(event: KeyEvent): Boolean {
         val direction = when (event.keyCode) {
             KeyEvent.KEYCODE_DPAD_LEFT -> -1
@@ -1012,8 +1007,16 @@ private fun TvPlayerSurface(
         val target = ((seekTarget ?: player.currentPosition) + (step * faster).toLong()).coerceIn(0L, end)
         seekTarget = target
         seekShown = target
-        seekPresses++
         seekHeld = true
+        seekJob?.cancel()
+        seekJob = seekScope.launch {
+            delay(SEEK_COMMIT_MS)
+            player.seekTo(target)
+            seekTarget = null
+            seekRepeats = 0
+            delay(SEEK_LINGER_MS)
+            seekShown = null
+        }
         return true
     }
     fun skipKey(event: KeyEvent): Boolean {
