@@ -22,7 +22,9 @@ Elle donne accès au **direct**, au **guide des programmes** (EPG), à la **rech
 épouse le **programme regardé** (du début à la fin de sa diffusion, heures de début et de fin
 affichées à ses extrémités), qui n'est pas celui à l'antenne quand on regarde en différé : la barre
 suit alors le programme où l'on se trouve, et couvre toute la fenêtre de rembobinage là où le guide
-ne sait plus ce qui passait. Le bord du direct se situe en
+ne sait plus ce qui passait. Tant que le guide ne donne que l'heure prévue d'un programme (une heure
+ronde, parfois à quelques minutes près), il est redemandé chaque minute pendant un quart d'heure, et
+la barre prend l'heure réelle dès qu'il la connaît. Le bord du direct se situe en
 cours de route et la portion pas encore diffusée formant la fin de la barre ; la partie trop ancienne
 pour être rembobinée y est tracée dans une couleur distincte, et un bouton **Revenir au direct**
 apparaît dès que l'on s'éloigne du bord pour y ramener d'un appui (sur le téléviseur, il s'affiche
