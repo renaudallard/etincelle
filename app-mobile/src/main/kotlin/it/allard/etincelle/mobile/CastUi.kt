@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -49,7 +51,9 @@ import it.allard.etincelle.core.designsystem.theme.BrandYellow
 fun CastButton(
     state: CastUiState,
     onConnect: (String) -> Unit,
-    onDisconnect: () -> Unit,
+    // Called with true to let go of the device and leave it playing, with false to bring playback back
+    // to this phone.
+    onDisconnect: (keepPlaying: Boolean) -> Unit,
     onActiveScan: (Boolean) -> Unit = {},
     onOpenChange: (Boolean) -> Unit = {},
 ) {
@@ -95,8 +99,16 @@ fun CastButton(
                 Column {
                     // This phone: selecting it while casting transfers playback back here, and gives up
                     // on a device still being connected to.
-                    TextButton(onClick = { if (state.showStatus) onDisconnect(); open = false }) {
+                    TextButton(onClick = { if (state.showStatus) onDisconnect(false); open = false }) {
                         Text((if (!state.showStatus) "• " else "") + "Cet appareil")
+                    }
+                    // Free to connect elsewhere, the device connected to going on with what it plays.
+                    if (state.connectedDeviceName != null) {
+                        TextButton(onClick = { onDisconnect(true); open = false }) {
+                            Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Se déconnecter (la lecture continue)")
+                        }
                     }
                     state.devices.forEach { device ->
                         // Prefer the route id (unambiguous across same-named devices); fall back to the

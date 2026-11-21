@@ -313,9 +313,13 @@ class MainActivity : ComponentActivity() {
                         // "Cet appareil" in the picker: bring playback back to this phone (not a stop).
                         // With nothing playing as far as the pages know (a link opened during the cast
                         // closed it, or the phone only drives a TV app), there is no player to bring it
-                        // back to: the cast just ends.
-                        onCastDisconnect = {
-                            if (viewModel.state.value.playing == null) controller?.endCast() else controller?.returnToThisDevice()
+                        // back to: the cast just ends. "Se déconnecter" leaves the device playing.
+                        onCastDisconnect = { keepPlaying ->
+                            when {
+                                keepPlaying -> controller?.leaveCast()
+                                viewModel.state.value.playing == null -> controller?.endCast()
+                                else -> controller?.returnToThisDevice()
+                            }
                         },
                         // Active-scan while the cast picker is open so the device list stays fresh.
                         onCastActiveScan = { controller?.setActiveScan(it) },
@@ -497,7 +501,7 @@ private fun AppRoot(
     upNextSlates: UpNextSlates,
     castState: CastUiState,
     onCastConnect: (String) -> Unit,
-    onCastDisconnect: () -> Unit,
+    onCastDisconnect: (keepPlaying: Boolean) -> Unit,
     onCastActiveScan: (Boolean) -> Unit = {},
     onTvKey: (String) -> Unit = {},
 ) {
@@ -948,7 +952,7 @@ private fun PlayerSurface(
     currentPlayer: Player,
     castState: CastUiState,
     onCastConnect: (String) -> Unit,
-    onCastDisconnect: () -> Unit,
+    onCastDisconnect: (keepPlaying: Boolean) -> Unit,
     onCastActiveScan: (Boolean) -> Unit,
     fetchProgramWindow: suspend (String, Long) -> ProgramWindow?,
     secure: Boolean = true,

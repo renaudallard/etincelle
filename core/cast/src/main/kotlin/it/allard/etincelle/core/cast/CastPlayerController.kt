@@ -994,8 +994,8 @@ class CastPlayerController(
         onPlaybackStopped?.invoke()
     }
 
-    // End the direct session and stop the receiver; true when there was one.
-    private fun stopDirect(): Boolean {
+    // End the direct session, stopping the receiver unless [stopReceiver] is false; true when there was one.
+    private fun stopDirect(stopReceiver: Boolean = true): Boolean {
         val rejoining = rejoinJob?.isActive == true
         rejoinJob?.cancel()
         val session = directSession
@@ -1003,7 +1003,7 @@ class CastPlayerController(
         // same, or it would stay the current one with nothing behind it.
         if (session == null && !rejoining) return false
         directSession = null
-        session?.stop()
+        if (stopReceiver) session?.stop() else session?.close()
         leaveDirectPlayer()
         onSessionDisconnected()
         return true
@@ -1212,6 +1212,31 @@ class CastPlayerController(
         val phonePlays = phoneStillPlays
         stopTvSession(stopTv = _currentPlayer.value === tvPlayer && currentItem != null)
         if (!phonePlays) currentItem = null
+    }
+
+    /**
+     * Lets go of the device cast to and leaves it playing, to connect elsewhere: the etincelle TV app
+     * goes on by itself, a Chromecast plays on and its own remote drives it. The phone stops showing the
+     * cast and closes its player, unless it still plays what the device had not taken over yet. A
+     * device still being connected to is given up, as by [disconnect].
+     */
+    fun leaveCast() {
+        val phonePlays = phoneStillPlays
+        if (stopTvSession(stopTv = false) || stopDirect(stopReceiver = false)) {
+            if (phonePlays) return
+            currentItem = null
+            onPlaybackStopped?.invoke()
+            return
+        }
+        if (castContext.sessionManager.currentCastSession?.isConnected != true) return disconnect()
+        // Ended on purpose, not lost: neither taken back nor brought back here (see onSessionDisconnected,
+        // which stops the phone's side and closes the player).
+        returnToPhoneOnEnd = false
+        transferring = false
+        transferFallbackJob?.cancel()
+        reResolveJob?.cancel()
+        endingOnPurpose = true
+        castContext.sessionManager.endCurrentSession(false)
     }
 
     override fun disconnect() {

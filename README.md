@@ -150,7 +150,7 @@ ligne. Sur
 téléphone, vous pouvez **diffuser** le flux en cours vers un **Chromecast** et transférer la lecture
 d'un appareil à l'autre. Si le direct a été **rembobiné** avant la diffusion, le Chromecast reprend au
 même endroit dans le différé plutôt qu'au bord du direct, et y revient aussi quand le flux doit être
-rechargé en cours de diffusion ou que l'on change de Chromecast. D'un Chromecast vers l'application TV, ou vers un Chromecast joint directement, la lecture passe par le téléphone, qui en garde la place sans rien jouer. Un direct regardé en différé garde aussi sa place en revenant sur le téléphone (« Cet appareil ») et en passant d'un téléviseur à un autre. Une **coupure Wi-Fi** passagère du téléphone n'arrête pas
+rechargé en cours de diffusion ou que l'on change de Chromecast. D'un Chromecast vers l'application TV, ou vers un Chromecast joint directement, la lecture passe par le téléphone, qui en garde la place sans rien jouer. Un direct regardé en différé garde aussi sa place en revenant sur le téléphone (« Cet appareil ») et en passant d'un téléviseur à un autre. **Se déconnecter (la lecture continue)**, sous « Cet appareil », libère le téléphone en laissant le programme se poursuivre sur l'application TV ou le Chromecast, pour se connecter ailleurs. Une **coupure Wi-Fi** passagère du téléphone n'arrête pas
 la diffusion : le téléphone reprend la main sur le Chromecast, qui joue sans interruption. Un programme diffusé garde son **point de reprise** sur le
 téléphone, même arrêté depuis le téléviseur : il reprend ensuite là où la diffusion s'est arrêtée. Le **programme en cours** est aussi repéré
 sur la barre du téléviseur pendant la diffusion. Pendant la diffusion, l'application **reste sur la fiche du programme** : une
