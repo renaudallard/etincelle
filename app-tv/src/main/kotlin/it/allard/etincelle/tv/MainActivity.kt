@@ -91,6 +91,7 @@ import it.allard.etincelle.core.player.LiveProgramme
 import it.allard.etincelle.core.player.MediaItemFactory
 import it.allard.etincelle.core.player.PlaybackProgress
 import it.allard.etincelle.core.player.PlaybackRecovery
+import it.allard.etincelle.core.player.RewindHold
 import it.allard.etincelle.core.player.followLive
 import it.allard.etincelle.core.player.followRecording
 import it.allard.etincelle.core.player.keepScreenOnWhilePlaying
@@ -982,11 +983,9 @@ private fun TvPlayerSurface(
     var seekDirection by remember { mutableIntStateOf(0) }
     var seekRepeats by remember { mutableIntStateOf(0) }
     val seekWindow = remember { Timeline.Window() }
-    // A rewind stops at the start of the programme playback is in, as on the Chromecast; a press of
-    // Left once stopped there, the seek made, goes on into the one before, where presses still coming
-    // in stay at the start. Held again once back in the programme.
-    var holdShowStart by remember(source) { mutableStateOf(true) }
-    var showStartParked by remember(source) { mutableStateOf(false) }
+    // A rewind stops at the start of the programme playback is in, as on the Chromecast (RewindHold).
+    val rewindHold = remember(source) { RewindHold() }
+    var parked by remember(source) { mutableStateOf(false) }
     // Each press puts the seek off again, at once: an effect keyed on the presses would only be
     // cancelled at the next frame, and could seek and drop the press in between.
     val seekScope = rememberCoroutineScope()
@@ -1009,16 +1008,16 @@ private fun TvPlayerSurface(
         seekDirection = direction
         val step = if (direction < 0) -LivePlayback.SEEK_BACK_MS else LivePlayback.SEEK_FORWARD_MS
         val faster = minOf(SEEK_MAX_FASTER, 1f + seekRepeats * SEEK_FASTER_STEP)
-        if (direction < 0 && event.repeatCount == 0 && showStartParked && seekTarget == null) holdShowStart = false
-        val base = seekTarget ?: player.currentPosition
-        // Where the programme starts in the window; only from within it, or any press would go there.
-        val showStart = programWindow?.takeIf { seekWindow.isLive() && seekWindow.windowStartTimeMs != C.TIME_UNSET }
-            ?.let { it.startMs - seekWindow.windowStartTimeMs }?.takeIf { it > 0L }
-        val holding = holdShowStart && showStart != null && base >= showStart
-        val floor = if (holding) showStart ?: 0L else 0L
-        val target = (base + (step * faster).toLong()).coerceIn(floor, end)
-        showStartParked = holding && target <= floor
-        if (showStart != null && target > showStart + 1000L) holdShowStart = true
+        val programme = programWindow?.takeIf { seekWindow.isLive() && seekWindow.windowStartTimeMs != C.TIME_UNSET }
+        val target = rewindHold.press(
+            base = seekTarget ?: player.currentPosition,
+            step = (step * faster).toLong(),
+            end = end,
+            start = programme?.let { it.startMs - seekWindow.windowStartTimeMs },
+            startOfDay = programme?.startMs,
+            letGo = direction < 0 && event.repeatCount == 0 && seekTarget == null,
+        )
+        parked = rewindHold.parked
         seekTarget = target
         seekShown = target
         seekHeld = true
@@ -1194,7 +1193,7 @@ private fun TvPlayerSurface(
         if (seeking != null) {
             SeekPreview(
                 label = seekLabel(player, seekWindow, seeking) +
-                    if (showStartParked) " · Début de l'émission, appuyez encore sur ◄ pour reculer plus loin" else "",
+                    if (parked) " · Début de l'émission, appuyez encore sur ◄ pour reculer plus loin" else "",
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = LiveProgramBarBottomOffset + 40.dp),
             )
         }
