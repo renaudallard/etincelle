@@ -23,8 +23,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material.icons.Icons
@@ -40,7 +38,6 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -82,6 +79,8 @@ import androidx.media3.ui.PlayerView
 import it.allard.etincelle.core.cast.CastPlayerController
 import it.allard.etincelle.core.cast.CastUiState
 import it.allard.etincelle.core.cast.LiveSkipCastPlayer
+import it.allard.etincelle.core.designsystem.RaisedButton
+import it.allard.etincelle.core.designsystem.RaisedButtonDefaults
 import it.allard.etincelle.core.designsystem.LiveProgramBar
 import it.allard.etincelle.core.designsystem.LiveProgramBarBottomOffset
 import it.allard.etincelle.core.designsystem.R as DesignR
@@ -906,9 +905,9 @@ private fun UpNextOverlay(source: PlaybackSource, player: Player, onPlayNext: ()
         drive = false,
         button = { label, primary, onClick, mod ->
             if (primary) {
-                Button(onClick = onClick, modifier = mod, colors = ButtonDefaults.buttonColors(containerColor = BrandYellow, contentColor = BrandBlack)) { Text(label) }
+                RaisedButton(onClick = onClick, modifier = mod) { Text(label) }
             } else {
-                OutlinedButton(onClick = onClick, modifier = mod) { Text(label, color = Color.White) }
+                RaisedButton(onClick = onClick, modifier = mod, color = RaisedButtonDefaults.Neutral) { Text(label) }
             }
         },
         modifier = modifier,

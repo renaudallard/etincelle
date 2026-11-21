@@ -42,7 +42,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -90,6 +89,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import coil.compose.AsyncImage
+import it.allard.etincelle.core.designsystem.RaisedButton
 import it.allard.etincelle.core.designsystem.CardTagPill
 import it.allard.etincelle.core.cast.CastReceiver
 import it.allard.etincelle.core.designsystem.categoryIconRes
@@ -138,7 +138,7 @@ fun LoginScreen(busy: Boolean, error: String?, onLogin: (String, String) -> Unit
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(16.dp))
-        Button(onClick = { onLogin(email, password) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+        RaisedButton(onClick = { onLogin(email, password) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
             Text("Se connecter")
         }
         Spacer(Modifier.height(16.dp))
@@ -180,7 +180,7 @@ fun CodeScreen(
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(16.dp))
-        Button(onClick = { onVerify(code) }, enabled = !busy && code.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
+        RaisedButton(onClick = { onVerify(code) }, enabled = !busy && code.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
             Text(challenge.submitLabel)
         }
         challenge.resendLabel?.let { TextButton(onClick = onResend, enabled = !busy) { Text(it) } }
@@ -1157,17 +1157,17 @@ private fun DetailHeader(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     if (showWatch) {
-                        Button(onClick = onWatch, enabled = !busy) {
+                        RaisedButton(onClick = onWatch, enabled = !busy) {
                             Text(if (detail.isLive) "Regarder en direct" else "Regarder")
                         }
                     }
                     if (showWatch && detail.isLive) {
-                        Button(onClick = onStartOver, enabled = !busy) { Text("Regarder depuis le début") }
+                        RaisedButton(onClick = onStartOver, enabled = !busy) { Text("Regarder depuis le début") }
                     }
                     // The same programme on demand: whole from its first minute, where the live stream
                     // only goes back as far as its rewind window.
                     if (showWatch && detail.replay != null) {
-                        Button(onClick = onWatchReplay, enabled = !busy) { Text("Regarder le replay") }
+                        RaisedButton(onClick = onWatchReplay, enabled = !busy) { Text("Regarder le replay") }
                     }
                     if (detail.recordActions.isNotEmpty()) {
                         RecordButton(detail.recordActions, enabled = !busy, onRecord = onRecord)
@@ -1262,12 +1262,12 @@ private fun EpisodeRow(card: ContentCard, enabled: Boolean, modifier: Modifier =
 @Composable
 private fun RecordButton(actions: List<RecordAction>, enabled: Boolean, onRecord: (RecordAction) -> Unit) {
     if (actions.size == 1) {
-        Button(onClick = { onRecord(actions[0]) }, enabled = enabled) { Text(actions[0].label) }
+        RaisedButton(onClick = { onRecord(actions[0]) }, enabled = enabled) { Text(actions[0].label) }
         return
     }
     var expanded by remember { mutableStateOf(false) }
     Box {
-        Button(onClick = { expanded = true }, enabled = enabled) { Text("Enregistrer") }
+        RaisedButton(onClick = { expanded = true }, enabled = enabled) { Text("Enregistrer") }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             actions.forEach { action ->
                 DropdownMenuItem(text = { Text(action.label) }, onClick = { expanded = false; onRecord(action) })

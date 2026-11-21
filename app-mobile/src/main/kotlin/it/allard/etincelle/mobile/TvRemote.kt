@@ -15,11 +15,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -39,8 +35,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.Player
 import it.allard.etincelle.core.cast.AdBreakOffer
+import it.allard.etincelle.core.designsystem.RaisedButton
+import it.allard.etincelle.core.designsystem.RaisedButtonDefaults
 import it.allard.etincelle.core.designsystem.SkipAdsButton
-import it.allard.etincelle.core.designsystem.theme.BrandBlack
 import it.allard.etincelle.core.designsystem.theme.BrandYellow
 import it.allard.etincelle.core.remote.RemoteMessages
 import kotlinx.coroutines.delay
@@ -109,19 +106,19 @@ fun TvRemoteScreen(player: Player, tvName: String, onKey: (String) -> Unit, onCl
         }
         PadButton("▼", onClick = { onKey("down") })
         Spacer(Modifier.height(24.dp))
-        OutlinedButton(onClick = { onKey("back") }) { Text("Retour") }
+        RaisedButton(onClick = { onKey("back") }, color = RaisedButtonDefaults.Neutral) { Text("Retour") }
         Spacer(Modifier.weight(1f))
     }
 }
 
 @Composable
 private fun PadButton(label: String, primary: Boolean = false, onClick: () -> Unit) {
-    val colors = if (primary) {
-        ButtonDefaults.buttonColors(containerColor = BrandYellow, contentColor = BrandBlack)
-    } else {
-        ButtonDefaults.filledTonalButtonColors()
-    }
-    Button(onClick = onClick, shape = CircleShape, colors = colors, contentPadding = PaddingValues(0.dp), modifier = Modifier.padding(6.dp).size(76.dp)) {
+    RaisedButton(
+        onClick = onClick,
+        color = if (primary) BrandYellow else RaisedButtonDefaults.Neutral,
+        contentPadding = PaddingValues(0.dp),
+        modifier = Modifier.padding(6.dp).size(76.dp),
+    ) {
         Text(label, fontSize = 20.sp, maxLines = 1)
     }
 }
