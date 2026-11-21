@@ -14,8 +14,10 @@ import android.os.Looper
 import android.os.SystemClock
 import android.media.AudioManager
 import android.os.Bundle
+import android.view.FocusFinder
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -893,6 +895,10 @@ private fun TvPlayerSurface(
     // key or the controls hiding leaves the pill. Up from the time bar of a catch-up is left to the
     // view, whose own search goes up to the main row from there.
     var pillSelected by remember { mutableStateOf(false) }
+    // The skip pill is selected the same way, with Right from the last button of the main row, level
+    // with it: OK then skips, Left returns to the controls, Up goes on to the back-to-live pill, and
+    // any other key or the controls hiding leaves it.
+    var skipSelected by remember { mutableStateOf(false) }
     // The ad break playback is in, when the stream's manifest gives it away and it can be skipped.
     val adSkipper = remember(source) { AdSkipper(TvPrefs.autoSkipAds(view.context)) }
     var adBreak by remember(source) { mutableStateOf<AdBreak?>(null) }
@@ -924,14 +930,36 @@ private fun TvPlayerSurface(
         return true
     }
     LaunchedEffect(behindLive, controlsVisible) { if (!behindLive || !controlsVisible) pillSelected = false }
+    LaunchedEffect(offered, controlsVisible) { if (!offered || !controlsVisible) skipSelected = false }
     fun remoteKeyUsed(event: KeyEvent): Boolean {
         val down = event.action == KeyEvent.ACTION_DOWN
         val ok = event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER || event.keyCode == KeyEvent.KEYCODE_ENTER ||
             event.keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
         val up = event.keyCode == KeyEvent.KEYCODE_DPAD_UP
+        val left = event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT
+        val right = event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
         val bottomBar = playerView?.findViewById<View>(androidx.media3.ui.R.id.exo_bottom_bar)
         val mainRow = playerView?.findViewById<View>(androidx.media3.ui.R.id.exo_center_controls)
         return when {
+            skipSelected && ok -> {
+                if (!down) {
+                    skipSelected = false
+                    skipAd()
+                }
+                true
+            }
+            skipSelected && right -> true
+            skipSelected && (left || up) -> {
+                if (down) {
+                    skipSelected = false
+                    if (up && behindLive) pillSelected = true
+                }
+                true
+            }
+            skipSelected -> {
+                if (down) skipSelected = false
+                false
+            }
             pillSelected && ok -> {
                 if (!down) {
                     pillSelected = false
@@ -948,6 +976,11 @@ private fun TvPlayerSurface(
                 playerView?.findViewById<View>(androidx.media3.ui.R.id.exo_play_pause)?.requestFocus() == true
             controlsVisible && down && up && (mainRow?.hasFocus() == true || playerView?.isFocused == true) -> {
                 if (behindLive) pillSelected = true
+                true
+            }
+            controlsVisible && down && right && adBreak != null && mainRow is ViewGroup && mainRow.hasFocus() &&
+                FocusFinder.getInstance().findNextFocus(mainRow, mainRow.findFocus(), View.FOCUS_RIGHT) == null -> {
+                skipSelected = true
                 true
             }
             else -> false
@@ -1052,12 +1085,14 @@ private fun TvPlayerSurface(
             }
         }
         // With or without the controls, for as long as the break can be skipped. A click is for a
-        // mouse or a touch screen: the remote's OK is taken above.
+        // mouse or a touch screen: the remote's OK is taken above, and with the controls up it skips
+        // once the pill is selected.
         if (adBreak != null) {
             SkipAdsButton(
                 onClick = { skipAd() },
-                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 48.dp),
-                label = if (controlsVisible) "Passer la pub" else "Passer la pub : OK",
+                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 48.dp)
+                    .then(if (skipSelected) Modifier.border(3.dp, Color.White, CircleShape) else Modifier),
+                label = if (controlsVisible && !skipSelected) "Passer la pub" else "Passer la pub : OK",
             )
         }
         if (behindLive && controlsVisible) {

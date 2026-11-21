@@ -28,7 +28,8 @@ pour être rembobinée y est tracée dans une couleur distincte, et un bouton **
 apparaît dès que l'on s'éloigne du bord pour y ramener d'un appui (sur le téléviseur, il s'affiche
 avec les commandes du lecteur et s'atteint avec la flèche **Haut**). En différé, quand ce que l'on
 regarde est une **coupure publicitaire** dont le flux indique la fin, un bouton **Passer la pub**
-apparaît (sur le téléviseur, **OK** suffit) et mène à la fin de la coupure ; le réglage **Passer les
+apparaît (sur le téléviseur, **OK** suffit, ou, les commandes affichées, la flèche **Droite**
+depuis leur dernier bouton puis **OK**) et mène à la fin de la coupure ; le réglage **Passer les
 publicités automatiquement** (dans **Paramètres**, désactivé par défaut) le fait sans rien demander,
 sauf pour une coupure dans laquelle on est revenu en arrière. Le réglage vaut pour les chaînes dont
 le flux signale ses coupures : celles des groupes TF1 et France Télévisions exactement, celles du
