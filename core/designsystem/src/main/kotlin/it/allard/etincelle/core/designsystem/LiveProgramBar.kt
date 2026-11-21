@@ -67,9 +67,9 @@ fun LiveProgramBar(
     onScrubbing: (Boolean) -> Unit = {},
 ) {
     // While dragging, follow the finger locally and commit the seek on release, so the thumb tracks
-    // smoothly instead of fighting the 1s position poll.
+    // smoothly instead of fighting the 1s position poll. Read only as the bar is drawn: a move of the
+    // finger draws it again, without composing it.
     var scrub by remember { mutableStateOf<Float?>(null) }
-    val played = scrub ?: playedFraction
     // The gestures outlive a recomposition: they call what the bar was last given.
     val seekTo by rememberUpdatedState(onSeekToFraction)
     val scrubbing by rememberUpdatedState(onScrubbing)
@@ -114,7 +114,7 @@ fun LiveProgramBar(
     ) {
         startLabel?.let { Text(it, color = Thumb, style = MaterialTheme.typography.labelMedium) }
         Canvas(Modifier.weight(1f).height(28.dp).then(gestures)) {
-            drawLiveBar(played, liveFraction, seekFloorFraction)
+            drawLiveBar(scrub ?: playedFraction, liveFraction, seekFloorFraction)
         }
         endLabel?.let { Text(it, color = Thumb, style = MaterialTheme.typography.labelMedium) }
     }
