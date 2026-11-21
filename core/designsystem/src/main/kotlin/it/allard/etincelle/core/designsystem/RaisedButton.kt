@@ -84,20 +84,21 @@ fun RaisedButton(
     // moves nothing around the button.
     Box(Modifier.padding(bottom = Depth).then(modifier), propagateMinConstraints = true) {
         Box(Modifier.matchParentSize().offset(y = Depth).background(lerp(face, Color.Black, 0.45f), shape))
-        Box(
-            Modifier
-                .offset(y = if (sunk) Depth else 0.dp)
-                .shadow(if (sunk || !enabled) 0.dp else Lift, shape, clip = false)
-                .clip(shape)
-                .background(Brush.verticalGradient(listOf(lerp(face, Color.White, 0.22f), face, lerp(face, Color.Black, 0.2f))))
-                .border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.4f), Color.Transparent)), shape)
-                .then(if (border != null) Modifier.border(border, shape) else Modifier)
-                .clickable(interactions, LocalIndication.current, enabled = enabled, role = Role.Button, onClick = onClick)
-                .defaultMinSize(ButtonDefaults.MinWidth, ButtonDefaults.MinHeight)
-                .padding(contentPadding),
-            contentAlignment = Alignment.Center,
-        ) {
-            CompositionLocalProvider(LocalContentColor provides ink) {
+        // The ink is given around the face, not only to its label: the press ripple takes its colour there.
+        CompositionLocalProvider(LocalContentColor provides ink) {
+            Box(
+                Modifier
+                    .offset(y = if (sunk) Depth else 0.dp)
+                    .shadow(if (sunk || !enabled) 0.dp else Lift, shape, clip = false)
+                    .clip(shape)
+                    .background(Brush.verticalGradient(listOf(lerp(face, Color.White, 0.22f), face, lerp(face, Color.Black, 0.2f))))
+                    .border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.4f), Color.Transparent)), shape)
+                    .then(if (border != null) Modifier.border(border, shape) else Modifier)
+                    .clickable(interactions, LocalIndication.current, enabled = enabled, role = Role.Button, onClick = onClick)
+                    .defaultMinSize(ButtonDefaults.MinWidth, ButtonDefaults.MinHeight)
+                    .padding(contentPadding),
+                contentAlignment = Alignment.Center,
+            ) {
                 ProvideTextStyle(MaterialTheme.typography.labelLarge) {
                     Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically, content = content)
                 }
