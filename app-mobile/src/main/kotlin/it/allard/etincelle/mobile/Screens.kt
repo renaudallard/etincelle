@@ -1047,8 +1047,55 @@ fun ProgramDetailScreen(
     modifier: Modifier = Modifier,
 ) {
     // Kept with the page (see where it is shown): a page pushed over this one starts at its own top.
-    val scrollState = rememberScrollState()
-    Column(modifier.fillMaxSize().statusBarsPadding().verticalScroll(scrollState)) {
+    val listState = rememberLazyListState()
+    // A series may have a hundred episodes and more: only those on screen are laid out.
+    val seasons = remember(detail.episodes) { detail.episodes.groupBySeason() }
+    var season by rememberSaveable { mutableIntStateOf(0) }
+    val shown = seasons.getOrNull(season.coerceIn(0, (seasons.size - 1).coerceAtLeast(0)))?.second.orEmpty()
+    LazyColumn(modifier.fillMaxSize().statusBarsPadding(), state = listState) {
+        item(key = "header", contentType = "header") {
+            DetailHeader(
+                detail, busy, error, info, onWatch, onStartOver, onWatchReplay, onRecord, onWatchRecording, onBack,
+                isRecording, castButton, seasons, season, onSeason = { season = it },
+            )
+        }
+        // By place as well: a page may list one id twice, which a key alone would not take.
+        itemsIndexed(shown, key = { i, ep -> "ep#$i#${ep.id}" }, contentType = { _, _ -> "episode" }) { _, ep ->
+            EpisodeRow(ep, enabled = !busy, onClick = { onEpisode(ep) }, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp))
+        }
+        if (shown.isNotEmpty()) item(key = "after-episodes", contentType = "spacer") { Spacer(Modifier.height(16.dp)) }
+        // A channel's catalogue carousels (replays, most-viewed, live & upcoming) full width below the
+        // live header. onEpisode is the shared card click (vm.onCardClick), so a card opens normally.
+        itemsIndexed(detail.sections, key = { i, rail -> "rail#$i#${rail.id}" }, contentType = { _, _ -> "rail" }) { _, rail ->
+            Spacer(Modifier.height(20.dp))
+            // No "Tout voir" here: a see-all would navigate out of the open detail. The carousels carry
+            // plenty of cards, and each card opens normally via onEpisode (vm.onCardClick).
+            Rail(rail, onCardClick = onEpisode, onSeeAll = {}, showSeeAll = false)
+        }
+        if (detail.sections.isNotEmpty()) item(key = "end", contentType = "spacer") { Spacer(Modifier.height(16.dp)) }
+    }
+}
+
+/** What heads a detail page, down to the title of its episodes: its artwork, its actions and its text. */
+@Composable
+private fun DetailHeader(
+    detail: ProgramDetail,
+    busy: Boolean,
+    error: String?,
+    info: String?,
+    onWatch: () -> Unit,
+    onStartOver: () -> Unit,
+    onWatchReplay: () -> Unit,
+    onRecord: (RecordAction) -> Unit,
+    onWatchRecording: (String) -> Unit,
+    onBack: () -> Unit,
+    isRecording: Boolean,
+    castButton: @Composable () -> Unit,
+    seasons: List<Pair<String, List<ContentCard>>>,
+    season: Int,
+    onSeason: (Int) -> Unit,
+) {
+    Column {
         Row(
             Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1081,7 +1128,9 @@ fun ProgramDetailScreen(
                 )
             }
         }
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // The episodes under it go on in line with its text.
+        val bottom = if (seasons.isEmpty()) 16.dp else 0.dp
+        Column(Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = bottom), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             detail.timeLabel?.let {
                 Text(it, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -1146,27 +1195,14 @@ fun ProgramDetailScreen(
                     RecordingRow(recording, enabled = !busy, onWatch = { onWatchRecording(recording.assetId) })
                 }
             }
-            if (detail.episodes.isNotEmpty()) {
-                EpisodesSection(detail.episodes, busy, onEpisode)
-            }
+            if (seasons.isNotEmpty()) EpisodesTitle(seasons, season, onSeason)
         }
-        // A channel's catalogue carousels (replays, most-viewed, live & upcoming) full width below the
-        // live header. onEpisode is the shared card click (vm.onCardClick), so a card opens normally.
-        detail.sections.forEach { rail ->
-            Spacer(Modifier.height(20.dp))
-            // No "Tout voir" here: a see-all would navigate out of the open detail. The carousels carry
-            // plenty of cards, and each card opens normally via onEpisode (vm.onCardClick).
-            Rail(rail, onCardClick = onEpisode, onSeeAll = {}, showSeeAll = false)
-        }
-        if (detail.sections.isNotEmpty()) Spacer(Modifier.height(16.dp))
     }
 }
 
-/** The "Épisodes disponibles" section: a season dropdown (when there are several) over the episode list. */
+/** The title of the "Épisodes disponibles", with a season dropdown when there are several. */
 @Composable
-private fun EpisodesSection(episodes: List<ContentCard>, busy: Boolean, onEpisode: (ContentCard) -> Unit) {
-    val seasons = remember(episodes) { episodes.groupBySeason() }
-    var selected by rememberSaveable { mutableIntStateOf(0) }
+private fun EpisodesTitle(seasons: List<Pair<String, List<ContentCard>>>, selected: Int, onSelect: (Int) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     val idx = selected.coerceIn(0, seasons.size - 1)
     Spacer(Modifier.height(8.dp))
@@ -1181,7 +1217,7 @@ private fun EpisodesSection(episodes: List<ContentCard>, busy: Boolean, onEpisod
                     seasons.forEachIndexed { i, (label, _) ->
                         DropdownMenuItem(
                             text = { Text(label, color = if (i == idx) BrandYellow else Color.Unspecified) },
-                            onClick = { selected = i; expanded = false },
+                            onClick = { onSelect(i); expanded = false },
                             trailingIcon = if (i == idx) ({ Text("✓", color = BrandYellow) }) else null,
                         )
                     }
@@ -1189,14 +1225,13 @@ private fun EpisodesSection(episodes: List<ContentCard>, busy: Boolean, onEpisod
             }
         }
     }
-    seasons[idx].second.forEach { ep -> EpisodeRow(ep, enabled = !busy, onClick = { onEpisode(ep) }) }
 }
 
 /** One catch-up episode row on a detail page: a thumbnail and label, tappable to open the episode. */
 @Composable
-private fun EpisodeRow(card: ContentCard, enabled: Boolean, onClick: () -> Unit) {
+private fun EpisodeRow(card: ContentCard, enabled: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(enabled = enabled) { onClick() }.padding(vertical = 6.dp),
+        modifier = modifier.fillMaxWidth().clickable(enabled = enabled) { onClick() }.padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.width(120.dp).height(68.dp).clip(RoundedCornerShape(8.dp)).background(BackgroundLevel1)) {

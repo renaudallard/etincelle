@@ -36,10 +36,10 @@ import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -919,10 +919,19 @@ fun TvProgramDetailScreen(
     // would otherwise leave the D-pad nothing to focus; make the column itself focusable as a fallback.
     val nothingFocusable = !showWatch && detail.recordActions.isEmpty() &&
         detail.episodes.isEmpty() && detail.recordings.isEmpty()
-    // Re-key on the shown detail so focus is re-established when navigating detail -> detail, not only
-    // for the first detail page.
-    LaunchedEffect(detail.vodId, detail.channelId, detail.title) { runCatching { watchFocus.requestFocus() } }
-    val scroll = rememberScrollState()
+    // A series may have a hundred episodes and more: only those on screen are laid out.
+    val list = rememberLazyListState()
+    val seasons = remember(detail.episodes) { detail.episodes.groupBySeason() }
+    // Kept with the page (see where it is shown), as is the episode opened from it, on which Back
+    // from that episode's page lands again.
+    var season by rememberSaveable { mutableIntStateOf(0) }
+    var opened by rememberSaveable { mutableStateOf<String?>(null) }
+    val openedFocus = remember { FocusRequester() }
+    val shown = seasons.getOrNull(season.coerceIn(0, (seasons.size - 1).coerceAtLeast(0)))?.second.orEmpty()
+    // With no "Regarder" and no recordings above, initial focus goes to the first episode.
+    val firstFocus = if (showWatch || detail.recordings.isNotEmpty()) null else watchFocus
+    // The detail focus was first given for: the header asks once, not each time it scrolls back in.
+    val focusGiven = remember { mutableStateOf<Any?>(null) }
     Box(Modifier.fillMaxSize()) {
         // The programme's artwork (16:9, like the screen) is the page's background, as in the official
         // app: faded into the page on the left, under the text, and at the bottom. It fades out as the
@@ -933,7 +942,10 @@ fun TvProgramDetailScreen(
                 model = url,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize()
-                    .graphicsLayer { alpha = 1f - (scroll.value / (size.height / 2)).coerceIn(0f, 1f) }
+                    .graphicsLayer {
+                        val scrolled = if (list.firstVisibleItemIndex > 0) Float.MAX_VALUE else list.firstVisibleItemScrollOffset.toFloat()
+                        alpha = 1f - (scrolled / (size.height / 2)).coerceIn(0f, 1f)
+                    }
                     .drawWithContent {
                         drawContent()
                         drawRect(Brush.horizontalGradient(0f to page, 0.4f to page.copy(alpha = 0.95f), 0.75f to Color.Transparent))
@@ -942,131 +954,176 @@ fun TvProgramDetailScreen(
                 contentScale = ContentScale.Crop,
             )
         }
-        Column(
-            Modifier.fillMaxSize().verticalScroll(scroll).padding(OVERSCAN)
-                .then(if (nothingFocusable) Modifier.focusRequester(watchFocus).focusable() else Modifier),
+        LazyColumn(
+            Modifier.fillMaxSize().then(if (nothingFocusable) Modifier.focusRequester(watchFocus).focusable() else Modifier),
+            state = list,
+            contentPadding = PaddingValues(OVERSCAN),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // The text stays on the left, over the faded side of the artwork.
-            Column(Modifier.fillMaxWidth(0.5f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                // No artwork (e.g. a FAST channel): the channel's logo heads the page instead.
-                if (detail.posterUrl == null) {
-                    detail.channelLogoUrl?.let {
-                        AsyncImage(
-                            model = it,
-                            contentDescription = null,
-                            modifier = Modifier.height(56.dp).width(160.dp),
-                            contentScale = ContentScale.Fit,
-                            alignment = Alignment.CenterStart,
-                        )
+            item(key = "header", contentType = "header") {
+                // Re-keyed on the shown detail so focus is re-established when navigating detail -> detail,
+                // not only for the first detail page.
+                val shownDetail = listOf(detail.vodId, detail.channelId, detail.title)
+                LaunchedEffect(shownDetail) {
+                    if (focusGiven.value != shownDetail) {
+                        focusGiven.value = shownDetail
+                        runCatching { watchFocus.requestFocus() }
                     }
                 }
-                detail.timeLabel?.let {
-                    Text(it, style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.7f))
-                }
-                Text(detail.title ?: "", style = MaterialTheme.typography.displaySmall)
-                val sub = listOfNotNull(detail.subtitle, detail.genre).joinToString(" • ")
-                if (sub.isNotBlank()) Text(sub, style = MaterialTheme.typography.titleMedium, color = Color.White)
-                if (detail.tags.isNotEmpty()) {
-                    Text(detail.tags.joinToString("   "), style = MaterialTheme.typography.titleSmall, color = BrandYellow)
-                }
-                // An upcoming (not-yet-aired) programme is not playable: show the backend's reason instead of
-                // a "Regarder" that 5xx's.
-                detail.upcomingMessage?.let {
-                    Text(it, style = MaterialTheme.typography.titleMedium, color = BrandYellow)
-                }
-                // A multi-episode series has no directly playable asset (its id is not a VOD), so it has
-                // no "Regarder"; the user picks an episode. A recorded series keeps it (plays the recording).
-                if (showWatch || detail.recordActions.isNotEmpty()) {
-                    // Wrap so every action stays reachable when a live channel shows several buttons
-                    // (Regarder en direct + depuis le début + Enregistrer l'épisode + la série).
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        if (showWatch) {
-                            TvButton(onClick = onWatch, enabled = !busy, modifier = Modifier.focusRequester(watchFocus)) {
-                                Text(if (detail.isLive) "Regarder en direct" else "Regarder")
-                            }
-                        }
-                        if (showWatch && detail.isLive) {
-                            TvButton(onClick = onStartOver, enabled = !busy) { Text("Regarder depuis le début") }
-                        }
-                        // The same programme on demand: whole from its first minute, where the live
-                        // stream only goes back as far as its rewind window.
-                        if (showWatch && detail.replay != null) {
-                            TvButton(onClick = onWatchReplay, enabled = !busy) { Text("Regarder le replay") }
-                        }
-                        // Each record option (the episode and/or the whole series) is its own D-pad button,
-                        // using the backend's own label. When there is no Regarder and no recording/episode to
-                        // take initial focus, the first record button is the only focusable widget, so it gets
-                        // watchFocus.
-                        val recordTakesFocus = !showWatch && detail.recordings.isEmpty() && detail.episodes.isEmpty()
-                        detail.recordActions.forEachIndexed { i, action ->
-                            TvButton(
-                                onClick = { onRecord(action) }, enabled = !busy,
-                                modifier = if (recordTakesFocus && i == 0) Modifier.focusRequester(watchFocus) else Modifier,
-                            ) { Text(action.label) }
-                        }
-                    }
-                }
-                if (busy) CircularProgressIndicator()
-                if (info != null) Text(info, color = BrandYellow)
-                if (error != null) Text(error, color = MaterialTheme.colorScheme.error)
-                detail.synopsis?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = Color.White) }
-                detail.credits?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Color.White) }
-                listOfNotNull(
-                    detail.year?.let { "Année de sortie : $it" },
-                    detail.classification?.let { "Classification : $it" },
-                ).forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Color.White) }
+                TvDetailHeader(
+                    detail, busy, error, info, showWatch, watchFocus, onWatch, onStartOver, onWatchReplay, onRecord,
+                    onWatchRecording, seasons, season, onSeason = { season = it },
+                )
             }
-            // Your own recordings first (what you came for); the available episodes follow.
-            if (detail.recordings.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                Text("Vos enregistrements", style = MaterialTheme.typography.titleMedium, color = Color.White)
-                // With no "Regarder" button the first recording takes initial focus, so the page is not
-                // a D-pad dead-end.
-                val recordingsOwnFocus = !showWatch
-                detail.recordings.forEachIndexed { i, recording ->
-                    TvRecordingRow(
-                        recording,
-                        enabled = !busy,
-                        onWatch = { onWatchRecording(recording.assetId) },
-                        focus = watchFocus.takeIf { recordingsOwnFocus && i == 0 },
-                    )
-                }
-            }
-            if (detail.episodes.isNotEmpty()) {
-                // With no "Regarder" and no recordings above, hand initial focus to the first episode.
-                TvEpisodesSection(
-                    detail.episodes, busy, onEpisode,
-                    firstFocus = if (showWatch || detail.recordings.isNotEmpty()) null else watchFocus,
+            // By place as well: a page may list one id twice, which a key alone would not take.
+            itemsIndexed(shown, key = { i, ep -> "ep#$i#${ep.id}" }, contentType = { _, _ -> "episode" }) { i, ep ->
+                TvEpisodeRow(
+                    ep, enabled = !busy,
+                    onClick = {
+                        opened = ep.id
+                        onEpisode(ep)
+                    },
+                    focus = firstFocus.takeIf { i == 0 },
+                    modifier = if (ep.id == opened) Modifier.focusRequester(openedFocus) else Modifier,
                 )
             }
             // A channel's catalogue carousels (replays, most-viewed, live & upcoming) below the header.
             // No "Tout voir" (it would navigate out of the open detail); each card opens via onEpisode.
-            detail.sections.forEach { rail ->
-                Spacer(Modifier.height(20.dp))
-                TvRail(rail, onCardClick = onEpisode, onSeeAll = {}, showSeeAll = false)
+            itemsIndexed(detail.sections, key = { i, rail -> "rail#$i#${rail.id}" }, contentType = { _, _ -> "rail" }) { _, rail ->
+                Column {
+                    Spacer(Modifier.height(20.dp))
+                    TvRail(rail, onCardClick = onEpisode, onSeeAll = {}, showSeeAll = false)
+                }
             }
         }
     }
+    // Once, as the page comes back, and after the rows have asked for theirs: a season chosen later
+    // must not send the focus to that episode again. The row is brought on screen first, as one off it
+    // is not laid out and cannot take the focus.
+    LaunchedEffect(Unit) {
+        val target = opened ?: return@LaunchedEffect
+        val row = shown.indexOfFirst { it.id == target }.takeIf { it >= 0 }?.plus(1) ?: return@LaunchedEffect
+        if (list.layoutInfo.visibleItemsInfo.none { it.index == row }) list.scrollToItem(row)
+        withFrameNanos { }
+        runCatching { openedFocus.requestFocus() }
+    }
 }
 
-/** The "Épisodes disponibles" section on TV: a season selector (when several) over the episode list. */
+/** What heads a TV detail page, down to the title of its episodes: its text, actions and recordings. */
 @Composable
-private fun TvEpisodesSection(
-    episodes: List<ContentCard>,
+private fun TvDetailHeader(
+    detail: ProgramDetail,
     busy: Boolean,
-    onEpisode: (ContentCard) -> Unit,
-    firstFocus: FocusRequester? = null,
+    error: String?,
+    info: String?,
+    showWatch: Boolean,
+    watchFocus: FocusRequester,
+    onWatch: () -> Unit,
+    onStartOver: () -> Unit,
+    onWatchReplay: () -> Unit,
+    onRecord: (RecordAction) -> Unit,
+    onWatchRecording: (String) -> Unit,
+    seasons: List<Pair<String, List<ContentCard>>>,
+    season: Int,
+    onSeason: (Int) -> Unit,
 ) {
-    val seasons = remember(episodes) { episodes.groupBySeason() }
-    // Kept with the page (see where it is shown), as is the episode opened from it, on which Back
-    // from that episode's page lands again.
-    var selected by rememberSaveable { mutableIntStateOf(0) }
-    var opened by rememberSaveable { mutableStateOf<String?>(null) }
-    val openedFocus = remember { FocusRequester() }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // The text stays on the left, over the faded side of the artwork.
+        Column(Modifier.fillMaxWidth(0.5f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // No artwork (e.g. a FAST channel): the channel's logo heads the page instead.
+            if (detail.posterUrl == null) {
+                detail.channelLogoUrl?.let {
+                    AsyncImage(
+                        model = it,
+                        contentDescription = null,
+                        modifier = Modifier.height(56.dp).width(160.dp),
+                        contentScale = ContentScale.Fit,
+                        alignment = Alignment.CenterStart,
+                    )
+                }
+            }
+            detail.timeLabel?.let {
+                Text(it, style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.7f))
+            }
+            Text(detail.title ?: "", style = MaterialTheme.typography.displaySmall)
+            val sub = listOfNotNull(detail.subtitle, detail.genre).joinToString(" • ")
+            if (sub.isNotBlank()) Text(sub, style = MaterialTheme.typography.titleMedium, color = Color.White)
+            if (detail.tags.isNotEmpty()) {
+                Text(detail.tags.joinToString("   "), style = MaterialTheme.typography.titleSmall, color = BrandYellow)
+            }
+            // An upcoming (not-yet-aired) programme is not playable: show the backend's reason instead of
+            // a "Regarder" that 5xx's.
+            detail.upcomingMessage?.let {
+                Text(it, style = MaterialTheme.typography.titleMedium, color = BrandYellow)
+            }
+            // A multi-episode series has no directly playable asset (its id is not a VOD), so it has
+            // no "Regarder"; the user picks an episode. A recorded series keeps it (plays the recording).
+            if (showWatch || detail.recordActions.isNotEmpty()) {
+                // Wrap so every action stays reachable when a live channel shows several buttons
+                // (Regarder en direct + depuis le début + Enregistrer l'épisode + la série).
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    if (showWatch) {
+                        TvButton(onClick = onWatch, enabled = !busy, modifier = Modifier.focusRequester(watchFocus)) {
+                            Text(if (detail.isLive) "Regarder en direct" else "Regarder")
+                        }
+                    }
+                    if (showWatch && detail.isLive) {
+                        TvButton(onClick = onStartOver, enabled = !busy) { Text("Regarder depuis le début") }
+                    }
+                    // The same programme on demand: whole from its first minute, where the live
+                    // stream only goes back as far as its rewind window.
+                    if (showWatch && detail.replay != null) {
+                        TvButton(onClick = onWatchReplay, enabled = !busy) { Text("Regarder le replay") }
+                    }
+                    // Each record option (the episode and/or the whole series) is its own D-pad button,
+                    // using the backend's own label. When there is no Regarder and no recording/episode to
+                    // take initial focus, the first record button is the only focusable widget, so it gets
+                    // watchFocus.
+                    val recordTakesFocus = !showWatch && detail.recordings.isEmpty() && detail.episodes.isEmpty()
+                    detail.recordActions.forEachIndexed { i, action ->
+                        TvButton(
+                            onClick = { onRecord(action) }, enabled = !busy,
+                            modifier = if (recordTakesFocus && i == 0) Modifier.focusRequester(watchFocus) else Modifier,
+                        ) { Text(action.label) }
+                    }
+                }
+            }
+            if (busy) CircularProgressIndicator()
+            if (info != null) Text(info, color = BrandYellow)
+            if (error != null) Text(error, color = MaterialTheme.colorScheme.error)
+            detail.synopsis?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = Color.White) }
+            detail.credits?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Color.White) }
+            listOfNotNull(
+                detail.year?.let { "Année de sortie : $it" },
+                detail.classification?.let { "Classification : $it" },
+            ).forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Color.White) }
+        }
+        // Your own recordings first (what you came for); the available episodes follow.
+        if (detail.recordings.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            Text("Vos enregistrements", style = MaterialTheme.typography.titleMedium, color = Color.White)
+            // With no "Regarder" button the first recording takes initial focus, so the page is not
+            // a D-pad dead-end.
+            val recordingsOwnFocus = !showWatch
+            detail.recordings.forEachIndexed { i, recording ->
+                TvRecordingRow(
+                    recording,
+                    enabled = !busy,
+                    onWatch = { onWatchRecording(recording.assetId) },
+                    focus = watchFocus.takeIf { recordingsOwnFocus && i == 0 },
+                )
+            }
+        }
+        if (seasons.isNotEmpty()) TvEpisodesTitle(seasons, season, onSeason)
+    }
+}
+
+/** The title of the "Épisodes disponibles" on TV, over a season selector when there are several. */
+@Composable
+private fun TvEpisodesTitle(seasons: List<Pair<String, List<ContentCard>>>, selected: Int, onSelect: (Int) -> Unit) {
     val idx = selected.coerceIn(0, seasons.size - 1)
     Spacer(Modifier.height(8.dp))
     Text("Épisodes disponibles", style = MaterialTheme.typography.titleMedium, color = Color.White)
@@ -1079,24 +1136,10 @@ private fun TvEpisodesSection(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             seasons.forEachIndexed { i, (label, _) ->
-                TvButton(onClick = { selected = i }, highlighted = i == idx) { Text(label) }
+                TvButton(onClick = { onSelect(i) }, highlighted = i == idx) { Text(label) }
             }
         }
     }
-    seasons[idx].second.forEachIndexed { i, ep ->
-        TvEpisodeRow(
-            ep, enabled = !busy,
-            onClick = {
-                opened = ep.id
-                onEpisode(ep)
-            },
-            focus = firstFocus.takeIf { i == 0 },
-            modifier = if (ep.id == opened) Modifier.focusRequester(openedFocus) else Modifier,
-        )
-    }
-    // Once, as the page comes back, and after the rows have asked for theirs: a season chosen later
-    // must not send the focus to that episode again.
-    LaunchedEffect(Unit) { if (opened != null) runCatching { openedFocus.requestFocus() } }
 }
 
 /** One catch-up episode on the TV detail: a thumbnail and label, focusable and clickable. */
