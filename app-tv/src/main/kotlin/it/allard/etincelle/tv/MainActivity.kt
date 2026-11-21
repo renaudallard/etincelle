@@ -23,12 +23,15 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,6 +40,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -104,6 +108,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.UUID
 
 // How long a TV set may take to settle once the phone's programme woke it.
@@ -125,6 +132,14 @@ private const val AWAY_INSTALL_MS = 60 * 60_000L
 
 // The key the sign-in screen keeps its state under.
 private const val LOGIN_STATE = "LOGIN"
+
+// A seek from the remote's arrows is made this long after the last press, and its preview stays this
+// much longer; a held arrow seeks this much faster at each repeat, up to that many times the step, so
+// a held rewind crosses the four hours of a live channel in a few seconds.
+private const val SEEK_COMMIT_MS = 400L
+private const val SEEK_LINGER_MS = 800L
+private const val SEEK_FASTER_STEP = 1.5f
+private const val SEEK_MAX_FASTER = 50f
 
 // What the media session lets others do with the player: see what plays, pause, resume, and seek in it.
 private val SESSION_COMMANDS = Player.Commands.Builder().addAll(
@@ -952,6 +967,49 @@ private fun TvPlayerSurface(
     // OK while the break on screen can be skipped and says so, the controls being hidden (shown, OK
     // is theirs): the press skips. Its release is taken along, and neither brings the controls up.
     var skipPressed by remember { mutableStateOf(false) }
+    // Left and Right with the controls hidden seek at once, as on the Chromecast, rather than bring the
+    // controls up: the presses add up to one seek, made once they stop, a held key going faster the
+    // longer it is held, and the bar shows where it lands meanwhile.
+    var seekTarget by remember(source) { mutableStateOf<Long?>(null) }
+    var seekShown by remember(source) { mutableStateOf<Long?>(null) }
+    var seekPresses by remember(source) { mutableIntStateOf(0) }
+    var seekHeld by remember { mutableStateOf(false) }
+    var seekDirection by remember { mutableIntStateOf(0) }
+    var seekRepeats by remember { mutableIntStateOf(0) }
+    val seekWindow = remember { Timeline.Window() }
+    LaunchedEffect(seekPresses) {
+        val target = seekTarget ?: return@LaunchedEffect
+        delay(SEEK_COMMIT_MS)
+        player.seekTo(target)
+        seekTarget = null
+        seekRepeats = 0
+        delay(SEEK_LINGER_MS)
+        seekShown = null
+    }
+    fun seekKey(event: KeyEvent): Boolean {
+        val direction = when (event.keyCode) {
+            KeyEvent.KEYCODE_DPAD_LEFT -> -1
+            KeyEvent.KEYCODE_DPAD_RIGHT -> 1
+            else -> return false
+        }
+        // The release of a press taken here, which would bring the controls up.
+        if (event.action != KeyEvent.ACTION_DOWN) return seekHeld.also { seekHeld = false }
+        if (controlsVisible || !player.isCurrentMediaItemSeekable || player.currentTimeline.isEmpty) return false
+        player.currentTimeline.getWindow(player.currentMediaItemIndex, seekWindow)
+        // The live point, or the end of what plays.
+        val end = if (seekWindow.isLive()) seekWindow.defaultPositionMs else player.duration
+        if (end == C.TIME_UNSET || end <= 0L) return false
+        seekRepeats = if (event.repeatCount > 0 && direction == seekDirection) seekRepeats + 1 else 0
+        seekDirection = direction
+        val step = if (direction < 0) -LivePlayback.SEEK_BACK_MS else LivePlayback.SEEK_FORWARD_MS
+        val faster = minOf(SEEK_MAX_FASTER, 1f + seekRepeats * SEEK_FASTER_STEP)
+        val target = ((seekTarget ?: player.currentPosition) + (step * faster).toLong()).coerceIn(0L, end)
+        seekTarget = target
+        seekShown = target
+        seekPresses++
+        seekHeld = true
+        return true
+    }
     fun skipKey(event: KeyEvent): Boolean {
         val ok = event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER || event.keyCode == KeyEvent.KEYCODE_ENTER ||
             event.keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
@@ -1022,7 +1080,8 @@ private fun TvPlayerSurface(
     }
     // Called by the player view before its own key handling; true when the key was used here. Such a
     // key never reaches the controls, so restart their hide timer by hand.
-    fun remoteKey(event: KeyEvent): Boolean = skipKey(event) || remoteKeyUsed(event).also { if (it) playerView?.showController() }
+    fun remoteKey(event: KeyEvent): Boolean =
+        skipKey(event) || seekKey(event) || remoteKeyUsed(event).also { if (it) playerView?.showController() }
     // The view below is made once, but the source can change under it (the next episode, a channel
     // the phone sends) along with its ad break and skipper: its keys go to this composition's handler.
     val keyHandler = rememberUpdatedState<(KeyEvent) -> Boolean> { remoteKey(it) }
@@ -1107,8 +1166,17 @@ private fun TvPlayerSurface(
             },
             modifier = Modifier.fillMaxSize(),
         )
-        barGeometry?.let { bar ->
-            if (controlsVisible) {
+        // While seeking from the remote, the bar and the time are those of where it lands.
+        val seeking = seekShown
+        if (seeking != null) {
+            SeekPreview(
+                label = seekLabel(player, seekWindow, seeking),
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = LiveProgramBarBottomOffset + 40.dp),
+            )
+        }
+        val shownBar = seeking?.let { LivePlayback.liveBarGeometry(player, seekWindow, programWindow, it) } ?: barGeometry
+        shownBar?.let { bar ->
+            if (controlsVisible || seeking != null) {
                 val pw = programWindow?.takeIf { bar.hasProgramBand }
                 LiveProgramBar(
                     playedFraction = bar.playedFraction,
@@ -1156,4 +1224,30 @@ private fun TvPlayerSurface(
             )
         }
     }
+}
+
+/**
+ * Where a seek chosen with the remote lands: the time of day on a live channel, as the bar's ends
+ * are, and the position out of the length otherwise. [window] was filled for the item playing.
+ */
+private fun seekLabel(player: Player, window: Timeline.Window, positionMs: Long): String =
+    if (window.isLive() && window.windowStartTimeMs != C.TIME_UNSET) {
+        SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(window.windowStartTimeMs + positionMs))
+    } else {
+        "${duration(positionMs)} / ${duration(player.duration)}"
+    }
+
+private fun duration(ms: Long): String {
+    val s = ms.coerceAtLeast(0L) / 1000
+    return if (s >= 3600) "%d:%02d:%02d".format(s / 3600, s / 60 % 60, s % 60) else "%d:%02d".format(s / 60, s % 60)
+}
+
+@Composable
+private fun SeekPreview(label: String, modifier: Modifier = Modifier) {
+    Text(
+        label,
+        color = Color.White,
+        style = MaterialTheme.typography.titleLarge,
+        modifier = modifier.background(Color(0xCC000000), RoundedCornerShape(8.dp)).padding(horizontal = 16.dp, vertical = 6.dp),
+    )
 }

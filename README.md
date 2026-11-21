@@ -28,7 +28,10 @@ la barre prend l'heure réelle dès qu'il la connaît. Le bord du direct se situ
 cours de route et la portion pas encore diffusée formant la fin de la barre ; la partie trop ancienne
 pour être rembobinée y est tracée dans une couleur distincte, et un bouton **Revenir au direct**
 apparaît dès que l'on s'éloigne du bord pour y ramener d'un appui (sur le téléviseur, il s'affiche
-avec les commandes du lecteur et s'atteint avec la flèche **Haut**). En différé, quand ce que l'on
+avec les commandes du lecteur et s'atteint avec la flèche **Haut**). Sur le téléviseur, commandes
+masquées, les flèches **Gauche** et **Droite** reculent de 10 s et avancent de 30 s sans les
+afficher, de plus en plus vite quand on les maintient, la barre et l'heure d'arrivée s'affichant le
+temps de choisir ; les appuis s'additionnent en un seul déplacement. En différé, quand ce que l'on
 regarde est une **coupure publicitaire** dont le flux indique la fin, un bouton **Passer la pub**
 apparaît (sur le téléviseur, **OK** suffit, ou, les commandes affichées, la flèche **Droite**
 depuis leur dernier bouton puis **OK**) et mène à la fin de la coupure ; le réglage **Passer les

@@ -99,15 +99,21 @@ object LivePlayback {
      * is the tail past it. The window maps to wall-clock via [Timeline.Window.windowStartTimeMs] (the
      * Fubo live manifest is epoch-normalised); without it (C.TIME_UNSET) or without a [programWindow]
      * the bar falls back to the bare seekable window. [window] is a caller-owned scratch instance to fill.
+     * The mark is at [positionMs] in the window, where playback is unless a seek is being chosen.
      */
-    fun liveBarGeometry(player: Player, window: Timeline.Window, programWindow: ProgramWindow?): LiveBarGeometry? {
+    fun liveBarGeometry(
+        player: Player,
+        window: Timeline.Window,
+        programWindow: ProgramWindow?,
+        positionMs: Long = player.currentPosition,
+    ): LiveBarGeometry? {
         if (!player.isCurrentMediaItemLive) return null
         val timeline = player.currentTimeline
         if (timeline.isEmpty) return null
         timeline.getWindow(player.currentMediaItemIndex, window)
         if (!window.isLive()) return null
         return liveBarGeometry(
-            player.currentPosition, window.defaultPositionMs, window.durationMs, window.windowStartTimeMs, programWindow,
+            positionMs, window.defaultPositionMs, window.durationMs, window.windowStartTimeMs, programWindow,
         )
     }
 
