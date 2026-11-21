@@ -250,20 +250,6 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
             }
         })
         player = exo
-        // What plays, for the system and the Assistant, which can then pause it, resume it or seek in it
-        // by voice. Nothing more: a stream is a single item, and no other app is to load one.
-        // A new id for each activity: Android may create the next before it has destroyed this one,
-        // and two sessions under one id are refused with an exception.
-        session = MediaSession.Builder(this, exo)
-            .setId(UUID.randomUUID().toString())
-            .setCallback(object : MediaSession.Callback {
-                override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo) =
-                    MediaSession.ConnectionResult.AcceptedResultBuilder(session)
-                        .setAvailablePlayerCommands(SESSION_COMMANDS)
-                        .setAvailableSessionCommands(SessionCommands.EMPTY)
-                        .build()
-            })
-            .build()
         remote.attach(this)
         // Opening the app turns the screen on (see the manifest), which older versions only take from here.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) turnScreenOn(true)
@@ -649,6 +635,10 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
     }
 
     override fun onStop() {
+        // Left, the player is paused, and the system would still hand the remote's Play to the session
+        // that played last: it would play on behind the launcher, heard and not seen.
+        session?.release()
+        session = null
         awaySource = viewModel.state.value.playing
         // Closed with Back, the app is left for good, and this activity is gone before a wait would end.
         // Otherwise the screensaver starting is told apart from leaving the app only by its broadcast,
@@ -681,6 +671,22 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
 
     override fun onStart() {
         super.onStart()
+        // What plays, for the system and the Assistant, which can then pause it, resume it or seek in it
+        // by voice, while the app is on screen. Nothing more: a stream is a single item, and no other
+        // app is to load one. A new id each time: Android may start the next activity before it has
+        // stopped this one, and two sessions under one id are refused with an exception.
+        player?.let { exo ->
+            session = MediaSession.Builder(this, exo)
+                .setId(UUID.randomUUID().toString())
+                .setCallback(object : MediaSession.Callback {
+                    override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo) =
+                        MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+                            .setAvailablePlayerCommands(SESSION_COMMANDS)
+                            .setAvailableSessionCommands(SessionCommands.EMPTY)
+                            .build()
+                })
+                .build()
+        }
         handler.removeCallbacks(stopRemoteUnlessDreaming)
         handler.removeCallbacks(installOnceAway)
         remote.start()
