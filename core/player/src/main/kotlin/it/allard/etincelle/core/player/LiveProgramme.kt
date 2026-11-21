@@ -36,6 +36,8 @@ class LiveProgramme(first: ProgramWindow?, private val ask: suspend (Long) -> Pr
     private val known = listOfNotNull(first).toMutableList()
     private var shown = first
     private var nextAskMs = 0L
+    // Apart: a planned start asked about must not hold back asking for the show that follows.
+    private var nextPlannedAskMs = 0L
 
     /**
      * The programme to scale the bar to now, or null for none; asks the guide when it is not known.
@@ -54,8 +56,8 @@ class LiveProgramme(first: ProgramWindow?, private val ask: suspend (Long) -> Pr
         if (found != null && found.holds(at)) {
             // Still planned: whatever the guide now has on then replaces it, a later start, or the
             // show before that is not over yet.
-            if (planned(found, at) && nowMs >= nextAskMs) {
-                nextAskMs = nowMs + PLANNED_ASK_MS
+            if (planned(found, at) && nowMs >= nextPlannedAskMs) {
+                nextPlannedAskMs = nowMs + PLANNED_ASK_MS
                 val answer = ask(at)
                 if (answer != null && answer != found && answer.holds(at)) {
                     known -= found

@@ -50,6 +50,19 @@ class LiveProgrammeTest {
     }
 
     @Test
+    fun `asking about a planned start does not hold back the next show`() = runBlocking {
+        // A short programme, the weather say, planned from 12:30 to 12:35.
+        val weather = ProgramWindow(750 * min, 755 * min)
+        val next = ProgramWindow(755 * min, 800 * min)
+        var asked = 0
+        val programme = LiveProgramme(weather) { at -> asked++; if (at >= 755 * min) next else weather }
+        assertEquals(weather, programme.atPlayhead(754 * min + 50_000L, 754 * min + 50_000L))
+        // Ten seconds on, past the planned end: the guide is asked for what follows at once.
+        assertEquals(next, programme.atPlayhead(755 * min, 755 * min))
+        assertEquals(2, asked)
+    }
+
+    @Test
     fun `an exact start is not asked about`() = runBlocking {
         var asked = 0
         val programme = LiveProgramme(real) { asked++; null }
