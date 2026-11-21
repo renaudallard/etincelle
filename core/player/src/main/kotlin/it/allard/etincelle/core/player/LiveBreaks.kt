@@ -48,6 +48,8 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
 
     private var logo: Logo? = null
     private var learntAt = Long.MIN_VALUE
+    // The learns in a row that found no logo.
+    private var failures = 0
     private var width = 0
     private var height = 0
 
@@ -137,8 +139,14 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
         val track = LogoTrack(pictures.size, width, height)
         pictures.forEachIndexed { i, picture -> track.add(i, picture) }
         logo = track.logo()
-        // Nothing learnt, as when the pictures could not be had: tried again a little further on.
-        if (logo == null) learntAt = at - LEARN_AGAIN_S + LEARN_RETRY_S
+        // Nothing learnt: tried again a little further on, then less and less often, as each try
+        // fetches all its pictures again.
+        if (logo == null) {
+            learntAt = at - LEARN_AGAIN_S + minOf(LEARN_AGAIN_S, LEARN_RETRY_S shl failures)
+            if (LEARN_RETRY_S shl failures < LEARN_AGAIN_S) failures++
+        } else {
+            failures = 0
+        }
     }
 
     private suspend fun <R> each(times: List<Long>, work: (Long) -> R): List<R> = coroutineScope {
