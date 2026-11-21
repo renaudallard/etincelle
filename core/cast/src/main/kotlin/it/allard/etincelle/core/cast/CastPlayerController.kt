@@ -38,6 +38,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -1038,8 +1039,9 @@ class CastPlayerController(
     // While casting, a receiver that should be playing but sits buffering for a long stretch is wedged
     // (typically its short-lived stream/DRM token expired and it cannot refresh it): re-resolve a fresh
     // stream and reload so a stalled cast self-heals instead of sitting black indefinitely. Runs for the
-    // controller's lifetime, idle unless the cast player is current with a live session.
-    private suspend fun monitorCastLiveness() {
+    // controller's lifetime, and only looks while a Chromecast's player is current.
+    private suspend fun monitorCastLiveness() = _currentPlayer.collectLatest { player ->
+        if (player !== castPlayer && player !== directPlayer) return@collectLatest
         var bufferingForMs = 0L
         while (true) {
             delay(LIVENESS_INTERVAL_MS)
