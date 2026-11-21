@@ -10,7 +10,8 @@ broadcasts `etincelle-discover\n1` there from an ephemeral port, during each of 
 (every 20 s or so while idle in the foreground, and one after the other while the list of devices is
 open, a cast running or not), and also
 sends it to each address of its subnet (up to a /22), as some TVs receive no broadcast or multicast at
-all (seen on a Google TV Streamer). Each TV app answers directly with
+all (seen on a Google TV Streamer). While idle, only the first scan and one a minute after it go to
+every address; the others go to the TV apps already found, which keeps them listed. Each TV app answers directly with
 `etincelle-tv\n2\n<port>\n<install id>\n<TV name>`, the port being TCP 47811 unless something else
 holds it: a phone that listed the TV before its server last started still connects. As its server
 starts, the TV app also broadcasts that answer

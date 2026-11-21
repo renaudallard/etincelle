@@ -16,6 +16,7 @@ import com.google.android.gms.cast.framework.SessionManagerListener
 import it.allard.etincelle.core.remote.RemoteDiscovery
 import it.allard.etincelle.core.remote.RemoteTv
 import java.net.DatagramSocket
+import java.net.InetAddress
 import java.net.InetSocketAddress
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -338,8 +339,9 @@ open class CastController(
         refreshDevices()
     }
 
-    // Our own scan, run with each active scan pulse; folds the answers into [scannedDevices].
-    private suspend fun scanDirectly() = scanLock.withLock {
+    // Our own scan, run with each active scan pulse; folds the answers into [scannedDevices]. The TV
+    // apps are asked at each address of the subnet when [everyHost], else only those already found.
+    private suspend fun scanDirectly(everyHost: Boolean = true) = scanLock.withLock {
         val network = wifiNetwork()
         // Off Wi-Fi no scan runs, so nothing would ever count as missed: the list kept offering the
         // devices of a network left an hour ago. Forget them as soon as that network is gone or replaced.
@@ -355,9 +357,14 @@ open class CastController(
         for (entry in scannedDevices.values) if (entry.device.id !in foundIds) entry.missed++
         scannedDevices.values.removeAll { it.missed >= MAX_MISSED_SCANS }
         for (device in found) scannedDevices[device.id] = ScannedDevice(device)
-        val hosts = connectivity?.getLinkProperties(network)?.linkAddresses.orEmpty()
-            .firstOrNull { it.address.address.size == 4 }
-            ?.let { RemoteDiscovery.subnetHosts(it.address.address, it.prefixLength) }.orEmpty()
+        val hosts = if (everyHost) {
+            connectivity?.getLinkProperties(network)?.linkAddresses.orEmpty()
+                .firstOrNull { it.address.address.size == 4 }
+                ?.let { RemoteDiscovery.subnetHosts(it.address.address, it.prefixLength) }.orEmpty()
+        } else {
+            // Numeric addresses, never looked up.
+            scannedTvs.values.mapNotNull { runCatching { InetAddress.getByName(it.tv.host).address }.getOrNull() }
+        }
         val tvs = withContext(Dispatchers.IO) { RemoteDiscovery.scan(network, hosts) }
         val tvIds = tvs.map { it.id }.toSet()
         for (entry in scannedTvs.values) if (entry.tv.id !in tvIds) entry.missed++
@@ -407,20 +414,24 @@ open class CastController(
     // gone from the route list, and the single active scan in start() will not bring it back, so the
     // cast button vanishes until the app is restarted. Run a short active scan on a timer so a device
     // that reappears is rediscovered on its own, without the battery cost of scanning continuously.
+    // The TV apps are asked at each address of the subnet on the first pulse and every
+    // [EVERY_HOST_PULSES] after it, a few hundred packets each time; in between, by broadcast and at
+    // the addresses of those already found, which keeps them listed.
     private suspend fun rediscoverWhileIdle() {
+        var pulses = 0
         while (true) {
             // Scan first, then wait, so the cast button appears as fast as the platform chooser would on
             // app open / return-to-foreground, instead of only after the first idle interval elapses.
-            if (state.value.connectedDeviceName == null) activeScanPulse()
+            if (state.value.connectedDeviceName == null) activeScanPulse(everyHost = pulses++ % EVERY_HOST_PULSES == 0)
             delay(REDISCOVERY_INTERVAL_MS)
         }
     }
 
     // One short active scan, then back to passive discovery, refreshing the device list afterwards.
     // Our own scan runs alongside, for the Chromecasts Play Services cannot see.
-    private suspend fun activeScanPulse() {
+    private suspend fun activeScanPulse(everyHost: Boolean) {
         mediaRouter.addCallback(selector, routerCallback, MediaRouter.CALLBACK_FLAG_PERFORM_ACTIVE_SCAN)
-        scanDirectly()
+        scanDirectly(everyHost)
         refreshDevices()
         delay(ACTIVE_SCAN_MS)
         mediaRouter.addCallback(selector, routerCallback, MediaRouter.CALLBACK_FLAG_REQUEST_DISCOVERY)
@@ -431,6 +442,8 @@ open class CastController(
         // Idle re-discovery cadence: a short active scan every interval brings a dropped Chromecast
         // back within roughly fifteen seconds, without scanning continuously.
         const val REDISCOVERY_INTERVAL_MS = 12_000L
+        // An idle pulse in this many asks each address of the subnet for TV apps, about once a minute.
+        const val EVERY_HOST_PULSES = 5
         // A Chromecast our own scan misses this many times in a row is dropped from the list.
         const val MAX_MISSED_SCANS = 3
         // Route id prefix of a Chromecast found by our own scan rather than by Play Services.
