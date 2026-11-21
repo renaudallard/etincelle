@@ -468,67 +468,75 @@ class FuboRepository(
     }
 
     override suspend fun fetchProgramDetail(id: String, kind: DetailKind): ProgramDetail = withRefresh {
-        var episodes = emptyList<ContentCard>()
-        // The show an airing belongs to, whose recordings folder lists the recorded episodes.
-        var seriesId: String? = null
-        val detail = when (kind) {
-            DetailKind.PROGRAM -> coroutineScope {
-                // An airing (LIVE_) may be a recording, which has no catch-up stream: only the page's
-                // default tab says so, through its player. Best-effort, beside the about tab.
-                val recording = if (id.startsWith("LIVE_")) async { recordingOf(id) } else null
-                // A show opens on one episode/airing; follow its "Détails du programme" series link to
-                // list the series' available episodes so the viewer can pick another.
-                val resp = api.programDetail(id)
-                seriesId = resp.seriesLink()
-                episodes = seriesId?.let { seriesEpisodes(it) }.orEmpty()
-                val detail = resp.toProgramDetail(channelId = null, vodId = id, isLive = false)
-                detail.copy(recordingAssetId = detail.recordingAssetId ?: recording?.await())
-            }
-            DetailKind.SERIES -> {
-                val resp = api.seriesDetail(id)
-                // Series with catch-up expose their episodes on a separate "Regarder maintenant" tab.
-                if (resp.hasWatchNowTab()) episodes = api.seriesDetail(id, "id-tab-watch-now").toEpisodes()
-                resp.toProgramDetail(channelId = null, vodId = id, isLive = false)
-            }
-            DetailKind.CHANNEL -> {
-                val resp = api.channelDetail(id)
-                episodes = resp.seriesLink()?.let { seriesEpisodes(it) }.orEmpty()
-                // The default (about) tab carries the live header; the "see also" tab carries the channel's
-                // replay / most-viewed / live-and-upcoming carousels. Best-effort and title-filtered (the
-                // tab bar is a title-less section), with the see-all dropped (it would navigate out of the
-                // open detail). Empty on failure, leaving the plain live detail.
-                val sections = try {
-                    api.channelDetail(id, "id-tab-see-also").toRails()
-                        .filter { it.title != null }
-                        .map { it.copy(seeAllUrl = null) }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    emptyList()
+        // The requests that do not need each other's answer go out together.
+        coroutineScope {
+            var episodes = emptyList<ContentCard>()
+            var matches = emptyList<Recording>()
+            val detail = when (kind) {
+                DetailKind.PROGRAM -> {
+                    // An airing (LIVE_) may be a recording, which has no catch-up stream: only the page's
+                    // default tab says so, through its player. Best-effort, beside the about tab.
+                    val recording = if (id.startsWith("LIVE_")) async { recordingOf(id) } else null
+                    // A show opens on one episode/airing; follow its "Détails du programme" series link to
+                    // list the series' available episodes so the viewer can pick another.
+                    val resp = api.programDetail(id)
+                    // The show an airing belongs to, whose recordings folder lists the recorded episodes.
+                    val seriesId = resp.seriesLink()
+                    val detail = resp.toProgramDetail(channelId = null, vodId = id, isLive = false)
+                    val programId = detail.programId
+                    val recorded = if (seriesId != null && programId != null) {
+                        async { recordingsOf(seriesId).filter { it.programId == programId } }
+                    } else {
+                        null
+                    }
+                    episodes = seriesId?.let { seriesEpisodes(it) }.orEmpty()
+                    matches = recorded?.await().orEmpty()
+                    detail.copy(recordingAssetId = detail.recordingAssetId ?: recording?.await())
                 }
-                resp.toProgramDetail(channelId = id, vodId = null, isLive = true).copy(sections = sections)
+                DetailKind.SERIES -> {
+                    val recorded = async { recordingsOf(id) }
+                    val resp = api.seriesDetail(id)
+                    // Series with catch-up expose their episodes on a separate "Regarder maintenant" tab.
+                    if (resp.hasWatchNowTab()) episodes = api.seriesDetail(id, "id-tab-watch-now").toEpisodes()
+                    matches = recorded.await()
+                    resp.toProgramDetail(channelId = null, vodId = id, isLive = false)
+                }
+                DetailKind.CHANNEL -> {
+                    // The default (about) tab carries the live header; the "see also" tab carries the channel's
+                    // replay / most-viewed / live-and-upcoming carousels. Best-effort and title-filtered (the
+                    // tab bar is a title-less section), with the see-all dropped (it would navigate out of the
+                    // open detail). Empty on failure, leaving the plain live detail.
+                    val sections = async {
+                        try {
+                            api.channelDetail(id, "id-tab-see-also").toRails()
+                                .filter { it.title != null }
+                                .map { it.copy(seeAllUrl = null) }
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            emptyList()
+                        }
+                    }
+                    val resp = api.channelDetail(id)
+                    episodes = resp.seriesLink()?.let { seriesEpisodes(it) }.orEmpty()
+                    resp.toProgramDetail(channelId = id, vodId = null, isLive = true).copy(sections = sections.await())
+                }
             }
+            detail.withRecordings(kind, episodes, matches)
         }
-        val detailProgramId = detail.programId
-        val matches = when (kind) {
-            DetailKind.PROGRAM -> {
-                val show = seriesId
-                if (detailProgramId == null || show == null) emptyList() else recordingsOf(show).filter { it.programId == detailProgramId }
-            }
-            DetailKind.SERIES -> recordingsOf(id)
-            DetailKind.CHANNEL -> emptyList()
-        }
-        // When the show has no real poster, fall back to a recording's own image (a real thumbnail).
-        detail.copy(
-            recordings = matches,
-            // Drop episodes the user has already recorded: a recorded episode's card carries the
-            // recording's LIVE_ asset id as its vodId, and its catch-up VOD returns a 5xx for recorded
-            // content. They stay in "Vos enregistrements" below, which plays them from the DVR.
-            episodes = episodes.filterNot { ep -> ep.vodId != null && matches.any { it.assetId == ep.vodId } },
-            posterUrl = detail.posterUrl ?: matches.firstOrNull()?.imageUrl,
-            isSeries = kind == DetailKind.SERIES,
-        )
     }
+
+    // This detail with its recordings, [matches], and those of [episodes] that are not among them.
+    private fun ProgramDetail.withRecordings(kind: DetailKind, episodes: List<ContentCard>, matches: List<Recording>) = copy(
+        recordings = matches,
+        // Drop episodes the user has already recorded: a recorded episode's card carries the
+        // recording's LIVE_ asset id as its vodId, and its catch-up VOD returns a 5xx for recorded
+        // content. They stay in "Vos enregistrements" below, which plays them from the DVR.
+        episodes = episodes.filterNot { ep -> ep.vodId != null && matches.any { it.assetId == ep.vodId } },
+        // When the show has no real poster, fall back to a recording's own image (a real thumbnail).
+        posterUrl = posterUrl ?: matches.firstOrNull()?.imageUrl,
+        isSeries = kind == DetailKind.SERIES,
+    )
 
     // The recording an airing's page plays, or null when it is none or the page cannot be had.
     private suspend fun recordingOf(id: String): String? = try {
