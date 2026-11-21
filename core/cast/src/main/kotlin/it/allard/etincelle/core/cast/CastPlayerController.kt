@@ -1217,18 +1217,22 @@ class CastPlayerController(
     /**
      * Lets go of the device cast to and leaves it playing, to connect elsewhere: the etincelle TV app
      * goes on by itself, a Chromecast plays on and its own remote drives it. The phone stops showing the
-     * cast and closes its player, unless it still plays what the device had not taken over yet. A
-     * device still being connected to is given up, as by [disconnect].
+     * cast and closes its player. A device that has not taken over yet has nothing to go on with: it is
+     * stopped and the phone goes on, as with "Cet appareil". One still being connected to is given up,
+     * as by [disconnect].
      */
     fun leaveCast() {
         val phonePlays = phoneStillPlays
-        if (stopTvSession(stopTv = false) || stopDirect(stopReceiver = false)) {
+        if (stopTvSession(stopTv = phonePlays) || stopDirect(stopReceiver = phonePlays)) {
             if (phonePlays) return
             currentItem = null
             onPlaybackStopped?.invoke()
             return
         }
-        if (castContext.sessionManager.currentCastSession?.isConnected != true) return disconnect()
+        val session = castContext.sessionManager.currentCastSession
+        if (session == null || session.isConnecting) return disconnect()
+        // The phone goes on playing until the Chromecast plays: before that, there is nothing there yet.
+        if (deferStopSource === localPlayer && localPlayer.playbackState != Player.STATE_IDLE) return returnToThisDevice()
         // Ended on purpose, not lost: neither taken back nor brought back here (see onSessionDisconnected,
         // which stops the phone's side and closes the player).
         returnToPhoneOnEnd = false
