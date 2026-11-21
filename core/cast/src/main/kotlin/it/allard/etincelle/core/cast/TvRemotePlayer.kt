@@ -44,20 +44,33 @@ internal class TvRemotePlayer : SimpleBasePlayer(Looper.getMainLooper()), AdBrea
     override var adBreakOffered = false
         private set
 
-    // Statuses are seconds apart; refresh the state between them so the position keeps moving.
+    // Statuses are seconds apart. On-demand content moves on by itself between them; a live window moves
+    // with the clock, and its state is refreshed every second while someone may look at it. Each refresh
+    // is a new timeline, which the media notification is rebuilt for.
     private val handler = Handler(Looper.getMainLooper())
     private val ticker = object : Runnable {
         override fun run() {
-            if (session == null) return
+            if (session == null || !onScreen || !live) return
             invalidateState()
             handler.postDelayed(this, TICK_MS)
         }
     }
 
+    /** Whether the app is on screen, where the live window is to keep moving between statuses. */
+    var onScreen = false
+        set(value) {
+            field = value
+            tickIfLive()
+        }
+
+    private fun tickIfLive() {
+        handler.removeCallbacks(ticker)
+        if (session != null && onScreen && live) handler.postDelayed(ticker, TICK_MS)
+    }
+
     fun attach(session: TvRemoteSession) {
         this.session = session
-        handler.removeCallbacks(ticker)
-        handler.postDelayed(ticker, TICK_MS)
+        tickIfLive()
     }
 
     /** The item now sent to the TV (the phone's [MediaItem], with its PlaybackSource tag). */
@@ -103,6 +116,7 @@ internal class TvRemotePlayer : SimpleBasePlayer(Looper.getMainLooper()), AdBrea
         windowStartMs = status.optLong(RemoteMessages.WINDOW_START, -1)
         adBreakOffered = status.optBoolean(RemoteMessages.SKIP)
         updatedAt = SystemClock.elapsedRealtime()
+        tickIfLive()
         invalidateState()
     }
 
@@ -131,7 +145,10 @@ internal class TvRemotePlayer : SimpleBasePlayer(Looper.getMainLooper()), AdBrea
             if (durationMs > 0) data.setDurationUs(durationMs * 1000)
             position = (if (playing) positionMs + elapsed else positionMs).let { if (durationMs > 0) it.coerceAtMost(durationMs) else it }
         }
-        builder.setPlaylist(listOf(data.build())).setContentPositionMs(position)
+        // On-demand content moves on by itself while playing; a live position stays in its window, which
+        // the refreshes move.
+        val supplier = if (live || !playing) PositionSupplier.getConstant(position) else PositionSupplier.getExtrapolating(position, 1f)
+        builder.setPlaylist(listOf(data.build())).setContentPositionMs(supplier)
         when (state) {
             RemoteMessages.STATE_PLAYING -> builder.setPlaybackState(STATE_READY).setPlayWhenReady(true, PLAY_WHEN_READY_CHANGE_REASON_REMOTE)
             RemoteMessages.STATE_PAUSED -> builder.setPlaybackState(STATE_READY).setPlayWhenReady(false, PLAY_WHEN_READY_CHANGE_REASON_REMOTE)

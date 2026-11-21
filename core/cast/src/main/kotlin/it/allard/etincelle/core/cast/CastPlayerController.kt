@@ -1079,6 +1079,9 @@ class CastPlayerController(
         // failed one re-arms its fallback. Nothing here can mis-fire because no flag is force-cleared.
         transferFallbackJob?.cancel()
         awaySince = SystemClock.elapsedRealtime()
+        // Nobody sees a live window move with the app away: it moves with each status only.
+        directPlayer.onScreen = false
+        tvPlayer.onScreen = false
         // A break taken with the app on screen does not count: the wait starts on leaving.
         tvRestingSince = 0L
         parkJob?.cancel()
@@ -1092,6 +1095,8 @@ class CastPlayerController(
     override fun start() {
         awaySince = 0L
         parkJob?.cancel()
+        directPlayer.onScreen = true
+        tvPlayer.onScreen = true
         returning = true
         try {
             super.start()

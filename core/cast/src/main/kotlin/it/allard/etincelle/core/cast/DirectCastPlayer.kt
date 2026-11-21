@@ -26,7 +26,8 @@ import org.json.JSONObject
  * On a live stream the receiver counts time from an arbitrary origin and reports the seekable window
  * as `liveSeekableRange`, whose end is the live edge. Positions here are relative to the start of that
  * window, and the window's wall-clock start is estimated from the phone's clock, the edge being now.
- * Main thread only.
+ * On-demand content moves on by itself between statuses; a live window is moved on every second while
+ * the app is on screen ([onScreen]), and with each status otherwise. Main thread only.
  */
 @UnstableApi
 internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
@@ -51,22 +52,49 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
 
     private val handler = Handler(Looper.getMainLooper())
 
-    // Statuses only come on changes: ask for one regularly so the position does not drift, and refresh
-    // the state every second so a live window keeps moving between them.
+    // A live window moves with the clock: its state is refreshed every second while someone may look at
+    // it. Each refresh is a new timeline, which the media notification is rebuilt for.
     private val ticker = object : Runnable {
         override fun run() {
-            if (session == null) return
-            if (++ticks % POLL_EVERY_TICKS == 0) session?.requestStatus()
+            if (session == null || !onScreen || !live) return
             invalidateState()
             handler.postDelayed(this, TICK_MS)
         }
     }
-    private var ticks = 0
+
+    /** Whether the app is on screen, where the live window is to keep moving between statuses. */
+    var onScreen = false
+        set(value) {
+            field = value
+            tickIfLive()
+        }
+
+    private fun tickIfLive() {
+        handler.removeCallbacks(ticker)
+        if (session != null && onScreen && live) handler.postDelayed(ticker, TICK_MS)
+    }
+
+    // Statuses only come on changes: while playback moves, one is asked for some time after the last,
+    // so the position does not drift and a live window moves on with the app away.
+    private val poller = object : Runnable {
+        override fun run() {
+            val session = session ?: return
+            session.requestStatus()
+            handler.postDelayed(this, POLL_MS)
+        }
+    }
+
+    // The playhead moves, or the window of a live stream while paused.
+    private fun pollLater() {
+        handler.removeCallbacks(poller)
+        val moving = playerState == "PLAYING" || (live && playerState == "PAUSED")
+        if (session != null && item != null && moving) handler.postDelayed(poller, POLL_MS)
+    }
 
     fun attach(session: DirectCastSession) {
         this.session = session
-        handler.removeCallbacks(ticker)
-        handler.postDelayed(ticker, TICK_MS)
+        tickIfLive()
+        pollLater()
     }
 
     /**
@@ -87,11 +115,14 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
         duration = 0.0
         times = ReceiverTimes(0.0, 0.0, 0.0)
         updatedAt = SystemClock.elapsedRealtime()
+        tickIfLive()
+        pollLater()
         invalidateState()
     }
 
     fun detach() {
         handler.removeCallbacks(ticker)
+        handler.removeCallbacks(poller)
         session = null
         item = null
         pendingRewindMs = 0
@@ -131,6 +162,8 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
             session?.seek(target)
             times = times.copy(time = target)
         }
+        tickIfLive()
+        pollLater()
         invalidateState()
     }
 
@@ -158,7 +191,11 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
             if (duration > 0) data.setDurationUs((duration * 1_000_000).toLong())
             positionMs = (now.time * 1000).toLong().coerceAtLeast(0)
         }
-        builder.setPlaylist(listOf(data.build())).setContentPositionMs(positionMs)
+        // On-demand content moves on by itself while playing; a live position stays in its window, which
+        // the refreshes move.
+        val playing = playerState == "PLAYING"
+        val position = if (live || !playing) PositionSupplier.getConstant(positionMs) else PositionSupplier.getExtrapolating(positionMs, 1f)
+        builder.setPlaylist(listOf(data.build())).setContentPositionMs(position)
 
         when (playerState) {
             "PLAYING" -> builder.setPlaybackState(STATE_READY).setPlayWhenReady(true, PLAY_WHEN_READY_CHANGE_REASON_REMOTE)
@@ -185,6 +222,7 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
             session.pause()
             playerState = "PAUSED"
         }
+        pollLater()
         return Futures.immediateVoidFuture()
     }
 
@@ -207,6 +245,7 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
 
     override fun handleRelease(): ListenableFuture<*> {
         handler.removeCallbacks(ticker)
+        handler.removeCallbacks(poller)
         session = null
         return Futures.immediateVoidFuture()
     }
@@ -224,7 +263,7 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
 
     private companion object {
         const val TICK_MS = 1_000L
-        const val POLL_EVERY_TICKS = 5
+        const val POLL_MS = 5_000L
 
         val COMMANDS: Player.Commands = Player.Commands.Builder().addAll(
             COMMAND_PLAY_PAUSE,
