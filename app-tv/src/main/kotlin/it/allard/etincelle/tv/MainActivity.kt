@@ -1183,10 +1183,17 @@ private fun TvPlayerSurface(
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = LiveProgramBarBottomOffset + 40.dp),
             )
         }
-        val shownBar = seeking?.let { LivePlayback.liveBarGeometry(player, seekWindow, programWindow, it) } ?: barGeometry
+        // Outside the programme playback is in, a held rewind passing into the one before, the bar spans
+        // the rewind window, as it does where the guide does not say what was on.
+        val shownProgramme = if (seeking == null) {
+            programWindow
+        } else {
+            programWindow?.takeIf { seekWindow.windowStartTimeMs != C.TIME_UNSET && seekWindow.windowStartTimeMs + seeking in it.startMs until it.endMs }
+        }
+        val shownBar = seeking?.let { LivePlayback.liveBarGeometry(player, seekWindow, shownProgramme, it) } ?: barGeometry
         shownBar?.let { bar ->
             if (controlsVisible || seeking != null) {
-                val pw = programWindow?.takeIf { bar.hasProgramBand }
+                val pw = shownProgramme?.takeIf { bar.hasProgramBand }
                 LiveProgramBar(
                     playedFraction = bar.playedFraction,
                     liveFraction = bar.liveFraction,
