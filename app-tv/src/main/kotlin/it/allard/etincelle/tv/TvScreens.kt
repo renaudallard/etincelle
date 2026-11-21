@@ -980,7 +980,8 @@ fun TvProgramDetailScreen(
             // No "Tout voir" (it would navigate out of the open detail); each card opens via onEpisode.
             itemsIndexed(detail.sections, key = { i, rail -> "rail#$i#${rail.id}" }, contentType = { _, _ -> "rail" }) { _, rail ->
                 Column {
-                    Spacer(Modifier.height(20.dp))
+                    // The list's own spacing is on one side only: as far apart as when the spacer was an item.
+                    Spacer(Modifier.height(32.dp))
                     TvRail(rail, onCardClick = onEpisode, onSeeAll = {}, showSeeAll = false)
                 }
             }
