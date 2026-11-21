@@ -11,7 +11,6 @@ val BrandBlack = Color(0xFF000000)
 val BrandWhite = Color(0xFFFFFFFF)
 
 val BackgroundUp = Color(0xFF10121A)
-val BackgroundLevel0 = Color(0xFF1B1C20)
 val BackgroundLevel1 = Color(0xFF24252A)
 val BackgroundLevel2 = Color(0xFF2E2F33)
 

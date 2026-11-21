@@ -14,7 +14,8 @@
 
 Application Android native (ciblant **Android 16 / API 36**) pour regarder **Molotov** via le
 backend **Fubo** qu'utilise l'application Molotov actuelle (5.51), avec l'apparence de l'ancienne
-interface Molotov **4.27**, avec des **boutons en relief** qui s'enfoncent à l'appui. Elle fonctionne sur **téléphone/tablette** et **Android TV**, et lit les
+interface Molotov **4.27**, sur un fond **noir pur** (les pixels d'un écran OLED restent éteints) et avec
+des **boutons en relief** qui s'enfoncent à l'appui. Elle fonctionne sur **téléphone/tablette** et **Android TV**, et lit les
 contenus directement sur l'appareil avec le **DRM Widevine** via AndroidX Media3.
 
 Elle donne accès au **direct**, au **guide des programmes** (EPG), à la **recherche**, au

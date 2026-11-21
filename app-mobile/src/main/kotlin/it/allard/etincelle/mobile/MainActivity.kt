@@ -734,6 +734,8 @@ private fun AppRoot(
                                     // the two do not stack a double gap above the gesture area. Gate on the
                                     // same value as the bar so the inset is never dropped without a bar.
                                     NavigationBar(
+                                        // Black like the page, not the theme's tinted container.
+                                        containerColor = MaterialTheme.colorScheme.background,
                                         windowInsets = if (showCastBar) {
                                             WindowInsets(0, 0, 0, 0)
                                         } else {

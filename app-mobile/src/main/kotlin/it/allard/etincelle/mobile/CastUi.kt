@@ -41,6 +41,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import it.allard.etincelle.core.cast.CastUiState
 import it.allard.etincelle.core.designsystem.R as DesignR
+import it.allard.etincelle.core.designsystem.theme.BackgroundLevel1
 import it.allard.etincelle.core.designsystem.theme.BrandYellow
 
 /** Cast control for the top bar: shows a picker of discovered Chromecasts, or the connected one. */
@@ -207,7 +208,8 @@ private fun CastFillGlyph(fill: Float) {
 fun CastVolumeOverlay(level: Float, deviceName: String?, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
-        color = MaterialTheme.colorScheme.surface,
+        // A card over the page: dark grey, the page being black.
+        color = BackgroundLevel1,
         shape = RoundedCornerShape(16.dp),
         tonalElevation = 6.dp,
     ) {

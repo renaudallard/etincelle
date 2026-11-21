@@ -8,13 +8,15 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
+// The pages are pure black, which an OLED screen shows by turning its pixels off; what stands on them
+// (cards, rows, menus) keeps the dark greys of the brand palette.
 private val EtincelleDarkColors = darkColorScheme(
     primary = BrandYellow,
     onPrimary = BrandBlack,
     secondary = BrandYellow,
-    background = BackgroundLevel0,
+    background = BrandBlack,
     onBackground = BrandWhite,
-    surface = BackgroundLevel1,
+    surface = BrandBlack,
     onSurface = BrandWhite,
     surfaceVariant = BackgroundLevel2,
     onSurfaceVariant = TextSecondary,
