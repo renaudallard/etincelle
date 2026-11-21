@@ -415,9 +415,17 @@ private fun TvSearchContent(
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     // A text field opens the keyboard as soon as it gets focus, which catches a remote that is only
-    // passing through. It stays read-only, with no keyboard, until OK is pressed on it.
+    // passing through. It stays read-only, with no keyboard, until OK is pressed on it, or the search
+    // is opened with nothing typed (below).
     var editing by remember { mutableStateOf(false) }
     LaunchedEffect(editing) { if (editing) keyboard?.show() }
+    // Coming to the search with nothing typed opens the keyboard at once: the remote's microphone
+    // types into an open keyboard only, and with it closed searches the whole TV instead.
+    var focused by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        if (focused && query.text.isEmpty()) editing = true
+    }
     // "Tout voir" and Back swap the rows and the grid under the focused item, which would hand the
     // focus to the first tab: carry it into the grid, or back to the item that opened it.
     val isGrid = state.current?.isGrid == true
@@ -453,7 +461,10 @@ private fun TvSearchContent(
                 }),
                 // Right leaves the field for the Rechercher button once the cursor is at the end.
                 modifier = Modifier.weight(1f).focusRequester(field)
-                    .onFocusChanged { if (!it.isFocused) editing = false }
+                    .onFocusChanged {
+                        focused = it.isFocused
+                        if (!it.isFocused) editing = false
+                    }
                     .onPreviewKeyEvent { event ->
                         val ok = event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter
                         if (event.type != KeyEventType.KeyDown || !ok) return@onPreviewKeyEvent false

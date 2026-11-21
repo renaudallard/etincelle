@@ -95,7 +95,9 @@ le nombre affiché en tête de rangée en tient compte. Une recherche sans résu
 voir les résultats. La recherche peut aussi se **dicter** : sur téléphone, le bouton au micro du
 champ de recherche ouvre la reconnaissance vocale de l'appareil et lance la recherche de ce qui a
 été entendu ; il n'apparaît que si l'appareil en a une. Sur un Google TV, la recherche se dicte
-avec la touche micro de la télécommande. L'application n'enregistre rien elle-même et ne demande
+avec la touche micro de la télécommande, clavier ouvert : clavier fermé, la touche lance une
+recherche Google TV hors de l'application. Le clavier s'ouvre donc de lui-même en arrivant sur une
+recherche vide. L'application n'enregistre rien elle-même et ne demande
 pas l'accès au micro.
 La grille de **toutes les chaînes** (TNT, chaînes thématiques Molotov…) s'ouvre avec l'onglet
 **Chaînes** sur la TV, et sur téléphone avec **Tout voir** de la rangée *Chaînes en direct* de
