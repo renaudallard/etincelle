@@ -23,7 +23,13 @@ internal object TokenCrypto {
     private const val IV_LENGTH = 12
     private const val TAG_BITS = 128
 
-    private fun key(): SecretKey {
+    // Looked up once: the Keystore is a service of its own, asked through a binder call each time.
+    private var cached: SecretKey? = null
+
+    @Synchronized
+    private fun key(): SecretKey = cached ?: lookUp().also { cached = it }
+
+    private fun lookUp(): SecretKey {
         val keyStore = KeyStore.getInstance(KEYSTORE).apply { load(null) }
         (keyStore.getEntry(ALIAS, null) as? KeyStore.SecretKeyEntry)?.let { return it.secretKey }
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE)
