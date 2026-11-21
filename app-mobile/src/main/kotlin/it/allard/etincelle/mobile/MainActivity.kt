@@ -913,6 +913,31 @@ private fun UpNextOverlay(source: PlaybackSource, player: Player, onPlayNext: ()
     )
 }
 
+/** The programme bar of a live stream, as far as [geometry] gives it. */
+@Composable
+private fun LiveBarOverlay(
+    geometry: () -> LiveBarGeometry?,
+    programWindow: ProgramWindow?,
+    onSeekToFraction: (Float) -> Unit,
+    onScrubbing: (Boolean) -> Unit,
+    modifier: Modifier,
+) {
+    val bar = geometry() ?: return
+    val pw = programWindow?.takeIf { bar.hasProgramBand }
+    val startLabel = remember(pw?.startMs) { pw?.let { LivePlayback.clockLabel(it.startMs) } }
+    val endLabel = remember(pw?.endMs) { pw?.let { LivePlayback.clockLabel(it.endMs) } }
+    LiveProgramBar(
+        playedFraction = bar.playedFraction,
+        liveFraction = bar.liveFraction,
+        seekFloorFraction = bar.seekFloorFraction,
+        onSeekToFraction = onSeekToFraction,
+        modifier = modifier,
+        startLabel = startLabel,
+        endLabel = endLabel,
+        onScrubbing = onScrubbing,
+    )
+}
+
 @Composable
 private fun PlayerSurface(
     source: PlaybackSource,
@@ -1104,21 +1129,16 @@ private fun PlayerSurface(
                 modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp),
             )
         }
-        barGeometry?.let { bar ->
-            if (controlsVisible) {
-                val pw = programWindow?.takeIf { bar.hasProgramBand }
-                LiveProgramBar(
-                    playedFraction = bar.playedFraction,
-                    liveFraction = bar.liveFraction,
-                    seekFloorFraction = bar.seekFloorFraction,
-                    onSeekToFraction = { LivePlayback.seekToFraction(currentPlayer, liveWindow, it, programWindow) },
-                    modifier = Modifier.align(Alignment.BottomCenter)
-                        .padding(start = 16.dp, end = 16.dp, bottom = LiveProgramBarBottomOffset),
-                    startLabel = pw?.let { LivePlayback.clockLabel(it.startMs) },
-                    endLabel = pw?.let { LivePlayback.clockLabel(it.endMs) },
-                    onScrubbing = { scrubbing = it },
-                )
-            }
+        // The bar changes every second: read in a composable of its own, which alone is drawn again.
+        if (controlsVisible) {
+            LiveBarOverlay(
+                geometry = { barGeometry },
+                programWindow = programWindow,
+                onSeekToFraction = { LivePlayback.seekToFraction(currentPlayer, liveWindow, it, programWindow) },
+                onScrubbing = { scrubbing = it },
+                modifier = Modifier.align(Alignment.BottomCenter)
+                    .padding(start = 16.dp, end = 16.dp, bottom = LiveProgramBarBottomOffset),
+            )
         }
         // The next episode, near the end of this one, on the phone or the Chromecast (an etincelle TV
         // app plays it itself).

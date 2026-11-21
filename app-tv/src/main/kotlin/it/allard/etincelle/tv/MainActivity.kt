@@ -864,6 +864,22 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
     }
 }
 
+/** The programme bar of a live stream, as far as [geometry] gives it. */
+@Composable
+private fun TvLiveBar(geometry: () -> LiveBarGeometry?, programWindow: ProgramWindow?, modifier: Modifier) {
+    val bar = geometry() ?: return
+    val pw = programWindow?.takeIf { bar.hasProgramBand }
+    val startLabel = remember(pw?.startMs) { pw?.let { LivePlayback.clockLabel(it.startMs) } }
+    val endLabel = remember(pw?.endMs) { pw?.let { LivePlayback.clockLabel(it.endMs) } }
+    LiveProgramBar(
+        playedFraction = bar.playedFraction,
+        liveFraction = bar.liveFraction,
+        seekFloorFraction = bar.seekFloorFraction,
+        modifier = modifier,
+        startLabel = startLabel,
+        endLabel = endLabel,
+    )
+}
 @Composable
 private fun TvPlayerSurface(
     source: PlaybackSource,
@@ -1204,20 +1220,14 @@ private fun TvPlayerSurface(
         } else {
             programWindow?.takeIf { seekWindow.windowStartTimeMs != C.TIME_UNSET && seekWindow.windowStartTimeMs + seeking in it.startMs until it.endMs }
         }
-        val shownBar = seeking?.let { LivePlayback.liveBarGeometry(player, seekWindow, shownProgramme, it) } ?: barGeometry
-        shownBar?.let { bar ->
-            if (controlsVisible || seeking != null) {
-                val pw = shownProgramme?.takeIf { bar.hasProgramBand }
-                LiveProgramBar(
-                    playedFraction = bar.playedFraction,
-                    liveFraction = bar.liveFraction,
-                    seekFloorFraction = bar.seekFloorFraction,
-                    modifier = Modifier.align(Alignment.BottomCenter)
-                        .padding(start = 48.dp, end = 48.dp, bottom = LiveProgramBarBottomOffset),
-                    startLabel = pw?.let { LivePlayback.clockLabel(it.startMs) },
-                    endLabel = pw?.let { LivePlayback.clockLabel(it.endMs) },
-                )
-            }
+        // The bar changes every second: read in a composable of its own, which alone is drawn again.
+        if (controlsVisible || seeking != null) {
+            TvLiveBar(
+                geometry = { seeking?.let { LivePlayback.liveBarGeometry(player, seekWindow, shownProgramme, it) } ?: barGeometry },
+                programWindow = shownProgramme,
+                modifier = Modifier.align(Alignment.BottomCenter)
+                    .padding(start = 48.dp, end = 48.dp, bottom = LiveProgramBarBottomOffset),
+            )
         }
         // With or without the controls, for as long as the break can be skipped. A click is for a
         // mouse or a touch screen: the remote's OK is taken above, and with the controls up it skips
