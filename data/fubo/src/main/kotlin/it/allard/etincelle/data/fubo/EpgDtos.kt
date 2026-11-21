@@ -92,17 +92,24 @@ private val FRACTION_OF_SECOND = Regex("\\.\\d+")
 
 // The backend writes "2026-06-13T19:10:00Z". A fraction of a second, or an offset in place of the Z,
 // would be as valid a timestamp, and must not read as no time at all: every programme would lose its.
-private fun parseRfc3339(rfc3339: String?): Date? = rfc3339?.let {
-    runCatching { SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US).parse(it.replace(FRACTION_OF_SECOND, "")) }.getOrNull()
+private fun parseRfc3339(rfc3339: String?, parser: SimpleDateFormat = rfc3339Parser()): Date? = rfc3339?.let {
+    runCatching { parser.parse(if ('.' in it) it.replace(FRACTION_OF_SECOND, "") else it) }.getOrNull()
 }
+
+private fun rfc3339Parser() = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US)
 
 /** Parses an RFC3339 timestamp to epoch millis, or null if absent/unparseable. */
 internal fun rfc3339UtcToEpochMillis(rfc3339: String?): Long? = parseRfc3339(rfc3339)?.time
 
-/** Parses an RFC3339 timestamp and renders it as device-local "HH:mm", or null if unparseable. */
-private fun localHourMinute(rfc3339: String?): String? {
-    val parsed = parseRfc3339(rfc3339) ?: return null
-    return SimpleDateFormat("HH:mm", Locale.getDefault()).format(parsed)
+/**
+ * Renders RFC3339 timestamps as device-local "HH:mm", or null when unparseable. One for the thousands
+ * of programmes of a guide, on the one thread that maps it.
+ */
+private class LocalHourMinute {
+    private val parser = rfc3339Parser()
+    private val format = SimpleDateFormat("HH:mm", Locale.getDefault())
+
+    fun of(rfc3339: String?): String? = parseRfc3339(rfc3339, parser)?.let { format.format(it) }
 }
 
 // --- mapping to domain ---
@@ -110,6 +117,7 @@ private fun localHourMinute(rfc3339: String?): String? {
 /** Maps the /epg guide into a page: one rail per channel, one card per program (tap plays live). */
 fun EpgResponse.toGuidePage(): ContentPage {
     val seen = HashSet<String>()
+    val hours = LocalHourMinute()
     val rails = response.orEmpty().mapNotNull { entry ->
         val data = entry.data ?: return@mapNotNull null
         val channel = data.channel ?: return@mapNotNull null
@@ -117,17 +125,17 @@ fun EpgResponse.toGuidePage(): ContentPage {
         // A repeated channel id would make two rails with the same "guide-<id>" key (a LazyColumn crash).
         if (!seen.add(channelId)) return@mapNotNull null
         val cards = data.programsWithAssets.orEmpty()
-            .mapIndexedNotNull { index, p -> p.toCard(channelId, channel.logoOnDarkUrl, index) }
+            .mapIndexedNotNull { index, p -> p.toCard(channelId, channel.logoOnDarkUrl, index, hours) }
         if (cards.isEmpty()) null else ContentRail("guide-$channelId", channel.displayName ?: channel.name, cards)
     }
     return ContentPage("Guide", rails)
 }
 
-private fun EpgProgramWithAssetsDto.toCard(channelId: String, channelLogo: String?, index: Int): ContentCard? {
+private fun EpgProgramWithAssetsDto.toCard(channelId: String, channelLogo: String?, index: Int, hours: LocalHourMinute): ContentCard? {
     // The show's name: on an episode the title is the episode's own ("Episode 38").
     val name = program?.heading ?: program?.title ?: return null
     val start = assets?.firstOrNull()?.accessRights?.startTime
-    val time = localHourMinute(start)
+    val time = hours.of(start)
     return ContentCard(
         // Index-based id: two same-titled programs with missing/equal start times must not collide,
         // or the guide's LazyRow throws on a duplicate key.
