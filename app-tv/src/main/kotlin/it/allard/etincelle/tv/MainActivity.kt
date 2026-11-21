@@ -40,6 +40,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -989,6 +990,9 @@ private fun TvPlayerSurface(
     // Called by the player view before its own key handling; true when the key was used here. Such a
     // key never reaches the controls, so restart their hide timer by hand.
     fun remoteKey(event: KeyEvent): Boolean = skipKey(event) || remoteKeyUsed(event).also { if (it) playerView?.showController() }
+    // The view below is made once, but the source can change under it (the next episode, a channel
+    // the phone sends) along with its ad break and skipper: its keys go to this composition's handler.
+    val keyHandler = rememberUpdatedState<(KeyEvent) -> Boolean> { remoteKey(it) }
     // Per source, not per kind: another live channel has its own programme, rewind and channel to ask.
     // Only while the app is on screen: it draws the bar, and asks the guide for the programme that follows.
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -1045,7 +1049,7 @@ private fun TvPlayerSurface(
             factory = { context ->
                 object : PlayerView(context) {
                     override fun dispatchKeyEvent(event: KeyEvent): Boolean =
-                        remoteKey(event) || super.dispatchKeyEvent(event)
+                        keyHandler.value(event) || super.dispatchKeyEvent(event)
                 }.apply {
                     // Before the player is set: the view shows its controls then or leaves them hidden,
                     // and says so only as it changes them.
