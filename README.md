@@ -413,6 +413,10 @@ Indiquez l'emplacement du SDK dans `local.properties` (`sdk.dir=/chemin/vers/And
 Kotlin 2.4, AGP 8.12, Gradle 8.14, Jetpack Compose (BOM 2025.06), Compose for TV (`androidx.tv`),
 AndroidX Media3 1.7. `compileSdk`/`targetSdk` = 36, `minSdk` = 24.
 
+## Remerciements
+
+Merci à [@edouardallard](https://github.com/edouardallard) pour le logo.
+
 ## Licence
 
 BSD 2-Clause. Voir [LICENSE](LICENSE).
