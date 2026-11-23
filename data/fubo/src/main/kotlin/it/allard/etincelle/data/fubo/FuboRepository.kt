@@ -68,6 +68,8 @@ private const val PROGRESS_END_MS = 15_000L
 private const val PROGRESS_MIN_MS = 10_000L
 // The official app asks who is watching again once the last choice is two days old.
 private const val PROFILE_PICK_TTL_MS = 2L * 24 * 60 * 60 * 1000
+// Long enough for the two asks of a start, short enough for a profile changed elsewhere.
+private const val PROFILES_KEPT_MS = 10_000L
 // How long the channels page, with the applications it lists as locked or not, is taken as current.
 private const val CHANNELS_PAGE_MAX_AGE_MS = 10L * 60 * 1000
 // The recordings page of "Mes vidéos", which the Enregistrements tab and the recordings rows open.
@@ -277,7 +279,32 @@ class FuboRepository(
 
     override suspend fun continueWatching(): List<HomeProgram> = withRefresh { api.continueWatching().toHomePrograms() }
 
-    override suspend fun profiles(): Profiles = withRefresh { api.profiles().toProfiles() }
+    // The profiles as last asked, for the moments a start asks for them twice (the TV's remote key, then
+    // who is watching). Dropped by whatever changes them from here.
+    private var profilesKept: Profiles? = null
+    private var profilesAt = 0L
+    private var profilesOf: String? = null
+    // Counts what changed them: a list asked for before a change is not kept after it.
+    private var profilesChanged = 0
+
+    private fun forgetProfiles() {
+        profilesKept = null
+        profilesChanged++
+    }
+
+    override suspend fun profiles(): Profiles {
+        val kept = profilesKept
+        if (kept != null && profilesOf == session.session?.userId && clock() - profilesAt in 0 until PROFILES_KEPT_MS) return kept
+        val asker = session.session?.userId
+        val changed = profilesChanged
+        val fresh = withRefresh { api.profiles().toProfiles() }
+        if (asker != null && asker == session.session?.userId && changed == profilesChanged) {
+            profilesKept = fresh
+            profilesAt = clock()
+            profilesOf = asker
+        }
+        return fresh
+    }
 
     override suspend fun remoteKey(): ByteArray? {
         // A sign-in under way has a session before it has its user.
@@ -316,8 +343,12 @@ class FuboRepository(
     }
 
     override suspend fun createProfile(name: String, avatarId: Int?): Profile = withRefresh {
-        val created = api.createProfile(ProfileRequest(name, avatarId)).profile?.toProfile()
-            ?: throw AppError.Unknown("Profil non créé")
+        // Whether it answered or not, the list may have changed.
+        val created = try {
+            api.createProfile(ProfileRequest(name, avatarId)).profile?.toProfile()
+        } finally {
+            forgetProfiles()
+        } ?: throw AppError.Unknown("Profil non créé")
         // The profile exists: failing to note the new list must not report the creation as failed,
         // or a retry would create it twice. The next start then just asks who is watching.
         try {
@@ -328,13 +359,21 @@ class FuboRepository(
     }
 
     override suspend fun updateProfile(id: String, name: String, avatarId: Int?) = withRefresh {
-        api.updateProfile(id, ProfileRequest(name, avatarId))
+        try {
+            api.updateProfile(id, ProfileRequest(name, avatarId))
+        } finally {
+            forgetProfiles()
+        }
         Unit
     }
 
     override suspend fun deleteProfile(id: String) {
         withRefresh {
-            val response = api.deleteProfile(id)
+            val response = try {
+                api.deleteProfile(id)
+            } finally {
+                forgetProfiles()
+            }
             if (!response.isSuccessful) throw HttpException(response)
         }
         // The profile is gone; what follows only keeps the choice in line, and the next start asks who
@@ -355,6 +394,7 @@ class FuboRepository(
 
     // Pages that depend on the profile (favourite channels) must not be served from the cache.
     private fun dropAccountCaches() {
+        forgetProfiles()
         channelsPageCache = null
         channelDirectory = null
     }
