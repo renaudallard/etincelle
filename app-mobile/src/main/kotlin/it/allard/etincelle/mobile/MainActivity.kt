@@ -238,12 +238,15 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch { playerFlow.collect { session.player = it } }
         // The phone resumes from its own store, which nothing writes during a cast, and most ends of a
         // cast (stopped on the TV, TV off, receiver giving up) leave no position to read: keep it as it goes.
+        // Only while a cast is up: nothing else gives a position to keep.
         if (controller != null) {
             lifecycleScope.launch {
-                while (true) {
-                    delay(CAST_PROGRESS_MS)
-                    val (source, pos, dur) = controller.castProgress() ?: continue
-                    PlaybackProgress.sampledToSave(source, pos, dur)?.let { viewModel.savePlaybackPosition(source.resumeKey, it) }
+                controller.state.map { it.isCasting }.distinctUntilChanged().collectLatest { casting ->
+                    while (casting) {
+                        delay(CAST_PROGRESS_MS)
+                        val (source, pos, dur) = controller.castProgress() ?: continue
+                        PlaybackProgress.sampledToSave(source, pos, dur)?.let { viewModel.savePlaybackPosition(source.resumeKey, it) }
+                    }
                 }
             }
         }
