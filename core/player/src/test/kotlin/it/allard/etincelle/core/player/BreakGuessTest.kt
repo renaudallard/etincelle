@@ -244,6 +244,18 @@ class BreakGuessTest {
     }
 
     @Test
+    fun `a channel's logo kept from before is told still seen or not`() {
+        val track = LogoTrack(60, width, height)
+        for (i in 0 until 60) track.add(i, picture(40 + i, logo = false, upper = 60))
+        val logo = track.logo()!!
+        assertTrue(logo.channel)
+        assertTrue(logo.seenIn(List(10) { picture(70 + it, logo = false, upper = 60) }, 0.4))
+        assertFalse(logo.seenIn(List(10) { picture(70 + it, logo = false) }, 0.4))
+        // Seen on half the pictures, the others adverts.
+        assertTrue(logo.seenIn(List(10) { picture(70 + it, logo = false, upper = if (it % 2 == 0) 60 else 0) }, 0.4))
+    }
+
+    @Test
     fun `a trailer carrying the second logo does not part a break`() {
         // The channel's logo gone throughout; its pictogram on a trailer in the middle, 32 s of it.
         val upper = gone(20 to false, 82 to true, 20 to false)

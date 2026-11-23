@@ -47,6 +47,12 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
     private val lock = Mutex()
 
     private var logo: Logo? = null
+    // The channel's logo, the last found (or learnt from earlier pictures, see [earlier]): what a learn
+    // over pictures mostly of adverts and trailers, the hour before the evening's programme, falls
+    // back on.
+    private var channelLogo: Logo? = null
+    // Whether the earlier pictures were searched for it, which is done once.
+    private var searchedBack = false
     private var learntAt = Long.MIN_VALUE
     // The learns in a row that found no logo.
     private var failures = 0
@@ -142,7 +148,15 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
         if (pictures.isEmpty()) return
         val track = LogoTrack(pictures.size, width, height)
         pictures.forEachIndexed { i, picture -> track.add(i, picture) }
-        logo = track.logo()
+        val own = track.logo()
+        own?.takeIf { it.channel }?.let { channelLogo = it.alone() }
+        // Where no logo stands out, as when most of the pictures are of adverts and trailers, the
+        // channel's from before, as long as it is still seen on enough of them.
+        if (own == null && channelLogo == null && !searchedBack) {
+            searchedBack = true
+            channelLogo = earlier(at)
+        }
+        logo = own ?: channelLogo?.takeIf { it.seenIn(pictures, KEPT_SEEN) }
         // Nothing learnt: tried again a little further on, then less and less often, as each try
         // fetches all its pictures again.
         if (logo == null) {
@@ -151,6 +165,23 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
         } else {
             failures = 0
         }
+    }
+
+    // The channel's logo as the pictures before those around [at] show it, forty minutes of them at a
+    // time, the nearest first, up to EARLIER_TIMES of them: for a channel opened in the middle of a
+    // long block of adverts and trailers, where its logo is faint and stands out only where the
+    // programme fills most of the pictures. Null when it stands out in none.
+    private suspend fun earlier(at: Long): Logo? {
+        for (back in 0 until EARLIER_TIMES) {
+            val end = at - LEARN_SPAN_S - back * 2 * LEARN_SPAN_S
+            val pictures = each((end - 2 * LEARN_SPAN_S until end step LEARN_EVERY_S).toList()) { luma(it) }.filterNotNull()
+            // Older than the service keeps them: the further back are too.
+            if (pictures.isEmpty()) return null
+            val track = LogoTrack(pictures.size, width, height)
+            pictures.forEachIndexed { i, picture -> track.add(i, picture) }
+            track.logo()?.takeIf { it.channel }?.let { return it.alone() }
+        }
+        return null
     }
 
     private suspend fun <R> each(times: List<Long>, work: (Long) -> R): List<R> = coroutineScope {
@@ -219,6 +250,10 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
         private const val LEARN_EVERY_S = 28L
         private const val LEARN_AGAIN_S = 900L
         private const val LEARN_RETRY_S = 120L
+        // The share of the pictures of a learn the channel's last logo must be seen on to be taken
+        // where none stands out, and how many times forty minutes before it is looked for.
+        private const val KEPT_SEEN = 0.4
+        private const val EARLIER_TIMES = 3
 
         // Read around the playhead at all times, and more at a time, up to MORE_TIMES in a go,
         // while a stretch without the logo goes on, for as far as a break may (FAR_S).

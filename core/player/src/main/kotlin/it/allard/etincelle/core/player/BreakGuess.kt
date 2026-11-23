@@ -93,7 +93,7 @@ internal object BreakGuess {
 
     // The share of its usual score under which a picture is without the logo, and the pictures
     // either side it is smoothed with.
-    private const val GONE = 0.5
+    const val GONE = 0.5
     private const val SMOOTH = 2
 
     // Fewer pictures than this without the logo are a stray, a bright scene or a badge put over the
@@ -303,7 +303,15 @@ internal class Logo(
     val usual: Double,
     /** A show's own logo, lower down, found beside this one, the channel's. */
     val lower: Logo? = null,
+    /** In an upper corner: the channel's, which stays from one programme to the next. */
+    val channel: Boolean = false,
 ) {
+    /** This one alone, without the show's beside it, which changes with the programme. */
+    fun alone() = if (lower == null) this else Logo(width, points, pattern, usual, null, channel)
+
+    /** Whether [pictures], as luma row by row, show it often enough for it to be theirs still. */
+    fun seenIn(pictures: List<ByteArray>, share: Double) = pictures.count { score(it) >= BreakGuess.GONE * usual } >= share * pictures.size
+
     private val whole = pattern.sum().toDouble()
 
     /** How much of the logo the picture of [luma], row by row, has: about [usual] with it, little without. */
@@ -421,7 +429,10 @@ internal class LogoTrack(private val pictures: Int, private val width: Int, priv
         val (left, top) = origins[learnt.corner.index]
         val mask = learnt.corner.mask
         val points = IntArray(mask.size) { k -> (top + mask[k] / edgesWide) * width + left + mask[k] % edgesWide }
-        return Logo(width, points, IntArray(mask.size) { learnt.corner.median[mask[it]] }, learnt.usual, learnt.lower?.let(::logo))
+        return Logo(
+            width, points, IntArray(mask.size) { learnt.corner.median[mask[it]] }, learnt.usual, learnt.lower?.let(::logo),
+            channel = learnt.corner.index < UPPER,
+        )
     }
 
     /** The logo of the pictures given, to look for in others. Null when no corner holds anything that stays. */
