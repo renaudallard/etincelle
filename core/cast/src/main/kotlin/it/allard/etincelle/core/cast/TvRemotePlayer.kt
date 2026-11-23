@@ -39,6 +39,9 @@ internal class TvRemotePlayer : SimpleBasePlayer(Looper.getMainLooper()), AdBrea
     private var durationMs = -1L
     private var live = false
     private var windowStartMs = -1L
+    // Where in the window the TV plays at the live point, some tens of seconds before its end; not
+    // said by an older TV app.
+    private var livePositionMs = -1L
     private var updatedAt = 0L
 
     // When the state last given out was worked out (elapsedRealtime ms): the live positions asked for are
@@ -86,6 +89,7 @@ internal class TvRemotePlayer : SimpleBasePlayer(Looper.getMainLooper()), AdBrea
         durationMs = -1
         live = false
         windowStartMs = -1
+        livePositionMs = -1
         updatedAt = SystemClock.elapsedRealtime()
         invalidateState()
     }
@@ -118,6 +122,7 @@ internal class TvRemotePlayer : SimpleBasePlayer(Looper.getMainLooper()), AdBrea
         durationMs = status.optLong(RemoteMessages.DURATION, -1)
         live = status.optBoolean(RemoteMessages.LIVE)
         windowStartMs = status.optLong(RemoteMessages.WINDOW_START, -1)
+        livePositionMs = status.optLong(RemoteMessages.LIVE_POSITION, -1)
         adBreakOffered = status.optBoolean(RemoteMessages.SKIP)
         updatedAt = SystemClock.elapsedRealtime()
         tickIfLive()
@@ -143,7 +148,7 @@ internal class TvRemotePlayer : SimpleBasePlayer(Looper.getMainLooper()), AdBrea
             data.setLiveConfiguration(MediaItem.LiveConfiguration.UNSET)
                 .setIsDynamic(true)
                 .setDurationUs(durationMs * 1000)
-                .setDefaultPositionUs(durationMs * 1000)
+                .setDefaultPositionUs((livePositionMs.takeIf { it in 1..durationMs } ?: durationMs) * 1000)
                 .setWindowStartTimeMs(if (windowStartMs > 0) windowStartMs + elapsed else System.currentTimeMillis() - durationMs)
             position = (if (playing) positionMs else positionMs - elapsed).coerceIn(0L, durationMs)
         } else {

@@ -633,6 +633,9 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
         if (source.isLive && !timeline.isEmpty) {
             timeline.getWindow(player.currentMediaItemIndex, remoteWindow)
             if (remoteWindow.windowStartTimeMs != C.TIME_UNSET) status.put(RemoteMessages.WINDOW_START, remoteWindow.windowStartTimeMs)
+            // Some tens of seconds before the end of the window: the phone tells from it whether this is
+            // behind the live point.
+            if (remoteWindow.defaultPositionMs > 0) status.put(RemoteMessages.LIVE_POSITION, remoteWindow.defaultPositionMs)
         }
         if (skipAdBreak != null) status.put(RemoteMessages.SKIP, true)
         return status.putProgramme(source)

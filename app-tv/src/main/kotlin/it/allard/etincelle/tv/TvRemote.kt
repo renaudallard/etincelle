@@ -21,7 +21,7 @@ import org.json.JSONObject
 private const val STATUS_MS = 1_000L
 // What of a status changes as playback goes on, and what more of a live one.
 private val MOVING = setOf(RemoteMessages.POSITION, RemoteMessages.WINDOW_START)
-private val MOVING_LIVE = MOVING + RemoteMessages.DURATION
+private val MOVING_LIVE = MOVING + RemoteMessages.DURATION + RemoteMessages.LIVE_POSITION
 
 /**
  * The phone's remote control of this TV app, one for the process: the server a phone finds and connects
