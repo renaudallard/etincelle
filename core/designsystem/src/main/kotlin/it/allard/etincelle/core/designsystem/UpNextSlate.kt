@@ -28,6 +28,9 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import it.allard.etincelle.core.designsystem.theme.BrandYellow
 import it.allard.etincelle.core.model.UpNext
 import kotlinx.coroutines.delay
@@ -102,7 +105,8 @@ class UpNextSlates {
  * [UpNext.playLabel] (play it now) and [UpNext.creditsLabel] (hide the slate and watch the end). When
  * the countdown reaches zero, [onPlayNext] runs once. The countdown follows [position] (pausing holds
  * it); a hidden slate comes back only after a seek before it. With [drive] false the countdown runs
- * elsewhere, through [UpNextSlateState.tick], and the slate only shows [state]. [button] draws a button
+ * elsewhere, through [UpNextSlateState.tick], and the slate only shows [state]; with it true, only
+ * while the app is on screen, as the app pauses what plays when it is left. [button] draws a button
  * in the app's own style; with [takeFocus] (TV) the play button gets the focus when the slate appears,
  * and [onLeave] runs when the slate goes away, so the caller can hand the focus back.
  */
@@ -124,10 +128,14 @@ fun UpNextSlate(
     val positionNow by rememberUpdatedState(position)
     val durationNow by rememberUpdatedState(duration)
     if (drive) {
-        LaunchedEffect(upNext, state) {
-            while (true) {
-                if (state.tick(upNext, positionNow(), durationNow())) playNext()
-                delay(TICK_MS)
+        val lifecycle = LocalLifecycleOwner.current.lifecycle
+        LaunchedEffect(upNext, state, lifecycle) {
+            // Only while on screen: the app pauses what plays when it is left, and nothing counts down.
+            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                while (true) {
+                    if (state.tick(upNext, positionNow(), durationNow())) playNext()
+                    delay(TICK_MS)
+                }
             }
         }
     }
