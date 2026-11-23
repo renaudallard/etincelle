@@ -1326,7 +1326,7 @@ class CastPlayerController(
      */
     fun castPlaysOwn(): Boolean {
         val player = _currentPlayer.value
-        if (player === localPlayer || player === tvPlayer || CastReceiver.isOfficial(appContext)) return true
+        if (player === localPlayer || player === tvPlayer || receiverAppId == CastReceiver.OFFICIAL) return true
         return currentItem?.let { playsOwn(player, it) } == true
     }
 
