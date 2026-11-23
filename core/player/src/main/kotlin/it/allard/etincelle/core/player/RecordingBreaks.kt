@@ -6,6 +6,7 @@ package it.allard.etincelle.core.player
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.SystemClock
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.Player
@@ -17,7 +18,10 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.dash.manifest.DashManifest
 import androidx.media3.exoplayer.dash.manifest.Representation
 import java.io.IOException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -25,7 +29,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
-import kotlinx.coroutines.withContext
 
 /**
  * Finds the ad breaks of a recording, so that one being watched can be skipped: a recording is one
@@ -49,24 +52,55 @@ object RecordingBreaks {
     private const val SAMPLE = 2
     private const val KNOWN = 20
 
+    // A recording that could not be read is not searched again before this.
+    private const val RETRY_MS = 5 * 60_000L
+
     private val http = DefaultHttpDataSource.Factory()
+
+    // Not the screen's: a search cut short by leaving it would download it all again on return.
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    // All three under the lock of [known].
     private val known = LinkedHashMap<String, List<Guess>>()
+    private val running = HashMap<String, Deferred<List<Guess>?>>()
+    private val failedAt = LinkedHashMap<String, Long>()
 
     /**
      * The breaks of the recording [key], whose [manifest] the player holds, as positions (ms) in it.
      * Empty when none is found, or nothing can be read.
      */
     suspend fun find(key: String, manifest: DashManifest): List<Guess> {
-        synchronized(known) { known[key] }?.let { return it }
-        // What could not be read is not remembered as nothing found: asked again another time.
-        val found = try {
-            withContext(Dispatchers.IO) { read(manifest) }
-        } catch (e: IOException) {
-            return emptyList()
+        val search = synchronized(known) {
+            known[key]?.let { return it }
+            // What could not be read is not remembered as nothing found: asked again a while later.
+            failedAt[key]?.let { if (SystemClock.elapsedRealtime() - it < RETRY_MS) return emptyList() }
+            // The search cannot finish before it is listed: it takes the lock to say so.
+            running.getOrPut(key) { scope.async { search(key, manifest) } }
         }
-        synchronized(known) {
-            known[key] = found
-            if (known.size > KNOWN) known.remove(known.keys.first())
+        return search.await().orEmpty()
+    }
+
+    private suspend fun search(key: String, manifest: DashManifest): List<Guess>? {
+        var found: List<Guess>? = null
+        try {
+            found = try {
+                read(manifest)
+            } catch (e: IOException) {
+                null
+            }
+        } finally {
+            synchronized(known) {
+                running.remove(key)
+                failedAt.remove(key)
+                val guesses = found
+                if (guesses == null) {
+                    failedAt[key] = SystemClock.elapsedRealtime()
+                    if (failedAt.size > KNOWN) failedAt.remove(failedAt.keys.first())
+                } else {
+                    known[key] = guesses
+                    if (known.size > KNOWN) known.remove(known.keys.first())
+                }
+            }
         }
         return found
     }
