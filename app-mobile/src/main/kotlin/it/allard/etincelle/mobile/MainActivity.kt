@@ -974,11 +974,12 @@ private fun PlayerSurface(
     // as while another Chromecast picked from it has not taken the stream yet.
     val shielded = secure || currentPlayer is ExoPlayer
     DisposableEffect(shielded, currentPlayer) {
-        // Keep the screen awake while playing, here or on what the cast controller drives. Wherever
-        // the phone's own picture shows, also block screenshots/recording (FLAG_SECURE).
+        // Wherever the phone's own picture shows, keep the screen awake while it plays and block
+        // screenshots/recording (FLAG_SECURE). The cast controller lets it sleep: a phone put down
+        // on it would otherwise stay lit for a whole film played on the TV.
         val window = (view.context as? Activity)?.window
         if (shielded) window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        val letScreenSleep = keepScreenOnWhilePlaying(window, currentPlayer)
+        val letScreenSleep = if (shielded) keepScreenOnWhilePlaying(window, currentPlayer) else ({})
         onDispose {
             letScreenSleep()
             if (shielded) window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)

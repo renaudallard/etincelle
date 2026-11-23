@@ -311,7 +311,8 @@ Sur un programme en pause, l'écran n'est plus maintenu allumé : le téléviseu
 d'écran puis en veille comme d'habitude, et la position est enregistrée dès que l'on quitte
 l'application. Après cinq minutes d'économiseur d'écran, il cesse de se charger, et il est rechargé à sa
 place au retour. Sur le téléphone aussi, un lecteur que la reprise n'a pas pu relancer se ferme avec le
-même message, et l'écran ne reste allumé que pendant la lecture.
+même message, et l'écran ne reste allumé que pendant la lecture sur le téléphone : pendant une
+diffusion vers un téléviseur, il se met en veille comme d'habitude.
 
 Sur Android TV, etincelle publie aussi une rangée **etincelle** de programmes recommandés sur
 l'écran d'accueil et place les programmes commencés dans **Continuer à regarder** (Watch Next), à
