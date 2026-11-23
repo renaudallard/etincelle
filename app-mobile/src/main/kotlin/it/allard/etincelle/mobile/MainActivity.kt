@@ -98,7 +98,6 @@ import it.allard.etincelle.core.domain.DetailKind
 import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.ProgramWindow
 import it.allard.etincelle.core.player.AdaptiveLoadControl
-import it.allard.etincelle.core.player.AdBreak
 import it.allard.etincelle.core.player.AdSkipper
 import it.allard.etincelle.core.player.LiveBarGeometry
 import it.allard.etincelle.core.player.LivePlayback
@@ -1001,7 +1000,9 @@ private fun PlayerSurface(
     var barGeometry by remember { mutableStateOf<LiveBarGeometry?>(null) }
     // The ad break playback is in, when the stream's manifest gives it away and it can be skipped.
     val adSkipper = remember(currentPlayer, source) { AdSkipper(LocalPrefs.skipAds(view.context)) }
-    var adBreak by remember(currentPlayer, source) { mutableStateOf<AdBreak?>(null) }
+    // The id of the ad break on offer: its positions slide with the live window at each reading of the
+    // manifest, and the screen would be composed again each time for a button that stays the same.
+    var adBreak by remember(currentPlayer, source) { mutableStateOf<Long?>(null) }
     DisposableEffect(adSkipper) {
         currentPlayer.addListener(adSkipper)
         onDispose { currentPlayer.removeListener(adSkipper) }
@@ -1040,7 +1041,7 @@ private fun PlayerSurface(
             val recording = source.originRecordingAssetId ?: return@LaunchedEffect
             if (currentPlayer !is ExoPlayer) return@LaunchedEffect
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                adSkipper.followRecording(currentPlayer, recording, liveWindow) { adBreak = it }
+                adSkipper.followRecording(currentPlayer, recording, liveWindow) { adBreak = it?.id }
             }
             return@LaunchedEffect
         }
@@ -1050,7 +1051,7 @@ private fun PlayerSurface(
                 // An ad break being watched behind the live point, where its end is known: skipped at
                 // once when the settings say so, each break once, and offered with a button otherwise
                 // (as is one gone back into by hand).
-                adBreak = adSkipper.tick(currentPlayer, liveWindow)
+                adBreak = adSkipper.tick(currentPlayer, liveWindow)?.id
                 if (showBar) {
                     // The show playback is in, which follows it past the show's end or back into the
                     // one before (see LiveProgramme).

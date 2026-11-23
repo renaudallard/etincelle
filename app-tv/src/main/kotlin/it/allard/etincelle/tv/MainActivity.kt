@@ -85,7 +85,6 @@ import it.allard.etincelle.core.model.PlaybackSource
 import it.allard.etincelle.core.model.isSameProgramme
 import it.allard.etincelle.core.model.ProgramWindow
 import it.allard.etincelle.core.player.AdaptiveLoadControl
-import it.allard.etincelle.core.player.AdBreak
 import it.allard.etincelle.core.player.AdSkipper
 import it.allard.etincelle.core.player.LiveBarGeometry
 import it.allard.etincelle.core.player.LivePlayback
@@ -994,7 +993,9 @@ private fun TvPlayerSurface(
     var skipSelected by remember { mutableStateOf(false) }
     // The ad break playback is in, when the stream's manifest gives it away and it can be skipped.
     val adSkipper = remember(source) { AdSkipper(TvPrefs.skipAds(view.context)) }
-    var adBreak by remember(source) { mutableStateOf<AdBreak?>(null) }
+    // The id of the ad break on offer: its positions slide with the live window at each reading of the
+    // manifest, and the screen would be composed again each time for a button that stays the same.
+    var adBreak by remember(source) { mutableStateOf<Long?>(null) }
     DisposableEffect(adSkipper) {
         player.addListener(adSkipper)
         onDispose { player.removeListener(adSkipper) }
@@ -1157,7 +1158,7 @@ private fun TvPlayerSurface(
             val recording = source.originRecordingAssetId ?: return@LaunchedEffect
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 try {
-                    adSkipper.followRecording(player, recording, liveWindow) { adBreak = it }
+                    adSkipper.followRecording(player, recording, liveWindow) { adBreak = it?.id }
                 } finally {
                     // Not looked at while the app is away: no break is on offer then.
                     adBreak = null
@@ -1172,7 +1173,7 @@ private fun TvPlayerSurface(
                     // An ad break being watched behind the live point, where its end is known: skipped at
                     // once when the settings say so, each break once, and offered with a pill otherwise
                     // (as is one gone back into with the remote).
-                    adBreak = adSkipper.tick(player, liveWindow)
+                    adBreak = adSkipper.tick(player, liveWindow)?.id
                     if (pendingRewind && LivePlayback.seekToTimeIfReady(player, liveWindow, rewindTo)) {
                         pendingRewind = false
                         adSkipper.ownSeek()
