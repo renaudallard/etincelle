@@ -74,6 +74,8 @@ private const val PROFILES_KEPT_MS = 10_000L
 private const val CHANNELS_PAGE_MAX_AGE_MS = 10L * 60 * 1000
 // The recordings page of "Mes vidéos", which the Enregistrements tab and the recordings rows open.
 private const val RECORDINGS_PATH = "papi/v1/my-stuff/status/recordings"
+// The channels page, which both the Chaînes tab and channelsPage() ask for.
+private const val CHANNELS_PATH = "papi/v1/page/channels"
 // How many times the user is asked for at the end of a sign-in, and how long between two.
 private const val USER_LOAD_TRIES = 3
 private const val USER_LOAD_RETRY_MS = 1_000L
@@ -412,7 +414,12 @@ class FuboRepository(
         if (url.contains("selectedTab=recordings")) {
             api.pageByUrl(RECORDINGS_PATH).page()
         } else {
-            labelChannels(api.pageByUrl(url).page())
+            val asker = session.session
+            val response = api.pageByUrl(url)
+            // The Chaînes tab is the channels page itself: what the app keeps of it is taken from here,
+            // rather than downloaded again.
+            if (url.trimStart('/') == CHANNELS_PATH) keepChannels(response, asker)
+            labelChannels(response.page())
         }
     }
 
@@ -436,13 +443,18 @@ class FuboRepository(
         val cached = channelsPageCache
         if (cached != null && clock() - channelsPageAt in 0 until CHANNELS_PAGE_MAX_AGE_MS) return cached
         val asker = session.session
-        val fresh = runCatching { api.channelsPage() }
+        val response = runCatching { api.channelsPage() }
             .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
             .getOrNull()
-            ?.let { page -> withContext(Dispatchers.Default) { ChannelsPage(page.toAppsRail(), page.toChannelDirectory()) } }
             // The one in hand, however old, when the new one could not be had.
             ?: return cached
-        // Not kept for the account that signed in while it was on its way.
+        return keepChannels(response, asker)
+    }
+
+    // What the app takes from the channels page [response], kept unless another account or profile
+    // took over from [asker] while it was on its way.
+    private suspend fun keepChannels(response: PageResponse, asker: UserSession?): ChannelsPage {
+        val fresh = withContext(Dispatchers.Default) { ChannelsPage(response.toAppsRail(), response.toChannelDirectory()) }
         if (session.session?.userId == asker?.userId && session.session?.profileId == asker?.profileId) {
             channelsPageCache = fresh
             channelsPageAt = clock()
