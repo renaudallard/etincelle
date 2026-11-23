@@ -4,6 +4,7 @@
 package it.allard.etincelle.mobile
 
 import android.app.Activity
+import android.content.ComponentCallbacks2
 import android.content.Intent
 import android.os.Bundle
 import android.view.KeyEvent
@@ -430,11 +431,13 @@ class MainActivity : ComponentActivity() {
         super.onTrimMemory(level)
         // Shrink the forward buffer under memory pressure so it stops growing and frees its slack.
         loadControl?.onTrimMemory(level)
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) viewModel.trimMemory()
     }
 
     override fun onLowMemory() {
         super.onLowMemory()
         loadControl?.onLowMemory()
+        viewModel.trimMemory()
     }
 
     override fun onDestroy() {

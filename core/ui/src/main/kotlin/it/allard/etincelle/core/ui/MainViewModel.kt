@@ -534,6 +534,11 @@ class MainViewModel(
         }
     }
 
+    /** The app is short of memory, or left: what is kept to show a page sooner is let go of. */
+    fun trimMemory() {
+        keptGuide = null
+    }
+
     // The guide kept from the last load, while it is recent enough and of the account and profile in use.
     private fun keptGuide(): KeptGuide? {
         val kept = keptGuide ?: return null
