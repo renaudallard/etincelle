@@ -619,7 +619,7 @@ private fun AppRoot(
 
                         tvRemote -> {
                             BackHandler { tvRemoteOpen = false }
-                            TvRemoteScreen(currentPlayer, castState.statusDeviceName.orEmpty(), onTvKey, onClose = { tvRemoteOpen = false })
+                            TvRemoteScreen(currentPlayer, castState.statusDeviceName.orEmpty(), vm::liveProgramWindow, onTvKey, onClose = { tvRemoteOpen = false })
                         }
 
                         // The cast controller: the same player surface bound to the cast player, so its
