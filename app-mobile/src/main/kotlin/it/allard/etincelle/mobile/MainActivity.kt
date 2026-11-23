@@ -1027,7 +1027,9 @@ private fun PlayerSurface(
             barGeometry = null
             adBreak = null
             // A recording's ad breaks are looked for in it, and offered as playback comes into one.
+            // The phone's own player only: a cast one has no manifest to look in.
             val recording = source.originRecordingAssetId ?: return@LaunchedEffect
+            if (currentPlayer !is ExoPlayer) return@LaunchedEffect
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 adSkipper.followRecording(currentPlayer, recording, liveWindow) { adBreak = it }
             }
