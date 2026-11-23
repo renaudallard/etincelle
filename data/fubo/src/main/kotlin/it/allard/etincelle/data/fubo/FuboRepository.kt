@@ -68,6 +68,10 @@ private const val PROGRESS_END_MS = 15_000L
 private const val PROGRESS_MIN_MS = 10_000L
 // The official app asks who is watching again once the last choice is two days old.
 private const val PROFILE_PICK_TTL_MS = 2L * 24 * 60 * 60 * 1000
+// How long what a series lists is taken as current (see seriesEpisodes).
+private const val SERIES_KEPT_MS = 5L * 60 * 1000
+// How long after a recording is asked for what a series lists is not kept: the service may not list it yet.
+private const val RECORDED_SETTLE_MS = 60_000L
 // Long enough for the two asks of a start, short enough for a profile changed elsewhere.
 private const val PROFILES_KEPT_MS = 10_000L
 // How long the channels page, with the applications it lists as locked or not, is taken as current.
@@ -396,6 +400,7 @@ class FuboRepository(
 
     // Pages that depend on the profile (favourite channels) must not be served from the cache.
     private fun dropAccountCaches() {
+        forgetSeries()
         forgetProfiles()
         channelsPageCache = null
         channelDirectory = null
@@ -618,11 +623,13 @@ class FuboRepository(
      * whole lookup is best-effort: it must never fail the detail open, since the episode list is only a
      * supplement to the show's own page.
      */
-    private suspend fun seriesEpisodes(seriesId: String): List<ContentCard> = coroutineScope {
+    private suspend fun seriesEpisodes(seriesId: String): List<ContentCard> = kept(episodesKept, seriesId) ?: coroutineScope {
+        val asked = seriesForgotten
         val watchNow = watchNowOf(seriesId)
         try {
             val series = api.seriesDetail(seriesId)
-            if (series.hasWatchNowTab()) watchNow.await().getOrThrow().episodes() else emptyList()
+            (if (series.hasWatchNowTab()) watchNow.await().getOrThrow().episodes() else emptyList())
+                .also { keep(episodesKept, seriesId, it, asked) }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -644,7 +651,42 @@ class FuboRepository(
         }
     }
 
-    override suspend fun record(action: RecordAction) = post(action.url, action.payload)
+    override suspend fun record(action: RecordAction) {
+        // Whatever it answers, the show's recordings may have changed.
+        try {
+            post(action.url, action.payload)
+        } finally {
+            recordedAt = clock()
+            forgetSeries()
+        }
+    }
+
+    // What a series lists, by its id, for a few minutes: going from its page to one episode's after
+    // another asks for the same series and its recordings each time. Answers only, not failures.
+    private val episodesKept = HashMap<String, Pair<Long, List<ContentCard>>>()
+    private val recordingsKept = HashMap<String, Pair<Long, List<Recording>>>()
+
+    // Counts the times they were let go of: an answer asked for before (another profile's, or one from
+    // before a recording) is not kept after. Nor is one asked for just after a recording, which the
+    // service may not list yet.
+    @Volatile private var seriesForgotten = 0
+    @Volatile private var recordedAt = Long.MIN_VALUE / 2
+
+    private fun <T> kept(map: HashMap<String, Pair<Long, T>>, id: String): T? = synchronized(map) {
+        map[id]?.takeIf { clock() - it.first in 0 until SERIES_KEPT_MS }?.second
+    }
+
+    private fun <T> keep(map: HashMap<String, Pair<Long, T>>, id: String, value: T, asked: Int) = synchronized(map) {
+        val now = clock()
+        map.values.removeAll { now - it.first !in 0 until SERIES_KEPT_MS }
+        if (asked == seriesForgotten && now - recordedAt !in 0 until RECORDED_SETTLE_MS) map[id] = now to value
+    }
+
+    private fun forgetSeries() {
+        seriesForgotten++
+        synchronized(episodesKept) { episodesKept.clear() }
+        synchronized(recordingsKept) { recordingsKept.clear() }
+    }
 
     override suspend fun toggleFavorite(action: RecordAction) = post(action.url, action.payload)
 
@@ -668,8 +710,9 @@ class FuboRepository(
      * The recordings of a show, from its folder in "Mes vidéos". They only supplement the show's page,
      * so any failure (a show never recorded has no folder) reads as none.
      */
-    private suspend fun recordingsOf(seriesId: String): List<Recording> = try {
-        api.recordingsFolder(seriesId).toRecordings(seriesId)
+    private suspend fun recordingsOf(seriesId: String): List<Recording> = kept(recordingsKept, seriesId) ?: try {
+        val asked = seriesForgotten
+        api.recordingsFolder(seriesId).toRecordings(seriesId).also { keep(recordingsKept, seriesId, it, asked) }
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
