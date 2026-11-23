@@ -112,7 +112,11 @@ interface MolotovRepository {
     /** Saves [channelIds] as the new order of the favourite channels, with the order's [save] action. */
     suspend fun saveFavoriteOrder(save: RecordAction, channelIds: List<String>)
 
-    suspend fun resolveLiveChannel(channelId: String): PlaybackSource
+    /**
+     * The live stream of [channelId], with the programme on air when [programme] (the guide is asked
+     * for it beside the stream, a wait of up to a few seconds when it is slow).
+     */
+    suspend fun resolveLiveChannel(channelId: String, programme: Boolean = true): PlaybackSource
     suspend fun resolveVod(vodId: String): PlaybackSource
 
     /** The air-window of the programme on a live channel, so the live seek bar can mark the show on

@@ -224,7 +224,8 @@ class TvLiveInputService : TvInputService() {
             withContext(Dispatchers.IO) {
                 val repo = (application as EtincelleTvApp).container.repository
                 if (repo.currentSession() == null) repo.restoreSession()
-                repo.resolveLiveChannel(id)
+                // The system shows its own guide: the programme on air is of no use here.
+                repo.resolveLiveChannel(id, programme = false)
             }
         } catch (e: CancellationException) {
             throw e

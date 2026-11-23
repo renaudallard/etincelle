@@ -682,13 +682,13 @@ class FuboRepository(
             .copy(resumeKey = assetId, startPositionMs = resumePosition(assetId), originRecordingAssetId = assetId)
     }
 
-    override suspend fun resolveLiveChannel(channelId: String): PlaybackSource = withRefresh {
+    override suspend fun resolveLiveChannel(channelId: String, programme: Boolean): PlaybackSource = withRefresh {
         coroutineScope {
-            val onAir = async { onAirWindow(channelId) }
+            val onAir = if (programme) async { onAirWindow(channelId) } else null
             val resp = api.playbackAsset(channelId = channelId, type = "live")
             resp.toPlaybackSource(ownHost).copy(
                 originChannelId = channelId,
-                programWindow = onAir.await() ?: resp.accessRightsV2?.live?.toProgramWindow(),
+                programWindow = onAir?.await() ?: resp.accessRightsV2?.live?.toProgramWindow(),
             )
         }
     }
