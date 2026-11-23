@@ -228,6 +228,23 @@ class BreakGuessTest {
     }
 
     @Test
+    fun `adverts that keep the channel's logo seen through half a break are found by the show's`() {
+        // The channel's logo kept seen by the adverts' own in its corner: pieces too short to count.
+        val pieces = (0 until 6).flatMap { listOf(9 to true) + if (it < 5) listOf(8 to false) else emptyList() }
+        val upper = gone(20 to false, *pieces.toTypedArray(), 20 to false)
+        val lower = gone(20 to false, 94 to true, 20 to false)
+        assertEquals(emptyList<LongRange>(), logoRanges(upper, 0, 4_000))
+        assertEquals(listOf(80_000L..456_000L), logoRanges(upper, 0, 4_000, lower))
+        assertEquals(listOf(false), BreakGuess.logoBreaks(upper, 0, 4_000, lower).map { it.sure })
+        // The channel's logo there through most of it: the show's alone is no break.
+        val mostly = gone(20 to false, *(0 until 6).flatMap { listOf(5 to true, 12 to false) }.toTypedArray(), 32 to false)
+        assertEquals(emptyList<LongRange>(), logoRanges(mostly, 0, 4_000, gone(20 to false, 102 to true, 32 to false)))
+        // Nor when the programme after it does not plainly show the channel's: it may be hidden there too.
+        val hidden = gone(20 to false, *pieces.toTypedArray(), 8 to false, 6 to true, 6 to false)
+        assertEquals(emptyList<LongRange>(), logoRanges(hidden, 0, 4_000, gone(20 to false, 94 to true, 20 to false)))
+    }
+
+    @Test
     fun `the corner found first is kept as more pictures are given`() {
         // A faint upper logo, just strong enough in every other strip of 25: with the strips of adverts
         // read next it no longer is, and the show's own, back a minute late, would be taken instead.

@@ -118,6 +118,10 @@ internal object BreakGuess {
     // sure: the programme is plainly there, not a scene of it that hides the logo now and then.
     private const val CLEAR = 12
 
+    // The share of a stretch without the show's logo that must be without the channel's too for it
+    // to be a break the channel's logo alone did not give.
+    private const val SHOW_LED = 0.5
+
     /**
      * Of each picture, whether it is without the logo, from what each has of it ([score], [usual]
      * with it). One odd picture is no break, nor the end of one: each is taken with its neighbours.
@@ -141,6 +145,13 @@ internal object BreakGuess {
      * tells of each picture whether it is without that one: a break is then what is left of one
      * once the pictures that show the second logo are taken for the programme's.
      *
+     * Adverts with something of their own in the logo's corner (Gulli's toy adverts, their makers'
+     * logos) can keep it seen through half a break, which then falls into pieces too short to count.
+     * Where a second logo is found, a stretch without it, a break by itself, that the first gave
+     * nothing in is one all the same when the first is gone through at least half of it and plainly
+     * there on each side, from where the first is first gone to where it is last gone: never past
+     * its return. Never sure.
+     *
      * A break is sure when it is one stretch without the logo, nothing bridged in it nor given up
      * at its ends, the second logo changed nothing in it, and the logo is there through most of
      * the pictures on each side. On the pictures of every channel that marks nothing, nearly 18
@@ -159,6 +170,7 @@ internal object BreakGuess {
         }
         val solid = solid(without)
         fun clear(from: Int, to: Int) = (from until to).count { !solid[it] } >= CLEAR
+        val led = if (lowerGone != null) showLed(gone, lowerGone, found, firstMs, pictureMs) else emptyList()
         return found.map { whole ->
             // A short piece held to either end by the bridge is given up: the logo hidden for a
             // moment just after a break, or before one, is a bright scene of the programme more
@@ -171,6 +183,20 @@ internal object BreakGuess {
             val sure = pieces.size == 1 && whole in unnarrowed &&
                 clear(whole.first - AROUND, whole.first) && clear(whole.last + 1, whole.last + 1 + AROUND)
             Guess(firstMs + (whole.first + pieces[from].first) * pictureMs..firstMs + (whole.first + pieces[to].last + 1) * pictureMs, sure)
+        } + led
+    }
+
+    // The breaks a stretch without the second logo gives where [found] has none (see [logoBreaks]).
+    private fun showLed(gone: BooleanArray, lowerGone: BooleanArray, found: List<IntRange>, firstMs: Long, pictureMs: Long): List<Guess> {
+        val solid = solid(gone)
+        fun clear(from: Int, to: Int) = from >= 0 && to <= solid.size && (from until to).count { !solid[it] } >= CLEAR
+        return breakRuns(lowerGone, pictureMs).mapNotNull { run ->
+            if (found.any { it.first <= run.last && run.first <= it.last }) return@mapNotNull null
+            if (run.count { gone[it] } < SHOW_LED * (run.last - run.first + 1)) return@mapNotNull null
+            val from = run.firstOrNull { solid[it] } ?: return@mapNotNull null
+            val to = run.last { solid[it] } + 1
+            if ((to - from) * pictureMs < MIN_MS || !clear(from - AROUND, from) || !clear(to, to + AROUND)) return@mapNotNull null
+            Guess(firstMs + from * pictureMs..firstMs + to * pictureMs)
         }
     }
 

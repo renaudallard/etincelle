@@ -76,7 +76,11 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
         // A stretch without the logo is followed to where the programme is back, or was before it.
         for (more in 0 until MORE_TIMES) {
             val (first, gone) = known(logo, scores, at)
-            val runs = BreakGuess.runs(BreakGuess.solid(gone), BreakGuess.BRIDGE)
+            // The show's logo is followed too: adverts can keep the channel's seen through half a
+            // break (see BreakGuess.logoBreaks), which the show's alone then gives.
+            val lowerGone = logo.lower?.let { known(it, lowerScores, at).second }
+            val runs = BreakGuess.runs(BreakGuess.solid(gone), BreakGuess.BRIDGE) +
+                lowerGone?.let { BreakGuess.runs(BreakGuess.solid(it), BreakGuess.BRIDGE) }.orEmpty()
             val until = first + gone.size * step
             val open = runs.any { it.last + BreakGuess.AROUND >= gone.size && (gone.size - it.first) * step <= FAR_S }
             val begun = runs.any { it.first < BreakGuess.AROUND && (it.last + 1) * step <= FAR_S }

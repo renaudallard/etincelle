@@ -50,7 +50,10 @@ chaque chaîne : le logo présent dans un coin pendant l'émission (celui de la 
 préférence à celui d'une émission, en bas, dont la présence suffit toutefois à reconnaître l'émission)
 disparaît pendant la publicité. Le
 bouton apparaît alors de la même façon : c'est une estimation, qu'une publicité portant quelque
-chose à elle dans le coin d'un de ces logos peut écourter ou faire manquer. Elle s'arrête une
+chose à elle dans le coin d'un de ces logos peut écourter ou faire manquer. Quand des publicités
+gardent ainsi le logo de la chaîne visible la moitié du temps, comme les jouets sur Gulli, la
+disparition du logo de l'émission tout du long suffit, si celui de la chaîne est bien visible avant
+et après ; jamais au-delà de son retour, et jamais sautée d'office. Elle s'arrête une
 demi-minute avant le retour du logo, que les chaînes remettent parfois après la reprise de
 l'émission : mieux vaut voir les dernières publicités que perdre le début de l'émission. Sur
 **Signalées et presque sûres**, le réglage saute aussi, douze secondes après son début, une coupure
