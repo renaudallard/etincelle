@@ -71,6 +71,7 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
         set(value) {
             field = value
             tickIfLive()
+            pollLater()
         }
 
     private fun tickIfLive() {
@@ -79,7 +80,7 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
     }
 
     // Statuses only come on changes: while playback moves, one is asked for some time after the last,
-    // so the position does not drift and a live window moves on with the app away.
+    // so the position does not drift, and a paused live window moves on while the app is on screen.
     private val poller = object : Runnable {
         override fun run() {
             val session = session ?: return
@@ -88,10 +89,11 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
         }
     }
 
-    // The playhead moves, or the window of a live stream while paused.
+    // The playhead moves, or the window of a live stream while paused and looked at: with the app
+    // away nobody does, and a TV switched off on a paused channel would be asked all night.
     private fun pollLater() {
         handler.removeCallbacks(poller)
-        val moving = playerState == "PLAYING" || (live && playerState == "PAUSED")
+        val moving = playerState == "PLAYING" || (live && playerState == "PAUSED" && onScreen)
         if (session != null && item != null && moving) handler.postDelayed(poller, POLL_MS)
     }
 
