@@ -4,13 +4,16 @@
 package it.allard.etincelle.mobile
 
 import android.app.Application
+import coil.ImageLoader
+import coil.ImageLoaderFactory
 import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
+import it.allard.etincelle.core.designsystem.artworkImageLoader
 import it.allard.etincelle.data.fubo.AppContainer
 
 /** Application-scoped manual DI (Hilt comes in a later milestone). */
-class EtincelleApp : Application() {
+class EtincelleApp : Application(), ImageLoaderFactory {
     val container: AppContainer by lazy { AppContainer(this, debug = BuildConfig.DEBUG) }
 
     /**
@@ -24,4 +27,6 @@ class EtincelleApp : Application() {
             null
         }
     }
+
+    override fun newImageLoader(): ImageLoader = artworkImageLoader(this)
 }
