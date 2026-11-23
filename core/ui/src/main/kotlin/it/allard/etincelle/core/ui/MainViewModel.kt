@@ -54,6 +54,7 @@ private const val PAIRING_MAX_ROUNDS = 12
 // Shown while no code could be had, until one is.
 private const val PAIRING_RETRY_NOTICE = "Connexion impossible, nouvel essai…"
 private const val UPDATE_INTERVAL_MS = 24 * 60 * 60 * 1000L
+private const val UPDATE_RECHECK_MS = 60 * 60 * 1000L
 // A page that shows what is on air goes stale as programmes change, and nothing on it says when. It is
 // loaded again once it is this old when someone comes back to it, and this old while it stays on screen.
 private const val STALE_ON_RETURN_MS = 2 * 60 * 1000L
@@ -1232,12 +1233,21 @@ class MainViewModel(
     /**
      * Checks GitHub for a newer release now, then once a day for as long as the caller runs; the app
      * proposes it when found, or takes it for an automatic install. The activity runs this while it is
-     * started, so each start checks again. No check is made while an update is already known.
+     * started, so each start checks again, unless the last check is less than an hour old (a TV coming
+     * back from its screensaver, a phone opened many times a day). No check is made while an update is
+     * already known.
      */
     suspend fun watchForUpdates() {
         while (true) {
             val known = _state.value.update
             if (known == null) {
+                // Only GitHub is spared: a clock set back makes the age meaningless, and it is asked again.
+                val since = clock() - updatesCheckedAt
+                if (updatesCheckedAt != 0L && since in 0 until UPDATE_RECHECK_MS) {
+                    delay(UPDATE_INTERVAL_MS - since)
+                    continue
+                }
+                updatesCheckedAt = clock()
                 updates.latestUpdate()?.let(::take)
             } else if (known.quiet) {
                 // An automatic install that has not happened: fetch it again, or propose it if it needed someone.
@@ -1246,6 +1256,9 @@ class MainViewModel(
             delay(UPDATE_INTERVAL_MS)
         }
     }
+
+    // When GitHub was last asked for a newer release (clock), 0 before.
+    private var updatesCheckedAt = 0L
 
     private val _autoUpdate = MutableStateFlow(auto?.enabled == true)
 

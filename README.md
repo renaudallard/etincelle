@@ -237,8 +237,8 @@ Sur le téléviseur, l'application TV signale au système ce qu'elle lit (titre,
 qu'elle est à l'écran ; il peut la mettre en pause, la reprendre ou s'y déplacer, par exemple à la voix avec l'Assistant ; il ne
 peut ni y lancer autre chose, ni passer à un autre programme.
 
-etincelle **vérifie les mises à jour** sur GitHub à chaque démarrage, puis une fois par jour tant
-qu'elle reste ouverte, et propose d'installer la dernière version lorsqu'une plus récente est
+etincelle **vérifie les mises à jour** sur GitHub à chaque démarrage (au plus une fois par heure),
+puis une fois par jour tant qu'elle reste ouverte, et propose d'installer la dernière version lorsqu'une plus récente est
 disponible (l'APK téléphone sur le téléphone, l'APK TV sur la TV). **Installer** la télécharge,
 vérifie sa taille et son empreinte SHA-256 publiées par GitHub, puis la confie à l'installateur
 d'Android, qui demande confirmation. La première fois, etincelle ouvre la page des paramètres où
