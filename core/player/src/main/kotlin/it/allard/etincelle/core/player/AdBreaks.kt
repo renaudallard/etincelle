@@ -16,9 +16,17 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  * the break began (epoch ms), stays. [skippable] when there is somewhere to skip to: it has ended
  * before the live point, and is not on its last second. [guessed] when the stream does not say it
  * is one, as in a recording (see [RecordingBreaks]) or by a live channel's pictures (see
- * [LiveBreaks]): for a button to offer, never to skip unasked.
+ * [LiveBreaks]): for a button to offer, and to skip unasked only when [sure] and the settings
+ * allow it (see [SkipAds]).
  */
-data class AdBreak(val startMs: Long, val endMs: Long, val id: Long, val skippable: Boolean, val guessed: Boolean = false)
+data class AdBreak(
+    val startMs: Long,
+    val endMs: Long,
+    val id: Long,
+    val skippable: Boolean,
+    val guessed: Boolean = false,
+    val sure: Boolean = false,
+)
 
 /**
  * Finds the ad breaks of the live stream a player plays, from its DASH manifest, so that one being
@@ -47,13 +55,13 @@ class AdBreaks {
     private var found: List<LongRange> = emptyList()
 
     /** The breaks of the recording being played, as positions (ms) in it, once they are known. */
-    var recorded: List<LongRange> = emptyList()
+    var recorded: List<Guess> = emptyList()
 
     /**
      * The breaks of the live channel being played that its pictures give away (see [LiveBreaks]), as
      * times of day (ms since 1970): those the stream does not mark.
      */
-    var guessed: List<LongRange> = emptyList()
+    var guessed: List<Guess> = emptyList()
 
     /**
      * The break playback is in, whether or not it can be skipped yet, or null. [window] is a
@@ -62,8 +70,10 @@ class AdBreaks {
     fun current(player: Player, window: Timeline.Window): AdBreak? {
         val at = player.currentPosition
         if (!player.isCurrentMediaItemLive) {
-            return recorded.firstOrNull { at >= it.first && at < it.last - GUESS_EARLY_MS }
-                ?.let { AdBreak(it.first, it.last - GUESS_EARLY_MS, it.first, skippable = at < it.last - GUESS_EARLY_MS - LAST_MOMENT_MS, guessed = true) }
+            return recorded.firstOrNull { at >= it.range.first && at < it.range.last - GUESS_EARLY_MS }?.let {
+                val end = it.range.last - GUESS_EARLY_MS
+                AdBreak(it.range.first, end, it.range.first, skippable = at < end - LAST_MOMENT_MS, guessed = true, sure = it.sure)
+            }
         }
         val timeline = player.currentTimeline
         if (timeline.isEmpty) return null
@@ -71,8 +81,8 @@ class AdBreaks {
         val start = window.windowStartTimeMs
         if (start == C.TIME_UNSET) return null
         val live = window.defaultPositionMs
-        fun breakAt(from: Long, to: Long, id: Long, guessed: Boolean) =
-            AdBreak(from, to, id, skippable = at < to - LAST_MOMENT_MS && to <= live - LIVE_MARGIN_MS, guessed = guessed)
+        fun breakAt(from: Long, to: Long, id: Long, guessed: Boolean, sure: Boolean = false) =
+            AdBreak(from, to, id, skippable = at < to - LAST_MOMENT_MS && to <= live - LIVE_MARGIN_MS, guessed = guessed, sure = sure)
         // What the stream marks is exact, and comes first.
         val dash = player.currentManifest as? DashManifest
         val zero = dash?.availabilityStartTimeMs ?: C.TIME_UNSET
@@ -86,8 +96,8 @@ class AdBreaks {
             found.firstOrNull { at >= it.first + shift && at < it.last + shift }
                 ?.let { return breakAt(it.first + shift, it.last + shift, zero + it.first, guessed = false) }
         }
-        return guessed.firstOrNull { at >= it.first - start && at < it.last - GUESS_EARLY_MS - start }
-            ?.let { breakAt(it.first - start, it.last - GUESS_EARLY_MS - start, it.first, guessed = true) }
+        return guessed.firstOrNull { at >= it.range.first - start && at < it.range.last - GUESS_EARLY_MS - start }
+            ?.let { breakAt(it.range.first - start, it.range.last - GUESS_EARLY_MS - start, it.range.first, guessed = true, sure = it.sure) }
     }
 
     /** One period of a manifest, as far as its ads go; times in ms from the manifest's time zero. */

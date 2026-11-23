@@ -38,10 +38,10 @@ plus loin. En différé, quand ce que l'on
 regarde est une **coupure publicitaire** dont le flux indique la fin, un bouton **Passer la pub**
 apparaît (sur le téléviseur, **OK** suffit, ou, les commandes affichées, la flèche **Droite**
 depuis leur dernier bouton puis **OK**) et mène à la fin de la coupure ; le réglage **Passer les
-publicités automatiquement** (dans **Paramètres**, désactivé par défaut) le fait sans rien demander,
-sauf pour une coupure dans laquelle on est revenu en arrière. Le réglage vaut pour les chaînes dont
-le flux signale ses coupures : celles des groupes TF1 et France Télévisions exactement, celles du
-groupe RMC d'après la forme de leurs coupures. Sur les chaînes qui signalent leurs coupures (groupe
+publicités automatiquement** (dans **Paramètres**, sur **Non** par défaut) le fait sans rien
+demander, sauf pour une coupure dans laquelle on est revenu en arrière. Sur **Coupures signalées**,
+il vaut pour les chaînes dont le flux signale ses coupures : celles des groupes TF1 et France
+Télévisions exactement, celles du groupe RMC d'après la forme de leurs coupures. Sur les chaînes qui signalent leurs coupures (groupe
 TF1, LCI, France Télévisions), rien d'autre n'est proposé : ce qui les entoure, bandes-annonces et
 parrainages, ne se distingue pas sûrement du début de l'émission. Sur les autres (groupe M6, groupe
 RMC, où le flux en manque beaucoup, CSTAR, CNEWS, BFMTV… ; pas Arte, qui n'a pas de publicité),
@@ -49,17 +49,23 @@ l'application cherche les coupures elle-même dans les **vignettes** que le serv
 chaque chaîne : le logo présent dans un coin pendant l'émission (celui de la chaîne, en haut, de
 préférence à celui d'une émission, en bas, dont la présence suffit toutefois à reconnaître l'émission)
 disparaît pendant la publicité. Le
-bouton apparaît alors de la même façon, mais rien n'est sauté automatiquement : c'est une estimation,
-qu'une publicité portant quelque chose à elle dans le coin d'un de ces logos peut écourter ou faire
-manquer. Elle s'arrête une demi-minute avant le retour du logo, que les chaînes remettent parfois
-après la reprise de l'émission : mieux vaut voir les dernières publicités que perdre le début de
-l'émission. Au direct même, il n'y a
+bouton apparaît alors de la même façon : c'est une estimation, qu'une publicité portant quelque
+chose à elle dans le coin d'un de ces logos peut écourter ou faire manquer. Elle s'arrête une
+demi-minute avant le retour du logo, que les chaînes remettent parfois après la reprise de
+l'émission : mieux vaut voir les dernières publicités que perdre le début de l'émission. Sur
+**Signalées et presque sûres**, le réglage saute aussi, douze secondes après son début, une coupure
+estimée dont rien ne laisse douter : d'un seul tenant, que le logo d'une émission ne réduit pas, et
+l'émission bien visible avant et après. Sur près de 18 heures de vignettes de ces chaînes, en
+novembre 2026, c'était le cas de 133 coupures sur 313 ; toutes s'arrêtaient dans la publicité, les
+bandes-annonces ou les génériques de la chaîne, mais certaines commençaient pendant le générique de
+fin de l'émission, et une huit secondes avant la fin d'un bulletin météo. Au direct même, il n'y a
 nulle part où sauter. Dans un **enregistrement**, qui ne signale rien non plus, les coupures sont
 cherchées à l'ouverture, d'après ses vignettes de la même façon et ses sous-titres (une émission
 parle pendant des minutes, une publicité quelques secondes) : le bouton apparaît dans la coupure,
 une dizaine de secondes après le début de la lecture sur un réseau domestique, le temps de la
 recherche (une quinzaine de Mo par heure d'enregistrement, soit un centième de ce que demande sa
-lecture), là aussi sans rien sauter automatiquement. Sur un **Chromecast**, c'est le récepteur qui
+lecture). Seul le réglage **Signalées et presque sûres** y saute une coupure, presque sûre d'après
+les vignettes et dont les sous-titres, quand ils permettent d'en juger, confirment les deux bords. Sur un **Chromecast**, c'est le récepteur qui
 cherche les coupures de la même façon et affiche **Passer la pub : OK** sur le téléviseur : la
 touche OK de sa télécommande y mène à la fin de la coupure. Cliquer sur un programme ouvre d'abord sa **fiche détaillée**
 (synopsis, casting, année, classification) plutôt que de le lire aussitôt, et la fiche regroupe ses

@@ -10,11 +10,15 @@ import androidx.media3.common.Timeline
 // How long after a stream is ready to play a seek backwards is still taken for the app's own.
 private const val SETTLING_MS = 5_000L
 
+// How far into a guessed break playback must be before it is skipped unasked: where a break is
+// guessed to begin, the programme can still be ending (seen: 8 s of a weather forecast).
+private const val SURE_AFTER_MS = 12_000L
+
 /**
- * What a player screen does about the ad break playback is in (see [AdBreaks]): with [auto], as the
- * settings ask, a break is skipped to its end once there is somewhere to skip to; otherwise, and for a
- * break gone back into, for as long as playback stays in it, it is handed to the screen to offer with
- * a button.
+ * What a player screen does about the ad break playback is in (see [AdBreaks]): as the settings ask
+ * ([skip]), a break is skipped to its end once there is somewhere to skip to, a guessed one only
+ * once playback is some seconds into it; otherwise, and for a break gone back into, for as long as
+ * playback stays in it, it is handed to the screen to offer with a button.
  *
  * Gone back into is told from a seek backwards, which this hears as a listener of the player: someone
  * who rewinds into the ads, or within them, wants to see them, or to get past them backwards, and
@@ -22,7 +26,7 @@ private const val SETTLING_MS = 5_000L
  * stream just loaded back to where it was (a place handed over, a programme resumed, an error got
  * over) and are told by that; one made later says so with [ownSeek].
  */
-class AdSkipper(private val auto: Boolean) : Player.Listener {
+class AdSkipper(private val skip: SkipAds) : Player.Listener {
     private val breaks = AdBreaks()
     // The break playback was in when last looked at, and whether it is left to play.
     private var inBreak = 0L
@@ -46,12 +50,12 @@ class AdSkipper(private val auto: Boolean) : Player.Listener {
     }
 
     /** The breaks of the recording being played, once found (see [RecordingBreaks]). */
-    fun recorded(found: List<LongRange>) {
+    fun recorded(found: List<Guess>) {
         breaks.recorded = found
     }
 
     /** The breaks of the live channel being played that its pictures give away (see [LiveBreaks]). */
-    fun guessed(found: List<LongRange>) {
+    fun guessed(found: List<Guess>) {
         breaks.guessed = found
     }
 
@@ -77,8 +81,10 @@ class AdSkipper(private val auto: Boolean) : Player.Listener {
         kept = back || (kept && ad.id == inBreak)
         inBreak = ad.id
         if (!ad.skippable) return null
-        // A guessed break is only ever offered: skipped unasked, a wrong guess would lose programme.
-        if (!auto || kept || ad.guessed) return ad
+        // A guessed break is skipped unasked only when sure and asked for: a wrong guess loses programme.
+        val auto = if (ad.guessed) skip == SkipAds.SURE && ad.sure else skip != SkipAds.OFF
+        if (!auto || kept) return ad
+        if (ad.guessed && player.currentPosition < ad.startMs + SURE_AFTER_MS) return ad
         player.seekTo(ad.endMs)
         return null
     }

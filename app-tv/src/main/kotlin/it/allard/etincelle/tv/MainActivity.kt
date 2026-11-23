@@ -972,7 +972,7 @@ private fun TvPlayerSurface(
     // any other key or the controls hiding leaves it.
     var skipSelected by remember { mutableStateOf(false) }
     // The ad break playback is in, when the stream's manifest gives it away and it can be skipped.
-    val adSkipper = remember(source) { AdSkipper(TvPrefs.autoSkipAds(view.context)) }
+    val adSkipper = remember(source) { AdSkipper(TvPrefs.skipAds(view.context)) }
     var adBreak by remember(source) { mutableStateOf<AdBreak?>(null) }
     DisposableEffect(adSkipper) {
         player.addListener(adSkipper)

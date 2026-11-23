@@ -8,6 +8,7 @@ import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardActions
@@ -53,6 +54,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -81,6 +83,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
@@ -109,6 +112,7 @@ import it.allard.etincelle.core.model.Profile
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.RecordAction
 import it.allard.etincelle.core.model.Recording
+import it.allard.etincelle.core.player.SkipAds
 import it.allard.etincelle.core.ui.PROFILE_NAME_MAX
 import it.allard.etincelle.core.ui.ProfileEditor
 import it.allard.etincelle.core.ui.ProfileScreen
@@ -727,7 +731,7 @@ fun SettingsScreen(
     var tvCode by remember { mutableStateOf("") }
     val context = LocalContext.current
     var mono by remember { mutableStateOf(AppIcon.isMono(context)) }
-    var autoSkipAds by remember { mutableStateOf(LocalPrefs.autoSkipAds(context)) }
+    var skipAds by remember { mutableStateOf(LocalPrefs.skipAds(context)) }
     var officialReceiver by remember { mutableStateOf(CastReceiver.isOfficial(context)) }
     // statusBarsPadding keeps the Retour button below the status bar so it stays tappable. The page
     // scrolls: it is longer than a small screen.
@@ -760,13 +764,23 @@ fun SettingsScreen(
             onCheckedChange = { LocalPrefs.setHideLocked(context, it); onHideLocked(it) },
         )
         HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-        SettingToggle(
+        SettingChoice(
             title = "Passer les publicités automatiquement",
-            subtitle = "En différé, sur les chaînes qui signalent leurs coupures. Sinon, un bouton le propose.",
-            checked = autoSkipAds,
-            onCheckedChange = {
-                LocalPrefs.setAutoSkipAds(context, it)
-                autoSkipAds = it
+            subtitle = "En différé. Une coupure qui n'est pas passée est proposée par un bouton.",
+            choices = listOf(
+                Triple(SkipAds.OFF, "Non", "Toujours le bouton"),
+                Triple(SkipAds.MARKED, "Coupures signalées", "Celles que la chaîne signale : groupes TF1, France Télévisions, RMC"),
+                Triple(
+                    SkipAds.SURE,
+                    "Signalées et presque sûres",
+                    "Aussi celles trouvées d'après le logo de la chaîne quand rien n'en laisse douter. " +
+                        "Peut couper la fin d'un générique ou quelques secondes d'émission.",
+                ),
+            ),
+            selected = skipAds,
+            onSelect = {
+                LocalPrefs.setSkipAds(context, it)
+                skipAds = it
             },
         )
         HorizontalDivider(Modifier.padding(horizontal = 16.dp))
@@ -912,6 +926,35 @@ fun SettingsScreen(
             },
             dismissButton = { TextButton(onClick = { connectTv = false; tvCode = ""; onClearTvConnect() }) { Text("Fermer") } },
         )
+    }
+}
+
+/** A setting with a few values: a title + subtitle, then one row with a radio button per value. */
+@Composable
+private fun <T> SettingChoice(title: String, subtitle: String, choices: List<Triple<T, String, String>>, selected: T, onSelect: (T) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
+        Text(title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(horizontal = 16.dp))
+        Text(
+            subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+        for ((value, label, detail) in choices) {
+            Row(
+                Modifier.fillMaxWidth()
+                    .selectable(selected = value == selected, role = Role.RadioButton, onClick = { onSelect(value) })
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(selected = value == selected, onClick = null)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(label, style = MaterialTheme.typography.bodyMedium)
+                    Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
     }
 }
 

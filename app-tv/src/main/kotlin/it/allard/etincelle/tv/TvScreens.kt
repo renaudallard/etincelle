@@ -115,6 +115,7 @@ import it.allard.etincelle.core.model.Profile
 import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.RecordAction
 import it.allard.etincelle.core.model.Recording
+import it.allard.etincelle.core.player.SkipAds
 import it.allard.etincelle.core.ui.PROFILE_NAME_MAX
 import it.allard.etincelle.core.ui.ProfileEditor
 import it.allard.etincelle.core.ui.ProfileScreen
@@ -586,17 +587,23 @@ fun TvSettingsScreen(
                 Text(if (autoUpdate) "Mises à jour automatiques : oui" else "Mises à jour automatiques : non")
             }
         }
-        // In time shift, on the channels whose stream says where its ad breaks are: skipped without
-        // asking, or offered with a pill and OK.
-        var autoSkipAds by remember { mutableStateOf(TvPrefs.autoSkipAds(context)) }
+        // In time shift, which ad breaks are skipped without asking: none, those the stream marks, or
+        // those and the sure guessed ones. The others are offered with a pill and OK. OK goes round.
+        var skipAds by remember { mutableStateOf(TvPrefs.skipAds(context)) }
         TvButton(
             onClick = {
-                autoSkipAds = !autoSkipAds
-                TvPrefs.setAutoSkipAds(context, autoSkipAds)
+                skipAds = SkipAds.entries[(skipAds.ordinal + 1) % SkipAds.entries.size]
+                TvPrefs.setSkipAds(context, skipAds)
             },
             highlighted = false,
         ) {
-            Text(if (autoSkipAds) "Passer les publicités automatiquement : oui" else "Passer les publicités automatiquement : non")
+            Text(
+                "Passer les publicités automatiquement : " + when (skipAds) {
+                    SkipAds.OFF -> "non"
+                    SkipAds.MARKED -> "coupures signalées"
+                    SkipAds.SURE -> "signalées et presque sûres"
+                },
+            )
         }
         Text("Vignettes par ligne : $gridColumns", style = MaterialTheme.typography.titleMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -991,7 +991,7 @@ private fun PlayerSurface(
     }
     var barGeometry by remember { mutableStateOf<LiveBarGeometry?>(null) }
     // The ad break playback is in, when the stream's manifest gives it away and it can be skipped.
-    val adSkipper = remember(currentPlayer, source) { AdSkipper(LocalPrefs.autoSkipAds(view.context)) }
+    val adSkipper = remember(currentPlayer, source) { AdSkipper(LocalPrefs.skipAds(view.context)) }
     var adBreak by remember(currentPlayer, source) { mutableStateOf<AdBreak?>(null) }
     DisposableEffect(adSkipper) {
         currentPlayer.addListener(adSkipper)

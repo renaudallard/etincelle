@@ -50,13 +50,13 @@ object RecordingBreaks {
     private const val KNOWN = 20
 
     private val http = DefaultHttpDataSource.Factory()
-    private val known = LinkedHashMap<String, List<LongRange>>()
+    private val known = LinkedHashMap<String, List<Guess>>()
 
     /**
      * The breaks of the recording [key], whose [manifest] the player holds, as positions (ms) in it.
      * Empty when none is found, or nothing can be read.
      */
-    suspend fun find(key: String, manifest: DashManifest): List<LongRange> {
+    suspend fun find(key: String, manifest: DashManifest): List<Guess> {
         synchronized(known) { known[key] }?.let { return it }
         // What could not be read is not remembered as nothing found: asked again another time.
         val found = try {
@@ -71,7 +71,7 @@ object RecordingBreaks {
         return found
     }
 
-    private suspend fun read(manifest: DashManifest): List<LongRange> = coroutineScope {
+    private suspend fun read(manifest: DashManifest): List<Guess> = coroutineScope {
         if (manifest.dynamic || manifest.periodCount != 1) return@coroutineScope emptyList()
         val lengthMs = manifest.getPeriodDurationMs(0)
         if (lengthMs == C.TIME_UNSET) return@coroutineScope emptyList()
@@ -80,7 +80,7 @@ object RecordingBreaks {
         val image = sets.firstOrNull { it.type == C.TRACK_TYPE_IMAGE }?.representations?.firstOrNull()
         val captions = async { text.firstNotNullOfOrNull { captionBreaks(it, lengthMs) } }
         val logo = async { image?.let { logoBreaks(it, lengthMs) } }
-        BreakGuess.combine(captions.await(), logo.await()).filter { it.first > 0 && it.last < lengthMs }
+        BreakGuess.combine(captions.await(), logo.await()).filter { it.range.first > 0 && it.range.last < lengthMs }
     }
 
     private class Segment(val timeMs: Long, val durationMs: Long, val uri: Uri)
@@ -133,7 +133,7 @@ object RecordingBreaks {
         return BreakGuess.captionBreaks(BooleanArray(spoken.size) { spoken[it] != false }, segments[0].timeMs, segments[0].durationMs)
     }
 
-    private suspend fun logoBreaks(representation: Representation, lengthMs: Long): List<LongRange>? {
+    private suspend fun logoBreaks(representation: Representation, lengthMs: Long): List<Guess>? {
         val across = representation.format.tileCountHorizontal
         val down = representation.format.tileCountVertical
         if (across == Format.NO_VALUE || down == Format.NO_VALUE || across <= 0 || down <= 0) return null
@@ -208,7 +208,8 @@ object RecordingBreaks {
 /**
  * Has this skipper follow the recording [key] that [player] plays: its breaks are looked for once the
  * player has its manifest (see [RecordingBreaks]), then [onBreak] is told every second which one
- * playback is in, to be offered with a button. Never returns; to be cancelled with the screen.
+ * playback is in, to be offered with a button, when [AdSkipper.tick] has not skipped it. Never
+ * returns; to be cancelled with the screen.
  */
 suspend fun AdSkipper.followRecording(
     player: Player,

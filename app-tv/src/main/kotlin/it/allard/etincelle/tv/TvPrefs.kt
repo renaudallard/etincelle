@@ -4,22 +4,20 @@
 package it.allard.etincelle.tv
 
 import android.content.Context
+import it.allard.etincelle.core.player.SkipAds
 
 /** Small persisted TV UI preferences (the ViewModel is Context-free, so the app layer stores these). */
 object TvPrefs {
     private const val PREFS = "etincelle"
     private const val GRID_COLUMNS = "grid_columns"
-    private const val AUTO_SKIP_ADS = "auto_skip_ads"
     const val MIN_GRID_COLUMNS = 1
     const val MAX_GRID_COLUMNS = 5
     const val DEFAULT_GRID_COLUMNS = 5
 
-    /** Ad breaks whose end is known are skipped without asking, rather than offered with a button. */
-    fun autoSkipAds(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(AUTO_SKIP_ADS, false)
+    /** Which ad breaks are skipped without asking, rather than offered with a pill. */
+    fun skipAds(context: Context): SkipAds = SkipAds.read(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE))
 
-    fun setAutoSkipAds(context: Context, skip: Boolean) =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(AUTO_SKIP_ADS, skip).apply()
+    fun setSkipAds(context: Context, skip: SkipAds) = SkipAds.write(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE), skip)
 
     /** Number of cards per row on the grid ("tout voir") pages, 1 to 5. */
     fun gridColumns(context: Context): Int =

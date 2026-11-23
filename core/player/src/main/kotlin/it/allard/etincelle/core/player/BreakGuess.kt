@@ -6,6 +6,13 @@ package it.allard.etincelle.core.player
 import kotlin.math.abs
 
 /**
+ * A break guessed from what a stream carries, from [range.first] to [range.last] (ms). [sure] when
+ * nothing in how it was found leaves its edges in doubt (see [BreakGuess.logoBreaks]): it may be
+ * skipped unasked when the settings allow it.
+ */
+data class Guess(val range: LongRange, val sure: Boolean = false)
+
+/**
  * The rules that tell the ad breaks of a recording from what it carries in the clear, its captions
  * and its thumbnails, the pictures and sound being encrypted and the stream marking nothing. Each is
  * a guess, as measured on the service in November 2026:
@@ -107,6 +114,10 @@ internal object BreakGuess {
     // bridge holds it there.
     private const val END_PIECE = 10
 
+    // Of the AROUND pictures on each side, how many at least must have the logo for a break to be
+    // sure: the programme is plainly there, not a scene of it that hides the logo now and then.
+    private const val CLEAR = 12
+
     /**
      * Of each picture, whether it is without the logo, from what each has of it ([score], [usual]
      * with it). One odd picture is no break, nor the end of one: each is taken with its neighbours.
@@ -129,16 +140,25 @@ internal object BreakGuess {
      * being at [firstMs] and each [pictureMs] after the one before. With a second logo, [lowerGone]
      * tells of each picture whether it is without that one: a break is then what is left of one
      * once the pictures that show the second logo are taken for the programme's.
+     *
+     * A break is sure when it is one stretch without the logo, nothing bridged in it nor given up
+     * at its ends, the second logo changed nothing in it, and the logo is there through most of
+     * the pictures on each side. On the pictures of every channel that marks nothing, nearly 18
+     * hours of them in November 2026, each of the 133 such breaks ended, 32 s early, in adverts,
+     * trailers or the channel's own jingles, and began at the programme's end or in its end
+     * credits, but for one that began 8 s before the end of a weather forecast.
      */
-    fun logoBreaks(gone: BooleanArray, firstMs: Long, pictureMs: Long, lowerGone: BooleanArray? = null): List<LongRange> {
+    fun logoBreaks(gone: BooleanArray, firstMs: Long, pictureMs: Long, lowerGone: BooleanArray? = null): List<Guess> {
         var without = gone
         var found = breakRuns(without, pictureMs)
+        val unnarrowed = found.toSet()
         if (lowerGone != null) {
             without = BooleanArray(gone.size)
             for (run in found) for (i in run) without[i] = gone[i] && lowerGone[i]
             found = breakRuns(without, pictureMs)
         }
         val solid = solid(without)
+        fun clear(from: Int, to: Int) = (from until to).count { !solid[it] } >= CLEAR
         return found.map { whole ->
             // A short piece held to either end by the bridge is given up: the logo hidden for a
             // moment just after a break, or before one, is a bright scene of the programme more
@@ -148,7 +168,9 @@ internal object BreakGuess {
             var to = pieces.lastIndex
             while (to > from && pieces[to].last - pieces[to].first + 1 < END_PIECE) to--
             while (from < to && pieces[from].last - pieces[from].first + 1 < END_PIECE) from++
-            firstMs + (whole.first + pieces[from].first) * pictureMs..firstMs + (whole.first + pieces[to].last + 1) * pictureMs
+            val sure = pieces.size == 1 && whole in unnarrowed &&
+                clear(whole.first - AROUND, whole.first) && clear(whole.last + 1, whole.last + 1 + AROUND)
+            Guess(firstMs + (whole.first + pieces[from].first) * pictureMs..firstMs + (whole.first + pieces[to].last + 1) * pictureMs, sure)
         }
     }
 
@@ -161,19 +183,26 @@ internal object BreakGuess {
         }
     }
 
-    /** What [captions] and [logo] agree on; either is null when it had nothing to go by. */
-    fun combine(captions: List<LongRange>?, logo: List<LongRange>?): List<LongRange> {
+    /**
+     * What [captions] and [logo] agree on; either is null when it had nothing to go by. A break the
+     * captions alone give is never sure, and one of the logo's stays so only where the captions do
+     * not say otherwise of its edges.
+     */
+    fun combine(captions: List<LongRange>?, logo: List<Guess>?): List<Guess> {
         if (captions == null) return logo.orEmpty()
-        if (logo == null) return captions
+        if (logo == null) return captions.map { Guess(it) }
         return captions.flatMap { spoken ->
-            logo.mapNotNull { shown ->
+            logo.mapNotNull { guess ->
+                val shown = guess.range
                 val late = maxOf(spoken.first, shown.first)
                 val early = minOf(spoken.last, shown.last)
                 if (early - late < SHARED_MS) return@mapNotNull null
                 // Further apart than that, one of them is wrong: the shorter break loses no programme.
-                val start = if (abs(spoken.first - shown.first) <= EDGE_MS) shown.first else late
-                val end = if (abs(spoken.last - shown.last) <= EDGE_MS) shown.last else early
-                start..end
+                val startAgrees = abs(spoken.first - shown.first) <= EDGE_MS
+                val endAgrees = abs(spoken.last - shown.last) <= EDGE_MS
+                val start = if (startAgrees) shown.first else late
+                val end = if (endAgrees) shown.last else early
+                Guess(start..end, guess.sure && startAgrees && endAgrees)
             }
         }
     }
@@ -324,7 +353,7 @@ internal class LogoTrack(private val pictures: Int, private val width: Int, priv
      * The stretches without the logo that have the programme, with it, on both sides; the first
      * picture being at [firstMs] and each [pictureMs] after the one before. Null as for [logo].
      */
-    fun breaks(firstMs: Long, pictureMs: Long): List<LongRange>? {
+    fun breaks(firstMs: Long, pictureMs: Long): List<Guess>? {
         val learnt = learn() ?: return null
         val lowerGone = learnt.lower?.let { BreakGuess.gone(it.score, it.usual, given) }
         return BreakGuess.logoBreaks(BreakGuess.gone(learnt.score, learnt.usual, given), firstMs, pictureMs, lowerGone)

@@ -58,19 +58,45 @@ class BreakGuessTest {
     @Test
     fun `a break is kept where both signals see it`() {
         val captions = listOf(2_081_000L..2_442_000L)
-        val logo = listOf(2_081_000L..2_429_000L)
-        assertEquals(listOf(2_081_000L..2_429_000L), BreakGuess.combine(captions, logo))
+        val logo = listOf(Guess(2_081_000L..2_429_000L))
+        assertEquals(listOf(2_081_000L..2_429_000L), BreakGuess.combine(captions, logo).ranges())
         // Captioned adverts at both ends of a break pass for the programme: the logo knows better.
-        assertEquals(listOf(1_289_000L..1_673_000L), BreakGuess.combine(listOf(1_344_000L..1_624_000L), listOf(1_289_000L..1_673_000L)))
+        assertEquals(listOf(1_289_000L..1_673_000L), BreakGuess.combine(listOf(1_344_000L..1_624_000L), listOf(Guess(1_289_000L..1_673_000L))).ranges())
         // Too far apart for that, at one end: the shorter break is kept there.
-        assertEquals(listOf(1_289_000L..1_624_000L), BreakGuess.combine(listOf(1_300_000L..1_624_000L), listOf(1_289_000L..1_900_000L)))
+        assertEquals(listOf(1_289_000L..1_624_000L), BreakGuess.combine(listOf(1_300_000L..1_624_000L), listOf(Guess(1_289_000L..1_900_000L))).ranges())
         // One alone, when the other has nothing to go by.
         assertEquals(logo, BreakGuess.combine(null, logo))
-        assertEquals(captions, BreakGuess.combine(captions, null))
-        assertEquals(emptyList<LongRange>(), BreakGuess.combine(null, null))
+        assertEquals(captions, BreakGuess.combine(captions, null).ranges())
+        assertEquals(emptyList<Guess>(), BreakGuess.combine(null, null))
         // Seen by one and not by the other, which could tell: not kept.
-        assertEquals(emptyList<LongRange>(), BreakGuess.combine(captions, listOf(600_000L..900_000L)))
-        assertEquals(emptyList<LongRange>(), BreakGuess.combine(captions, emptyList()))
+        assertEquals(emptyList<Guess>(), BreakGuess.combine(captions, listOf(Guess(600_000L..900_000L))))
+        assertEquals(emptyList<Guess>(), BreakGuess.combine(captions, emptyList()))
+    }
+
+    @Test
+    fun `a sure break of the logo stays so only where the captions agree on both edges`() {
+        val logo = listOf(Guess(1_289_000L..1_673_000L, sure = true))
+        assertEquals(logo, BreakGuess.combine(listOf(1_344_000L..1_624_000L), logo))
+        assertEquals(listOf(Guess(1_289_000L..1_624_000L)), BreakGuess.combine(listOf(1_300_000L..1_624_000L), listOf(Guess(1_289_000L..1_900_000L, sure = true))))
+        assertEquals(logo, BreakGuess.combine(null, logo))
+        // The captions alone are never sure.
+        assertEquals(listOf(Guess(1_289_000L..1_673_000L)), BreakGuess.combine(listOf(1_289_000L..1_673_000L), null))
+    }
+
+    @Test
+    fun `a break is sure when one clean stretch with the programme plainly on both sides`() {
+        fun sure(gone: BooleanArray, lowerGone: BooleanArray? = null) = BreakGuess.logoBreaks(gone, 0, 4_000, lowerGone).map { it.sure }
+        assertEquals(listOf(true), sure(gone(20 to false, 90 to true, 20 to false)))
+        // Something bridged in it.
+        assertEquals(listOf(false), sure(gone(20 to false, 30 to true, 7 to false, 58 to true, 30 to false)))
+        // A short piece given up at an end.
+        assertEquals(listOf(false), sure(gone(20 to false, 90 to true, 5 to false, 8 to true, 20 to false)))
+        // Narrowed by the second logo, or not.
+        val whole = BooleanArray(130) { it in 20 until 110 }
+        assertEquals(listOf(false), sure(whole, BooleanArray(130) { it in 20 until 80 }))
+        assertEquals(listOf(true), sure(whole, BooleanArray(130) { true }))
+        // Five pictures without the logo among the fifteen before it: a break, but not a sure one.
+        assertEquals(listOf(false), sure(gone(20 to false, 5 to true, 9 to false, 90 to true, 20 to false)))
     }
 
     private val width = 64
@@ -101,12 +127,12 @@ class BreakGuessTest {
     @Test
     fun `a stretch without the logo, with programme around it, is a break`() {
         // 100 pictures of programme, 90 of adverts (6 min), 100 of programme.
-        assertEquals(listOf(400_000L..760_000L), track(100, 90, 100).breaks(0, 4_000))
+        assertEquals(listOf(400_000L..760_000L), track(100, 90, 100).breaks(0, 4_000).ranges())
     }
 
     @Test
     fun `an advert with something in the logo's corner does not end the break`() {
-        assertEquals(listOf(400_000L..760_000L), track(100, 90, 100, logoInAdverts = 40..44).breaks(0, 4_000))
+        assertEquals(listOf(400_000L..760_000L), track(100, 90, 100, logoInAdverts = 40..44).breaks(0, 4_000).ranges())
     }
 
     @Test
@@ -120,7 +146,7 @@ class BreakGuessTest {
         // The break shows in the strips read within it, and nowhere else.
         assertEquals(setOf(6, 8), (0 until 15).filter { strip -> (strip * 25 until strip * 25 + 25).any { gone[it] } }.toSet())
         listOf(5, 7, 9).forEach(::give)
-        assertEquals(listOf(600_000L..960_000L), track.breaks(0, 4_000))
+        assertEquals(listOf(600_000L..960_000L), track.breaks(0, 4_000).ranges())
     }
 
     @Test
@@ -129,7 +155,7 @@ class BreakGuessTest {
         // adverts: 100 pictures of programme, 90 of adverts, 15 with the upper logo only, 100 with both.
         val track = LogoTrack(305, width, height)
         for (i in 0 until 305) track.add(i, picture(40 + i % 100, logo = i < 100 || i >= 205, upper = if (i in 100 until 190) 0 else 60))
-        assertEquals(listOf(400_000L..760_000L), track.breaks(0, 4_000))
+        assertEquals(listOf(400_000L..760_000L), track.breaks(0, 4_000).ranges())
     }
 
     @Test
@@ -137,11 +163,11 @@ class BreakGuessTest {
         // Four minutes of programme too bright for the channel's logo to show, the show's own still there.
         val bright = LogoTrack(260, width, height)
         for (i in 0 until 260) bright.add(i, picture(40 + i % 100, logo = true, upper = if (i in 100 until 160) 0 else 60))
-        assertEquals(emptyList<LongRange>(), bright.breaks(0, 4_000))
+        assertEquals(emptyList<LongRange>(), bright.breaks(0, 4_000).ranges())
         // The show's logo back 40 s before the channel's: the break ends with the first of the two.
         val late = LogoTrack(300, width, height)
         for (i in 0 until 300) late.add(i, picture(40 + i % 100, logo = i !in 100 until 190, upper = if (i in 100 until 200) 0 else 60))
-        assertEquals(listOf(400_000L..760_000L), late.breaks(0, 4_000))
+        assertEquals(listOf(400_000L..760_000L), late.breaks(0, 4_000).ranges())
     }
 
     @Test
@@ -156,7 +182,7 @@ class BreakGuessTest {
         val gone = track.gone()!!
         assertEquals(setOf(4, 6, 12, 14), (0 until 24).filter { strip -> (strip * 25 until strip * 25 + 25).any { gone[it] } }.toSet())
         listOf(3, 5, 7, 11, 13, 15).forEach(::give)
-        assertEquals(listOf(400_000L..800_000L), track.breaks(0, 4_000))
+        assertEquals(listOf(400_000L..800_000L), track.breaks(0, 4_000).ranges())
     }
 
     @Test
@@ -170,35 +196,35 @@ class BreakGuessTest {
         val faint = LogoTrack(260, width, height)
         for (i in 0 until 260) faint.add(i, picture(40 + i % 100, logo = true, upper = if (i in 100 until 160) 0 else 60, faint = 20))
         assertEquals(null, faint.logo()!!.lower)
-        assertEquals(listOf(400_000L..640_000L), faint.breaks(0, 4_000))
+        assertEquals(listOf(400_000L..640_000L), faint.breaks(0, 4_000).ranges())
     }
 
     @Test
     fun `a short piece held to either end of a break by the bridge is given up`() {
         // The logo back five pictures, then hidden eight: a bright scene after the break, not part of it.
-        assertEquals(listOf(80_000L..440_000L), BreakGuess.logoBreaks(gone(20 to false, 90 to true, 5 to false, 8 to true, 20 to false), 0, 4_000))
+        assertEquals(listOf(80_000L..440_000L), logoRanges(gone(20 to false, 90 to true, 5 to false, 8 to true, 20 to false), 0, 4_000))
         // The same before it, and at both ends, and two of them in a row.
-        assertEquals(listOf(132_000L..492_000L), BreakGuess.logoBreaks(gone(20 to false, 8 to true, 5 to false, 90 to true, 20 to false), 0, 4_000))
-        assertEquals(listOf(132_000L..492_000L), BreakGuess.logoBreaks(gone(20 to false, 8 to true, 5 to false, 90 to true, 5 to false, 9 to true, 20 to false), 0, 4_000))
-        assertEquals(listOf(80_000L..440_000L), BreakGuess.logoBreaks(gone(20 to false, 90 to true, 5 to false, 6 to true, 4 to false, 6 to true, 20 to false), 0, 4_000))
+        assertEquals(listOf(132_000L..492_000L), logoRanges(gone(20 to false, 8 to true, 5 to false, 90 to true, 20 to false), 0, 4_000))
+        assertEquals(listOf(132_000L..492_000L), logoRanges(gone(20 to false, 8 to true, 5 to false, 90 to true, 5 to false, 9 to true, 20 to false), 0, 4_000))
+        assertEquals(listOf(80_000L..440_000L), logoRanges(gone(20 to false, 90 to true, 5 to false, 6 to true, 4 to false, 6 to true, 20 to false), 0, 4_000))
         // Forty seconds and more is adverts again.
-        assertEquals(listOf(80_000L..500_000L), BreakGuess.logoBreaks(gone(20 to false, 90 to true, 5 to false, 10 to true, 20 to false), 0, 4_000))
+        assertEquals(listOf(80_000L..500_000L), logoRanges(gone(20 to false, 90 to true, 5 to false, 10 to true, 20 to false), 0, 4_000))
         // Of short pieces only, the first is kept: something is left of every break found.
-        assertEquals(listOf(80_000L..116_000L), BreakGuess.logoBreaks(gone(20 to false, 9 to true, 5 to false, 9 to true, 5 to false, 9 to true, 5 to false, 9 to true, 20 to false), 0, 4_000))
+        assertEquals(listOf(80_000L..116_000L), logoRanges(gone(20 to false, 9 to true, 5 to false, 9 to true, 5 to false, 9 to true, 5 to false, 9 to true, 20 to false), 0, 4_000))
         // With a second logo, it is what is left without it that gives up its short end.
         val second = gone(20 to true, 90 to true, 5 to true, 8 to true, 20 to true)
-        assertEquals(listOf(80_000L..440_000L), BreakGuess.logoBreaks(gone(20 to false, 103 to true, 20 to false), 0, 4_000, second.also { for (i in 110 until 115) it[i] = false }))
+        assertEquals(listOf(80_000L..440_000L), logoRanges(gone(20 to false, 103 to true, 20 to false), 0, 4_000, second.also { for (i in 110 until 115) it[i] = false }))
     }
 
     @Test
     fun `a break is narrowed to the pictures without the second logo`() {
         val gone = BooleanArray(130) { it in 20 until 110 }
-        assertEquals(listOf(80_000L..440_000L), BreakGuess.logoBreaks(gone, 0, 4_000))
-        assertEquals(listOf(80_000L..320_000L), BreakGuess.logoBreaks(gone, 0, 4_000, BooleanArray(130) { it in 20 until 80 }))
+        assertEquals(listOf(80_000L..440_000L), logoRanges(gone, 0, 4_000))
+        assertEquals(listOf(80_000L..320_000L), logoRanges(gone, 0, 4_000, BooleanArray(130) { it in 20 until 80 }))
         // Too little of it left for a break.
-        assertEquals(emptyList<LongRange>(), BreakGuess.logoBreaks(gone, 0, 4_000, BooleanArray(130) { it in 20 until 50 }))
+        assertEquals(emptyList<LongRange>(), logoRanges(gone, 0, 4_000, BooleanArray(130) { it in 20 until 50 }))
         // What the second logo misses outside a break of the first makes none.
-        assertEquals(emptyList<LongRange>(), BreakGuess.logoBreaks(BooleanArray(130), 0, 4_000, gone))
+        assertEquals(emptyList<LongRange>(), logoRanges(BooleanArray(130), 0, 4_000, gone))
     }
 
     @Test
@@ -214,13 +240,13 @@ class BreakGuessTest {
         val gone = track.gone()!!
         assertEquals(setOf(4, 6), (0 until 24).filter { strip -> (strip * 25 until strip * 25 + 25).any { gone[it] } }.toSet())
         listOf(3, 5, 7).forEach(::give)
-        assertEquals(listOf(400_000L..800_000L), track.breaks(0, 4_000))
+        assertEquals(listOf(400_000L..800_000L), track.breaks(0, 4_000).ranges())
     }
 
     @Test
     fun `too short a stretch, or one at the end of the recording, is no break`() {
-        assertEquals(emptyList<LongRange>(), track(100, 20, 100).breaks(0, 4_000))
-        assertEquals(emptyList<LongRange>(), track(200, 90, 0).breaks(0, 4_000))
+        assertEquals(emptyList<LongRange>(), track(100, 20, 100).breaks(0, 4_000).ranges())
+        assertEquals(emptyList<LongRange>(), track(200, 90, 0).breaks(0, 4_000).ranges())
     }
 
     @Test
@@ -235,11 +261,17 @@ class BreakGuessTest {
     @Test
     fun `a stretch without the logo is a break once the programme is seen on both sides`() {
         fun flags(before: Int, without: Int, after: Int) = BooleanArray(before + without + after) { it in before until before + without }
-        assertEquals(listOf(1_000_080_000L..1_000_440_000L), BreakGuess.logoBreaks(flags(20, 90, 20), 1_000_000_000L, 4_000))
+        assertEquals(listOf(1_000_080_000L..1_000_440_000L), logoRanges(flags(20, 90, 20), 1_000_000_000L, 4_000))
         // Still going on, or begun before what is known: not yet.
-        assertEquals(emptyList<LongRange>(), BreakGuess.logoBreaks(flags(20, 90, 5), 1_000_000_000L, 4_000))
-        assertEquals(emptyList<LongRange>(), BreakGuess.logoBreaks(flags(5, 90, 20), 1_000_000_000L, 4_000))
+        assertEquals(emptyList<LongRange>(), logoRanges(flags(20, 90, 5), 1_000_000_000L, 4_000))
+        assertEquals(emptyList<LongRange>(), logoRanges(flags(5, 90, 20), 1_000_000_000L, 4_000))
     }
+
+    private fun List<Guess>?.ranges() = this?.map { it.range }
+
+    // The breaks [BreakGuess.logoBreaks] finds, without whether each is sure.
+    private fun logoRanges(gone: BooleanArray, firstMs: Long, pictureMs: Long, lowerGone: BooleanArray? = null) =
+        BreakGuess.logoBreaks(gone, firstMs, pictureMs, lowerGone).map { it.range }
 
     // Pictures from stretches given as a number of them and whether they are without the logo.
     private fun gone(vararg stretches: Pair<Int, Boolean>) = stretches.flatMap { (count, gone) -> List(count) { gone } }.toBooleanArray()
@@ -247,27 +279,27 @@ class BreakGuessTest {
     @Test
     fun `a few pictures without the logo near a break neither end it late nor undo it`() {
         // Three pictures of a bright scene, five or ten pictures after the adverts.
-        assertEquals(listOf(80_000L..440_000L), BreakGuess.logoBreaks(gone(20 to false, 90 to true, 5 to false, 3 to true, 30 to false), 0, 4_000))
-        assertEquals(listOf(80_000L..440_000L), BreakGuess.logoBreaks(gone(20 to false, 90 to true, 10 to false, 3 to true, 30 to false), 0, 4_000))
+        assertEquals(listOf(80_000L..440_000L), logoRanges(gone(20 to false, 90 to true, 5 to false, 3 to true, 30 to false), 0, 4_000))
+        assertEquals(listOf(80_000L..440_000L), logoRanges(gone(20 to false, 90 to true, 10 to false, 3 to true, 30 to false), 0, 4_000))
     }
 
     @Test
     fun `a badge over the logo a minute after the adverts is not more of them`() {
         // The programme is back for 12 pictures, then has a badge over its logo for 11.
-        assertEquals(listOf(80_000L..440_000L), BreakGuess.logoBreaks(gone(20 to false, 90 to true, 12 to false, 11 to true, 30 to false), 0, 4_000))
+        assertEquals(listOf(80_000L..440_000L), logoRanges(gone(20 to false, 90 to true, 12 to false, 11 to true, 30 to false), 0, 4_000))
     }
 
     @Test
     fun `an advert with something in the logo's corner is bridged when short, and splits the break when long`() {
-        assertEquals(listOf(80_000L..460_000L), BreakGuess.logoBreaks(gone(20 to false, 30 to true, 7 to false, 58 to true, 30 to false), 0, 4_000))
+        assertEquals(listOf(80_000L..460_000L), logoRanges(gone(20 to false, 30 to true, 7 to false, 58 to true, 30 to false), 0, 4_000))
         // Nine pictures of it: the first part is too short to be offered, the second is.
-        assertEquals(listOf(236_000L..448_000L), BreakGuess.logoBreaks(gone(20 to false, 30 to true, 9 to false, 53 to true, 30 to false), 0, 4_000))
+        assertEquals(listOf(236_000L..448_000L), logoRanges(gone(20 to false, 30 to true, 9 to false, 53 to true, 30 to false), 0, 4_000))
     }
 
     @Test
     fun `pictures with nothing that stays say nothing`() {
         val track = LogoTrack(120, width, height)
         for (i in 0 until 120) track.add(i, picture(40 + i, logo = false))
-        assertNull(track.breaks(0, 4_000))
+        assertNull(track.breaks(0, 4_000).ranges())
     }
 }

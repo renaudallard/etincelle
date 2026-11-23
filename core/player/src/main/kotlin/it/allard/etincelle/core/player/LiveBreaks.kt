@@ -65,7 +65,7 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
      * The breaks around the playhead, at [atMs] with the live point at [liveMs] (ms since 1970), as
      * far as they are known, in the same time. Reads the pictures it still needs: for an IO thread.
      */
-    suspend fun around(atMs: Long, liveMs: Long): List<LongRange> = lock.withLock {
+    suspend fun around(atMs: Long, liveMs: Long): List<Guess> = lock.withLock {
         val at = atMs / 1000 / step * step
         // The last pictures are not there yet.
         val last = (liveMs / 1000 - NOT_YET_S) / step * step
