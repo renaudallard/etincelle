@@ -85,7 +85,7 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
         override fun run() {
             val session = session ?: return
             session.requestStatus()
-            handler.postDelayed(this, POLL_MS)
+            handler.postDelayed(this, pollMs())
         }
     }
 
@@ -94,8 +94,12 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
     private fun pollLater() {
         handler.removeCallbacks(poller)
         val moving = playerState == "PLAYING" || (live && playerState == "PAUSED" && onScreen)
-        if (session != null && item != null && moving) handler.postDelayed(poller, POLL_MS)
+        if (session != null && item != null && moving) handler.postDelayed(poller, pollMs())
     }
+
+    // With the app away, the position is only kept and the next episode started from it, which a drift
+    // of some seconds does not change; each status there is a new media notification too.
+    private fun pollMs() = if (onScreen) POLL_MS else POLL_AWAY_MS
 
     fun attach(session: DirectCastSession) {
         this.session = session
@@ -269,6 +273,7 @@ internal class DirectCastPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
     private companion object {
         const val TICK_MS = 1_000L
         const val POLL_MS = 5_000L
+        const val POLL_AWAY_MS = 30_000L
 
         val COMMANDS: Player.Commands = Player.Commands.Builder().addAll(
             COMMAND_PLAY_PAUSE,
