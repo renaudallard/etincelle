@@ -47,7 +47,8 @@ parrainages, ne se distingue pas sûrement du début de l'émission. Sur les aut
 RMC, où le flux en manque beaucoup, CSTAR, CNEWS, BFMTV… ; pas Arte, qui n'a pas de publicité),
 l'application cherche les coupures elle-même dans les **vignettes** que le service garde de
 chaque chaîne : le logo présent dans un coin pendant l'émission (celui de la chaîne, en haut, de
-préférence à celui d'une émission, en bas, dont la présence suffit toutefois à reconnaître l'émission)
+préférence à celui d'une émission, en bas, dont la présence, s'il ressort nettement, suffit toutefois à
+reconnaître l'émission)
 disparaît pendant la publicité. Le
 bouton apparaît alors de la même façon : c'est une estimation, qu'une publicité portant quelque
 chose à elle dans le coin d'un de ces logos peut écourter ou faire manquer. Quand des publicités

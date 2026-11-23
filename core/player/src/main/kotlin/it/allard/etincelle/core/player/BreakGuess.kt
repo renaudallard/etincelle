@@ -425,7 +425,7 @@ internal class LogoTrack(private val pictures: Int, private val width: Int, priv
             ?: (if (found < 0) lower?.takeIf { it.strength >= STRONG } else corner(found, read, counts))
             ?: return null
         found = main.index
-        val beside = lower?.takeIf { upper != null && it.strength >= STRONG }
+        val beside = lower?.takeIf { upper != null && it.strength >= BESIDE }
         return scored(main, read, beside?.let { scored(it, read, null) })
     }
 
@@ -464,8 +464,11 @@ internal class LogoTrack(private val pictures: Int, private val width: Int, priv
         const val CORNER = 0.22
         const val MASK = 0.92
 
-        // The least a logo's edges must stand out.
+        // The least a logo's edges must stand out, and those of a show's own beside the channel's: a
+        // fainter one, as a band of text along the bottom, is matched by the notices along the bottom
+        // of adverts, which then pass for the programme and part the break.
         const val STRONG = 25.0
+        const val BESIDE = 30.0
 
         // How many of the corners, the first ones, are the upper ones.
         const val UPPER = 2

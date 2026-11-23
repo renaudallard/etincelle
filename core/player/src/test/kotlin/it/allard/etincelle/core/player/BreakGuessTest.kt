@@ -204,6 +204,11 @@ class BreakGuessTest {
         for (i in 0 until 260) faint.add(i, picture(40 + i % 100, logo = true, upper = if (i in 100 until 160) 0 else 60, faint = 20))
         assertEquals(null, faint.logo()!!.lower)
         assertEquals(listOf(400_000L..640_000L), faint.breaks(0, 4_000).ranges())
+        // As is one that stands out only as much as the channel's must, as a band of text along the bottom.
+        val band = LogoTrack(260, width, height)
+        for (i in 0 until 260) band.add(i, picture(40 + i % 100, logo = true, upper = if (i in 100 until 160) 0 else 60, faint = 26))
+        assertEquals(null, band.logo()!!.lower)
+        assertEquals(listOf(400_000L..640_000L), band.breaks(0, 4_000).ranges())
     }
 
     @Test
