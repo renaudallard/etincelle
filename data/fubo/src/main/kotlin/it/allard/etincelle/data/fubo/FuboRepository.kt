@@ -37,6 +37,8 @@ import it.allard.etincelle.core.network.SessionStore
 import it.allard.etincelle.core.network.isTrustedApiHost
 import it.allard.etincelle.core.remote.RemoteProtocol
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
@@ -502,9 +504,10 @@ class FuboRepository(
                 }
                 DetailKind.SERIES -> {
                     val recorded = async { recordingsOf(id) }
+                    val watchNow = watchNowOf(id)
                     val resp = api.seriesDetail(id)
                     // Series with catch-up expose their episodes on a separate "Regarder maintenant" tab.
-                    if (resp.hasWatchNowTab()) episodes = api.seriesDetail(id, "id-tab-watch-now").episodes()
+                    if (resp.hasWatchNowTab()) episodes = watchNow.await().getOrThrow().episodes() else watchNow.cancel()
                     matches = recorded.await()
                     resp.toProgramDetail(channelId = null, vodId = id, isLive = false)
                 }
@@ -559,13 +562,30 @@ class FuboRepository(
      * whole lookup is best-effort: it must never fail the detail open, since the episode list is only a
      * supplement to the show's own page.
      */
-    private suspend fun seriesEpisodes(seriesId: String): List<ContentCard> = try {
-        val series = api.seriesDetail(seriesId)
-        if (series.hasWatchNowTab()) api.seriesDetail(seriesId, "id-tab-watch-now").episodes() else emptyList()
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        emptyList()
+    private suspend fun seriesEpisodes(seriesId: String): List<ContentCard> = coroutineScope {
+        val watchNow = watchNowOf(seriesId)
+        try {
+            val series = api.seriesDetail(seriesId)
+            if (series.hasWatchNowTab()) watchNow.await().getOrThrow().episodes() else emptyList()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            emptyList()
+        } finally {
+            watchNow.cancel()
+        }
+    }
+
+    // The "Regarder maintenant" tab of series [id], asked for beside its default tab, which says
+    // whether it has one: a round trip less on each page that lists the episodes. Given up when not.
+    private fun CoroutineScope.watchNowOf(id: String): Deferred<Result<PageResponse>> = async {
+        try {
+            Result.success(api.seriesDetail(id, "id-tab-watch-now"))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     override suspend fun record(action: RecordAction) = post(action.url, action.payload)

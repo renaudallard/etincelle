@@ -345,13 +345,43 @@ class FuboRepositoryTest {
     @Test
     fun `a series detail still opens for an account without recordings`() = runTest {
         session.session = UserSession("AT", "RT", "u1", "p1")
-        server.enqueue(MockResponse().setBody("""{"title":{"text":"Une série"},"content":{"sections":[]}}"""))
-        server.enqueue(MockResponse().setResponseCode(404).setBody("404 page not found"))
+        // Its watch-now tab is asked for at once, and given up: the page has none.
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse = when (request.path) {
+                "/papi/v1/program-details/series/100001?tabID=id-tab-about" ->
+                    MockResponse().setBody("""{"title":{"text":"Une série"},"content":{"sections":[]}}""")
+                "/papi/v1/program-details/series/100001?tabID=id-tab-watch-now" -> MockResponse().setResponseCode(500)
+                else -> MockResponse().setResponseCode(404).setBody("404 page not found")
+            }
+        }
 
         val detail = repo.fetchProgramDetail("100001", DetailKind.SERIES)
 
-        assertEquals(2, server.requestCount)
         assertTrue(detail.recordings.isEmpty())
+        assertTrue(detail.episodes.isEmpty())
+    }
+
+    @Test
+    fun `a series detail lists the episodes of its watch-now tab`() = runTest {
+        session.session = UserSession("AT", "RT", "u1", "p1")
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse = when (request.path) {
+                "/papi/v1/program-details/series/100001?tabID=id-tab-about" -> MockResponse().setBody(
+                    """{"title":{"text":"Une série"},"content":{"sections":[
+                      {"component_type":"tab","components":[{"slug":"tab-watch-now"}]}]}}""",
+                )
+                "/papi/v1/program-details/series/100001?tabID=id-tab-watch-now" -> MockResponse().setBody(
+                    """{"content":{"sections":[{"component_type":"list-item-wide","components":[
+                      {"id":"VOD_1","title":{"text":"Épisode 1"},"actions":{"on_click":[{"type":"navigation",
+                        "endpoint":{"url":"program-details/program/VOD_1"}}]}}]}]}}""",
+                )
+                else -> MockResponse().setResponseCode(404).setBody("404 page not found")
+            }
+        }
+
+        val detail = repo.fetchProgramDetail("100001", DetailKind.SERIES)
+
+        assertEquals(listOf("VOD_1"), detail.episodes.map { it.id })
     }
 
     @Test
