@@ -44,6 +44,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.material3.OutlinedTextField
@@ -951,15 +952,19 @@ fun TvProgramDetailScreen(
             AsyncImage(
                 model = url,
                 contentDescription = null,
+                // Only the picture fades, its alpha applied as it is drawn: a fading layer of picture and
+                // gradients would be drawn off screen whole on each frame of the scroll. The gradients go
+                // to the page's own colour, on which it lies, so drawn whole over it they look the same.
                 modifier = Modifier.fillMaxSize()
-                    .graphicsLayer {
-                        val scrolled = if (list.firstVisibleItemIndex > 0) Float.MAX_VALUE else list.firstVisibleItemScrollOffset.toFloat()
-                        alpha = 1f - (scrolled / (size.height / 2)).coerceIn(0f, 1f)
-                    }
                     .drawWithContent {
                         drawContent()
                         drawRect(Brush.horizontalGradient(0f to page, 0.4f to page.copy(alpha = 0.95f), 0.75f to Color.Transparent))
                         drawRect(Brush.verticalGradient(0.45f to Color.Transparent, 1f to page))
+                    }
+                    .graphicsLayer {
+                        val scrolled = if (list.firstVisibleItemIndex > 0) Float.MAX_VALUE else list.firstVisibleItemScrollOffset.toFloat()
+                        alpha = 1f - (scrolled / (size.height / 2)).coerceIn(0f, 1f)
+                        compositingStrategy = CompositingStrategy.ModulateAlpha
                     },
                 contentScale = ContentScale.Crop,
             )
