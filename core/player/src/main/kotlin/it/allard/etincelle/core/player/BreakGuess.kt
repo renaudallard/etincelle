@@ -127,6 +127,11 @@ internal object BreakGuess {
     // than the programme, which shows it for minutes on end.
     private const val SHORT_SHOW = 10
 
+    // The most pictures in a row the first logo may be seen in a break, the second being gone with it,
+    // for them to be an advert with its brand in the first one's corner (M6's faint logo) rather than
+    // the programme, which shows both.
+    private const val BRAND = 12
+
     /**
      * Of each picture, whether it is without the logo, from what each has of it ([score], [usual]
      * with it). One odd picture is no break, nor the end of one: each is taken with its neighbours.
@@ -153,7 +158,9 @@ internal object BreakGuess {
      * The second logo can be the channel's own pictogram, which its trailers carry too: a trailer in a
      * break would then pass for the programme and cut the break in two, each part too short to
      * count. So the second logo shown at most [SHORT_SHOW] pictures in a row, the first gone the while,
-     * does not part two pieces of a break; nor does it count in their length, and the break is
+     * does not part two pieces of a break; nor does the first seen at most [BRAND] pictures in a row,
+     * the second gone the while, which is an advert with its brand in the first one's corner. Neither
+     * counts in the pieces' length, never into a break longer than one may be, and such a break is
      * never sure.
      *
      * Adverts with something of their own in the logo's corner (Gulli's toy adverts, their makers'
@@ -181,7 +188,8 @@ internal object BreakGuess {
                 without[i] = gone[i] && lowerGone[i]
                 trailer[i] = gone[i] && !lowerGone[i]
             }
-            found = breakRuns(without, pictureMs, trailer)
+            val brand = BooleanArray(gone.size) { !gone[it] && lowerGone[it] }
+            found = breakRuns(without, pictureMs, trailer, brand)
         }
         val solid = solid(without)
         fun clear(from: Int, to: Int) = (from until to).count { !solid[it] } >= CLEAR
@@ -215,39 +223,48 @@ internal object BreakGuess {
         }
     }
 
-    // The stretches of [gone] that are breaks: solid, held together by the bridge, or by a trailer
-    // (see [logoBreaks]) where [trailer] is given, between two stretches with the programme, and of
+    // The stretches of [gone] that are breaks: solid, held together by the bridge, or by a trailer or a
+    // brand (see [logoBreaks]) where they are given, between two stretches with the programme, and of
     // a break's length.
-    private fun breakRuns(gone: BooleanArray, pictureMs: Long, trailer: BooleanArray? = null): List<IntRange> {
+    private fun breakRuns(gone: BooleanArray, pictureMs: Long, trailer: BooleanArray? = null, brand: BooleanArray? = null): List<IntRange> {
         val solid = solid(gone)
         fun programme(from: Int, to: Int) = from >= 0 && to <= solid.size && (from until to).count { !solid[it] } >= MOSTLY
-        val held = runs(solid, BRIDGE).let { if (trailer == null) it else joined(it, trailer) }
+        val held = runs(solid, BRIDGE).let { if (trailer == null || brand == null) it else joined(it, trailer, brand, pictureMs) }
         return held.filter { run ->
             val between = programme(run.first - AROUND, run.first) && programme(run.last + 1, run.last + 1 + AROUND)
             between && (run.last + 1 - run.first) * pictureMs in MIN_MS..MAX_MS
         }
     }
 
-    // [runs] with those parted only by a trailer, with up to BRIDGE other pictures, made one.
-    private fun joined(runs: List<IntRange>, trailer: BooleanArray): List<IntRange> {
+    // [runs] with those parted only by a trailer or a brand, with up to BRIDGE other pictures, made one,
+    // unless that one would be longer than a break may be.
+    private fun joined(runs: List<IntRange>, trailer: BooleanArray, brand: BooleanArray, pictureMs: Long): List<IntRange> {
         val out = mutableListOf<IntRange>()
         for (run in runs) {
             val last = out.lastOrNull()
-            val gap = if (last == null) IntRange.EMPTY else last.last + 1 until run.first
-            val shown = gap.count { trailer[it] }
-            var row = 0
-            var longest = 0
-            for (i in gap) {
-                row = if (trailer[i]) row + 1 else 0
-                longest = maxOf(longest, row)
-            }
-            if (last != null && gap.count() <= SHORT_SHOW + BRIDGE && shown >= gap.count() - BRIDGE && longest <= SHORT_SHOW) {
+            if (last != null && (run.last + 1 - last.first) * pictureMs <= MAX_MS && partedBy(last.last + 1 until run.first, trailer, brand)) {
                 out[out.size - 1] = last.first..run.last
             } else {
                 out += run
             }
         }
         return out
+    }
+
+    // Whether [gap] holds a trailer or a brand, with up to BRIDGE other pictures, and no more of either.
+    private fun partedBy(gap: IntRange, trailer: BooleanArray, brand: BooleanArray): Boolean =
+        gap.count() <= SHORT_SHOW + BRAND + BRIDGE && gap.count { trailer[it] || brand[it] } >= gap.count() - BRIDGE &&
+            longest(trailer, gap) <= SHORT_SHOW && longest(brand, gap) <= BRAND
+
+    // The most [flags] in a row in [range].
+    private fun longest(flags: BooleanArray, range: IntRange): Int {
+        var row = 0
+        var most = 0
+        for (i in range) {
+            row = if (flags[i]) row + 1 else 0
+            most = maxOf(most, row)
+        }
+        return most
     }
 
     /**

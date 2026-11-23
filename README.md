@@ -55,7 +55,9 @@ gardent ainsi le logo de la chaîne visible la moitié du temps, comme les jouet
 disparition du logo de l'émission tout du long suffit, si celui de la chaîne est bien visible avant
 et après ; jamais au-delà de son retour, et jamais sautée d'office. Et une bande-annonce qui porte
 le pictogramme de la chaîne au milieu des publicités, comme sur Paris Première, ne coupe plus la
-coupure en deux : le logo du bas ne compte pour l'émission qu'au-delà de 40 secondes. Elle s'arrête une
+coupure en deux : le logo du bas ne compte pour l'émission qu'au-delà de 40 secondes. Pas plus
+qu'une publicité qui montre sa marque dans le coin du logo de la chaîne, celui de l'émission absent,
+comme sur M6 dont le logo est pâle : jusqu'à 48 secondes, elle ne compte pas pour l'émission. Elle s'arrête une
 demi-minute avant le retour du logo, que les chaînes remettent parfois après la reprise de
 l'émission : mieux vaut voir les dernières publicités que perdre le début de l'émission. Sur
 **Signalées et presque sûres**, le réglage saute aussi, douze secondes après son début, une coupure

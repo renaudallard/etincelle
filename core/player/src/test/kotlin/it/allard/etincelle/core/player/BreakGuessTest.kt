@@ -228,6 +228,22 @@ class BreakGuessTest {
     }
 
     @Test
+    fun `an advert with its brand in the channel's corner does not part a break`() {
+        // The channel's logo seen 36 s mid-break, the show's gone the while: two breaks made one.
+        val upper = gone(20 to false, 40 to true, 9 to false, 40 to true, 20 to false)
+        val lower = gone(20 to false, 89 to true, 20 to false)
+        assertEquals(listOf(80_000L..436_000L), logoRanges(upper, 0, 4_000, lower))
+        assertEquals(listOf(false), BreakGuess.logoBreaks(upper, 0, 4_000, lower).map { it.sure })
+        // The show's seen with it: the programme, between two breaks.
+        val programme = gone(20 to false, 40 to true, 9 to false, 40 to true, 20 to false)
+        assertEquals(listOf(80_000L..240_000L, 276_000L..436_000L), logoRanges(upper, 0, 4_000, programme))
+        // Nor into a break longer than one may be: the two are left as they are.
+        val long = gone(20 to false, 110 to true, 9 to false, 110 to true, 20 to false)
+        val longLower = gone(20 to false, 229 to true, 20 to false)
+        assertEquals(listOf(80_000L..520_000L, 556_000L..996_000L), logoRanges(long, 0, 4_000, longLower))
+    }
+
+    @Test
     fun `a trailer carrying the second logo does not part a break`() {
         // The channel's logo gone throughout; its pictogram on a trailer in the middle, 32 s of it.
         val upper = gone(20 to false, 82 to true, 20 to false)
