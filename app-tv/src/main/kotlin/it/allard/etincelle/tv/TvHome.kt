@@ -18,6 +18,8 @@ import androidx.tvprovider.media.tv.TvContractCompat
 import androidx.tvprovider.media.tv.WatchNextProgram
 import it.allard.etincelle.core.domain.MolotovRepository
 import it.allard.etincelle.core.model.HomeProgram
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -45,8 +47,13 @@ object TvHome {
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(ROW_WRITTEN).remove(NEXT_WRITTEN).apply()
             return@withLock
         }
-        runCatching { repo.homeRecommendations() }.onSuccess { writeChanged(context, ROW_WRITTEN, it) { replaceRow(context, it) } }
-        runCatching { repo.continueWatching() }.onSuccess { writeChanged(context, NEXT_WRITTEN, it) { replaceWatchNext(context, it) } }
+        // Asked together: neither needs the other's answer.
+        coroutineScope {
+            val row = async { runCatching { repo.homeRecommendations() } }
+            val next = async { runCatching { repo.continueWatching() } }
+            row.await().onSuccess { writeChanged(context, ROW_WRITTEN, it) { replaceRow(context, it) } }
+            next.await().onSuccess { writeChanged(context, NEXT_WRITTEN, it) { replaceWatchNext(context, it) } }
+        }
     }
 
     // Has [write] put [programs] in, unless they are those last written under [key]. The row and Watch
