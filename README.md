@@ -126,7 +126,10 @@ Ce qui passe **en ce moment** se périme avec l'heure : le guide et toute page q
 programmes en direct (l'accueil, **Direct**, les rangées « En direct ») se rechargent d'eux-mêmes,
 sans perdre la position dans la liste : toutes les 5 minutes tant qu'ils restent à l'écran, et dès
 que l'on y revient (retour dans l'application, sortie d'une fiche ou du lecteur) s'ils ont plus de
-2 minutes, 5 pour le guide, bien plus lourd. Sur téléphone, n'importe quelle page se **rafraîchit** aussi en tirant au-delà du haut ou
+2 minutes, 5 pour le guide, bien plus lourd. Les trois derniers onglets quittés depuis leur
+propre page (Accueil, Direct, Chaînes, Films ou Séries) s'affichent aussitôt tels qu'ils étaient s'ils
+sont rouverts dans la demi-heure, puis suivent ces mêmes règles ; ils sont oubliés si le système
+manque de mémoire. Sur téléphone, n'importe quelle page se **rafraîchit** aussi en tirant au-delà du haut ou
 du bas de la liste.
 
 L'application accepte aussi des **liens profonds** vers une fiche, pour l'intégration par des

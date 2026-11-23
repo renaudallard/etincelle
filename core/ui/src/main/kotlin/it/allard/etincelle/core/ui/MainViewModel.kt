@@ -23,6 +23,7 @@ import it.allard.etincelle.core.model.ProgramDetail
 import it.allard.etincelle.core.model.ProgramWindow
 import it.allard.etincelle.core.model.RecordAction
 import it.allard.etincelle.core.model.UpNext
+import it.allard.etincelle.core.model.UserSession
 import it.allard.etincelle.core.model.withUpNext
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
@@ -60,9 +61,13 @@ private const val UPDATE_RECHECK_MS = 60 * 60 * 1000L
 private const val STALE_ON_RETURN_MS = 2 * 60 * 1000L
 private const val STALE_ON_SCREEN_MS = 5 * 60 * 1000L
 private const val STALE_CHECK_MS = 30 * 1000L
-// The guide, a day of every channel and megabytes to fetch, is shown again as it was when its tab is
-// chosen again within this time, and loaded again only if it has gone stale meanwhile.
-private const val GUIDE_KEPT_MS = 30 * 60 * 1000L
+// The guide, a day of every channel and megabytes to fetch, and the page of a tab left, are shown again
+// as they were when their tab is chosen again within this time, and loaded again only if gone stale.
+private const val KEPT_PAGE_MS = 30 * 60 * 1000L
+// The tabs whose page is kept as they are left (the guide is kept as it loads): not the recordings,
+// which a recording made meanwhile changes, nor the search. As many as this at once.
+private val KEPT_TABS = setOf(Tab.HOME, Tab.LIVE, Tab.CHANNELS, Tab.MOVIES, Tab.SERIES)
+private const val KEPT_TABS_MAX = 3
 // Signed in, but the first page did not come: the tabs are there to load one.
 private const val HOME_FAILED = "Échec du chargement de l'accueil"
 // The official app caps a profile name at 30 characters.
@@ -176,8 +181,14 @@ class MainViewModel(
     private val loadedAt = IdentityHashMap<ContentPage, Long>()
 
     // The last guide loaded, when, and for which account and profile.
-    private class KeptGuide(val page: ContentPage, val at: Long, val user: String, val profile: String)
-    private var keptGuide: KeptGuide? = null
+    private class KeptPage(val page: ContentPage, val at: Long, val user: String, val profile: String) {
+        fun fresh(session: UserSession?, now: Long) =
+            session?.userId == user && session.profileId == profile && now - at in 0 until KEPT_PAGE_MS
+    }
+    private var keptGuide: KeptPage? = null
+
+    // The page each of the last tabs left was showing, to be shown again at once on coming back to it.
+    private val keptTabs = LinkedHashMap<Tab, KeptPage>()
 
     init {
         viewModelScope.launch {
@@ -444,7 +455,7 @@ class MainViewModel(
     private fun applyFailure(e: Throwable, fallback: String) {
         if (e is AppError.Unauthorized && repo.currentSession() == null) {
             lastQuery = null
-            keptGuide = null
+            forgetKeptPages()
             _state.update { UiState(checking = false, error = e.message, hideLocked = it.hideLocked, update = it.update) }
         } else {
             // An error that says nothing of its own is told by what was being done.
@@ -475,6 +486,7 @@ class MainViewModel(
     }
 
     fun selectTab(tab: Tab) {
+        if (tab != _state.value.tab) keepTabPage()
         if (tab == Tab.SEARCH) {
             // A page still loading for the tab being left must not land in the search results.
             cancelNav()
@@ -496,6 +508,15 @@ class MainViewModel(
             // The guide is time-sensitive, so re-selecting it refreshes (silently when already loaded)
             // rather than keeping a stale snapshot.
             reloadGuide(silent = tab == _state.value.tab && _state.value.backStack.isNotEmpty())
+            return
+        }
+        val kept = keptTab(tab)
+        if (tab != _state.value.tab && kept != null) {
+            cancelNav()
+            // With the time it was loaded at, which the check below goes by.
+            loadedAt[kept.page] = kept.at
+            _state.update { it.copy(tab = tab, error = null, busy = false, backStack = listOf(kept.page)) }
+            reloadIfStale(STALE_ON_RETURN_MS)
             return
         }
         if (tab == Tab.HOME) {
@@ -525,7 +546,7 @@ class MainViewModel(
                     // Not kept for the account or profile that took over while it was on its way.
                     val now = repo.currentSession()
                     keptGuide = if (asker != null && now?.userId == asker.userId && now.profileId == asker.profileId) {
-                        KeptGuide(page, clock(), asker.userId, asker.profileId)
+                        KeptPage(page, clock(), asker.userId, asker.profileId)
                     } else {
                         null
                     }
@@ -536,15 +557,37 @@ class MainViewModel(
     }
 
     /** The app is short of memory, or left: what is kept to show a page sooner is let go of. */
-    fun trimMemory() {
+    fun trimMemory() = forgetKeptPages()
+
+    private fun forgetKeptPages() {
         keptGuide = null
+        keptTabs.clear()
+    }
+
+    // Notes the page of the tab being left, when it shows its own page, to show it again on return.
+    private fun keepTabPage() {
+        val s = _state.value
+        if (s.tab !in KEPT_TABS) return
+        val page = s.backStack.singleOrNull() ?: return
+        val at = loadedAt[page] ?: return
+        val session = repo.currentSession() ?: return
+        keptTabs.remove(s.tab)
+        keptTabs[s.tab] = KeptPage(page, at, session.userId, session.profileId)
+        if (keptTabs.size > KEPT_TABS_MAX) keptTabs.remove(keptTabs.keys.first())
+    }
+
+    // The page kept for [tab], while it is recent enough and of the account and profile in use.
+    private fun keptTab(tab: Tab): KeptPage? {
+        val kept = keptTabs[tab] ?: return null
+        if (kept.fresh(repo.currentSession(), clock())) return kept
+        keptTabs.remove(tab)
+        return null
     }
 
     // The guide kept from the last load, while it is recent enough and of the account and profile in use.
-    private fun keptGuide(): KeptGuide? {
+    private fun keptGuide(): KeptPage? {
         val kept = keptGuide ?: return null
-        val session = repo.currentSession()
-        val fresh = session?.userId == kept.user && session.profileId == kept.profile && clock() - kept.at in 0 until GUIDE_KEPT_MS
+        val fresh = kept.fresh(repo.currentSession(), clock())
         if (!fresh) keptGuide = null
         return kept.takeIf { fresh }
     }
@@ -919,7 +962,10 @@ class MainViewModel(
         val stopping = (action.payload["action_name"] as? String)?.contains("stop", ignoreCase = true) == true
         _state.update { it.copy(busy = true, error = null, info = null) }
         viewModelScope.launch {
+            // What the kept pages show may have changed with it, kept before it or while it was on its way.
+            keptTabs.clear()
             val result = runCatching { repo.record(action) }
+            keptTabs.clear()
             // Only reflect the outcome if still on the detail that started it; a slow action completing
             // after the user navigated away must not stamp busy/banner onto an unrelated screen.
             if (_state.value.detailStack.lastOrNull() !== entry) return@launch
@@ -1075,7 +1121,10 @@ class MainViewModel(
         if (_state.value.busy) return
         _state.update { it.copy(busy = true, error = null, info = null) }
         viewModelScope.launch {
+            // What the kept pages show may have changed with it, kept before it or while it was on its way.
+            keptTabs.clear()
             runCatching { repo.toggleFavorite(action) }
+                .also { keptTabs.clear() }
                 .onSuccess {
                     // A page opened meanwhile owns the spinner, and the refresh would cancel it. Not a
                     // silent reload, which has no spinner to take down and is replaced by this one: it
@@ -1117,7 +1166,10 @@ class MainViewModel(
         if (_state.value.busy) return
         _state.update { it.copy(busy = true, error = null, info = null) }
         viewModelScope.launch {
+            // What the kept pages show may have changed with it, kept before it or while it was on its way.
+            keptTabs.clear()
             runCatching { repo.saveFavoriteOrder(order.save, order.channels.map { it.id }) }
+                .also { keptTabs.clear() }
                 .onSuccess {
                     _state.update { it.copy(busy = false, favoriteOrder = null, info = "Ordre des favoris enregistré") }
                     // In the place of a reload already on its way, which may predate the save.
@@ -1383,7 +1435,7 @@ class MainViewModel(
         pairingJob?.cancel()
         upNextJob?.cancel()
         lastQuery = null
-        keptGuide = null
+        forgetKeptPages()
         viewModelScope.launch {
             // Wait out a pending resume-position save so it cannot land after the progress wipe below
             // and leak the previous account's continue-watching position to the next one.
