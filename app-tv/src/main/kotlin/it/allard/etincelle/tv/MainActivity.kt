@@ -104,6 +104,7 @@ import it.allard.etincelle.core.ui.AutoUpdate
 import it.allard.etincelle.core.ui.MainViewModelFactory
 import it.allard.etincelle.core.ui.Tab
 import it.allard.etincelle.core.ui.UpdateChecker
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -1167,6 +1168,11 @@ private fun TvPlayerSurface(
             return@LaunchedEffect
         }
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            // The guide is asked for the programme beside the loop, not in it: an answer that takes a few
+            // seconds holds back neither the skip, the rewind asked nor the bar. One ask at a time, in
+            // its own window.
+            var asking: Job? = null
+            val askWindow = Timeline.Window()
             try {
                 while (true) {
                     behindLive = LivePlayback.behindLiveEdgeMs(player, liveWindow) > LivePlayback.LIVE_REWIND_THRESHOLD_MS
@@ -1180,7 +1186,9 @@ private fun TvPlayerSurface(
                     }
                     // The show playback is in, which follows it past the show's end or back into the one
                     // before, as when it was handed over rewound (see LiveProgramme).
-                    programWindow = programme.current(player, liveWindow)
+                    if (asking?.isActive != true) {
+                        asking = launch(start = CoroutineStart.UNDISPATCHED) { programWindow = programme.current(player, askWindow) }
+                    }
                     barGeometry = LivePlayback.liveBarGeometry(player, liveWindow, programWindow)
                     delay(1000)
                 }
