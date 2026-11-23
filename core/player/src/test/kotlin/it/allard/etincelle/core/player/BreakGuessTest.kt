@@ -131,6 +131,13 @@ class BreakGuessTest {
     }
 
     @Test
+    fun `adverts and trailers between two programmes are a break up to twenty minutes`() {
+        // 19 min without the logo, about as long as M6's block before its early evening sitcom, then 21 min.
+        assertEquals(listOf(1_200_000L..2_340_000L), track(300, 285, 300).breaks(0, 4_000).ranges())
+        assertEquals(emptyList<LongRange>(), track(350, 315, 350).breaks(0, 4_000).ranges())
+    }
+
+    @Test
     fun `an advert with something in the logo's corner does not end the break`() {
         assertEquals(listOf(400_000L..760_000L), track(100, 90, 100, logoInAdverts = 40..44).breaks(0, 4_000).ranges())
     }
@@ -238,9 +245,9 @@ class BreakGuessTest {
         val programme = gone(20 to false, 40 to true, 9 to false, 40 to true, 20 to false)
         assertEquals(listOf(80_000L..240_000L, 276_000L..436_000L), logoRanges(upper, 0, 4_000, programme))
         // Nor into a break longer than one may be: the two are left as they are.
-        val long = gone(20 to false, 110 to true, 9 to false, 110 to true, 20 to false)
-        val longLower = gone(20 to false, 229 to true, 20 to false)
-        assertEquals(listOf(80_000L..520_000L, 556_000L..996_000L), logoRanges(long, 0, 4_000, longLower))
+        val long = gone(20 to false, 150 to true, 9 to false, 150 to true, 20 to false)
+        val longLower = gone(20 to false, 309 to true, 20 to false)
+        assertEquals(listOf(80_000L..680_000L, 716_000L..1_316_000L), logoRanges(long, 0, 4_000, longLower))
     }
 
     @Test

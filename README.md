@@ -61,7 +61,9 @@ comme sur M6 dont le logo est pâle : jusqu'à 48 secondes, elle ne compte pas p
 l'heure qui précède le programme du soir, où publicités et bandes-annonces sont si nombreuses qu'aucun
 logo ne ressort plus, le logo de la chaîne trouvé plus tôt sert encore, ou à défaut celui qui ressort
 dans les deux heures précédentes, cherché une fois par visionnage, tant qu'il se voit sur une bonne part
-des vignettes. Elle s'arrête une
+des vignettes. Une coupure estimée d'après les vignettes dure de deux minutes et demie à vingt minutes : sur M6,
+publicités et bandes-annonces occupent dix-huit minutes et demie entre le journal du soir et la série
+qui suit. Elle s'arrête une
 demi-minute avant le retour du logo, que les chaînes remettent parfois après la reprise de
 l'émission : mieux vaut voir les dernières publicités que perdre le début de l'émission. Sur
 **Signalées et presque sûres**, le réglage saute aussi, douze secondes après son début, une coupure

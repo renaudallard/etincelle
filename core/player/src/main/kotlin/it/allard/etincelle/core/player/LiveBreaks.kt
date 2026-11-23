@@ -261,7 +261,7 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
         private const val AHEAD_S = 88L
         private const val MORE_S = 120L
         private const val MORE_TIMES = 4
-        private const val FAR_S = 960L
+        private const val FAR_S = BreakGuess.LOGO_MAX_MS / 1000 + 160
 
         // Pictures this far behind the playhead are forgotten.
         private const val KEPT_S = 1200L

@@ -34,9 +34,13 @@ data class Guess(val range: LongRange, val sure: Boolean = false)
  */
 internal object BreakGuess {
     // A break lasts between these: under, it is a pause or a scene without a word; over, the end of
-    // one programme and the start of another.
+    // one programme and the start of another, a programme without captions being as silent as adverts.
     const val MIN_MS = 150_000L
     const val MAX_MS = 800_000L
+
+    // Without the logo, as programmes show it, a break can last up to this: adverts and trailers fill
+    // eighteen and a half minutes between M6's evening news and its sitcom.
+    const val LOGO_MAX_MS = 1_200_000L
 
     // A run of captions this long is programme, no advert being; a run holds silences of up to
     // CAPTION_GAP segments.
@@ -232,7 +236,7 @@ internal object BreakGuess {
         val held = runs(solid, BRIDGE).let { if (trailer == null || brand == null) it else joined(it, trailer, brand, pictureMs) }
         return held.filter { run ->
             val between = programme(run.first - AROUND, run.first) && programme(run.last + 1, run.last + 1 + AROUND)
-            between && (run.last + 1 - run.first) * pictureMs in MIN_MS..MAX_MS
+            between && (run.last + 1 - run.first) * pictureMs in MIN_MS..LOGO_MAX_MS
         }
     }
 
@@ -242,7 +246,7 @@ internal object BreakGuess {
         val out = mutableListOf<IntRange>()
         for (run in runs) {
             val last = out.lastOrNull()
-            if (last != null && (run.last + 1 - last.first) * pictureMs <= MAX_MS && partedBy(last.last + 1 until run.first, trailer, brand)) {
+            if (last != null && (run.last + 1 - last.first) * pictureMs <= LOGO_MAX_MS && partedBy(last.last + 1 until run.first, trailer, brand)) {
                 out[out.size - 1] = last.first..run.last
             } else {
                 out += run
