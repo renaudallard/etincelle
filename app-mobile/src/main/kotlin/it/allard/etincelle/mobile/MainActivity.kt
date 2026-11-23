@@ -720,7 +720,10 @@ private fun AppRoot(
 
                         state.loggedIn -> {
                             BackHandler(enabled = state.canGoBack) { vm.back() }
+                            // On the page's own black Surface: a black of its own would be one more fill
+                            // of the whole screen for each frame.
                             Scaffold(
+                                containerColor = Color.Transparent,
                                 topBar = {
                                     TopAppBar(
                                         title = { Text(state.current?.title ?: state.tab.label) },
