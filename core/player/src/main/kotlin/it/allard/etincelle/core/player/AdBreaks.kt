@@ -54,6 +54,10 @@ class AdBreaks {
     private var manifest: Any? = null
     private var found: List<LongRange> = emptyList()
 
+    // What each event of the last reading says (see [opens]), by its content: each reading of a live
+    // manifest, a few seconds apart, has mostly the same events, which are not decoded again.
+    private var said = HashMap<String, Boolean?>()
+
     /** The breaks of the recording being played, as positions (ms) in it, once they are known. */
     var recorded: List<Guess> = emptyList()
 
@@ -89,7 +93,16 @@ class AdBreaks {
         if (dash != null && zero != C.TIME_UNSET) {
             if (dash !== manifest) {
                 manifest = dash
-                found = breaks(stretches(dash))
+                val now = HashMap<String, Boolean?>()
+                found = breaks(
+                    stretches(dash) { data ->
+                        val key = String(data, Charsets.ISO_8859_1)
+                        val opens = if (key in said) said[key] else opens(data)
+                        now[key] = opens
+                        opens
+                    },
+                )
+                said = now
             }
             // From the manifest's own time to a position in the window.
             val shift = zero - start
@@ -128,13 +141,13 @@ class AdBreaks {
         private const val SCTE35 = "urn:scte:scte35"
         private val BASE64 = Regex("[A-Za-z0-9+/]{16,}={0,2}")
 
-        fun stretches(dash: DashManifest): List<Stretch> = (0 until dash.periodCount).map { i ->
+        fun stretches(dash: DashManifest, opensOf: (ByteArray) -> Boolean? = ::opens): List<Stretch> = (0 until dash.periodCount).map { i ->
             val period = dash.getPeriod(i)
             val length = dash.getPeriodDurationMs(i).takeIf { it != C.TIME_UNSET }
             val streams = period.eventStreams.filter { it.schemeIdUri.startsWith(SCTE35) }
             val marks = streams.flatMap { stream ->
                 stream.events.mapIndexedNotNull { n, event ->
-                    val opens = opens(event.messageData) ?: return@mapIndexedNotNull null
+                    val opens = opensOf(event.messageData) ?: return@mapIndexedNotNull null
                     val at = period.startMs + stream.presentationTimesUs.getOrElse(n) { 0L } / 1000
                     Mark(at, event.durationMs.takeIf { it > 0 }, opens)
                 }
@@ -191,6 +204,8 @@ class AdBreaks {
             // The section is the run of base64 that starts as one does (table id 0xFC): the XML around
             // it has other runs that look like base64, such as the path of its namespace.
             val section = BASE64.findAll(text)
+                // Padded base64 comes in fours: any other run would only fail to decode.
+                .filter { it.value.length % 4 == 0 }
                 .mapNotNull { run -> runCatching { Base64.decode(run.value) }.getOrNull() }
                 .firstOrNull { it.size >= 20 && it[0] == 0xFC.toByte() } ?: return null
             return try {
