@@ -122,6 +122,11 @@ internal object BreakGuess {
     // to be a break the channel's logo alone did not give.
     private const val SHOW_LED = 0.5
 
+    // The most pictures in a row the second logo may show in a break, the channel's being gone with
+    // it, for them to be a trailer or a sponsor that carries it (Paris Première's pictogram) rather
+    // than the programme, which shows it for minutes on end.
+    private const val SHORT_SHOW = 10
+
     /**
      * Of each picture, whether it is without the logo, from what each has of it ([score], [usual]
      * with it). One odd picture is no break, nor the end of one: each is taken with its neighbours.
@@ -145,6 +150,12 @@ internal object BreakGuess {
      * tells of each picture whether it is without that one: a break is then what is left of one
      * once the pictures that show the second logo are taken for the programme's.
      *
+     * The second logo can be the channel's own pictogram, which its trailers carry too: a trailer in a
+     * break would then pass for the programme and cut the break in two, each part too short to
+     * count. So the second logo shown at most [SHORT_SHOW] pictures in a row, the first gone the while,
+     * does not part two pieces of a break; nor does it count in their length, and the break is
+     * never sure.
+     *
      * Adverts with something of their own in the logo's corner (Gulli's toy adverts, their makers'
      * logos) can keep it seen through half a break, which then falls into pieces too short to count.
      * Where a second logo is found, a stretch without it, a break by itself, that the first gave
@@ -165,8 +176,12 @@ internal object BreakGuess {
         val unnarrowed = found.toSet()
         if (lowerGone != null) {
             without = BooleanArray(gone.size)
-            for (run in found) for (i in run) without[i] = gone[i] && lowerGone[i]
-            found = breakRuns(without, pictureMs)
+            val trailer = BooleanArray(gone.size)
+            for (run in found) for (i in run) {
+                without[i] = gone[i] && lowerGone[i]
+                trailer[i] = gone[i] && !lowerGone[i]
+            }
+            found = breakRuns(without, pictureMs, trailer)
         }
         val solid = solid(without)
         fun clear(from: Int, to: Int) = (from until to).count { !solid[it] } >= CLEAR
@@ -200,13 +215,39 @@ internal object BreakGuess {
         }
     }
 
-    private fun breakRuns(gone: BooleanArray, pictureMs: Long): List<IntRange> {
+    // The stretches of [gone] that are breaks: solid, held together by the bridge, or by a trailer
+    // (see [logoBreaks]) where [trailer] is given, between two stretches with the programme, and of
+    // a break's length.
+    private fun breakRuns(gone: BooleanArray, pictureMs: Long, trailer: BooleanArray? = null): List<IntRange> {
         val solid = solid(gone)
         fun programme(from: Int, to: Int) = from >= 0 && to <= solid.size && (from until to).count { !solid[it] } >= MOSTLY
-        return runs(solid, BRIDGE).filter { run ->
+        val held = runs(solid, BRIDGE).let { if (trailer == null) it else joined(it, trailer) }
+        return held.filter { run ->
             val between = programme(run.first - AROUND, run.first) && programme(run.last + 1, run.last + 1 + AROUND)
             between && (run.last + 1 - run.first) * pictureMs in MIN_MS..MAX_MS
         }
+    }
+
+    // [runs] with those parted only by a trailer, with up to BRIDGE other pictures, made one.
+    private fun joined(runs: List<IntRange>, trailer: BooleanArray): List<IntRange> {
+        val out = mutableListOf<IntRange>()
+        for (run in runs) {
+            val last = out.lastOrNull()
+            val gap = if (last == null) IntRange.EMPTY else last.last + 1 until run.first
+            val shown = gap.count { trailer[it] }
+            var row = 0
+            var longest = 0
+            for (i in gap) {
+                row = if (trailer[i]) row + 1 else 0
+                longest = maxOf(longest, row)
+            }
+            if (last != null && gap.count() <= SHORT_SHOW + BRIDGE && shown >= gap.count() - BRIDGE && longest <= SHORT_SHOW) {
+                out[out.size - 1] = last.first..run.last
+            } else {
+                out += run
+            }
+        }
+        return out
     }
 
     /**
