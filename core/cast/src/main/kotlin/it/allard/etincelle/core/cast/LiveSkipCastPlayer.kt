@@ -18,9 +18,18 @@ class LiveSkipCastPlayer(
     private val skipLive: (Long) -> Unit,
 ) : ForwardingPlayer(player) {
 
+    // The commands with the skips, built once for each set the player gives out.
+    private var base: Player.Commands? = null
+    private var withSkips = Player.Commands.EMPTY
+
     override fun getAvailableCommands(): Player.Commands {
         val commands = super.getAvailableCommands()
-        return if (live()) commands.buildUpon().addAll(Player.COMMAND_SEEK_BACK, Player.COMMAND_SEEK_FORWARD).build() else commands
+        if (!live()) return commands
+        if (commands !== base) {
+            base = commands
+            withSkips = commands.buildUpon().addAll(Player.COMMAND_SEEK_BACK, Player.COMMAND_SEEK_FORWARD).build()
+        }
+        return withSkips
     }
 
     override fun isCommandAvailable(command: Int): Boolean = availableCommands.contains(command)
