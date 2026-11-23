@@ -704,8 +704,9 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
         RemoteKeepAliveService.start(this)
         // Back in the foreground: any memory pressure that shrank the buffer has passed.
         loadControl?.restoreFullBuffer()
-        // Refresh the home screen row and Watch Next (and make sure their periodic sync is scheduled).
-        TvHomeJob.schedule(this)
+        // The home screen row and Watch Next are not seen with the app in front: they are refreshed as
+        // it is left. Only make sure their periodic sync is scheduled.
+        TvHomeJob.schedule(this, now = false)
         val same = viewModel.state.value.playing === awaySource
         awaySource = null
         if (unloaded) {

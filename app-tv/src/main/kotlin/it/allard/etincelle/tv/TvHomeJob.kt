@@ -19,8 +19,8 @@ import kotlinx.coroutines.launch
 
 /**
  * Keeps the home screen row, Watch Next ([TvHome]) and the system guide's channels ([TvLive]) fresh:
- * every few hours, and at once when the app starts or leaves the screen, or when the system asks for
- * the app's channels.
+ * every few hours, and at once when the app leaves the screen, where they are seen, or when the
+ * system asks for the app's channels.
  */
 class TvHomeJob : JobService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -48,8 +48,8 @@ class TvHomeJob : JobService() {
         private const val NOW_ID = 2
         private const val PERIOD_MS = 3L * 60 * 60 * 1000
 
-        /** Schedules the periodic sync if it is not already, and a sync now. */
-        fun schedule(context: Context) {
+        /** Schedules the periodic sync if it is not already, and a sync [now]. */
+        fun schedule(context: Context, now: Boolean = true) {
             val scheduler = context.getSystemService(JobScheduler::class.java) ?: return
             val service = ComponentName(context, TvHomeJob::class.java)
             if (scheduler.allPendingJobs.none { it.id == PERIODIC_ID }) {
@@ -61,6 +61,7 @@ class TvHomeJob : JobService() {
                         .build(),
                 )
             }
+            if (!now) return
             scheduler.schedule(
                 JobInfo.Builder(NOW_ID, service)
                     .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
