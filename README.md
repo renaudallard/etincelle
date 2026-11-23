@@ -309,7 +309,8 @@ impossible, réessayez ». Une chaîne choisie dans le guide du téléviseur est
 Sur téléphone, un direct rembobiné retrouve lui aussi sa place quand le flux doit être redemandé.
 Sur un programme en pause, l'écran n'est plus maintenu allumé : le téléviseur passe à son économiseur
 d'écran puis en veille comme d'habitude, et la position est enregistrée dès que l'on quitte
-l'application. Sur le téléphone aussi, un lecteur que la reprise n'a pas pu relancer se ferme avec le
+l'application. Après cinq minutes d'économiseur d'écran, il cesse de se charger, et il est rechargé à sa
+place au retour. Sur le téléphone aussi, un lecteur que la reprise n'a pas pu relancer se ferme avec le
 même message, et l'écran ne reste allumé que pendant la lecture.
 
 Sur Android TV, etincelle publie aussi une rangée **etincelle** de programmes recommandés sur

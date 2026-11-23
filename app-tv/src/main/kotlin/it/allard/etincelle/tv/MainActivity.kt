@@ -121,6 +121,8 @@ private const val TV_WAKING_MS = 30_000L
 
 // How long after the activity stops the screensaver's broadcast may come.
 private const val DREAM_GRACE_MS = 3_000L
+// How long a screensaver lasts before what was paused under it stops loading.
+private const val DREAM_UNLOAD_MS = 5 * 60_000L
 
 // How often, and how many times, a live stream loaded again on return is checked for its window having
 // been read anew, to go back to what was airing when it was left: half a minute in all.
@@ -190,7 +192,10 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
     // all times (see TvRemote).
     private var dreaming = false
     private val handler = Handler(Looper.getMainLooper())
-    private val stopRemoteUnlessDreaming = Runnable { if (!dreaming) leave() }
+    private val stopRemoteUnlessDreaming = Runnable { if (!dreaming) leave() else handler.postDelayed(unloadWhileDreaming, DREAM_UNLOAD_MS) }
+    // A screensaver can last for hours: what was paused under it stops loading after a while, and is
+    // loaded again when the app is back (see unload). A short one finds it ready.
+    private val unloadWhileDreaming = Runnable { if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) unload() }
     private val installOnceAway = object : Runnable {
         override fun run() {
             if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return
@@ -693,6 +698,7 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                 .build()
         }
         handler.removeCallbacks(stopRemoteUnlessDreaming)
+        handler.removeCallbacks(unloadWhileDreaming)
         handler.removeCallbacks(installOnceAway)
         remote.start()
         RemoteKeepAliveService.start(this)
@@ -855,6 +861,7 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
 
     override fun onDestroy() {
         handler.removeCallbacks(stopRemoteUnlessDreaming)
+        handler.removeCallbacks(unloadWhileDreaming)
         handler.removeCallbacks(installOnceAway)
         handler.removeCallbacks(letScreenRest)
         runCatching { unregisterReceiver(screenReceiver) }
