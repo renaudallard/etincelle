@@ -27,7 +27,9 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 
 /**
@@ -60,6 +62,10 @@ object RecordingBreaks {
     // Not the screen's: a search cut short by leaving it would download it all again on return.
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    // Nor cancelled with it, so recordings opened one after the other would be searched all at once,
+    // each with its downloads and its pictures in memory: one at a time.
+    private val oneAtATime = Mutex()
+
     // All three under the lock of [known].
     private val known = LinkedHashMap<String, List<Guess>>()
     private val running = HashMap<String, Deferred<List<Guess>?>>()
@@ -84,7 +90,7 @@ object RecordingBreaks {
         var found: List<Guess>? = null
         try {
             found = try {
-                read(manifest)
+                oneAtATime.withLock { read(manifest) }
             } catch (e: IOException) {
                 null
             }
