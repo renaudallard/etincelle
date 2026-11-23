@@ -107,6 +107,8 @@ import it.allard.etincelle.core.ui.Tab
 import it.allard.etincelle.core.ui.UpdateChecker
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -171,7 +173,12 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
     // The programme held in pause was let go of when the app was left (see unload), to be loaded again
     // on return. A live one is taken up again at what was airing then, noted as its time of day
     // (epoch ms) with the start of the live window it was read in.
-    private var unloaded = false
+    private val unloadedNow = MutableStateFlow(false)
+    private var unloaded: Boolean
+        get() = unloadedNow.value
+        set(value) {
+            unloadedNow.value = value
+        }
     // The player was stopped for it, and is to be prepared again on return.
     private var stoppedAway = false
     private var resumeLiveAtMs: Long? = null
@@ -331,7 +338,7 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                             TvPlayerSurface(
                                 playing, exo, viewModel::savePlaybackPosition, viewModel::reportProgress,
                                 viewModel::liveProgramWindow, viewModel::reResolve, viewModel::playbackFailed, viewModel::playUpNext,
-                                away = { unloaded },
+                                away = unloadedNow,
                                 onAdBreak = { skipAdBreak = it },
                             )
                         }
@@ -905,7 +912,7 @@ private fun TvPlayerSurface(
     onPlaybackFailed: (PlaybackSource) -> Unit,
     onPlayNext: () -> Unit = {},
     // The app was left: nothing is to be loaded until it is back.
-    away: () -> Boolean = { false },
+    away: StateFlow<Boolean>,
     // Told what skips the ad break on offer, for a phone to ask for it too, and null when there is none.
     onAdBreak: ((() -> Unit)?) -> Unit = {},
 ) {

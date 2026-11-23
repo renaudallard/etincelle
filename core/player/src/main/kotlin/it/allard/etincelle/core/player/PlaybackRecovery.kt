@@ -12,6 +12,9 @@ import it.allard.etincelle.core.model.PlaybackSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 // How many times in a row playback is brought back before giving up.
@@ -27,16 +30,17 @@ private const val RETRY_RESET_MS = 60_000L
 // How often a reloaded live stream is checked for being ready to seek.
 private const val SEEK_POLL_MS = 250L
 
-// How often an attempt that waits looks whether it may go on.
-private const val HELD_POLL_MS = 1_000L
+// What a recovery that is never held waits on.
+private val NEVER_HELD: StateFlow<Boolean> = MutableStateFlow(false)
 
 /**
  * Brings back the playback of [source] on [player] when it fails: a player left on its error shows a
  * frozen picture and nothing else. The stream is asked again with [resolve] (null when there is none to
  * be had), as its address or its licence may be what went stale, and played from where it was: the
  * position of a replay, the time of day of a live programme watched behind the live point. After
- * [MAX_RECOVERIES] failures in a row [onGiveUp] is called. While [held] says so nothing is loaded: the
- * attempt waits, as for an app that was left and keeps no stream loaded behind what the TV shows.
+ * [MAX_RECOVERIES] failures in a row [onGiveUp] is called. While [held] is true nothing is loaded: the
+ * attempt waits for it to turn false, as for an app that was left and keeps no stream loaded behind
+ * what the TV shows.
  * Main thread only; [stop] ends it.
  */
 class PlaybackRecovery(
@@ -44,7 +48,7 @@ class PlaybackRecovery(
     private val scope: CoroutineScope,
     private val source: PlaybackSource,
     private val resolve: suspend (PlaybackSource) -> PlaybackSource?,
-    private val held: () -> Boolean = { false },
+    private val held: StateFlow<Boolean> = NEVER_HELD,
     private val onGiveUp: () -> Unit,
 ) : Player.Listener {
     private var attempts = 0
@@ -105,11 +109,11 @@ class PlaybackRecovery(
         job?.cancel()
         job = scope.launch {
             if (backoff > 0) delay(backoff)
-            while (held()) delay(HELD_POLL_MS)
+            held.first { !it }
             // No stream to be had is one more failure.
             val fresh = resolve(source) ?: return@launch recover(PlaybackException.ERROR_CODE_UNSPECIFIED)
             // The app may have been left while the stream was asked for.
-            while (held()) delay(HELD_POLL_MS)
+            held.first { !it }
             // Where playback is now, not where it failed: a seek made during the wait counts.
             noteLiveTime()
             val position = player.currentPosition
