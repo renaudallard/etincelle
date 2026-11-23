@@ -443,6 +443,7 @@ class MainViewModel(
     private fun applyFailure(e: Throwable, fallback: String) {
         if (e is AppError.Unauthorized && repo.currentSession() == null) {
             lastQuery = null
+            keptGuide = null
             _state.update { UiState(checking = false, error = e.message, hideLocked = it.hideLocked, update = it.update) }
         } else {
             // An error that says nothing of its own is told by what was being done.
@@ -565,6 +566,8 @@ class MainViewModel(
         while (true) {
             delay(STALE_CHECK_MS)
             reloadIfStale(STALE_ON_SCREEN_MS)
+            // A day of every channel, not to be held past the time it is kept for.
+            keptGuide()
         }
     }
 
@@ -1360,6 +1363,7 @@ class MainViewModel(
         pairingJob?.cancel()
         upNextJob?.cancel()
         lastQuery = null
+        keptGuide = null
         viewModelScope.launch {
             // Wait out a pending resume-position save so it cannot land after the progress wipe below
             // and leak the previous account's continue-watching position to the next one.
