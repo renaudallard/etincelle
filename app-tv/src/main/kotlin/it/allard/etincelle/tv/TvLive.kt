@@ -35,6 +35,7 @@ import it.allard.etincelle.core.designsystem.theme.EtincelleTheme
 import it.allard.etincelle.core.domain.MolotovRepository
 import it.allard.etincelle.core.model.LiveChannel
 import it.allard.etincelle.core.model.PlaybackSource
+import it.allard.etincelle.core.player.AdaptiveLoadControl
 import it.allard.etincelle.core.player.MediaItemFactory
 import it.allard.etincelle.core.player.PlaybackRecovery
 import kotlinx.coroutines.CancellationException
@@ -169,7 +170,21 @@ object TvLive {
  * on the surface the system gives, as the app's own player does.
  */
 class TvLiveInputService : TvInputService() {
+    // The sessions open in this service, told of memory pressure as the app's own player is. Main
+    // thread only.
+    private val live = mutableSetOf<LiveSession>()
+
     override fun onCreateSession(inputId: String): Session = LiveSession(this)
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        live.forEach { it.loadControl.onTrimMemory(level) }
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        live.forEach { it.loadControl.onLowMemory() }
+    }
 
     companion object {
         // The sessions the system holds, each a channel of its guide played in this process: an
@@ -179,13 +194,16 @@ class TvLiveInputService : TvInputService() {
     }
 
     private inner class LiveSession(context: Context) : Session(context) {
-        private val player = ExoPlayer.Builder(context).build()
+        // Sized to the heap and trimmed under pressure, as the app's own player's.
+        val loadControl = AdaptiveLoadControl.create(context)
+        private val player = ExoPlayer.Builder(context).setLoadControl(loadControl).build()
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
         private var tuneJob: Job? = null
         private var recovery: PlaybackRecovery? = null
 
         init {
             sessions++
+            live += this
             player.addListener(object : Player.Listener {
                 override fun onPlaybackStateChanged(state: Int) {
                     when (state) {
@@ -224,6 +242,8 @@ class TvLiveInputService : TvInputService() {
 
         override fun onTune(channelUri: Uri): Boolean {
             notifyVideoUnavailable(TvInputManager.VIDEO_UNAVAILABLE_REASON_TUNING)
+            // A pressure that lowered the buffer is not told to be over: a new channel starts whole.
+            loadControl.restoreFullBuffer()
             tuneJob?.cancel()
             dropRecovery()
             player.stop()
@@ -259,6 +279,7 @@ class TvLiveInputService : TvInputService() {
 
         override fun onRelease() {
             sessions--
+            live -= this
             dropRecovery()
             scope.cancel()
             player.release()
