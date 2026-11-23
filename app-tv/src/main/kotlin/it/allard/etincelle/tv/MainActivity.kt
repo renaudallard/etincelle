@@ -26,6 +26,7 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
@@ -1204,31 +1205,7 @@ private fun TvPlayerSurface(
             },
             modifier = Modifier.fillMaxSize(),
         )
-        // While seeking from the remote, the bar and the time are those of where it lands.
-        val seeking = seekShown
-        if (seeking != null) {
-            SeekPreview(
-                label = seekLabel(player, seekWindow, seeking) +
-                    if (parked) " · Début de l'émission, appuyez encore sur ◄ pour reculer plus loin" else "",
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = LiveProgramBarBottomOffset + 40.dp),
-            )
-        }
-        // Outside the programme playback is in, a held rewind passing into the one before, the bar spans
-        // the rewind window, as it does where the guide does not say what was on.
-        val shownProgramme = if (seeking == null) {
-            programWindow
-        } else {
-            programWindow?.takeIf { seekWindow.windowStartTimeMs != C.TIME_UNSET && seekWindow.windowStartTimeMs + seeking in it.startMs until it.endMs }
-        }
-        // The bar changes every second: read in a composable of its own, which alone is drawn again.
-        if (controlsVisible || seeking != null) {
-            TvLiveBar(
-                geometry = { seeking?.let { LivePlayback.liveBarGeometry(player, seekWindow, shownProgramme, it) } ?: barGeometry },
-                programWindow = shownProgramme,
-                modifier = Modifier.align(Alignment.BottomCenter)
-                    .padding(start = 48.dp, end = 48.dp, bottom = LiveProgramBarBottomOffset),
-            )
-        }
+        TvSeekAndBar(player, seekWindow, { seekShown }, { parked }, programWindow, { barGeometry }, controlsVisible)
         // With or without the controls, for as long as the break can be skipped. A click is for a
         // mouse or a touch screen: the remote's OK is taken above, and with the controls up it skips
         // once the pill is selected.
@@ -1267,12 +1244,55 @@ private fun TvPlayerSurface(
 }
 
 /**
- * Where a seek chosen with the remote lands: the time of day on a live channel, as the bar's ends
- * are, and the position out of the length otherwise. [window] was filled for the item playing.
+ * Where a seek from the remote lands ([seekShown]) and the live bar, which follow each repeat of a
+ * held key: read here, so that only this is composed again meanwhile, not the whole player screen.
  */
-private fun seekLabel(player: Player, window: Timeline.Window, positionMs: Long): String =
+@Composable
+private fun BoxScope.TvSeekAndBar(
+    player: Player,
+    seekWindow: Timeline.Window,
+    seekShown: () -> Long?,
+    parked: () -> Boolean,
+    programWindow: ProgramWindow?,
+    barGeometry: () -> LiveBarGeometry?,
+    controlsVisible: Boolean,
+) {
+    val clock = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }
+    // While seeking from the remote, the bar and the time are those of where it lands.
+    val seeking = seekShown()
+    if (seeking != null) {
+        SeekPreview(
+            label = seekLabel(player, seekWindow, seeking, clock) +
+                if (parked()) " · Début de l'émission, appuyez encore sur ◄ pour reculer plus loin" else "",
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = LiveProgramBarBottomOffset + 40.dp),
+        )
+    }
+    // Outside the programme playback is in, a held rewind passing into the one before, the bar spans
+    // the rewind window, as it does where the guide does not say what was on.
+    val shownProgramme = if (seeking == null) {
+        programWindow
+    } else {
+        programWindow?.takeIf { seekWindow.windowStartTimeMs != C.TIME_UNSET && seekWindow.windowStartTimeMs + seeking in it.startMs until it.endMs }
+    }
+    // The bar changes every second: read in a composable of its own, which alone is drawn again.
+    if (controlsVisible || seeking != null) {
+        TvLiveBar(
+            geometry = { seeking?.let { LivePlayback.liveBarGeometry(player, seekWindow, shownProgramme, it) } ?: barGeometry() },
+            programWindow = shownProgramme,
+            modifier = Modifier.align(Alignment.BottomCenter)
+                .padding(start = 48.dp, end = 48.dp, bottom = LiveProgramBarBottomOffset),
+        )
+    }
+}
+
+/**
+ * Where a seek chosen with the remote lands: the time of day on a live channel, as the bar's ends
+ * are, with [clock], and the position out of the length otherwise. [window] was filled for the item
+ * playing.
+ */
+private fun seekLabel(player: Player, window: Timeline.Window, positionMs: Long, clock: SimpleDateFormat): String =
     if (window.isLive() && window.windowStartTimeMs != C.TIME_UNSET) {
-        SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(window.windowStartTimeMs + positionMs))
+        clock.format(Date(window.windowStartTimeMs + positionMs))
     } else {
         "${duration(positionMs)} / ${duration(player.duration)}"
     }
