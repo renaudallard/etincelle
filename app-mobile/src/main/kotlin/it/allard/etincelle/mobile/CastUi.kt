@@ -161,7 +161,7 @@ fun CastStatusBar(state: CastUiState, onClick: (() -> Unit)?, modifier: Modifier
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (connecting) PulsingCastGlyph() else CastFillGlyph(1f)
+            if (connecting) PulsingCastGlyph() else CastFillGlyph { 1f }
             Spacer(Modifier.width(12.dp))
             Text(label, style = MaterialTheme.typography.bodyMedium, maxLines = 1, modifier = Modifier.weight(1f))
             if (onClick != null) {
@@ -181,18 +181,19 @@ fun CastStatusBar(state: CastUiState, onClick: (() -> Unit)?, modifier: Modifier
 // its own composable so the infinite transition only schedules frames while actually connecting.
 @Composable
 private fun PulsingCastGlyph() {
-    val pulse by rememberInfiniteTransition(label = "cast").animateFloat(
+    val pulse = rememberInfiniteTransition(label = "cast").animateFloat(
         initialValue = 0.2f,
         targetValue = 0.9f,
         animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
         label = "castFill",
     )
-    CastFillGlyph(pulse)
+    // Read as it is drawn: each frame of the pulse is then drawn again, not composed again.
+    CastFillGlyph { pulse.value }
 }
 
 // The cast glyph with the filled variant revealed from the bottom up to [fill] (0..1).
 @Composable
-private fun CastFillGlyph(fill: Float) {
+private fun CastFillGlyph(fill: () -> Float) {
     Box(contentAlignment = Alignment.Center) {
         Icon(
             painterResource(DesignR.drawable.ic_cast),
@@ -205,7 +206,7 @@ private fun CastFillGlyph(fill: Float) {
             contentDescription = null,
             tint = BrandYellow,
             modifier = Modifier.size(28.dp).drawWithContent {
-                val visible = size.height * fill.coerceIn(0f, 1f)
+                val visible = size.height * fill().coerceIn(0f, 1f)
                 clipRect(top = size.height - visible) { this@drawWithContent.drawContent() }
             },
         )
