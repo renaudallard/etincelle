@@ -583,8 +583,10 @@ class MainViewModel(
         val page = s.current ?: return
         if (!s.loggedIn || s.tab == Tab.SEARCH || !(s.tab == Tab.GUIDE || page.showsWhatIsOnAir)) return
         val age = clock() - (loadedAt[page] ?: return)
+        // The guide is some megabytes for each load: on return as on screen, not before five minutes.
+        val limit = if (s.tab == Tab.GUIDE) maxOf(limitMs, STALE_ON_SCREEN_MS) else limitMs
         // A clock set back makes the age meaningless: load again.
-        if (age in 0 until limitMs) return
+        if (age in 0 until limit) return
         reloadCurrent(quiet = true)
     }
 
