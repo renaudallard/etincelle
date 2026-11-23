@@ -232,8 +232,10 @@ open class CastController(
         if (activeScanning && scope != null) {
             mediaRouter.addCallback(selector, activeScanCallback, MediaRouter.CALLBACK_FLAG_PERFORM_ACTIVE_SCAN)
             listScan = scope.launch {
+                var passes = 0
                 while (true) {
-                    scanDirectly()
+                    // The whole subnet on opening, then now and then: a TV app found stays asked.
+                    scanDirectly(everyHost = passes++ % LIST_EVERY_HOST_PASSES == 0)
                     refreshDevices()
                     delay(LIST_SCAN_MS)
                 }
@@ -451,5 +453,7 @@ open class CastController(
         const val ACTIVE_SCAN_MS = 4_000L
         // Between two of our own scans while the list of devices is looked at.
         const val LIST_SCAN_MS = 2_000L
+        // A pass in this many, the first, asks each address of the subnet for TV apps: about every 20 s.
+        const val LIST_EVERY_HOST_PASSES = 5
     }
 }
