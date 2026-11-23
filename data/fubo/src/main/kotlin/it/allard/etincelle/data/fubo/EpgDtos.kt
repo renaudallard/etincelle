@@ -113,8 +113,12 @@ private fun parseRfc3339(rfc3339: String?, parser: SimpleDateFormat = rfc3339Par
 
 private fun rfc3339Parser() = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US)
 
-/** Parses an RFC3339 timestamp to epoch millis, or null if absent/unparseable. */
-internal fun rfc3339UtcToEpochMillis(rfc3339: String?): Long? = parseRfc3339(rfc3339)?.time
+/**
+ * Parses an RFC3339 timestamp to epoch millis, or null if absent/unparseable. The thousands of a feed
+ * share one [parser], on the one thread that maps it.
+ */
+internal fun rfc3339UtcToEpochMillis(rfc3339: String?, parser: SimpleDateFormat = rfc3339Parser()): Long? =
+    parseRfc3339(rfc3339, parser)?.time
 
 /**
  * Renders RFC3339 timestamps as device-local "HH:mm", or null when unparseable. One for the thousands
@@ -179,55 +183,59 @@ internal fun EpgResponse.onAirWindow(channelId: String, nowMs: Long): ProgramWin
         .firstOrNull { nowMs >= it.startMs && nowMs < it.endMs }
 
 /** The programmes of a home feed, each with its first playable asset. */
-fun TopshelfResponse.toHomePrograms(): List<HomeProgram> = response.orEmpty().mapNotNull { entry ->
-    val program = entry.data?.program ?: return@mapNotNull null
-    val asset = entry.data.assets.orEmpty().firstOrNull { !it.assetId.isNullOrBlank() } ?: return@mapNotNull null
-    val start = rfc3339UtcToEpochMillis(asset.accessRights?.startTime)
-    val end = rfc3339UtcToEpochMillis(asset.accessRights?.endTime)
-    HomeProgram(
-        assetId = asset.assetId ?: return@mapNotNull null,
-        title = program.heading ?: program.title ?: return@mapNotNull null,
-        episodeTitle = program.title?.takeIf { program.heading != null && it != program.heading },
-        subtitle = program.subheading,
-        description = program.shortDescription,
-        imageUrl = program.horizontalImage,
-        posterUrl = program.verticalImage,
-        kind = when (program.type) {
-            "movie" -> HomeProgram.Kind.MOVIE
-            "episode" -> HomeProgram.Kind.EPISODE
-            else -> HomeProgram.Kind.OTHER
-        },
-        durationSec = asset.playbackDurationSec,
-        positionSec = asset.userProperties?.lastOffset?.takeIf { it > 0 },
-        watchedAtMs = rfc3339UtcToEpochMillis(asset.userProperties?.lastOffsetTimeStamp),
-        // A live airing carries its air times; a replay or VOD carries its availability window.
-        liveStartMs = start.takeIf { asset.assetId.startsWith("LIVE_") },
-        liveEndMs = end.takeIf { asset.assetId.startsWith("LIVE_") },
-    )
+fun TopshelfResponse.toHomePrograms(): List<HomeProgram> = rfc3339Parser().let { parser ->
+    response.orEmpty().mapNotNull { entry ->
+        val program = entry.data?.program ?: return@mapNotNull null
+        val asset = entry.data.assets.orEmpty().firstOrNull { !it.assetId.isNullOrBlank() } ?: return@mapNotNull null
+        val start = rfc3339UtcToEpochMillis(asset.accessRights?.startTime, parser)
+        val end = rfc3339UtcToEpochMillis(asset.accessRights?.endTime, parser)
+        HomeProgram(
+            assetId = asset.assetId ?: return@mapNotNull null,
+            title = program.heading ?: program.title ?: return@mapNotNull null,
+            episodeTitle = program.title?.takeIf { program.heading != null && it != program.heading },
+            subtitle = program.subheading,
+            description = program.shortDescription,
+            imageUrl = program.horizontalImage,
+            posterUrl = program.verticalImage,
+            kind = when (program.type) {
+                "movie" -> HomeProgram.Kind.MOVIE
+                "episode" -> HomeProgram.Kind.EPISODE
+                else -> HomeProgram.Kind.OTHER
+            },
+            durationSec = asset.playbackDurationSec,
+            positionSec = asset.userProperties?.lastOffset?.takeIf { it > 0 },
+            watchedAtMs = rfc3339UtcToEpochMillis(asset.userProperties?.lastOffsetTimeStamp, parser),
+            // A live airing carries its air times; a replay or VOD carries its availability window.
+            liveStartMs = start.takeIf { asset.assetId.startsWith("LIVE_") },
+            liveEndMs = end.takeIf { asset.assetId.startsWith("LIVE_") },
+        )
+    }
 }
 
 /** The channels of a device guide feed (/device-integrations/epg), each with its timed programmes. */
-fun EpgResponse.toLiveChannels(): List<LiveChannel> = response.orEmpty().mapNotNull { entry ->
-    val channel = entry.data?.channel ?: return@mapNotNull null
-    val programs = entry.data.programsWithAssets.orEmpty().mapNotNull { pwa ->
-        val program = pwa.program ?: return@mapNotNull null
-        val asset = pwa.assets.orEmpty().firstOrNull() ?: return@mapNotNull null
-        val start = rfc3339UtcToEpochMillis(asset.accessRights?.startTime) ?: return@mapNotNull null
-        val end = rfc3339UtcToEpochMillis(asset.accessRights?.endTime)?.takeIf { it > start } ?: return@mapNotNull null
-        LiveProgram(
-            id = asset.assetId ?: program.programId ?: "$start",
-            title = program.heading ?: program.title ?: return@mapNotNull null,
-            episodeTitle = program.title?.takeIf { program.heading != null && it != program.heading },
-            description = program.shortDescription,
-            imageUrl = program.horizontalImage,
-            startMs = start,
-            endMs = end,
+fun EpgResponse.toLiveChannels(): List<LiveChannel> = rfc3339Parser().let { parser ->
+    response.orEmpty().mapNotNull { entry ->
+        val channel = entry.data?.channel ?: return@mapNotNull null
+        val programs = entry.data.programsWithAssets.orEmpty().mapNotNull { pwa ->
+            val program = pwa.program ?: return@mapNotNull null
+            val asset = pwa.assets.orEmpty().firstOrNull() ?: return@mapNotNull null
+            val start = rfc3339UtcToEpochMillis(asset.accessRights?.startTime, parser) ?: return@mapNotNull null
+            val end = rfc3339UtcToEpochMillis(asset.accessRights?.endTime, parser)?.takeIf { it > start } ?: return@mapNotNull null
+            LiveProgram(
+                id = asset.assetId ?: program.programId ?: "$start",
+                title = program.heading ?: program.title ?: return@mapNotNull null,
+                episodeTitle = program.title?.takeIf { program.heading != null && it != program.heading },
+                description = program.shortDescription,
+                imageUrl = program.horizontalImage,
+                startMs = start,
+                endMs = end,
+            )
+        }
+        LiveChannel(
+            id = channel.id ?: return@mapNotNull null,
+            name = channel.displayName ?: channel.name ?: return@mapNotNull null,
+            logoUrl = channel.logoOnDarkUrl,
+            programs = programs,
         )
     }
-    LiveChannel(
-        id = channel.id ?: return@mapNotNull null,
-        name = channel.displayName ?: channel.name ?: return@mapNotNull null,
-        logoUrl = channel.logoOnDarkUrl,
-        programs = programs,
-    )
 }
