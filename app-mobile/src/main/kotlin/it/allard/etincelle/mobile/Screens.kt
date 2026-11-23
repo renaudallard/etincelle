@@ -1364,13 +1364,15 @@ private fun Rail(
                 Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 16.dp, bottom = 8.dp))
             }
         }
+        // A card id can repeat within a rail (it falls back to label/image), and a duplicate lazy-list
+        // key crashes the row: the index joins it then. Otherwise the id alone, so that a card keeps
+        // its place as those before it come and go (the guide loaded again as programmes end).
+        val unique = remember(rail.cards) { rail.cards.mapTo(HashSet()) { it.id }.size == rail.cards.size }
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            // Index in the key: a card id can repeat within a rail (it falls back to label/image), and
-            // a duplicate lazy-list key crashes the row.
-            itemsIndexed(rail.cards, key = { i, c -> "${c.id}#$i" }) { _, card -> CardItem(card, onCardClick) }
+            itemsIndexed(rail.cards, key = { i, c -> if (unique) c.id else "${c.id}#$i" }) { _, card -> CardItem(card, onCardClick) }
         }
     }
 }

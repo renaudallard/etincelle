@@ -55,6 +55,21 @@ class EpgMapperTest {
     }
 
     @Test
+    fun `a guide card keeps its id as the programmes before it end, and no two share one`() {
+        fun programme(title: String, start: String?) =
+            EpgProgramWithAssetsDto(EpgProgramDto(title, null, null), start?.let { listOf(EpgAssetDto(EpgAccessRightsDto(it, null))) })
+        fun guide(vararg programmes: EpgProgramWithAssetsDto) = EpgResponse(
+            listOf(EpgEntryDto(EpgChannelDataDto(EpgChannelDto("600019", "France 2", "France 2", null), programmes.toList()))),
+        ).toGuidePage().rails.single().cards.map { it.id }
+
+        val before = guide(programme("A", "2026-11-23T18:00:00Z"), programme("B", "2026-11-23T19:00:00Z"))
+        val after = guide(programme("B", "2026-11-23T19:00:00Z"))
+        assertEquals(before[1], after[0])
+        val shared = guide(programme("A", "2026-11-23T18:00:00Z"), programme("B", "2026-11-23T18:00:00Z"), programme("C", null))
+        assertEquals(3, shared.toSet().size)
+    }
+
+    @Test
     fun `an episode is listed under its show's name, its own title below`() {
         val response = EpgResponse(
             listOf(

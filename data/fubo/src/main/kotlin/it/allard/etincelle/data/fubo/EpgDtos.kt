@@ -143,22 +143,29 @@ fun EpgResponse.toGuidePage(): ContentPage {
         val channelId = channel.id ?: return@mapNotNull null
         // A repeated channel id would make two rails with the same "guide-<id>" key (a LazyColumn crash).
         if (!seen.add(channelId)) return@mapNotNull null
+        val ids = HashSet<String>()
         val cards = data.programsWithAssets.orEmpty()
-            .mapIndexedNotNull { index, p -> p.toCard(channelId, channel.logoOnDarkUrl, index, hours) }
+            .mapIndexedNotNull { index, p -> p.toCard(channelId, channel.logoOnDarkUrl, index, hours, ids) }
         if (cards.isEmpty()) null else ContentRail("guide-$channelId", channel.displayName ?: channel.name, cards)
     }
     return ContentPage("Guide", rails)
 }
 
-private fun EpgProgramWithAssetsDto.toCard(channelId: String, channelLogo: String?, index: Int, hours: LocalHourMinute): ContentCard? {
+private fun EpgProgramWithAssetsDto.toCard(
+    channelId: String,
+    channelLogo: String?,
+    index: Int,
+    hours: LocalHourMinute,
+    ids: MutableSet<String>,
+): ContentCard? {
     // The show's name: on an episode the title is the episode's own ("Episode 38").
     val name = program?.heading ?: program?.title ?: return null
     val start = assets?.firstOrNull()?.accessRights?.startTime
     val time = hours.of(start)
     return ContentCard(
-        // Index-based id: two same-titled programs with missing/equal start times must not collide,
-        // or the guide's LazyRow throws on a duplicate key.
-        id = "$channelId-$index",
+        // By its start, so that a programme keeps its id as those before it end and leave the guide
+        // loaded again; by its place when it has none, or shares it, as no two may have one id.
+        id = start?.let { "$channelId@$it" }?.takeIf { ids.add(it) } ?: "$channelId-$index",
         title = if (time != null) "$time · $name" else name,
         imageUrl = program?.horizontalImage ?: channelLogo,
         isLocked = false,

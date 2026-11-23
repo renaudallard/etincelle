@@ -1253,9 +1253,11 @@ private fun TvRail(
                 Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(bottom = 6.dp))
             }
         }
+        // A card id can repeat within a rail, and a duplicate lazy key crashes: the index joins it then.
+        // Otherwise the id alone, so that a card keeps its place as those before it come and go.
+        val unique = remember(rail.cards) { rail.cards.mapTo(HashSet()) { it.id }.size == rail.cards.size }
         LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            // Index in the key: a card id can repeat within a rail, and a duplicate lazy key crashes.
-            itemsIndexed(rail.cards, key = { i, c -> "${c.id}#$i" }) { i, card ->
+            itemsIndexed(rail.cards, key = { i, c -> if (unique) c.id else "${c.id}#$i" }) { i, card ->
                 val key = "${rail.id}|$i|${card.id}"
                 TvCard(card, { returnFocus?.save(key); onCardClick(it) }, returnFocus?.target(key) ?: Modifier)
             }
