@@ -143,6 +143,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Made first: the saved sign-in it reads, off this thread, is then read while the player is built.
+        viewModel
         val control = AdaptiveLoadControl.create(this)
         loadControl = control
         val exo = ExoPlayer.Builder(this)
