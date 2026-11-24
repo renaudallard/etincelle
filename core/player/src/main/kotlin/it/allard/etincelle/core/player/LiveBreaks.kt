@@ -64,17 +64,27 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
     // The pictures that could not be had, with how many times each was asked for.
     private val missed = HashMap<Long, Int>()
 
+    // The breaks the last look found.
+    private var found: List<Guess> = emptyList()
+
     /**
      * The breaks around the playhead, at [atMs] with the live point at [liveMs] (ms since 1970), as
      * far as they are known, in the same time. Reads the pictures it still needs: for an IO thread.
      */
-    suspend fun around(atMs: Long, liveMs: Long): List<Guess> = lock.withLock {
+    suspend fun around(atMs: Long, liveMs: Long): List<Guess> =
+        lock.withLock { look(atMs, liveMs).also { found = it } }
+
+    private suspend fun look(atMs: Long, liveMs: Long): List<Guess> {
         val at = atMs / 1000 / step * step
         // The last pictures are not there yet.
         val last = (liveMs / 1000 - NOT_YET_S) / step * step
-        if (at > last) return@withLock emptyList()
-        if (abs(at - learntAt) > LEARN_AGAIN_S) learn(at, last)
-        val logo = logo ?: return@withLock emptyList()
+        if (at > last) return emptyList()
+        // Not learnt again in a break: all that is known of it would be read again with the new logo,
+        // and the break be lost the while. Once out of it, as late as a break may last.
+        val since = abs(at - learntAt)
+        val held = found.any { at * 1000 in it.range } && since <= LEARN_AGAIN_S + BreakGuess.LOGO_MAX_MS / 1000
+        if (since > LEARN_AGAIN_S && !held) learn(at, last)
+        val logo = logo ?: return emptyList()
         read(logo, at - BACK_S, minOf(last, at + AHEAD_S))
         // A stretch without the logo is followed to where the programme is back, or was before it.
         for (more in 0 until MORE_TIMES) {
@@ -103,7 +113,7 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
         scores.headMap(at - KEPT_S).clear()
         lowerScores.headMap(at - KEPT_S).clear()
         missed.keys.removeAll { it < at - KEPT_S }
-        BreakGuess.logoBreaks(gone, first * 1000, step * 1000, lowerGone)
+        return BreakGuess.logoBreaks(gone, first * 1000, step * 1000, lowerGone)
     }
 
     // The pictures read, without a gap, around [at]: the time of the first, and whether each is
