@@ -96,7 +96,9 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
                 lowerGone?.let { BreakGuess.runs(BreakGuess.solid(it), BreakGuess.BRIDGE) }.orEmpty()
             val until = first + gone.size * step
             val open = runs.any { it.last + BreakGuess.AROUND >= gone.size && (gone.size - it.first) * step <= FAR_S }
-            val begun = runs.any { it.first < BreakGuess.AROUND && (it.last + 1) * step <= FAR_S }
+            // Back only for the break the playhead is in: one over before it has nothing to skip.
+            val here = (at - first) / step
+            val begun = runs.any { it.first < BreakGuess.AROUND && it.last >= here && (it.last + 1) * step <= FAR_S }
             if (open && until <= last) {
                 read(logo, until, minOf(last, until + MORE_S))
             } else if (begun && first > at - FAR_S) {
