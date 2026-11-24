@@ -215,8 +215,9 @@ Si le téléviseur ne parvient pas à lire ce que le téléphone lui passe, ou s
 qu'il ne l'ait lu, la lecture revient sur le téléphone, là où elle en était. La barre de diffusion indique « Lecture sur » le téléviseur quand il
 lit, « Connecté à » quand rien n'y passe.
 Toucher la barre de diffusion ouvre une **télécommande** : ce qui passe, lecture/pause, recul de
-10 s, avance de 30 s, **Revenir au début** (sur une chaîne en direct, au début de l'émission en cours,
-quand le guide la connaît), **Revenir au direct** quand le téléviseur est en retard sur le direct,
+10 s, avance de 30 s, **Revenir au début** (sur une chaîne en direct envoyée par le téléphone, au début
+de l'émission en cours, quand le guide la connaît), **Revenir au direct** quand le téléviseur est en
+retard sur le direct,
 et les flèches, OK et Retour pour naviguer dans l'application TV ; quand le
 téléviseur propose de passer une coupure publicitaire, le bouton **Passer la pub** y apparaît aussi. Tant qu'on la
 pilote ainsi, le téléviseur ne lance pas son économiseur d'écran, et OK ou Retour répondent à sa
