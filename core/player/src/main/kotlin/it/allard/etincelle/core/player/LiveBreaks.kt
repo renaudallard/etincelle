@@ -14,6 +14,7 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import it.allard.etincelle.core.model.LiveThumbnails
 import java.io.IOException
 import java.util.TreeMap
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.abs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -47,11 +48,7 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
     private val lock = Mutex()
 
     private var logo: Logo? = null
-    // The channel's logo, the last found (or learnt from earlier pictures, see [earlier]): what a learn
-    // over pictures mostly of adverts and trailers, the hour before the evening's programme, falls
-    // back on.
-    private var channelLogo: Logo? = null
-    // Whether the earlier pictures were searched for it, which is done once.
+    // Whether the earlier pictures were searched for the channel's logo, which is done once (see [kept]).
     private var searchedBack = false
     private var learntAt = Long.MIN_VALUE
     // The learns in a row that found no logo.
@@ -149,14 +146,8 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
         val track = LogoTrack(pictures.size, width, height)
         pictures.forEachIndexed { i, picture -> track.add(i, picture) }
         val own = track.logo()
-        own?.takeIf { it.channel }?.let { channelLogo = it.alone() }
-        // Where no logo stands out, as when most of the pictures are of adverts and trailers, the
-        // channel's from before, as long as it is still seen on enough of them.
-        if (own == null && channelLogo == null && !searchedBack) {
-            searchedBack = true
-            channelLogo = earlier(at)
-        }
-        logo = own ?: channelLogo?.takeIf { it.seenIn(pictures, KEPT_SEEN) }
+        own?.takeIf { it.channel }?.let { remember(it.alone()) }
+        logo = own ?: kept(at, pictures)
         // Nothing learnt: tried again a little further on, then less and less often, as each try
         // fetches all its pictures again.
         if (logo == null) {
@@ -165,6 +156,24 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
         } else {
             failures = 0
         }
+    }
+
+    // [logo], the channel's, kept for when its pictures are read again.
+    private fun remember(logo: Logo) {
+        remembered[thumbnails.baseUrl] = logo
+    }
+
+    // Where no logo stands out in [pictures], as when most of them are of adverts and trailers, the
+    // channel's from before, when seen on enough of them: the last found since the app started, or
+    // else one looked for in the earlier pictures, once a viewing. One learnt over another programme
+    // can fit these pictures too poorly: the top left corner of M6's teleshopping holds its own logo.
+    private suspend fun kept(at: Long, pictures: List<ByteArray>): Logo? {
+        remembered[thumbnails.baseUrl]?.takeIf { it.seenIn(pictures, KEPT_SEEN) }?.let { return it }
+        if (searchedBack) return null
+        searchedBack = true
+        val back = earlier(at) ?: return null
+        remember(back)
+        return back.takeIf { it.seenIn(pictures, KEPT_SEEN) }
     }
 
     // The channel's logo as the pictures before those around [at] show it, forty minutes of them at a
@@ -231,6 +240,11 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
         // The last channel followed, with what was learnt and read of it: back on the screen, it goes
         // on from there instead of fetching the pictures of forty minutes again. Main thread only.
         private var followed: LiveBreaks? = null
+
+        // The channel's logo last found, by the address of its pictures, for a channel played again
+        // while the app runs: it stays from one programme to the next, and the hour before the
+        // evening's programme often shows it too little to be found then. Any thread.
+        private val remembered = ConcurrentHashMap<String, Logo>()
 
         /** The instance of the channel whose pictures are at [thumbnails]. On the main thread. */
         fun of(thumbnails: LiveThumbnails): LiveBreaks =

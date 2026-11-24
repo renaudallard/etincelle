@@ -62,9 +62,9 @@ la fois, ou celui de l'émission pendant vingt secondes). Pas plus
 qu'une publicité qui montre sa marque dans le coin du logo de la chaîne, celui de l'émission absent,
 comme sur M6 dont le logo est pâle : jusqu'à 48 secondes, elle ne compte pas pour l'émission. Et dans
 l'heure qui précède le programme du soir, où publicités et bandes-annonces sont si nombreuses qu'aucun
-logo ne ressort plus, le logo de la chaîne trouvé plus tôt sert encore, ou à défaut celui qui ressort
-dans les deux heures précédentes, cherché une fois par visionnage, tant qu'il se voit sur une bonne part
-des vignettes. Une coupure estimée d'après les vignettes dure de deux minutes et demie à vingt minutes : sur M6,
+logo ne ressort plus, le logo de la chaîne trouvé plus tôt sert encore, même lors d'un autre visionnage
+depuis le lancement de l'application, ou à défaut celui qui ressort dans les deux heures précédentes,
+cherché une fois par visionnage, tant qu'il se voit sur une bonne part des vignettes. Une coupure estimée d'après les vignettes dure de deux minutes et demie à vingt minutes : sur M6,
 publicités et bandes-annonces occupent dix-huit minutes et demie entre le journal du soir et la série
 qui suit. Elle s'arrête une
 demi-minute avant le retour du logo, que les chaînes remettent parfois après la reprise de
