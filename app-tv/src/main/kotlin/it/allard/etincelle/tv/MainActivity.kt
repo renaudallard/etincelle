@@ -43,6 +43,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -1023,6 +1024,8 @@ private fun TvPlayerSurface(
     // controls up: the presses add up to one seek, made once they stop, a held key going faster the
     // longer it is held, and the bar shows where it lands meanwhile.
     var seekTarget by remember(source) { mutableStateOf<Long?>(null) }
+    // Where playback stood at the first press of those adding up to [seekTarget].
+    var seekFrom by remember(source) { mutableLongStateOf(0L) }
     var seekShown by remember(source) { mutableStateOf<Long?>(null) }
     var seekHeld by remember { mutableStateOf(false) }
     var seekDirection by remember { mutableIntStateOf(0) }
@@ -1054,6 +1057,7 @@ private fun TvPlayerSurface(
         val step = if (direction < 0) -LivePlayback.SEEK_BACK_MS else LivePlayback.SEEK_FORWARD_MS
         val faster = minOf(SEEK_MAX_FASTER, 1f + seekRepeats * SEEK_FASTER_STEP)
         val programme = programWindow?.takeIf { seekWindow.isLive() && seekWindow.windowStartTimeMs != C.TIME_UNSET }
+        if (seekTarget == null) seekFrom = player.currentPosition
         val target = rewindHold.press(
             base = seekTarget ?: player.currentPosition,
             step = (step * faster).toLong(),
@@ -1069,7 +1073,9 @@ private fun TvPlayerSurface(
         seekJob?.cancel()
         seekJob = seekScope.launch {
             delay(SEEK_COMMIT_MS)
-            player.seekTo(target)
+            // Forward, an ad break skipped meanwhile can have taken playback past the place asked
+            // for: going there would be back into the adverts.
+            if (target < seekFrom || player.currentPosition < target) player.seekTo(target)
             seekTarget = null
             seekRepeats = 0
             delay(SEEK_LINGER_MS)
