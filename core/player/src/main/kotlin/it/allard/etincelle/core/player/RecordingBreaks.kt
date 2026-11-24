@@ -147,7 +147,11 @@ object RecordingBreaks {
         }
     }
 
-    private fun fetch(uri: Uri): ByteArray? = try {
+    // Asked twice: one that fails for a moment would otherwise have the whole search made again, and
+    // all of it downloaded again.
+    private fun fetch(uri: Uri): ByteArray? = fetchOnce(uri) ?: fetchOnce(uri)
+
+    private fun fetchOnce(uri: Uri): ByteArray? = try {
         DataSourceInputStream(http.createDataSource(), DataSpec(uri)).use { it.readBytes() }
     } catch (e: IOException) {
         null
