@@ -266,8 +266,8 @@ internal object BreakGuess {
      * sides of the break, at least ANCHOR_GAP_MS away, the one or the other being in a break of
      * [all] and the second near an edge of one: the channel's cards, bumpers and a show's splash
      * that open and close its breaks, or an advert shown at both ends of one. With the channel's
-     * logo [firm] seen at most INNER pictures in a row in the break. Pictures without a glance are
-     * not known and anchor nothing.
+     * logo [firm] seen at most INNER pictures in a row in the break, and drawn in to no less than
+     * MIN_MS, as a break sure by its logo. Pictures without a glance are not known and anchor nothing.
      *
      * On the pictures of every channel that marks nothing, in November 2026, each of the 33 breaks
      * so made sure began at the programme's end or later and landed, 32 s before its end, before
@@ -313,6 +313,7 @@ internal object BreakGuess {
         // anchor before it.
         val first = (opening.filter { it in start..start + START_AFTER_MS } + start).max()
         val last = (closing.map { it + pictureMs }.filter { it <= end } + end).min()
+        if (last - first < MIN_MS) return null
         return Guess(first..last, sure = true)
     }
 

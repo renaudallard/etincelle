@@ -449,6 +449,15 @@ class BreakGuessTest {
     }
 
     @Test
+    fun `a break drawn in to less than a break is not sure`() {
+        // Short pieces at its end given up: what is left is one piece of 48 s, and a card in it
+        // anchors both its edges.
+        val short = gone(20 to false, 12 to true, 7 to false, 9 to true, 7 to false, 5 to true, 20 to false)
+        assertEquals(listOf(Guess(80_000L..128_000L)), BreakGuess.logoBreaks(short, 0, 4_000))
+        assertEquals(listOf(Guess(80_000L..128_000L)), BreakGuess.logoBreaks(short, 0, 4_000, glances = glances(80, setOf(22, 40))))
+    }
+
+    @Test
     fun `an anchored break with the channel's logo seen long in it is not sure`() {
         // Twelve pictures of the channel's logo, the show's gone the while, part it: joined as a brand.
         val upper = gone(20 to false, 40 to true, 12 to false, 40 to true, 20 to false)
