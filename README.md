@@ -77,7 +77,12 @@ le logo de la chaîne bien visible avant et après. Sur près de 18 heures de vi
 novembre 2026, c'était le cas de 133 coupures sur 313 (un peu moins depuis, la règle étant devenue
 plus stricte) ; toutes s'arrêtaient dans la publicité, les
 bandes-annonces ou les génériques de la chaîne, mais certaines commençaient pendant le générique de
-fin de l'émission, et une huit secondes avant la fin d'un bulletin météo. Au direct même, il n'y a
+fin de l'émission, et une huit secondes avant la fin d'un bulletin météo. Une coupure trouvée d'après
+le logo de la chaîne est aussi sautée, même découpée, quand ses deux bords sont marqués par une
+image revue dans la coupure (le carton « Publicité » de la chaîne, son jingle, le générique de
+reprise de l'émission, une publicité passée au début et à la fin) et que le logo de la chaîne n'y
+reparaît jamais plus de 36 secondes d'affilée : sur les mêmes vignettes, 33 coupures de plus, dont
+aucune ne commençait avant la fin de l'émission ni ne s'arrêtait après sa reprise. Au direct même, il n'y a
 nulle part où sauter. Dans un **enregistrement**, qui ne signale rien non plus, les coupures sont
 cherchées à l'ouverture, d'après ses vignettes de la même façon et ses sous-titres (une émission
 parle pendant des minutes, une publicité quelques secondes) : le bouton apparaît dans la coupure,

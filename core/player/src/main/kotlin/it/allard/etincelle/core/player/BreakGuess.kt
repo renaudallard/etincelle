@@ -4,6 +4,7 @@
 package it.allard.etincelle.core.player
 
 import kotlin.math.abs
+import kotlin.math.sqrt
 
 /**
  * A break guessed from what a stream carries, from [range.first] to [range.last] (ms). [sure] when
@@ -136,6 +137,31 @@ internal object BreakGuess {
     // the programme, which shows both.
     private const val BRAND = 12
 
+    // A break not sure by its logo is sure all the same when both its edges are anchored (see
+    // [anchored]): a picture this near its start (before, after) or its end (either side) comes back
+    // in the break, at least ANCHOR_GAP_MS away, near an edge of a break; and the logo, the channel's,
+    // is seen at most INNER pictures in a row in it, adverts with something in its corner, where a
+    // weather forecast between two blocks of adverts shows it for a minute or more.
+    private const val START_BEFORE_MS = 90_000L
+    private const val START_AFTER_MS = 40_000L
+    private const val END_SIDE_MS = 60_000L
+    private const val ANCHOR_GAP_MS = 60_000L
+    private const val EDGE_NEAR_MS = 90_000L
+    private const val INNER = 9
+
+    // A picture is told again by its glance: GLANCE_WIDE by GLANCE_HIGH blocks, the mean luma of
+    // each. Two with blocks varying by at least FLAT are alike when they match to SAME; flatter ones,
+    // as a card of one colour, when their means are within FLAT_MEAN and no block differs by more
+    // than FLAT_BLOCK, but never black or white ones, which any fade gives.
+    const val GLANCE_WIDE = 30
+    const val GLANCE_HIGH = 15
+    private const val FLAT = 8.0
+    private const val SAME = 0.95
+    private const val FLAT_MEAN = 4.0
+    private const val FLAT_BLOCK = 12
+    private const val DARKEST = 30.0
+    private const val BRIGHTEST = 225.0
+
     /**
      * Of each picture, whether it is without the logo, from what each has of it ([score], [usual]
      * with it). One odd picture is no break, nor the end of one: each is taken with its neighbours.
@@ -184,8 +210,17 @@ internal object BreakGuess {
      * hours of them in November 2026, each of the 133 such breaks ended, 32 s early, in adverts,
      * trailers or the channel's own jingles, and began at the programme's end or in its end
      * credits, but for one that began 8 s before the end of a weather forecast.
+     *
+     * With the [glances] of the pictures, the first logo being the channel's, one not sure so is
+     * sure all the same when both its edges are anchored (see [anchored]).
      */
-    fun logoBreaks(gone: BooleanArray, firstMs: Long, pictureMs: Long, lowerGone: BooleanArray? = null): List<Guess> {
+    fun logoBreaks(
+        gone: BooleanArray,
+        firstMs: Long,
+        pictureMs: Long,
+        lowerGone: BooleanArray? = null,
+        glances: Array<ByteArray?>? = null,
+    ): List<Guess> {
         var without = gone
         val brand = lowerGone?.let { lower -> BooleanArray(gone.size) { !gone[it] && lower[it] } }
         val trailers = lowerGone?.let { lower -> BooleanArray(gone.size) { gone[it] && !lower[it] } }
@@ -206,7 +241,7 @@ internal object BreakGuess {
         val beside = if (lowerGone == null) solid else solid(gone)
         fun clear(from: Int, to: Int) = (from until to).count { !beside[it] } >= CLEAR
         val led = if (lowerGone != null) showLed(gone, lowerGone, found, firstMs, pictureMs) else emptyList()
-        return found.map { whole ->
+        val guesses = found.map { whole ->
             // A short piece held to either end by the bridge is given up: the logo hidden for a
             // moment just after a break, or before one, is a bright scene of the programme more
             // often than a last advert, and the break would run into it. With a second logo, pieces
@@ -218,7 +253,104 @@ internal object BreakGuess {
             val sure = pieces.size == 1 && whole in unnarrowed &&
                 clear(whole.first - AROUND, whole.first) && clear(whole.last + 1, whole.last + 1 + AROUND)
             Guess(firstMs + (whole.first + span.first) * pictureMs..firstMs + (whole.first + span.last + 1) * pictureMs, sure)
-        } + led
+        }
+        if (glances == null || glances.size != gone.size) return guesses + led
+        val firm = solid(gone)
+        val all = guesses + led
+        return guesses.map { if (it.sure) it else anchored(it, all, firm, glances, firstMs, pictureMs) ?: it } + led
+    }
+
+    /**
+     * [guess] made sure, with its edges drawn in to the anchors, when both are anchored; null when
+     * not. An edge is anchored by a picture near it that comes back between the start and the end
+     * sides of the break, at least ANCHOR_GAP_MS away, the one or the other being in a break of
+     * [all] and the second near an edge of one: the channel's cards, bumpers and a show's splash
+     * that open and close its breaks, or an advert shown at both ends of one. With the channel's
+     * logo [firm] seen at most INNER pictures in a row in the break. Pictures without a glance are
+     * not known and anchor nothing.
+     *
+     * On the pictures of every channel that marks nothing, in November 2026, each of the 33 breaks
+     * so made sure began at the programme's end or later and landed, 32 s before its end, before
+     * the programme was back.
+     */
+    private fun anchored(
+        guess: Guess,
+        all: List<Guess>,
+        firm: BooleanArray,
+        glances: Array<ByteArray?>,
+        firstMs: Long,
+        pictureMs: Long,
+    ): Guess? {
+        val start = guess.range.first
+        val end = guess.range.last
+        val from = ((start - firstMs) / pictureMs).toInt()
+        val to = ((end - firstMs) / pictureMs).toInt()
+        if (from < 0 || to > firm.size || longest(BooleanArray(firm.size) { !firm[it] }, from until to) > INNER) return null
+        fun at(i: Int) = firstMs + i * pictureMs
+        // The pictures from [low] to [high], as far as there are any.
+        fun between(low: Long, high: Long) =
+            maxOf(0L, (low - firstMs + pictureMs - 1).floorDiv(pictureMs)).toInt()..minOf(glances.size - 1L, (high - firstMs).floorDiv(pictureMs)).toInt()
+        fun inside(time: Long) = all.any { time in it.range }
+        fun nearEdge(time: Long) = all.any { abs(it.range.first - time) <= EDGE_NEAR_MS || abs(it.range.last - time) <= EDGE_NEAR_MS }
+        val own = between(start - START_BEFORE_MS, end + END_SIDE_MS)
+        // Each glance's numbers, worked out once.
+        val seen = arrayOfNulls<Seen>(glances.size)
+        fun seenAt(i: Int) = seen[i] ?: glances[i]?.let { Seen(it) }?.also { seen[i] = it }
+        // The times of the pictures from [low] to [high] that anchor the break.
+        fun anchors(low: Long, high: Long): List<Long> = between(low, high).filter { i ->
+            val time = at(i)
+            val one = seenAt(i)
+            one != null && own.any { k ->
+                val twin = at(k)
+                abs(twin - time) >= ANCHOR_GAP_MS && nearEdge(twin) && (inside(time) || inside(twin)) && seenAt(k)?.let { alike(one, it) } == true
+            }
+        }.map(::at)
+        val opening = anchors(start - START_BEFORE_MS, start + START_AFTER_MS)
+        if (opening.isEmpty()) return null
+        val closing = anchors(end - END_SIDE_MS, end + END_SIDE_MS)
+        if (closing.isEmpty()) return null
+        // Drawn in only: the start to the last anchor after it, the end to just after the first
+        // anchor before it.
+        val first = (opening.filter { it in start..start + START_AFTER_MS } + start).max()
+        val last = (closing.map { it + pictureMs }.filter { it <= end } + end).min()
+        return Guess(first..last, sure = true)
+    }
+
+    /** What tells the picture of [luma], [width] by [height], from others (see [alike]). */
+    fun glance(luma: ByteArray, width: Int, height: Int): ByteArray = ByteArray(GLANCE_WIDE * GLANCE_HIGH) { b ->
+        val x0 = b % GLANCE_WIDE * width / GLANCE_WIDE
+        val x1 = (b % GLANCE_WIDE + 1) * width / GLANCE_WIDE
+        val y0 = b / GLANCE_WIDE * height / GLANCE_HIGH
+        val y1 = (b / GLANCE_WIDE + 1) * height / GLANCE_HIGH
+        var sum = 0L
+        for (y in y0 until y1) for (x in x0 until x1) sum += luma[y * width + x].toInt() and 0xFF
+        val count = (x1 - x0) * (y1 - y0)
+        (if (count > 0) (sum + count / 2) / count else 0L).toInt().toByte()
+    }
+
+    // A glance's blocks, their mean, the sum of their squared distances to it, and their spread.
+    private class Seen(glance: ByteArray) {
+        val blocks = IntArray(glance.size) { glance[it].toInt() and 0xFF }
+        val mean = blocks.average()
+        val squares = blocks.sumOf { (it - mean) * (it - mean) }
+        val spread = if (blocks.isEmpty()) 0.0 else sqrt(squares / blocks.size)
+    }
+
+    /** Whether the pictures of glances [a] and [b] are the same one (see [glance]). */
+    fun alike(a: ByteArray, b: ByteArray): Boolean = a.isNotEmpty() && alike(Seen(a), Seen(b))
+
+    private fun alike(a: Seen, b: Seen): Boolean {
+        val x = a.blocks
+        val y = b.blocks
+        if (x.size != y.size) return false
+        if (a.spread >= FLAT) {
+            if (b.spread < FLAT) return false
+            var xy = 0.0
+            for (i in x.indices) xy += (x[i] - a.mean) * (y[i] - b.mean)
+            return xy / sqrt(a.squares * b.squares) >= SAME
+        }
+        if (b.spread >= FLAT || a.mean !in DARKEST..BRIGHTEST || abs(a.mean - b.mean) > FLAT_MEAN) return false
+        return x.indices.all { abs(x[it] - y[it]) <= FLAT_BLOCK }
     }
 
     // From the first picture of [held], the pieces of a break, to the last, once a short piece at

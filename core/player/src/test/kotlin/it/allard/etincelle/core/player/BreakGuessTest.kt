@@ -405,6 +405,59 @@ class BreakGuessTest {
         assertEquals(listOf(236_000L..448_000L), logoRanges(gone(20 to false, 30 to true, 9 to false, 53 to true, 30 to false), 0, 4_000))
     }
 
+    // Glances of pictures each unlike the others, but for those at [same], all of one card.
+    private fun glances(count: Int, same: Set<Int> = emptySet(), card: ByteArray = noise(9_999)): Array<ByteArray?> =
+        Array(count) { if (it in same) card else noise(it) }
+
+    private fun noise(seed: Int): ByteArray {
+        val random = java.util.Random(seed.toLong())
+        return ByteArray(BreakGuess.GLANCE_WIDE * BreakGuess.GLANCE_HIGH) { (20 + random.nextInt(200)).toByte() }
+    }
+
+    @Test
+    fun `a glance tells the same picture again, and a card of one colour but not a black one`() {
+        val luma = ByteArray(240 * 135) { p -> (p % 240 + p / 240).toByte() }
+        val glance = BreakGuess.glance(luma, 240, 135)
+        assertEquals(BreakGuess.GLANCE_WIDE * BreakGuess.GLANCE_HIGH, glance.size)
+        assertTrue(BreakGuess.alike(glance, BreakGuess.glance(luma.copyOf(), 240, 135)))
+        assertFalse(BreakGuess.alike(noise(1), noise(2)))
+        val red = ByteArray(450) { 76 }
+        assertTrue(BreakGuess.alike(red, ByteArray(450) { 78 }))
+        assertFalse(BreakGuess.alike(red, ByteArray(450) { 90 }))
+        assertFalse(BreakGuess.alike(red, noise(3)))
+        assertFalse(BreakGuess.alike(ByteArray(450) { 16 }, ByteArray(450) { 16 }))
+    }
+
+    @Test
+    fun `a break opened and closed by the same card is sure, drawn in to the card`() {
+        // Something bridged in it: not sure by the logo.
+        val bridged = gone(20 to false, 30 to true, 7 to false, 58 to true, 30 to false)
+        assertEquals(listOf(Guess(80_000L..460_000L)), BreakGuess.logoBreaks(bridged, 0, 4_000, glances = glances(145)))
+        // The card at its first picture and near its end, in it.
+        val carded = BreakGuess.logoBreaks(bridged, 0, 4_000, glances = glances(145, setOf(20, 113)))
+        assertEquals(listOf(Guess(80_000L..456_000L, sure = true)), carded)
+        // Only one edge anchored.
+        assertEquals(listOf(false), BreakGuess.logoBreaks(bridged, 0, 4_000, glances = glances(145, setOf(20, 60))).map { it.sure })
+        // The same picture before and after it, outside it: the programme on both sides says nothing.
+        assertEquals(listOf(false), BreakGuess.logoBreaks(bridged, 0, 4_000, glances = glances(145, setOf(15, 118))).map { it.sure })
+        // Black pictures, as any fade gives.
+        val black = ByteArray(450) { 16 }
+        assertEquals(listOf(false), BreakGuess.logoBreaks(bridged, 0, 4_000, glances = glances(145, setOf(20, 113), black)).map { it.sure })
+        // Without glances, or a picture of the pair not read.
+        assertEquals(listOf(false), BreakGuess.logoBreaks(bridged, 0, 4_000).map { it.sure })
+        assertEquals(listOf(false), BreakGuess.logoBreaks(bridged, 0, 4_000, glances = glances(145, setOf(20, 113)).also { it[113] = null }).map { it.sure })
+    }
+
+    @Test
+    fun `an anchored break with the channel's logo seen long in it is not sure`() {
+        // Twelve pictures of the channel's logo, the show's gone the while, part it: joined as a brand.
+        val upper = gone(20 to false, 40 to true, 12 to false, 40 to true, 20 to false)
+        val lower = gone(20 to false, 92 to true, 20 to false)
+        val guesses = BreakGuess.logoBreaks(upper, 0, 4_000, lower, glances(132, setOf(20, 110)))
+        assertEquals(listOf(80_000L..448_000L), guesses.map { it.range })
+        assertEquals(listOf(false), guesses.map { it.sure })
+    }
+
     @Test
     fun `pictures with nothing that stays say nothing`() {
         val track = LogoTrack(120, width, height)

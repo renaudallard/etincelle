@@ -60,6 +60,8 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
     private val scores = TreeMap<Long, Double>()
     // The same of the show's own logo, when one was learnt beside the channel's.
     private val lowerScores = TreeMap<Long, Double>()
+    // The glance of each picture read (see [BreakGuess.glance]), by its time.
+    private val glances = TreeMap<Long, ByteArray>()
 
     // The pictures that could not be had, with how many times each was asked for.
     private val missed = HashMap<Long, Int>()
@@ -112,10 +114,14 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
         val (first, gone) = known(logo, scores, at)
         // Read at the same times as the first, so over the same pictures.
         val lowerGone = logo.lower?.let { known(it, lowerScores, at).second }
+        // Anchored edges only with the channel's logo: a show's own alone does not tell a weather
+        // forecast between two blocks of adverts from them.
+        val seen = if (logo.channel) Array(gone.size) { glances[first + it * step] } else null
         scores.headMap(at - KEPT_S).clear()
         lowerScores.headMap(at - KEPT_S).clear()
+        glances.headMap(at - KEPT_S).clear()
         missed.keys.removeAll { it < at - KEPT_S }
-        return BreakGuess.logoBreaks(gone, first * 1000, step * 1000, lowerGone)
+        return BreakGuess.logoBreaks(gone, first * 1000, step * 1000, lowerGone, seen)
     }
 
     // The pictures read, without a gap, around [at]: the time of the first, and whether each is
@@ -136,14 +142,18 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
         val wanted = (from..to step step).filter { it !in scores || (missed[it] ?: TRIES) < TRIES }
         if (wanted.isEmpty()) return
         val lower = logo.lower
-        val got = each(wanted) { time -> luma(time)?.let { logo.score(it) to lower?.score(it) } }
+        val got = each(wanted) { time -> luma(time)?.let { Picture(logo.score(it), lower?.score(it), BreakGuess.glance(it, width, height)) } }
         wanted.forEachIndexed { i, time ->
-            val score = got[i]
-            if (score == null) missed[time] = (missed[time] ?: 0) + 1 else missed.remove(time)
-            scores[time] = score?.first ?: logo.usual
-            if (lower != null) lowerScores[time] = score?.second ?: lower.usual
+            val picture = got[i]
+            if (picture == null) missed[time] = (missed[time] ?: 0) + 1 else missed.remove(time)
+            scores[time] = picture?.score ?: logo.usual
+            if (lower != null) lowerScores[time] = picture?.lower ?: lower.usual
+            if (picture != null) glances[time] = picture.glance else glances.remove(time)
         }
     }
+
+    // What a picture read has of the logo, of the show's beside it, and its glance.
+    private class Picture(val score: Double, val lower: Double?, val glance: ByteArray)
 
     private suspend fun learn(at: Long, last: Long) {
         val times = (at - LEARN_SPAN_S..minOf(last, at + LEARN_SPAN_S) step LEARN_EVERY_S).toList()
@@ -163,6 +173,7 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
         logo = found
         scores.clear()
         lowerScores.clear()
+        glances.clear()
         missed.clear()
         if (found == null) again(at) else failures = 0
     }
