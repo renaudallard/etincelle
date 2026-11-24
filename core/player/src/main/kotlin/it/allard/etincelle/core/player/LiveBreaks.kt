@@ -277,8 +277,9 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
         private const val MORE_TIMES = 4
         private const val FAR_S = BreakGuess.LOGO_MAX_MS / 1000 + 160
 
-        // Pictures this far behind the playhead are forgotten.
-        private const val KEPT_S = 1200L
+        // Pictures this far behind the playhead are forgotten: no nearer than a read back may reach,
+        // as far as a break may and a read more, or they would be read again at each look.
+        private const val KEPT_S = FAR_S + MORE_S
     }
 }
 
