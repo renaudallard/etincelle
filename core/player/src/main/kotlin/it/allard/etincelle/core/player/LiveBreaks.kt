@@ -170,15 +170,19 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
 
     // [logo], the channel's, kept for when its pictures are read again.
     private fun remember(logo: Logo) {
-        remembered[thumbnails.baseUrl] = logo
+        remembered[rememberedAs()] = logo
     }
+
+    // What the channel's logo is remembered by: where its pictures are, and their size, as a logo is
+    // read on pictures of the size it was learnt on.
+    private fun rememberedAs() = "${thumbnails.baseUrl} $width $height"
 
     // Where no logo stands out in [pictures], as when most of them are of adverts and trailers, the
     // channel's from before, when seen on enough of them: the last found since the app started, or
     // else one looked for in the earlier pictures, once a viewing. One learnt over another programme
     // can fit these pictures too poorly: the top left corner of M6's teleshopping holds its own logo.
     private suspend fun kept(at: Long, pictures: List<ByteArray>): Logo? {
-        remembered[thumbnails.baseUrl]?.takeIf { it.seenIn(pictures, KEPT_SEEN) }?.let { return it }
+        remembered[rememberedAs()]?.takeIf { it.seenIn(pictures, KEPT_SEEN) }?.let { return it }
         if (searchedBack) return null
         val back = earlier(at) ?: return null
         remember(back)
@@ -256,9 +260,9 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
         // on from there instead of fetching the pictures of forty minutes again. Main thread only.
         private var followed: LiveBreaks? = null
 
-        // The channel's logo last found, by the address of its pictures, for a channel played again
-        // while the app runs: it stays from one programme to the next, and the hour before the
-        // evening's programme often shows it too little to be found then. Any thread.
+        // The channel's logo last found, by the address and size of its pictures, for a channel
+        // played again while the app runs: it stays from one programme to the next, and the hour
+        // before the evening's programme often shows it too little to be found then. Any thread.
         private val remembered = ConcurrentHashMap<String, Logo>()
 
         /** The instance of the channel whose pictures are at [thumbnails]. On the main thread. */
