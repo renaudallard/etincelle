@@ -61,7 +61,8 @@ coupure en deux : le logo du bas ne compte pour l'émission qu'au-delà de 40 se
 publicités restent dans la coupure tant que rien entre elles ne ressemble à l'émission (les deux logos à
 la fois, ou celui de l'émission pendant vingt secondes). Pas plus
 qu'une publicité qui montre sa marque dans le coin du logo de la chaîne, celui de l'émission absent,
-comme sur M6 dont le logo est pâle : jusqu'à 48 secondes, elle ne compte pas pour l'émission. Et dans
+comme sur M6 dont le logo est pâle : jusqu'à 48 secondes, elle ne compte pas pour l'émission, même
+entre une coupure et quelques minutes de publicités trop courtes pour en faire une à elles seules. Et dans
 l'heure qui précède le programme du soir, où publicités et bandes-annonces sont si nombreuses qu'aucun
 logo ne ressort plus, le logo de la chaîne trouvé plus tôt sert encore, même lors d'un autre visionnage
 depuis le lancement de l'application, ou à défaut celui qui ressort dans les deux heures précédentes,

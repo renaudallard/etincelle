@@ -163,9 +163,13 @@ internal object BreakGuess {
      * break would then pass for the programme and cut the break in two, each part too short to
      * count. So the second logo shown at most [SHORT_SHOW] pictures in a row, the first gone the while,
      * does not part two pieces of a break; nor does the first seen at most [BRAND] pictures in a row,
-     * the second gone the while, which is an advert with its brand in the first one's corner. Neither
-     * counts in the pieces' length, never into a break longer than one may be, and such a break is
-     * never sure.
+     * the second gone the while, which is an advert with its brand in the first one's corner, and
+     * that from the first look on, where a part beyond it can be too short to count by itself, so
+     * long as another is a break by itself and it is no shorter than an end piece: a new programme
+     * whose show's logo is not the one learnt looks like such a brand, and a scene of it without the
+     * first logo would otherwise be taken in.
+     * Neither counts in the pieces' length, never into a break longer than one may be, and such a
+     * break is never sure. Parts so joined that are no break together are taken each by itself.
      *
      * Adverts with something of their own in the logo's corner (Gulli's toy adverts, their makers'
      * logos) can keep it seen through half a break, which then falls into pieces too short to count.
@@ -183,7 +187,9 @@ internal object BreakGuess {
      */
     fun logoBreaks(gone: BooleanArray, firstMs: Long, pictureMs: Long, lowerGone: BooleanArray? = null): List<Guess> {
         var without = gone
-        var found = breakRuns(without, pictureMs)
+        val brand = lowerGone?.let { lower -> BooleanArray(gone.size) { !gone[it] && lower[it] } }
+        val trailers = lowerGone?.let { lower -> BooleanArray(gone.size) { gone[it] && !lower[it] } }
+        var found = breakRuns(without, pictureMs, trailers, brand, lengthen = true)
         val unnarrowed = found.toSet()
         if (lowerGone != null) {
             without = BooleanArray(gone.size)
@@ -192,7 +198,6 @@ internal object BreakGuess {
                 without[i] = gone[i] && lowerGone[i]
                 trailer[i] = gone[i] && !lowerGone[i]
             }
-            val brand = BooleanArray(gone.size) { !gone[it] && lowerGone[it] }
             found = breakRuns(without, pictureMs, trailer, brand)
         }
         val solid = solid(without)
@@ -272,14 +277,26 @@ internal object BreakGuess {
 
     // The stretches of [gone] that are breaks: solid, held together by the bridge, or by a trailer or a
     // brand (see [logoBreaks]) where they are given, between two stretches with the programme, and of
-    // a break's length.
-    private fun breakRuns(gone: BooleanArray, pictureMs: Long, trailer: BooleanArray? = null, brand: BooleanArray? = null): List<IntRange> {
+    // a break's length. Parts joined that are no break together are taken each by itself, as are those
+    // none of which is a break by itself where a join is only to [lengthen] one.
+    private fun breakRuns(
+        gone: BooleanArray,
+        pictureMs: Long,
+        trailer: BooleanArray? = null,
+        brand: BooleanArray? = null,
+        lengthen: Boolean = false,
+    ): List<IntRange> {
         val solid = solid(gone)
         fun programme(from: Int, to: Int) = from >= 0 && to <= solid.size && (from until to).count { !solid[it] } >= MOSTLY
-        val held = runs(solid, BRIDGE).let { if (trailer == null || brand == null) it else joined(it, trailer, brand, pictureMs) }
-        return held.filter { run ->
-            val between = programme(run.first - AROUND, run.first) && programme(run.last + 1, run.last + 1 + AROUND)
-            between && (run.last + 1 - run.first) * pictureMs in MIN_MS..LOGO_MAX_MS
+        fun isBreak(run: IntRange) = programme(run.first - AROUND, run.first) && programme(run.last + 1, run.last + 1 + AROUND) &&
+            (run.last + 1 - run.first) * pictureMs in MIN_MS..LOGO_MAX_MS
+        val held = runs(solid, BRIDGE)
+        if (trailer == null || brand == null) return held.filter { isBreak(it) }
+        // No short part to lengthen one with (see [logoBreaks]): it is never a break by itself either.
+        val joinable = if (lengthen) held.filter { it.last - it.first + 1 >= END_PIECE } else held
+        return joined(joinable, trailer, brand, pictureMs).flatMap { run ->
+            val parts = joinable.filter { it.first >= run.first && it.last <= run.last }
+            if (isBreak(run) && (!lengthen || parts.size == 1 || parts.any { isBreak(it) })) listOf(run) else parts.filter { isBreak(it) }
         }
     }
 

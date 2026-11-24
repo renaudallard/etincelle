@@ -366,6 +366,23 @@ class BreakGuessTest {
         BreakGuess.logoBreaks(gone, firstMs, pictureMs, lowerGone).map { it.range }
 
     // Pictures from stretches given as a number of them and whether they are without the logo.
+    @Test
+    fun `a brand parts no break even where a part beyond it is short`() {
+        val lower = gone(20 to false, 79 to true, 20 to false)
+        assertEquals(listOf(80_000L..396_000L), logoRanges(gone(20 to false, 40 to true, 9 to false, 30 to true, 20 to false), 0, 4_000, lower))
+        assertEquals(listOf(80_000L..396_000L), logoRanges(gone(20 to false, 30 to true, 9 to false, 40 to true, 20 to false), 0, 4_000, lower))
+        // A trailer between two brands.
+        val upper = gone(20 to false, 40 to true, 8 to false, 9 to true, 8 to false, 40 to true, 20 to false)
+        val show = gone(20 to false, 40 to true, 8 to true, 9 to false, 8 to true, 40 to true, 20 to false)
+        assertEquals(listOf(80_000L..500_000L), logoRanges(upper, 0, 4_000, show))
+        assertEquals(listOf(false), BreakGuess.logoBreaks(upper, 0, 4_000, show).map { it.sure })
+        // A new programme whose show's logo is not the one learnt looks like a brand: a short scene of
+        // it without the channel's logo is no part of the break before.
+        assertEquals(listOf(80_000L..320_000L), logoRanges(gone(20 to false, 60 to true, 10 to false, 6 to true, 40 to false), 0, 4_000, gone(20 to false, 116 to true)))
+        // Joined, no break, as too near what is known: the part that is one by itself stays.
+        assertEquals(listOf(124_000L..284_000L), logoRanges(gone(10 to false, 12 to true, 9 to false, 40 to true, 20 to false), 0, 4_000, gone(10 to false, 61 to true, 20 to false)))
+    }
+
     private fun gone(vararg stretches: Pair<Int, Boolean>) = stretches.flatMap { (count, gone) -> List(count) { gone } }.toBooleanArray()
 
     @Test
