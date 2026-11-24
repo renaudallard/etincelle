@@ -115,9 +115,11 @@ object RecordingBreaks {
     }
 
     private suspend fun read(manifest: DashManifest): List<Guess> = coroutineScope {
-        if (manifest.dynamic || manifest.periodCount != 1) return@coroutineScope emptyList()
+        // One still being made, of no length yet, is read once it is whole: what is found is kept.
+        if (manifest.dynamic) throw IOException("not whole yet")
+        if (manifest.periodCount != 1) return@coroutineScope emptyList()
         val lengthMs = manifest.getPeriodDurationMs(0)
-        if (lengthMs == C.TIME_UNSET) return@coroutineScope emptyList()
+        if (lengthMs == C.TIME_UNSET) throw IOException("of no length yet")
         val sets = manifest.getPeriod(0).adaptationSets
         val text = sets.filter { it.type == C.TRACK_TYPE_TEXT }.mapNotNull { it.representations.firstOrNull() }
         val image = sets.firstOrNull { it.type == C.TRACK_TYPE_IMAGE }?.representations?.firstOrNull()
@@ -266,7 +268,7 @@ suspend fun AdSkipper.followRecording(
     window: Timeline.Window,
     onBreak: (AdBreak?) -> Unit,
 ): Unit = coroutineScope {
-    val manifest = manifestOf(player, key)
+    var manifest = manifestOf(player, key)
     launch {
         while (true) {
             RecordingBreaks.find(key, manifest)?.let {
@@ -274,6 +276,8 @@ suspend fun AdSkipper.followRecording(
                 return@launch
             }
             delay(RecordingBreaks.RETRY_MS)
+            // The player's own by then: a recording still being made has become whole.
+            manifest = manifestOf(player, key)
         }
     }
     while (true) {
