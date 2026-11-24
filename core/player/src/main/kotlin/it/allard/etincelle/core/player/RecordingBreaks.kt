@@ -17,6 +17,7 @@ import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.dash.manifest.DashManifest
 import androidx.media3.exoplayer.dash.manifest.Representation
+import it.allard.etincelle.core.model.PlaybackSource
 import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -248,8 +249,9 @@ object RecordingBreaks {
 /**
  * Has this skipper follow the recording [key] that [player] plays: its breaks are looked for once the
  * player has its manifest (see [RecordingBreaks]), then [onBreak] is told every second which one
- * playback is in, to be offered with a button, when [AdSkipper.tick] has not skipped it. Never
- * returns; to be cancelled with the screen.
+ * playback is in, to be offered with a button, when [AdSkipper.tick] has not skipped it. Nothing is
+ * done while the player plays something else, as when a screen comes back to a recording that the
+ * next episode followed in the background. Never returns; to be cancelled with the screen.
  */
 suspend fun AdSkipper.followRecording(
     player: Player,
@@ -258,14 +260,22 @@ suspend fun AdSkipper.followRecording(
     onBreak: (AdBreak?) -> Unit,
 ) {
     // A cast player has no manifest, and never will: there is nothing to look in.
-    var manifest = player.currentManifest as? DashManifest
+    var manifest = manifestOf(player, key)
     while (manifest == null) {
         delay(1000)
-        manifest = player.currentManifest as? DashManifest
+        manifest = manifestOf(player, key)
     }
     recorded(RecordingBreaks.find(key, manifest))
     while (true) {
-        onBreak(tick(player, window))
+        onBreak(if (recordingOf(player) == key) tick(player, window) else null)
         delay(1000)
     }
 }
+
+// The recording [player] plays, from the source its item was made of.
+private fun recordingOf(player: Player): String? =
+    (player.currentMediaItem?.localConfiguration?.tag as? PlaybackSource)?.originRecordingAssetId
+
+// The manifest of the recording [key], once [player] has it.
+private fun manifestOf(player: Player, key: String): DashManifest? =
+    if (recordingOf(player) == key) player.currentManifest as? DashManifest else null
