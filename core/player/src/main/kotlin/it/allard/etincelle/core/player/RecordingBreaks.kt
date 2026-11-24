@@ -256,11 +256,11 @@ object RecordingBreaks {
 
 /**
  * Has this skipper follow the recording [key] that [player] plays: its breaks are looked for once the
- * player has its manifest (see [RecordingBreaks]), and again a while later as long as they could not
- * be read, then [onBreak] is told every second which one playback is in, to be offered with a button,
- * when [AdSkipper.tick] has not skipped it. Nothing is done while the player plays something else, as
- * when a screen comes back to a recording that the next episode followed in the background. Never
- * returns; to be cancelled with the screen.
+ * player has its manifest (see [RecordingBreaks]), and again later, less and less often, as long as
+ * they could not be read, then [onBreak] is told every second which one playback is in, to be offered
+ * with a button, when [AdSkipper.tick] has not skipped it. Nothing is done while the player plays
+ * something else, as when a screen comes back to a recording that the next episode followed in the
+ * background. Never returns; to be cancelled with the screen.
  */
 suspend fun AdSkipper.followRecording(
     player: Player,
@@ -270,12 +270,15 @@ suspend fun AdSkipper.followRecording(
 ): Unit = coroutineScope {
     var manifest = manifestOf(player, key)
     launch {
+        var wait = RecordingBreaks.RETRY_MS
         while (true) {
             RecordingBreaks.find(key, manifest)?.let {
                 recorded(it)
                 return@launch
             }
-            delay(RecordingBreaks.RETRY_MS)
+            delay(wait)
+            // Less and less often: one that can never be read would be downloaded again and again.
+            wait *= 2
             // The player's own by then: a recording still being made has become whole.
             manifest = manifestOf(player, key)
         }
