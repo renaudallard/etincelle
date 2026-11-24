@@ -72,8 +72,9 @@ demi-minute avant le retour du logo, que les chaînes remettent parfois après l
 l'émission : mieux vaut voir les dernières publicités que perdre le début de l'émission. Sur
 **Signalées et presque sûres**, le réglage saute aussi, douze secondes après son début, une coupure
 estimée dont rien ne laisse douter : d'un seul tenant, que le logo d'une émission ne réduit pas, et
-l'émission bien visible avant et après. Sur près de 18 heures de vignettes de ces chaînes, en
-novembre 2026, c'était le cas de 133 coupures sur 313 ; toutes s'arrêtaient dans la publicité, les
+le logo de la chaîne bien visible avant et après. Sur près de 18 heures de vignettes de ces chaînes, en
+novembre 2026, c'était le cas de 133 coupures sur 313 (un peu moins depuis, la règle étant devenue
+plus stricte) ; toutes s'arrêtaient dans la publicité, les
 bandes-annonces ou les génériques de la chaîne, mais certaines commençaient pendant le générique de
 fin de l'émission, et une huit secondes avant la fin d'un bulletin météo. Au direct même, il n'y a
 nulle part où sauter. Dans un **enregistrement**, qui ne signale rien non plus, les coupures sont

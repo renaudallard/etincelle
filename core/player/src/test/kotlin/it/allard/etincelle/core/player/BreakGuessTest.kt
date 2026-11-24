@@ -96,7 +96,10 @@ class BreakGuessTest {
         assertEquals(listOf(false), sure(whole, BooleanArray(130) { it in 20 until 80 }))
         assertEquals(listOf(true), sure(whole, BooleanArray(130) { true }))
         // Five pictures without the logo among the fifteen before it: a break, but not a sure one.
-        assertEquals(listOf(false), sure(gone(20 to false, 5 to true, 9 to false, 90 to true, 20 to false)))
+        val near = gone(20 to false, 5 to true, 9 to false, 90 to true, 20 to false)
+        assertEquals(listOf(false), sure(near))
+        // Nor with a second logo gone with the first.
+        assertEquals(listOf(false), sure(near, near))
     }
 
     private val width = 64

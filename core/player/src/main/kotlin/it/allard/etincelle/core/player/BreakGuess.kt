@@ -196,7 +196,10 @@ internal object BreakGuess {
             found = breakRuns(without, pictureMs, trailer, brand)
         }
         val solid = solid(without)
-        fun clear(from: Int, to: Int) = (from until to).count { !solid[it] } >= CLEAR
+        // The sides of a break are told by the first logo, as with no second one: [solid] holds only
+        // what lies in the breaks the first gives.
+        val beside = if (lowerGone == null) solid else solid(gone)
+        fun clear(from: Int, to: Int) = (from until to).count { !beside[it] } >= CLEAR
         val led = if (lowerGone != null) showLed(gone, lowerGone, found, firstMs, pictureMs) else emptyList()
         return found.map { whole ->
             // A short piece held to either end by the bridge is given up: the logo hidden for a
