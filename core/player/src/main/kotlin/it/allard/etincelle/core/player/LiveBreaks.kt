@@ -138,26 +138,34 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
         // Nothing changes until the pictures are in, and the earlier ones looked at where needed: a
         // learn cut short with the screen is done again.
         val pictures = each(times) { luma(it) }.filterNotNull()
-        val own = if (pictures.isEmpty()) null else LogoTrack(pictures.size, width, height).run {
-            pictures.forEachIndexed { i, picture -> add(i, picture) }
-            logo()
+        // None could be had, as when the connection is lost for a moment: what was learnt before
+        // stays, and the learn is tried again as when it finds nothing.
+        if (pictures.isEmpty()) {
+            again(at)
+            return
         }
+        val own = logoIn(pictures)
         own?.takeIf { it.channel }?.let { remember(it.alone()) }
-        val found = if (pictures.isEmpty()) null else own ?: kept(at, pictures)
+        val found = own ?: kept(at, pictures)
         learntAt = at
         logo = found
         scores.clear()
         lowerScores.clear()
         missed.clear()
-        if (pictures.isEmpty()) return
-        // Nothing learnt: tried again a little further on, then less and less often, as each try
-        // fetches all its pictures again.
-        if (logo == null) {
-            learntAt = at - LEARN_AGAIN_S + minOf(LEARN_AGAIN_S, LEARN_RETRY_S shl failures)
-            if (LEARN_RETRY_S shl failures < LEARN_AGAIN_S) failures++
-        } else {
-            failures = 0
-        }
+        if (found == null) again(at) else failures = 0
+    }
+
+    // Nothing learnt at [at]: tried again a little further on, then less and less often, as each try
+    // fetches all its pictures again.
+    private fun again(at: Long) {
+        learntAt = at - LEARN_AGAIN_S + minOf(LEARN_AGAIN_S, LEARN_RETRY_S shl failures)
+        if (LEARN_RETRY_S shl failures < LEARN_AGAIN_S) failures++
+    }
+
+    // The logo that stands out in [pictures], or null.
+    private fun logoIn(pictures: List<ByteArray>): Logo? = LogoTrack(pictures.size, width, height).run {
+        pictures.forEachIndexed { i, picture -> add(i, picture) }
+        logo()
     }
 
     // [logo], the channel's, kept for when its pictures are read again.
@@ -172,10 +180,7 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
     private suspend fun kept(at: Long, pictures: List<ByteArray>): Logo? {
         remembered[thumbnails.baseUrl]?.takeIf { it.seenIn(pictures, KEPT_SEEN) }?.let { return it }
         if (searchedBack) return null
-        val back = earlier(at)
-        // Only once searched to the end: a search cut short with the screen is made again.
-        searchedBack = true
-        if (back == null) return null
+        val back = earlier(at) ?: return null
         remember(back)
         return back.takeIf { it.seenIn(pictures, KEPT_SEEN) }
     }
@@ -185,16 +190,22 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
     // long block of adverts and trailers, where its logo is faint and stands out only where the
     // programme fills most of the pictures. Null when it stands out in none.
     private suspend fun earlier(at: Long): Logo? {
+        var found: Logo? = null
         for (back in 0 until EARLIER_TIMES) {
             val end = at - LEARN_SPAN_S - back * 2 * LEARN_SPAN_S
             val pictures = each((end - 2 * LEARN_SPAN_S until end step LEARN_EVERY_S).toList()) { luma(it) }.filterNotNull()
-            // Older than the service keeps them: the further back are too.
-            if (pictures.isEmpty()) return null
-            val track = LogoTrack(pictures.size, width, height)
-            pictures.forEachIndexed { i, picture -> track.add(i, picture) }
-            track.logo()?.takeIf { it.channel }?.let { return it.alone() }
+            // None of the nearest could be had, as when the connection is lost: looked for again at the
+            // next learn. None further on: older than the service keeps them, as are those before.
+            if (pictures.isEmpty()) {
+                if (back == 0) return null
+                break
+            }
+            found = logoIn(pictures)?.takeIf { it.channel }?.alone()
+            if (found != null) break
         }
-        return null
+        // Only once searched to the end: a search cut short with the screen is made again.
+        searchedBack = true
+        return found
     }
 
     private suspend fun <R> each(times: List<Long>, work: (Long) -> R): List<R> = coroutineScope {
