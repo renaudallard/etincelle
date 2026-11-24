@@ -339,6 +339,7 @@ class MainActivity : ComponentActivity(), TvRemote.Screen {
                                 playing, exo, viewModel::savePlaybackPosition, viewModel::reportProgress,
                                 viewModel::liveProgramWindow, viewModel::reResolve, viewModel::playbackFailed, viewModel::playUpNext,
                                 away = unloadedNow,
+                                returning = { reloadJob?.isActive == true },
                                 onAdBreak = { skipAdBreak = it },
                             )
                         }
@@ -916,6 +917,8 @@ private fun TvPlayerSurface(
     onPlayNext: () -> Unit = {},
     // The app was left: nothing is to be loaded until it is back.
     away: StateFlow<Boolean>,
+    // Back from away, a live programme is still being taken to where it was.
+    returning: () -> Boolean = { false },
     // Told what skips the ad break on offer, for a phone to ask for it too, and null when there is none.
     onAdBreak: ((() -> Unit)?) -> Unit = {},
 ) {
@@ -1182,7 +1185,9 @@ private fun TvPlayerSurface(
                     // An ad break being watched behind the live point, where its end is known: skipped at
                     // once when the settings say so, each break once, and offered with a pill otherwise
                     // (as is one gone back into with the remote).
-                    adBreak = adSkipper.tick(player, liveWindow)?.id
+                    // Not while it is taken back to where it was as the app was left: until then it stands
+                    // at its old place in a new window, a later time, maybe in a break it would skip.
+                    adBreak = if (returning()) null else adSkipper.tick(player, liveWindow)?.id
                     if (pendingRewind && LivePlayback.seekToTimeIfReady(player, liveWindow, rewindTo)) {
                         pendingRewind = false
                         adSkipper.ownSeek()
