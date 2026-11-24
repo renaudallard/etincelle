@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import it.allard.etincelle.core.cast.AdBreakOffer
@@ -70,6 +71,8 @@ fun TvRemoteScreen(
     // The TV is in an ad break it offers to skip.
     var adBreak by remember { mutableStateOf(false) }
     var live by remember { mutableStateOf(false) }
+    // The TV has said how long what it plays is, or its live window: no seek is taken before.
+    var known by remember { mutableStateOf(false) }
     var behindLive by remember { mutableStateOf(false) }
     // What this phone sent the TV, while the TV plays it: nothing for what was started on the TV itself.
     var source by remember { mutableStateOf<PlaybackSource?>(null) }
@@ -86,6 +89,7 @@ fun TvRemoteScreen(
                 playing = player.playWhenReady
                 adBreak = (player as? AdBreakOffer)?.adBreakOffered == true
                 live = player.isCurrentMediaItemLive
+                known = player.duration != C.TIME_UNSET
                 behindLive = LivePlayback.behindLiveEdgeMs(player, window) > LivePlayback.LIVE_REWIND_THRESHOLD_MS
                 source = player.currentMediaItem?.localConfiguration?.tag as? PlaybackSource
                 delay(REFRESH_MS)
@@ -132,7 +136,7 @@ fun TvRemoteScreen(
                 PadButton("+30", onClick = { player.seekForward() })
             }
             // A live channel goes back to the start of its programme, when known.
-            val toStart = !live || programWindow != null
+            val toStart = known && (!live || programWindow != null)
             if (toStart || behindLive) {
                 Spacer(Modifier.height(12.dp))
                 FlowRow(
