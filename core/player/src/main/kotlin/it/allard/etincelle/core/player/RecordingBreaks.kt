@@ -28,6 +28,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
@@ -56,7 +57,7 @@ object RecordingBreaks {
     private const val KNOWN = 20
 
     // A recording that could not be read is not searched again before this.
-    private const val RETRY_MS = 5 * 60_000L
+    internal const val RETRY_MS = 5 * 60_000L
 
     private val http = DefaultHttpDataSource.Factory()
 
@@ -74,17 +75,18 @@ object RecordingBreaks {
 
     /**
      * The breaks of the recording [key], whose [manifest] the player holds, as positions (ms) in it.
-     * Empty when none is found, or nothing can be read.
+     * Empty when none is found; null when it could not be read, and is not to be asked again before
+     * [RETRY_MS].
      */
-    suspend fun find(key: String, manifest: DashManifest): List<Guess> {
+    suspend fun find(key: String, manifest: DashManifest): List<Guess>? {
         val search = synchronized(known) {
             known[key]?.let { return it }
             // What could not be read is not remembered as nothing found: asked again a while later.
-            failedAt[key]?.let { if (SystemClock.elapsedRealtime() - it < RETRY_MS) return emptyList() }
+            failedAt[key]?.let { if (SystemClock.elapsedRealtime() - it < RETRY_MS) return null }
             // The search cannot finish before it is listed: it takes the lock to say so.
             running.getOrPut(key) { scope.async { search(key, manifest) } }
         }
-        return search.await().orEmpty()
+        return search.await()
     }
 
     private suspend fun search(key: String, manifest: DashManifest): List<Guess>? {
@@ -248,24 +250,28 @@ object RecordingBreaks {
 
 /**
  * Has this skipper follow the recording [key] that [player] plays: its breaks are looked for once the
- * player has its manifest (see [RecordingBreaks]), then [onBreak] is told every second which one
- * playback is in, to be offered with a button, when [AdSkipper.tick] has not skipped it. Nothing is
- * done while the player plays something else, as when a screen comes back to a recording that the
- * next episode followed in the background. Never returns; to be cancelled with the screen.
+ * player has its manifest (see [RecordingBreaks]), and again a while later as long as they could not
+ * be read, then [onBreak] is told every second which one playback is in, to be offered with a button,
+ * when [AdSkipper.tick] has not skipped it. Nothing is done while the player plays something else, as
+ * when a screen comes back to a recording that the next episode followed in the background. Never
+ * returns; to be cancelled with the screen.
  */
 suspend fun AdSkipper.followRecording(
     player: Player,
     key: String,
     window: Timeline.Window,
     onBreak: (AdBreak?) -> Unit,
-) {
-    // A cast player has no manifest, and never will: there is nothing to look in.
-    var manifest = manifestOf(player, key)
-    while (manifest == null) {
-        delay(1000)
-        manifest = manifestOf(player, key)
+): Unit = coroutineScope {
+    val manifest = manifestOf(player, key)
+    launch {
+        while (true) {
+            RecordingBreaks.find(key, manifest)?.let {
+                recorded(it)
+                return@launch
+            }
+            delay(RecordingBreaks.RETRY_MS)
+        }
     }
-    recorded(RecordingBreaks.find(key, manifest))
     while (true) {
         onBreak(if (recordingOf(player) == key) tick(player, window) else null)
         delay(1000)
@@ -276,6 +282,11 @@ suspend fun AdSkipper.followRecording(
 private fun recordingOf(player: Player): String? =
     (player.currentMediaItem?.localConfiguration?.tag as? PlaybackSource)?.originRecordingAssetId
 
-// The manifest of the recording [key], once [player] has it.
-private fun manifestOf(player: Player, key: String): DashManifest? =
-    if (recordingOf(player) == key) player.currentManifest as? DashManifest else null
+// The manifest of the recording [key], once [player] has it. A cast player has none, and never will:
+// there is nothing to look in.
+private suspend fun manifestOf(player: Player, key: String): DashManifest {
+    while (true) {
+        if (recordingOf(player) == key) (player.currentManifest as? DashManifest)?.let { return it }
+        delay(1000)
+    }
+}
