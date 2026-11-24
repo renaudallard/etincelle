@@ -56,7 +56,9 @@ gardent ainsi le logo de la chaîne visible la moitié du temps, comme les jouet
 disparition du logo de l'émission tout du long suffit, si celui de la chaîne est bien visible avant
 et après ; jamais au-delà de son retour, et jamais sautée d'office. Et une bande-annonce qui porte
 le pictogramme de la chaîne au milieu des publicités, comme sur Paris Première, ne coupe plus la
-coupure en deux : le logo du bas ne compte pour l'émission qu'au-delà de 40 secondes. Pas plus
+coupure en deux : le logo du bas ne compte pour l'émission qu'au-delà de 40 secondes ; et ses dernières
+publicités restent dans la coupure tant que rien entre elles ne ressemble à l'émission (les deux logos à
+la fois, ou celui de l'émission pendant vingt secondes). Pas plus
 qu'une publicité qui montre sa marque dans le coin du logo de la chaîne, celui de l'émission absent,
 comme sur M6 dont le logo est pâle : jusqu'à 48 secondes, elle ne compte pas pour l'émission. Et dans
 l'heure qui précède le programme du soir, où publicités et bandes-annonces sont si nombreuses qu'aucun

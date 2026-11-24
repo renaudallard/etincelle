@@ -268,6 +268,21 @@ class BreakGuessTest {
     }
 
     @Test
+    fun `a last piece of adverts parted by an advert's brand stays part of the break`() {
+        // The channel's logo seen three pictures near the end, the show's gone the while: an advert's
+        // brand, not the programme back; the last eight pictures are still adverts.
+        val upper = gone(20 to false, 60 to true, 3 to false, 8 to true, 20 to false)
+        assertEquals(listOf(80_000L..364_000L), logoRanges(upper, 0, 4_000, gone(20 to false, 71 to true, 20 to false)))
+        assertEquals(listOf(false), BreakGuess.logoBreaks(upper, 0, 4_000, gone(20 to false, 71 to true, 20 to false)).map { it.sure })
+        // Both logos seen: the programme back for a moment, and the short piece after it given up.
+        val back = gone(20 to false, 60 to true, 3 to false, 8 to true, 20 to false)
+        assertEquals(listOf(80_000L..320_000L), logoRanges(upper, 0, 4_000, back))
+        // The show's logo matched for a picture now and then, the channel's gone: still adverts.
+        val noise = gone(20 to false, 103 to true, 20 to false).also { for (i in listOf(110, 112, 114)) it[i] = false }
+        assertEquals(listOf(80_000L..492_000L), logoRanges(gone(20 to false, 103 to true, 20 to false), 0, 4_000, noise))
+    }
+
+    @Test
     fun `a trailer carrying the second logo does not part a break`() {
         // The channel's logo gone throughout; its pictogram on a trailer in the middle, 32 s of it.
         val upper = gone(20 to false, 82 to true, 20 to false)

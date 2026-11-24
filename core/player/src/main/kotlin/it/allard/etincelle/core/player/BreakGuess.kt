@@ -201,16 +201,47 @@ internal object BreakGuess {
         return found.map { whole ->
             // A short piece held to either end by the bridge is given up: the logo hidden for a
             // moment just after a break, or before one, is a bright scene of the programme more
-            // often than a last advert, and the break would run into it.
+            // often than a last advert, and the break would run into it. With a second logo, pieces
+            // with nothing between them that looks like the programme are one: what parts them is an
+            // advert's brand in the channel's corner, or the show's logo matched for a picture now and
+            // then by the notices along the bottom of adverts.
             val pieces = runs(BooleanArray(whole.last - whole.first + 1) { solid[whole.first + it] }, 0)
+            val held = if (lowerGone == null) pieces else merged(pieces, whole.first, gone, lowerGone)
             var from = 0
-            var to = pieces.lastIndex
-            while (to > from && pieces[to].last - pieces[to].first + 1 < END_PIECE) to--
-            while (from < to && pieces[from].last - pieces[from].first + 1 < END_PIECE) from++
+            var to = held.lastIndex
+            while (to > from && held[to].last - held[to].first + 1 < END_PIECE) to--
+            while (from < to && held[from].last - held[from].first + 1 < END_PIECE) from++
             val sure = pieces.size == 1 && whole in unnarrowed &&
                 clear(whole.first - AROUND, whole.first) && clear(whole.last + 1, whole.last + 1 + AROUND)
-            Guess(firstMs + (whole.first + pieces[from].first) * pictureMs..firstMs + (whole.first + pieces[to].last + 1) * pictureMs, sure)
+            Guess(firstMs + (whole.first + held[from].first) * pictureMs..firstMs + (whole.first + held[to].last + 1) * pictureMs, sure)
         } + led
+    }
+
+    // [pieces] of a break whose first picture is [offset], made one where nothing between them looks
+    // like the programme (see [programmeIn]).
+    private fun merged(pieces: List<IntRange>, offset: Int, gone: BooleanArray, lowerGone: BooleanArray): List<IntRange> {
+        val out = mutableListOf<IntRange>()
+        for (piece in pieces) {
+            val last = out.lastOrNull()
+            if (last != null && !programmeIn(offset + last.last + 1 until offset + piece.first, gone, lowerGone)) {
+                out[out.size - 1] = last.first..piece.last
+            } else {
+                out += piece
+            }
+        }
+        return out
+    }
+
+    // Whether [range] looks like the programme: a picture with both logos seen, or the show's seen SOLID
+    // pictures in a row.
+    private fun programmeIn(range: IntRange, gone: BooleanArray, lowerGone: BooleanArray): Boolean {
+        var row = 0
+        for (i in range) {
+            if (!gone[i] && !lowerGone[i]) return true
+            row = if (lowerGone[i]) 0 else row + 1
+            if (row >= SOLID) return true
+        }
+        return false
     }
 
     // The breaks a stretch without the second logo gives where [found] has none (see [logoBreaks]).
