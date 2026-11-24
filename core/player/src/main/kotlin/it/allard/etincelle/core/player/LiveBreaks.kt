@@ -135,19 +135,21 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
 
     private suspend fun learn(at: Long, last: Long) {
         val times = (at - LEARN_SPAN_S..minOf(last, at + LEARN_SPAN_S) step LEARN_EVERY_S).toList()
-        // Nothing changes until the pictures are in: a learn cut short with the screen is done again.
+        // Nothing changes until the pictures are in, and the earlier ones looked at where needed: a
+        // learn cut short with the screen is done again.
         val pictures = each(times) { luma(it) }.filterNotNull()
+        val own = if (pictures.isEmpty()) null else LogoTrack(pictures.size, width, height).run {
+            pictures.forEachIndexed { i, picture -> add(i, picture) }
+            logo()
+        }
+        own?.takeIf { it.channel }?.let { remember(it.alone()) }
+        val found = if (pictures.isEmpty()) null else own ?: kept(at, pictures)
         learntAt = at
-        logo = null
+        logo = found
         scores.clear()
         lowerScores.clear()
         missed.clear()
         if (pictures.isEmpty()) return
-        val track = LogoTrack(pictures.size, width, height)
-        pictures.forEachIndexed { i, picture -> track.add(i, picture) }
-        val own = track.logo()
-        own?.takeIf { it.channel }?.let { remember(it.alone()) }
-        logo = own ?: kept(at, pictures)
         // Nothing learnt: tried again a little further on, then less and less often, as each try
         // fetches all its pictures again.
         if (logo == null) {
@@ -170,8 +172,10 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
     private suspend fun kept(at: Long, pictures: List<ByteArray>): Logo? {
         remembered[thumbnails.baseUrl]?.takeIf { it.seenIn(pictures, KEPT_SEEN) }?.let { return it }
         if (searchedBack) return null
+        val back = earlier(at)
+        // Only once searched to the end: a search cut short with the screen is made again.
         searchedBack = true
-        val back = earlier(at) ?: return null
+        if (back == null) return null
         remember(back)
         return back.takeIf { it.seenIn(pictures, KEPT_SEEN) }
     }
