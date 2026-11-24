@@ -28,11 +28,13 @@ private const val SURE_AFTER_MS = 12_000L
  */
 class AdSkipper(private val skip: SkipAds) : Player.Listener {
     private val breaks = AdBreaks()
-    // The break playback was in when last looked at, and whether it is left to play.
-    private var inBreak = 0L
-    private var kept = false
-    // The viewer went backwards since then.
+    // The viewer went backwards since the last look; and where to, as a break's id says where it
+    // began: one that began there or before was gone back into, whether it was known then or is found
+    // later, as a live channel's guessed breaks are. A time of day on a live stream, a position in a
+    // recording: it counts only in its own.
     private var rewound = false
+    private var backTo = Long.MIN_VALUE
+    private var backToLive = false
     // When the stream loaded was first seen ready to play; 0 until it is.
     private var readyAt = 0L
 
@@ -62,6 +64,7 @@ class AdSkipper(private val skip: SkipAds) : Player.Listener {
     /** The seek just made was the screen's own, not the viewer's. */
     fun ownSeek() {
         rewound = false
+        backTo = Long.MIN_VALUE
     }
 
     /**
@@ -70,20 +73,16 @@ class AdSkipper(private val skip: SkipAds) : Player.Listener {
      */
     fun tick(player: Player, window: Timeline.Window): AdBreak? {
         if (readyAt == 0L && player.playbackState == Player.STATE_READY) readyAt = SystemClock.elapsedRealtime()
-        val back = rewound
-        rewound = false
-        val ad = breaks.current(player, window)
-        if (ad == null) {
-            inBreak = 0L
-            kept = false
-            return null
+        if (rewound) {
+            rewound = false
+            backTo = breaks.timeOf(player, window) ?: Long.MIN_VALUE
+            backToLive = player.isCurrentMediaItemLive
         }
-        kept = back || (kept && ad.id == inBreak)
-        inBreak = ad.id
+        val ad = breaks.current(player, window) ?: return null
         if (!ad.skippable) return null
         // A guessed break is skipped unasked only when sure and asked for: a wrong guess loses programme.
         val auto = if (ad.guessed) skip == SkipAds.SURE && ad.sure else skip != SkipAds.OFF
-        if (!auto || kept) return ad
+        if (!auto || (ad.id <= backTo && player.isCurrentMediaItemLive == backToLive)) return ad
         if (ad.guessed && player.currentPosition < ad.startMs + SURE_AFTER_MS) return ad
         player.seekTo(ad.endMs)
         return null

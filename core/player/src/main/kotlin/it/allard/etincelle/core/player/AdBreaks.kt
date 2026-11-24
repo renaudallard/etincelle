@@ -68,6 +68,19 @@ class AdBreaks {
     var guessed: List<Guess> = emptyList()
 
     /**
+     * Where playback is, in the time of a break's [AdBreak.id]: the time of day on a live stream, the
+     * position in a recording; null when not known. [window] as for [current].
+     */
+    fun timeOf(player: Player, window: Timeline.Window): Long? {
+        if (!player.isCurrentMediaItemLive) return player.currentPosition
+        val timeline = player.currentTimeline
+        if (timeline.isEmpty) return null
+        timeline.getWindow(player.currentMediaItemIndex, window)
+        val start = window.windowStartTimeMs
+        return if (start == C.TIME_UNSET) null else start + player.currentPosition
+    }
+
+    /**
      * The break playback is in, whether or not it can be skipped yet, or null. [window] is a
      * caller-owned scratch instance to fill.
      */
