@@ -171,8 +171,8 @@ internal object BreakGuess {
      * logos) can keep it seen through half a break, which then falls into pieces too short to count.
      * Where a second logo is found, a stretch without it, a break by itself, that the first gave
      * nothing in is one all the same when the first is gone through at least half of it and plainly
-     * there on each side, from where the first is first gone to where it is last gone: never past
-     * its return. Never sure.
+     * there on each side, from where the first is first gone to where it is last gone, a short piece
+     * at either end given up as below: never past its return. Never sure.
      *
      * A break is sure when it is one stretch without the logo, nothing bridged in it nor given up
      * at its ends, the second logo changed nothing in it, and the logo is there through most of
@@ -206,15 +206,21 @@ internal object BreakGuess {
             // advert's brand in the channel's corner, or the show's logo matched for a picture now and
             // then by the notices along the bottom of adverts.
             val pieces = runs(BooleanArray(whole.last - whole.first + 1) { solid[whole.first + it] }, 0)
-            val held = if (lowerGone == null) pieces else merged(pieces, whole.first, gone, lowerGone)
-            var from = 0
-            var to = held.lastIndex
-            while (to > from && held[to].last - held[to].first + 1 < END_PIECE) to--
-            while (from < to && held[from].last - held[from].first + 1 < END_PIECE) from++
+            val span = trimmed(if (lowerGone == null) pieces else merged(pieces, whole.first, gone, lowerGone))
             val sure = pieces.size == 1 && whole in unnarrowed &&
                 clear(whole.first - AROUND, whole.first) && clear(whole.last + 1, whole.last + 1 + AROUND)
-            Guess(firstMs + (whole.first + held[from].first) * pictureMs..firstMs + (whole.first + held[to].last + 1) * pictureMs, sure)
+            Guess(firstMs + (whole.first + span.first) * pictureMs..firstMs + (whole.first + span.last + 1) * pictureMs, sure)
         } + led
+    }
+
+    // From the first picture of [held], the pieces of a break, to the last, once a short piece at
+    // either end is given up (see [logoBreaks]); of short pieces only, the first is kept.
+    private fun trimmed(held: List<IntRange>): IntRange {
+        var from = 0
+        var to = held.lastIndex
+        while (to > from && held[to].last - held[to].first + 1 < END_PIECE) to--
+        while (from < to && held[from].last - held[from].first + 1 < END_PIECE) from++
+        return held[from].first..held[to].last
     }
 
     // [pieces] of a break whose first picture is [offset], made one where nothing between them looks
@@ -251,10 +257,13 @@ internal object BreakGuess {
         return breakRuns(lowerGone, pictureMs).mapNotNull { run ->
             if (found.any { it.first <= run.last && run.first <= it.last }) return@mapNotNull null
             if (run.count { gone[it] } < SHOW_LED * (run.last - run.first + 1)) return@mapNotNull null
-            val from = run.firstOrNull { solid[it] } ?: return@mapNotNull null
-            val to = run.last { solid[it] } + 1
+            val pieces = runs(BooleanArray(run.last - run.first + 1) { solid[run.first + it] }, 0)
+            if (pieces.isEmpty()) return@mapNotNull null
+            val from = run.first + pieces.first().first
+            val to = run.first + pieces.last().last + 1
             if ((to - from) * pictureMs < MIN_MS || !clear(from - AROUND, from) || !clear(to, to + AROUND)) return@mapNotNull null
-            Guess(firstMs + from * pictureMs..firstMs + to * pictureMs)
+            val span = trimmed(merged(pieces, run.first, gone, lowerGone))
+            Guess(firstMs + (run.first + span.first) * pictureMs..firstMs + (run.first + span.last + 1) * pictureMs)
         }
     }
 

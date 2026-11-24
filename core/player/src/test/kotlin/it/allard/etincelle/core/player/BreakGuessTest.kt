@@ -309,6 +309,11 @@ class BreakGuessTest {
         // Nor when the programme after it does not plainly show the channel's: it may be hidden there too.
         val hidden = gone(20 to false, *pieces.toTypedArray(), 8 to false, 6 to true, 6 to false)
         assertEquals(emptyList<LongRange>(), logoRanges(hidden, 0, 4_000, gone(20 to false, 94 to true, 20 to false)))
+        // A scene of the programme without either logo, held to an end by the bridge, is given up.
+        val after = gone(20 to false, *pieces.toTypedArray(), 7 to false, 9 to true, 30 to false)
+        assertEquals(listOf(80_000L..456_000L), logoRanges(after, 0, 4_000, gone(20 to false, 94 to true, 7 to false, 9 to true, 30 to false)))
+        val before = gone(30 to false, 5 to true, 7 to false, *pieces.toTypedArray(), 30 to false)
+        assertEquals(listOf(168_000L..544_000L), logoRanges(before, 0, 4_000, gone(30 to false, 5 to true, 7 to false, 94 to true, 30 to false)))
     }
 
     @Test
