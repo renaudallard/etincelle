@@ -95,6 +95,9 @@ class BreakGuessTest {
         val whole = BooleanArray(130) { it in 20 until 110 }
         assertEquals(listOf(false), sure(whole, BooleanArray(130) { it in 20 until 80 }))
         assertEquals(listOf(true), sure(whole, BooleanArray(130) { true }))
+        // Only trimmed at its ends, a few pictures each, as T18's logo comes back after its show's.
+        assertEquals(listOf(true), sure(whole, BooleanArray(130) { it in 21 until 107 }))
+        assertEquals(listOf(false), sure(whole, BooleanArray(130) { it in 24 until 110 }))
         // Five pictures without the logo among the fifteen before it: a break, but not a sure one.
         val near = gone(20 to false, 5 to true, 9 to false, 90 to true, 20 to false)
         assertEquals(listOf(false), sure(near))

@@ -123,6 +123,12 @@ internal object BreakGuess {
     // sure: the programme is plainly there, not a scene of it that hides the logo now and then.
     private const val CLEAR = 12
 
+    // The pictures the show's logo may trim off each end of a stretch without the channel's, the
+    // break staying sure: T18 takes its logo off a moment before the programme stops and puts it back
+    // a dozen seconds after it starts again, the show's logo there until the cut. Measured on the
+    // pictures of November 2026: 22 more sure breaks on 11 channels, all skipped within the adverts.
+    private const val TRIMMED = 3
+
     // The share of a stretch without the show's logo that must be without the channel's too for it
     // to be a break the channel's logo alone did not give.
     private const val SHOW_LED = 0.5
@@ -254,7 +260,10 @@ internal object BreakGuess {
             // then by the notices along the bottom of adverts.
             val pieces = runs(BooleanArray(whole.last - whole.first + 1) { solid[whole.first + it] }, 0)
             val span = trimmed(if (lowerGone == null) pieces else merged(pieces, whole.first, gone, lowerGone))
-            val sure = channel && pieces.size == 1 && whole in unnarrowed &&
+            val trimmedOnly = unnarrowed.any {
+                it.first <= whole.first && whole.last <= it.last && whole.first - it.first <= TRIMMED && it.last - whole.last <= TRIMMED
+            }
+            val sure = channel && pieces.size == 1 && trimmedOnly &&
                 clear(whole.first - AROUND, whole.first) && clear(whole.last + 1, whole.last + 1 + AROUND)
             Guess(firstMs + (whole.first + span.first) * pictureMs..firstMs + (whole.first + span.last + 1) * pictureMs, sure)
         }

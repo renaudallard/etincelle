@@ -72,7 +72,7 @@ qui suit. Elle s'arrête une
 demi-minute avant le retour du logo, que les chaînes remettent parfois après la reprise de
 l'émission : mieux vaut voir les dernières publicités que perdre le début de l'émission. Sur
 **Signalées et presque sûres**, le réglage saute aussi, douze secondes après son début, une coupure
-estimée dont rien ne laisse douter : d'un seul tenant, que le logo d'une émission ne réduit pas, et
+estimée dont rien ne laisse douter : d'un seul tenant, que le logo d'une émission ne réduit pas, ou de douze secondes au plus à chaque bord (T18 retire le sien juste avant la fin de l'émission et le remet une douzaine de secondes après sa reprise ; sur les mêmes vignettes, 22 coupures de plus sur 11 chaînes, toutes sautées dans la publicité), et
 le logo de la chaîne bien visible avant et après, jamais d'après le seul logo d'une émission, qui
 part avec elle : la coupure courrait alors de la fin d'une émission jusque dans le début de la
 suivante. Sur près de 18 heures de vignettes de ces chaînes, en
