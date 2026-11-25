@@ -91,7 +91,7 @@ aucune ne commençait avant la fin de l'émission ni ne s'arrêtait après sa re
 **Gulli**, qui séparent deux publicités par une demi-seconde de noir, la coupure se lit aussi dans le
 flux lui-même : l'image est chiffrée, mais pas la taille de chaque image, et un noir en fait une
 douzaine de quelques octets. Une coupure en compte au moins six sur une minute et demie ou plus, jamais
-à plus d'une minute quarante l'un de l'autre (un noir manqué laisse deux publicités entre deux autres) ; elle va du deuxième à l'avant-dernier, qu'un noir égaré dans
+à plus d'une minute l'un de l'autre, ou d'une minute quarante entre deux groupes d'au moins trois (un noir manqué laisse deux publicités entre deux autres, mais un ou deux noirs d'un dessin animé juste avant la coupure ne s'y joignent pas) ; elle va du deuxième à l'avant-dernier, qu'un noir égaré dans
 l'émission juste avant ou après la coupure laisse encore dans la publicité, et **Signalées et presque
 sûres** la saute dès le deuxième. Sur quatre heures de chacune de ces chaînes, en
 novembre 2026, elle trouvait 8 coupures de M6 et 7 de Gulli, toutes commencées et arrêtées dans la

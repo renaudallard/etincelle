@@ -42,8 +42,10 @@ import kotlinx.coroutines.withContext
  * minutes. A black's frames are the smallest a frame can be, 32 to 36 bytes, a held picture's
  * mostly more: so they must be [BLACK_MEAN] at most on average, which left at most three of a
  * cartoon's within a minute, and a break is at least [LEAST] of them over [SPAN_MS] or more, none
- * more than [GAP_MS] from the next: a black now and then is a few bytes over and missed (seen: 41 on
- * average), which leaves two adverts between two others, 95 s on M6. W9 and 6ter have none.
+ * more than [GAP_MS] from the next. A black now and then is a few bytes over and missed (seen: 41 on
+ * average), which leaves two adverts between two others, 95 s on M6: two runs of [PART] or more are
+ * one across up to [WIDE_GAP_MS], but not a run of one or two, as a cartoon's last blacks just
+ * before a break on Canal J. W9 and 6ter have none.
  * The first advert has no separator before it and the last none after it, so the separators of a
  * break are all in its adverts. A stray one, in the programme less than a minute from a break, would
  * be counted in it: a break runs from the second to the one before the last, which one stray at
@@ -60,11 +62,13 @@ internal object Separators {
     private val BLACK = 10..14
 
     // The separators of a break, at the least, how long they span at the least, and the most apart
-    // two of them are: the longest advert seen between two was 55 s, two of them with the black
-    // between them missed 95 s.
+    // two of them are: the longest advert seen between two was 55 s. Two runs of PART or more are one
+    // across up to WIDE_GAP_MS, where a black was missed: two adverts, 95 s seen.
     const val LEAST = 6
     const val SPAN_MS = 90_000L
-    const val GAP_MS = 100_000L
+    const val GAP_MS = 60_000L
+    const val WIDE_GAP_MS = 100_000L
+    const val PART = 3
 
     // The most bytes a segment's header is read to, and the most frames it may list: a few
     // kilobytes for its hundred frames.
@@ -94,15 +98,17 @@ internal object Separators {
 
     /** The breaks the separators ending at [ends] make, in order: each from its second to the one before its last. */
     fun breaks(ends: List<Long>): List<LongRange> {
-        val sorted = ends.sorted()
-        val out = ArrayList<LongRange>()
-        var first = 0
-        for (i in sorted.indices) {
-            if (i < sorted.lastIndex && sorted[i + 1] - sorted[i] <= GAP_MS) continue
-            if (i - first + 1 >= LEAST && sorted[i] - sorted[first] >= SPAN_MS) out += sorted[first + 1]..sorted[i - 1]
-            first = i + 1
+        val runs = ArrayList<MutableList<Long>>()
+        for (end in ends.sorted()) {
+            val last = runs.lastOrNull()
+            if (last != null && end - last.last() <= GAP_MS) last += end else runs += mutableListOf(end)
         }
-        return out
+        val joined = ArrayList<MutableList<Long>>()
+        for (run in runs) {
+            val last = joined.lastOrNull()
+            if (last != null && run.first() - last.last() <= WIDE_GAP_MS && last.size >= PART && run.size >= PART) last += run else joined += run
+        }
+        return joined.filter { it.size >= LEAST && it.last() - it.first() >= SPAN_MS }.map { it[1]..it[it.size - 2] }
     }
 
     /**

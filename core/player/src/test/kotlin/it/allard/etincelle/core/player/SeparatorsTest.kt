@@ -104,6 +104,16 @@ class SeparatorsTest {
     }
 
     @Test
+    fun `two runs of blacks are one across a black missed, a cartoon's last ones are not`() {
+        // M6 on 2026-11-25: four blacks, one missed (95 s), six more.
+        val m6 = seconds(0, 21, 30, 51, 95, 30, 51, 19, 15, 20)
+        assertEquals(listOf(m6[1]..m6[m6.size - 2]), Separators.breaks(m6))
+        // Canal J the same day: two blacks of a cartoon, 67 s before the adverts' own.
+        val ads = seconds(107_000, 15, 16, 15, 16, 30, 15, 16, 15)
+        assertEquals(listOf(ads[1]..ads[ads.size - 2]), Separators.breaks(listOf(0L, 40_000L) + ads))
+    }
+
+    @Test
     fun `a stray separator at either end leaves the break in the adverts`() {
         val ads = seconds(100_000, 15, 15, 30, 15, 20, 30)
         val before = ads.first() - 50_000
