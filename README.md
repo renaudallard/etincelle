@@ -80,8 +80,8 @@ novembre 2026, c'était le cas de 133 coupures sur 313 (un peu moins depuis, la 
 plus stricte) ; toutes s'arrêtaient dans la publicité, les
 bandes-annonces ou les génériques de la chaîne, mais certaines commençaient pendant le générique de
 fin de l'émission, et une huit secondes avant la fin d'un bulletin météo. Au direct, une coupure
-presque sûre s'arrête 24 secondes seulement avant le retour du logo : après les 210 de ces
-vignettes, l'émission elle-même, son générique de début à part, ne reprenait jamais plus de 20
+presque sûre s'arrête 24 secondes seulement avant le retour du logo : après les 210 coupures
+presque sûres de ces vignettes, l'émission elle-même, son générique de début à part, ne reprenait jamais plus de 20
 secondes avant lui. Une coupure trouvée d'après
 le logo de la chaîne est aussi sautée, même découpée, quand ses deux bords sont marqués par une
 image revue dans la coupure (le carton « Publicité » de la chaîne, son jingle, le générique de

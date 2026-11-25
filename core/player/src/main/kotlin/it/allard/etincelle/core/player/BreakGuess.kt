@@ -274,8 +274,8 @@ internal object BreakGuess {
      * MIN_MS, as a break sure by its logo. Pictures without a glance are not known and anchor nothing.
      *
      * On the pictures of every channel that marks nothing, in November 2026, each of the 33 breaks
-     * so made sure began at the programme's end or later and landed, 32 s before its end, before
-     * the programme was back.
+     * so made sure began at the programme's end or later and landed, 24 s before its end as sure
+     * breaks do live, before the programme was back.
      */
     private fun anchored(
         guess: Guess,
