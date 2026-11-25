@@ -100,6 +100,9 @@ class BreakGuessTest {
         assertEquals(listOf(false), sure(near))
         // Nor with a second logo gone with the first.
         assertEquals(listOf(false), sure(near, near))
+        // Found by a show's own logo, not the channel's: the break is there, never sure.
+        val shown = BreakGuess.logoBreaks(gone(20 to false, 90 to true, 20 to false), 0, 4_000, channel = false)
+        assertEquals(listOf(Guess(80_000L..440_000L)), shown)
     }
 
     private val width = 64

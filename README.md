@@ -73,7 +73,9 @@ demi-minute avant le retour du logo, que les chaînes remettent parfois après l
 l'émission : mieux vaut voir les dernières publicités que perdre le début de l'émission. Sur
 **Signalées et presque sûres**, le réglage saute aussi, douze secondes après son début, une coupure
 estimée dont rien ne laisse douter : d'un seul tenant, que le logo d'une émission ne réduit pas, et
-le logo de la chaîne bien visible avant et après. Sur près de 18 heures de vignettes de ces chaînes, en
+le logo de la chaîne bien visible avant et après, jamais d'après le seul logo d'une émission, qui
+part avec elle : la coupure courrait alors de la fin d'une émission jusque dans le début de la
+suivante. Sur près de 18 heures de vignettes de ces chaînes, en
 novembre 2026, c'était le cas de 133 coupures sur 313 (un peu moins depuis, la règle étant devenue
 plus stricte) ; toutes s'arrêtaient dans la publicité, les
 bandes-annonces ou les génériques de la chaîne, mais certaines commençaient pendant le générique de

@@ -121,7 +121,7 @@ internal class LiveBreaks(private val thumbnails: LiveThumbnails) {
         lowerScores.headMap(at - KEPT_S).clear()
         glances.headMap(at - KEPT_S).clear()
         missed.keys.removeAll { it < at - KEPT_S }
-        return BreakGuess.logoBreaks(gone, first * 1000, step * 1000, lowerGone, seen)
+        return BreakGuess.logoBreaks(gone, first * 1000, step * 1000, lowerGone, seen, logo.channel)
     }
 
     // The pictures read, without a gap, around [at]: the time of the first, and whether each is

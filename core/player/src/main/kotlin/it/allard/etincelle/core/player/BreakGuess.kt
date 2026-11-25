@@ -206,7 +206,10 @@ internal object BreakGuess {
      *
      * A break is sure when it is one stretch without the logo, nothing bridged in it nor given up
      * at its ends, the second logo changed nothing in it, and the logo is there through most of
-     * the pictures on each side. On the pictures of every channel that marks nothing, nearly 18
+     * the pictures on each side; never when the first logo is not the [channel]'s: a show's own
+     * leaves with the show, and a stretch without it can run from the end of one programme into
+     * the opening of the next, as on M6 one night in November 2026, which would have cut three
+     * minutes of programme. On the pictures of every channel that marks nothing, nearly 18
      * hours of them in November 2026, each of the 133 such breaks ended, 32 s early, in adverts,
      * trailers or the channel's own jingles, and began at the programme's end or in its end
      * credits, but for one that began 8 s before the end of a weather forecast.
@@ -220,6 +223,7 @@ internal object BreakGuess {
         pictureMs: Long,
         lowerGone: BooleanArray? = null,
         glances: Array<ByteArray?>? = null,
+        channel: Boolean = true,
     ): List<Guess> {
         var without = gone
         val brand = lowerGone?.let { lower -> BooleanArray(gone.size) { !gone[it] && lower[it] } }
@@ -250,11 +254,11 @@ internal object BreakGuess {
             // then by the notices along the bottom of adverts.
             val pieces = runs(BooleanArray(whole.last - whole.first + 1) { solid[whole.first + it] }, 0)
             val span = trimmed(if (lowerGone == null) pieces else merged(pieces, whole.first, gone, lowerGone))
-            val sure = pieces.size == 1 && whole in unnarrowed &&
+            val sure = channel && pieces.size == 1 && whole in unnarrowed &&
                 clear(whole.first - AROUND, whole.first) && clear(whole.last + 1, whole.last + 1 + AROUND)
             Guess(firstMs + (whole.first + span.first) * pictureMs..firstMs + (whole.first + span.last + 1) * pictureMs, sure)
         }
-        if (glances == null || glances.size != gone.size) return guesses + led
+        if (!channel || glances == null || glances.size != gone.size) return guesses + led
         val firm = solid(gone)
         val all = guesses + led
         return guesses.map { if (it.sure) it else anchored(it, all, firm, glances, firstMs, pictureMs) ?: it } + led
@@ -648,7 +652,9 @@ internal class LogoTrack(private val pictures: Int, private val width: Int, priv
     fun breaks(firstMs: Long, pictureMs: Long): List<Guess>? {
         val learnt = learn() ?: return null
         val lowerGone = learnt.lower?.let { BreakGuess.gone(it.score, it.usual, given) }
-        return BreakGuess.logoBreaks(BreakGuess.gone(learnt.score, learnt.usual, given), firstMs, pictureMs, lowerGone)
+        return BreakGuess.logoBreaks(
+            BreakGuess.gone(learnt.score, learnt.usual, given), firstMs, pictureMs, lowerGone, channel = learnt.corner.index < UPPER,
+        )
     }
 
     private companion object {
