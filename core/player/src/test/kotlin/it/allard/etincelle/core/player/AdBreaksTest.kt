@@ -84,4 +84,10 @@ class AdBreaksTest {
         // One unbroken period, as on the M6 channels and in every recording.
         assertEquals(emptyList<LongRange>(), AdBreaks.breaks(listOf(plain(0, null))))
     }
+
+    @Test
+    fun `a live guess ends before the logo is back, a sure one less early`() {
+        assertEquals(268_000L, AdBreaks.liveEnd(Guess(0L..300_000L)))
+        assertEquals(276_000L, AdBreaks.liveEnd(Guess(0L..300_000L, sure = true)))
+    }
 }

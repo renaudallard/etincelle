@@ -122,8 +122,8 @@ class AdBreaks {
             found.firstOrNull { at >= it.first + shift && at < it.last + shift }
                 ?.let { return breakAt(it.first + shift, it.last + shift, zero + it.first, guessed = false) }
         }
-        return guessed.firstOrNull { at >= it.range.first - start && at < it.range.last - GUESS_EARLY_MS - start }
-            ?.let { breakAt(it.range.first - start, it.range.last - GUESS_EARLY_MS - start, it.range.first, guessed = true, sure = it.sure) }
+        return guessed.firstOrNull { at >= it.range.first - start && at < liveEnd(it) - start }
+            ?.let { breakAt(it.range.first - start, liveEnd(it) - start, it.range.first, guessed = true, sure = it.sure) }
     }
 
     /** One period of a manifest, as far as its ads go; times in ms from the manifest's time zero. */
@@ -142,6 +142,14 @@ class AdBreaks {
         // logo up again as much as half a minute after the programme, and skipping to it would cut
         // that much of the show. The last adverts are left in instead.
         private const val GUESS_EARLY_MS = 32_000L
+
+        // A sure one, live, ends less early: on the pictures of every channel that marks nothing,
+        // in November 2026, the programme itself was back at most 20 s before the logo after the
+        // 210 sure breaks, its titles aside, so 24 s with the pictures 4 s apart.
+        private const val SURE_EARLY_MS = 24_000L
+
+        /** Where the live break [guess] is taken to end. */
+        fun liveEnd(guess: Guess) = guess.range.last - if (guess.sure) SURE_EARLY_MS else GUESS_EARLY_MS
 
         // Two breaks this close are one: the TF1 channels put three seconds of jingle between two halves.
         private const val MERGE_GAP_MS = 10_000L
