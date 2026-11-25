@@ -85,8 +85,10 @@ data class PlaybackSource(
 // there was trailers, the weather or a short programme.
 private val NO_GUESS_CHANNELS = setOf("600046", "600036", "600040", "600067", "600005", "600019", "600049", "600018", "600042", "600136", "600034")
 
-// M6 and Gulli: 0.48 s of black between two adverts. Not W9 or 6ter, whose breaks have none.
-private val SEPARATED_CHANNELS = setOf("600045", "600058")
+// M6, Gulli, Canal J, TIJI, Paris Première, Automoto, Toute l'Histoire and AB 1: 0.48 s of black
+// between two adverts, every break of two samples of each found by them and skipped within the
+// adverts in November 2026. Not W9 or 6ter, whose breaks have none.
+private val SEPARATED_CHANNELS = setOf("600045", "600058", "600137", "600138", "600021", "600027", "600052", "600006")
 
 /**
  * The service's pictures of a live channel: one every [intervalSec], kept for as long as the channel

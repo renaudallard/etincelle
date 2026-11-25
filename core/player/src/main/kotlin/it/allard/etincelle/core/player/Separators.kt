@@ -30,8 +30,8 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 /**
- * The ad breaks of M6 and Gulli as their streams give them away: these channels put 0.48 s of black
- * between two adverts. The pictures are encrypted, but not the size of each frame, in the header of
+ * The ad breaks of M6, Gulli and a few others (see PlaybackSource.separatedBreaks) as their streams
+ * give them away: these channels put 0.48 s of black between two adverts. The pictures are encrypted, but not the size of each frame, in the header of
  * each segment, and a black is a dozen frames of a few bytes, ended by a key frame of several
  * kilobytes where the next advert starts. A break is a series of these, one every 10 to 55 s, or
  * twice that where one was missed.

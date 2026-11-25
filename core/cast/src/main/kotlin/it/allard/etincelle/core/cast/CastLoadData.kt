@@ -88,7 +88,7 @@ internal object CastLoadData {
             source?.breakPictures?.takeIf { it.intervalSec == LIVE_PICTURE_EVERY_S }?.let {
                 put("live_thumbnails_url", it.baseUrl)
             }
-            // M6 and Gulli: the receiver also finds their breaks by the blacks between adverts, in the
+            // M6, Gulli and a few others: the receiver also finds their breaks by the blacks between adverts, in the
             // frame sizes, as this app does (Separators).
             if (source?.separatedBreaks == true) put("separated_breaks", true)
             // A recording, which has ad breaks to look for, as a replay does not.
