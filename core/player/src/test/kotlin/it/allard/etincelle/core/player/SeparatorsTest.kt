@@ -78,6 +78,9 @@ class SeparatorsTest {
         frames[95] = 12000
 
         assertEquals(listOf(10_000L + 42 * 40), Separators.ends(frames, 10_000L, 40.0))
+        // A key frame of a little over four kilobytes after a black, as seen on M6, ends it all the same.
+        frames[42] = 4600
+        assertEquals(listOf(10_000L + 42 * 40), Separators.ends(frames, 10_000L, 40.0))
     }
 
     private fun seconds(first: Long, vararg gaps: Int): List<Long> = gaps.runningFold(first) { at, gap -> at + gap * 1000L }

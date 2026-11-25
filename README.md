@@ -91,11 +91,11 @@ aucune ne commençait avant la fin de l'émission ni ne s'arrêtait après sa re
 **Gulli**, qui séparent deux publicités par une demi-seconde de noir, la coupure se lit aussi dans le
 flux lui-même : l'image est chiffrée, mais pas la taille de chaque image, et un noir en fait une
 douzaine de quelques octets. Une coupure en compte au moins six sur une minute et demie ou plus, jamais
-à plus d'une minute l'un de l'autre ; elle va du deuxième à l'avant-dernier, qu'un noir égaré dans
+à plus d'une minute quarante l'un de l'autre (un noir manqué laisse deux publicités entre deux autres) ; elle va du deuxième à l'avant-dernier, qu'un noir égaré dans
 l'émission juste avant ou après la coupure laisse encore dans la publicité, et **Signalées et presque
 sûres** la saute dès le deuxième. Sur quatre heures de chacune de ces chaînes, en
-novembre 2026, elle trouvait 6 coupures sur 7 de M6 et les 7 de Gulli, toutes commencées et arrêtées dans
-la publicité, de 20 secondes à une minute et demie avant la reprise de l'émission ; les images figées des
+novembre 2026, elle trouvait 8 coupures de M6 et 7 de Gulli, toutes commencées et arrêtées dans la
+publicité, de 20 secondes à une minute et demie avant la reprise de l'émission ; les images figées des
 dessins animés de Gulli en imitent quelques-uns, jamais assez pour faire une coupure. Il suffit pour
 cela de l'en-tête de chaque segment de la vidéo, environ 7 Mo par heure. Au direct même, il n'y a
 nulle part où sauter. Dans un **enregistrement**, qui ne signale rien non plus, les coupures sont

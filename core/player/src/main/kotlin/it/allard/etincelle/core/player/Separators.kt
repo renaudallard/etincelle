@@ -33,7 +33,8 @@ import kotlinx.coroutines.withContext
  * The ad breaks of M6 and Gulli as their streams give them away: these channels put 0.48 s of black
  * between two adverts. The pictures are encrypted, but not the size of each frame, in the header of
  * each segment, and a black is a dozen frames of a few bytes, ended by a key frame of several
- * kilobytes where the next advert starts. A break is a series of these, one every 10 to 55 s.
+ * kilobytes where the next advert starts. A break is a series of these, one every 10 to 55 s, or
+ * twice that where one was missed.
  *
  * Seen on the service in November 2026, at the lowest rendition (270 lines, 25 frames a second), over
  * four hours of each: on M6, nearly every separator of a break and a few elsewhere; on Gulli the same
@@ -41,7 +42,8 @@ import kotlinx.coroutines.withContext
  * minutes. A black's frames are the smallest a frame can be, 32 to 36 bytes, a held picture's
  * mostly more: so they must be [BLACK_MEAN] at most on average, which left at most three of a
  * cartoon's within a minute, and a break is at least [LEAST] of them over [SPAN_MS] or more, none
- * more than [GAP_MS] from the next. W9 and 6ter have none.
+ * more than [GAP_MS] from the next: a black now and then is a few bytes over and missed (seen: 41 on
+ * average), which leaves two adverts between two others, 95 s on M6. W9 and 6ter have none.
  * The first advert has no separator before it and the last none after it, so the separators of a
  * break are all in its adverts. A stray one, in the programme less than a minute from a break, would
  * be counted in it: a break runs from the second to the one before the last, which one stray at
@@ -54,14 +56,15 @@ internal object Separators {
     // of which those around the segment's own key frames can be counted in or out.
     private const val TINY = 120
     private const val BLACK_MEAN = 40
-    private const val KEY = 5000
+    private const val KEY = 4000
     private val BLACK = 10..14
 
     // The separators of a break, at the least, how long they span at the least, and the most apart
-    // two of them are: the longest advert seen between two was 55 s.
+    // two of them are: the longest advert seen between two was 55 s, two of them with the black
+    // between them missed 95 s.
     const val LEAST = 6
     const val SPAN_MS = 90_000L
-    const val GAP_MS = 60_000L
+    const val GAP_MS = 100_000L
 
     // The most bytes a segment's header is read to, and the most frames it may list: a few
     // kilobytes for its hundred frames.
