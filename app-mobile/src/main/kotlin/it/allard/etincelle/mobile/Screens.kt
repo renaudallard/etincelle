@@ -773,7 +773,8 @@ fun SettingsScreen(
                 Triple(
                     SkipAds.SURE,
                     "Signalées et presque sûres",
-                    "Aussi celles trouvées d'après le logo de la chaîne quand rien n'en laisse douter. " +
+                    "Aussi celles trouvées d'après le logo de la chaîne quand rien n'en laisse douter, " +
+                        "et sur M6 et Gulli d'après les noirs qui séparent les publicités. " +
                         "Peut couper la fin d'un générique ou quelques secondes d'émission.",
                 ),
             ),

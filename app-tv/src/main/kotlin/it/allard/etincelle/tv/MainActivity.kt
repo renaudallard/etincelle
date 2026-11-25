@@ -96,6 +96,7 @@ import it.allard.etincelle.core.player.PlaybackRecovery
 import it.allard.etincelle.core.player.RewindHold
 import it.allard.etincelle.core.player.followLive
 import it.allard.etincelle.core.player.followRecording
+import it.allard.etincelle.core.player.followSeparators
 import it.allard.etincelle.core.player.keepScreenOnWhilePlaying
 import it.allard.etincelle.core.remote.RemoteMessages
 import it.allard.etincelle.core.ui.installFetchedUpdate
@@ -1217,6 +1218,11 @@ private fun TvPlayerSurface(
     LaunchedEffect(source, lifecycle) {
         val thumbnails = source.breakPictures ?: return@LaunchedEffect
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { adSkipper.followLive(player, thumbnails, Timeline.Window()) }
+    }
+    // And on the channels that have them, in the blacks between their adverts.
+    LaunchedEffect(source, lifecycle) {
+        if (!source.separatedBreaks) return@LaunchedEffect
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { adSkipper.followSeparators(player, Timeline.Window()) }
     }
     Box(Modifier.fillMaxSize()) {
         AndroidView(

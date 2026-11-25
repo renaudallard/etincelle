@@ -74,12 +74,19 @@ data class PlaybackSource(
      */
     val breakPictures: LiveThumbnails?
         get() = liveThumbnails?.takeIf { isLive && originChannelId !in NO_GUESS_CHANNELS }
+
+    /** Whether this live channel puts the blacks between its adverts that give its breaks away. */
+    val separatedBreaks: Boolean
+        get() = isLive && originChannelId in SEPARATED_CHANNELS
 }
 
 // TF1, TMC, TFX, TF1 Séries Films, LCI, France 2, 3 and 5: their streams mark their breaks.
 // France 4, franceinfo and Arte: no advert break was ever seen on them, and what a guess offered
 // there was trailers, the weather or a short programme.
 private val NO_GUESS_CHANNELS = setOf("600046", "600036", "600040", "600067", "600005", "600019", "600049", "600018", "600042", "600136", "600034")
+
+// M6 and Gulli: 0.48 s of black between two adverts. Not W9 or 6ter, whose breaks have none.
+private val SEPARATED_CHANNELS = setOf("600045", "600058")
 
 /**
  * The service's pictures of a live channel: one every [intervalSec], kept for as long as the channel

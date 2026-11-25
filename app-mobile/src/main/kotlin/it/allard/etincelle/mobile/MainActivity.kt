@@ -107,6 +107,7 @@ import it.allard.etincelle.core.player.PlaybackProgress
 import it.allard.etincelle.core.player.PlaybackRecovery
 import it.allard.etincelle.core.player.followLive
 import it.allard.etincelle.core.player.followRecording
+import it.allard.etincelle.core.player.followSeparators
 import it.allard.etincelle.core.player.keepScreenOnWhilePlaying
 import it.allard.etincelle.core.ui.installFetchedUpdate
 import it.allard.etincelle.core.ui.installUpdate
@@ -1080,6 +1081,11 @@ private fun PlayerSurface(
         if (currentPlayer !is ExoPlayer) return@LaunchedEffect
         val thumbnails = source.breakPictures ?: return@LaunchedEffect
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { adSkipper.followLive(currentPlayer, thumbnails, Timeline.Window()) }
+    }
+    // And on the channels that have them, in the blacks between their adverts.
+    LaunchedEffect(currentPlayer, source, lifecycle) {
+        if (currentPlayer !is ExoPlayer || !source.separatedBreaks) return@LaunchedEffect
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { adSkipper.followSeparators(currentPlayer, Timeline.Window()) }
     }
     // Follow the player controls' show/hide so the cast button and the back-to-live pill fade with the
     // position bar (tap to bring them back) instead of sitting permanently over the video.

@@ -11,13 +11,14 @@ import androidx.media3.common.Timeline
 private const val SETTLING_MS = 5_000L
 
 // How far into a guessed break playback must be before it is skipped unasked: where a break is
-// guessed to begin, the programme can still be ending (seen: 8 s of a weather forecast).
+// guessed to begin, the programme can still be ending (seen: 8 s of a weather forecast). Not one
+// found by the blacks between its adverts, which begins in them.
 private const val SURE_AFTER_MS = 12_000L
 
 /**
  * What a player screen does about the ad break playback is in (see [AdBreaks]): as the settings ask
  * ([skip]), a break is skipped to its end once there is somewhere to skip to, a guessed one only
- * once playback is some seconds into it; otherwise, and for a break gone back into, for as long as
+ * once playback is some seconds into it, unless found by the blacks between its adverts; otherwise, and for a break gone back into, for as long as
  * playback stays in it, it is handed to the screen to offer with a button.
  *
  * Gone back into is told from a seek backwards, which this hears as a listener of the player: someone
@@ -61,6 +62,11 @@ class AdSkipper(private val skip: SkipAds) : Player.Listener {
         breaks.guessed = found
     }
 
+    /** The breaks of the live channel being played that the blacks between its adverts give away (see [Separators]). */
+    fun separated(found: List<LongRange>) {
+        breaks.separated = found
+    }
+
     /** The seek just made was the screen's own, not the viewer's. */
     fun ownSeek() {
         rewound = false
@@ -83,7 +89,7 @@ class AdSkipper(private val skip: SkipAds) : Player.Listener {
         // A guessed break is skipped unasked only when sure and asked for: a wrong guess loses programme.
         val auto = if (ad.guessed) skip == SkipAds.SURE && ad.sure else skip != SkipAds.OFF
         if (!auto || (ad.id <= backTo && player.isCurrentMediaItemLive == backToLive)) return ad
-        if (ad.guessed && player.currentPosition < ad.startMs + SURE_AFTER_MS) return ad
+        if (ad.guessed && !ad.separated && player.currentPosition < ad.startMs + SURE_AFTER_MS) return ad
         player.seekTo(ad.endMs)
         return null
     }

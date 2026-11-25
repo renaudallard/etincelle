@@ -17,7 +17,8 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  * before the live point, and is not on its last second. [guessed] when the stream does not say it
  * is one, as in a recording (see [RecordingBreaks]) or by a live channel's pictures (see
  * [LiveBreaks]): for a button to offer, and to skip unasked only when [sure] and the settings
- * allow it (see [SkipAds]).
+ * allow it (see [SkipAds]). [separated] when found by the blacks between its adverts (see
+ * [Separators]): both its ends are then in the adverts, and it is sure from its start.
  */
 data class AdBreak(
     val startMs: Long,
@@ -26,6 +27,7 @@ data class AdBreak(
     val skippable: Boolean,
     val guessed: Boolean = false,
     val sure: Boolean = false,
+    val separated: Boolean = false,
 )
 
 /**
@@ -41,11 +43,13 @@ data class AdBreak(
  *   a few minutes, some five seconds of jingle, and a few minutes again. That shape is taken for a
  *   break when the manifest carries no marker at all.
  * - The M6 channels, and every recording, are one unbroken period with no marker, in the manifest or
- *   in the segments: nothing is found there.
+ *   in the segments. M6 and Gulli give their breaks away all the same, by the size of the frames of
+ *   the blacks between two adverts (see [Separators]).
  *
  * A recording is told its breaks from outside, with [recorded]: its stream marks none, and they are
  * guessed from what it carries (see [RecordingBreaks]). So is a live stream, with [guessed], on the
- * channels that mark nothing or too little: the M6 channels' breaks, and those the RMC shape misses.
+ * channels that mark nothing or too little: the M6 channels' breaks, and those the RMC shape misses;
+ * and on M6 and Gulli, with [separated], by the blacks between their adverts.
  * A channel that marks its breaks is told nothing more: see PlaybackSource.breakPictures.
  *
  * One instance per player screen: the breaks are worked out again only when the manifest changes.
@@ -66,6 +70,12 @@ class AdBreaks {
      * times of day (ms since 1970): those the stream does not mark.
      */
     var guessed: List<Guess> = emptyList()
+
+    /**
+     * The breaks of the live channel being played that the blacks between its adverts give away
+     * (see [Separators]), as times of day (ms since 1970), both ends in the adverts.
+     */
+    var separated: List<LongRange> = emptyList()
 
     /**
      * Where playback is, in the time of a break's [AdBreak.id]: the time of day on a live stream, the
@@ -98,8 +108,8 @@ class AdBreaks {
         val start = window.windowStartTimeMs
         if (start == C.TIME_UNSET) return null
         val live = window.defaultPositionMs
-        fun breakAt(from: Long, to: Long, id: Long, guessed: Boolean, sure: Boolean = false) =
-            AdBreak(from, to, id, skippable = at < to - LAST_MOMENT_MS && to <= live - LIVE_MARGIN_MS, guessed = guessed, sure = sure)
+        fun breakAt(from: Long, to: Long, id: Long, guessed: Boolean, sure: Boolean = false, separated: Boolean = false) =
+            AdBreak(from, to, id, skippable = at < to - LAST_MOMENT_MS && to <= live - LIVE_MARGIN_MS, guessed = guessed, sure = sure, separated = separated)
         // What the stream marks is exact, and comes first.
         val dash = player.currentManifest as? DashManifest
         val zero = dash?.availabilityStartTimeMs ?: C.TIME_UNSET
@@ -122,6 +132,10 @@ class AdBreaks {
             found.firstOrNull { at >= it.first + shift && at < it.last + shift }
                 ?.let { return breakAt(it.first + shift, it.last + shift, zero + it.first, guessed = false) }
         }
+        // Then the blacks between the adverts, whose ends are in them, and as the break began up to
+        // SEPARATED_LEAD_MS before its first, one gone back into there was gone back into.
+        separated.firstOrNull { at >= it.first - start && at < it.last - start }
+            ?.let { return breakAt(it.first - start, it.last - start, it.first - SEPARATED_LEAD_MS, guessed = true, sure = true, separated = true) }
         return guessed.firstOrNull { at >= it.range.first - start && at < liveEnd(it) - start }
             ?.let { breakAt(it.range.first - start, liveEnd(it) - start, it.range.first, guessed = true, sure = it.sure) }
     }
@@ -147,6 +161,10 @@ class AdBreaks {
         // in November 2026, the programme itself was back at most 20 s before the logo after the
         // 210 sure breaks, its titles aside, so 24 s with the pictures 4 s apart.
         private const val SURE_EARLY_MS = 24_000L
+
+        // How long before the first black between its adverts a break begins, at the most: the card
+        // that opens it and the first advert, 8 to 45 s on M6 and Gulli in November 2026.
+        private const val SEPARATED_LEAD_MS = 45_000L
 
         /** Where the live break [guess] is taken to end. */
         fun liveEnd(guess: Guess) = guess.range.last - if (guess.sure) SURE_EARLY_MS else GUESS_EARLY_MS

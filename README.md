@@ -87,7 +87,17 @@ le logo de la chaîne est aussi sautée, même découpée, quand ses deux bords 
 image revue dans la coupure (le carton « Publicité » de la chaîne, son jingle, le générique de
 reprise de l'émission, une publicité passée au début et à la fin) et que le logo de la chaîne n'y
 reparaît jamais plus de 36 secondes d'affilée : sur les mêmes vignettes, 33 coupures de plus, dont
-aucune ne commençait avant la fin de l'émission ni ne s'arrêtait après sa reprise. Au direct même, il n'y a
+aucune ne commençait avant la fin de l'émission ni ne s'arrêtait après sa reprise. Sur **M6** et
+**Gulli**, qui séparent deux publicités par une demi-seconde de noir, la coupure se lit aussi dans le
+flux lui-même : l'image est chiffrée, mais pas la taille de chaque image, et un noir en fait une
+douzaine de quelques octets. Une coupure en compte au moins six sur une minute et demie ou plus, jamais
+à plus d'une minute l'un de l'autre ; elle va du deuxième à l'avant-dernier, qu'un noir égaré dans
+l'émission juste avant ou après la coupure laisse encore dans la publicité, et **Signalées et presque
+sûres** la saute dès le deuxième. Sur quatre heures de chacune de ces chaînes, en
+novembre 2026, elle trouvait 6 coupures sur 7 de M6 et les 7 de Gulli, toutes commencées et arrêtées dans
+la publicité, de 20 secondes à une minute et demie avant la reprise de l'émission ; les images figées des
+dessins animés de Gulli en imitent quelques-uns, jamais assez pour faire une coupure. Il suffit pour
+cela de l'en-tête de chaque segment de la vidéo, environ 7 Mo par heure. Au direct même, il n'y a
 nulle part où sauter. Dans un **enregistrement**, qui ne signale rien non plus, les coupures sont
 cherchées à l'ouverture, d'après ses vignettes de la même façon et ses sous-titres (une émission
 parle pendant des minutes, une publicité quelques secondes) : le bouton apparaît dans la coupure,
