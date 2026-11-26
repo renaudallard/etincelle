@@ -98,6 +98,28 @@ class AdBreaksTest {
     }
 
     @Test
+    fun `the adverts the ad server puts in a break while it airs are a break`() {
+        fun plain(from: Long, to: Long?) = Stretch(from, to, emptyList(), signalled = false)
+        fun ad(from: Long, to: Long?) = Stretch(from, to, emptyList(), signalled = false, inserted = true)
+        val second = 1_000L
+        // BFMTV on 26 November 2026 at 05:15, watched while it aired: six adverts of 30 s and 6 s of
+        // filler, the 4 s of jingle as aired, seven adverts more, then the programme.
+        val first = (0 until 6).map { ad((600 + 30 * it) * second, (630 + 30 * it) * second) }
+        val then = (0 until 7).map { ad((790 + 30 * it) * second, (820 + 30 * it) * second) }
+        val aired = listOf(plain(0, 600 * second)) + first + listOf(ad(780 * second, 786 * second), plain(786 * second, 790 * second)) +
+            then + listOf(plain(1000 * second, null))
+        assertEquals(listOf(600 * second..1000 * second), AdBreaks.breaks(aired))
+
+        // One still on air, the manifest's last period with no length yet, is not one yet.
+        assertEquals(emptyList<LongRange>(), AdBreaks.breaks(listOf(plain(0, 600 * second), ad(600 * second, null))))
+
+        // Its filler is no jingle: a long advert, filler, then a few minutes of programme are not
+        // taken for the two halves of a break.
+        val filler = listOf(plain(0, 600 * second), ad(600 * second, 690 * second), ad(690 * second, 696 * second), plain(696 * second, 896 * second), plain(896 * second, null))
+        assertEquals(listOf(600 * second..696 * second), AdBreaks.breaks(filler))
+    }
+
+    @Test
     fun `a live guess ends before the logo is back, a sure one less early`() {
         assertEquals(268_000L, AdBreaks.liveEnd(Guess(0L..300_000L)))
         assertEquals(276_000L, AdBreaks.liveEnd(Guess(0L..300_000L, sure = true)))

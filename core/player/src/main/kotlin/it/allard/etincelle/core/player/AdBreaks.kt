@@ -39,16 +39,18 @@ data class AdBreak(
  * - The TF1 and France Télévisions channels mark each break with an SCTE-35 event (a "placement
  *   opportunity" or an ad "start", with its length), mostly as a period of its own, on LCI as events
  *   timed inside one long period. These are exact.
- * - The RMC channels mark nothing, but cut the stream into periods at each break, which then shows as
- *   a few minutes, some five seconds of jingle, and a few minutes again. That shape is taken for a
- *   break when the manifest carries no marker at all.
+ * - The RMC channels and BFMTV mark nothing, but cut the stream into periods at each break, which
+ *   then shows as a few minutes, some five seconds of jingle, and a few minutes again. That shape is
+ *   taken for a break when the manifest carries no marker at all. A break that airs while the
+ *   stream is being watched shows instead as the adverts the service's ad server puts in it, each a
+ *   period of its own served by that server: those periods are a break too, exact.
  * - The M6 channels, and every recording, are one unbroken period with no marker, in the manifest or
  *   in the segments. M6 and Gulli give their breaks away all the same, by the size of the frames of
  *   the blacks between two adverts (see [Separators]).
  *
  * A recording is told its breaks from outside, with [recorded]: its stream marks none, and they are
  * guessed from what it carries (see [RecordingBreaks]). So is a live stream, with [guessed], on the
- * channels that mark nothing or too little: the M6 channels' breaks, and those the RMC shape misses;
+ * channels that mark nothing or too little: the M6 channels' breaks, and those the RMC periods miss;
  * and on M6 and Gulli, with [separated], by the blacks between their adverts.
  * A channel that marks its breaks is told nothing more: see PlaybackSource.breakPictures.
  *
@@ -140,8 +142,11 @@ class AdBreaks {
             ?.let { breakAt(it.range.first - start, liveEnd(it, separated) - start, it.range.first, guessed = true, sure = it.sure) }
     }
 
-    /** One period of a manifest, as far as its ads go; times in ms from the manifest's time zero. */
-    internal data class Stretch(val startMs: Long, val endMs: Long?, val marks: List<Mark>, val signalled: Boolean)
+    /**
+     * One period of a manifest, as far as its ads go; times in ms from the manifest's time zero.
+     * [inserted] when the ad server serves it (see [INSERTED]).
+     */
+    internal data class Stretch(val startMs: Long, val endMs: Long?, val marks: List<Mark>, val signalled: Boolean, val inserted: Boolean = false)
 
     /** An SCTE-35 event: where it stands, the length it gives if any, and whether it opens a break. */
     internal data class Mark(val atMs: Long, val durationMs: Long?, val opens: Boolean)
@@ -189,6 +194,11 @@ class AdBreaks {
         private val HALF_BREAK_MS = 60_000L..420_000L
 
         private const val SCTE35 = "urn:scte:scte35"
+
+        // Where the service's ad server (Broadpeak) serves the adverts, and the filler of unsold time,
+        // that it puts in a break of the RMC channels and BFMTV that airs while the stream is being
+        // watched, as seen in November 2026.
+        private const val INSERTED = "/bpkio-jitt/"
         private val BASE64 = Regex("[A-Za-z0-9+/]{16,}={0,2}")
 
         fun stretches(dash: DashManifest, opensOf: (ByteArray) -> Boolean? = ::opens): List<Stretch> = (0 until dash.periodCount).map { i ->
@@ -202,7 +212,8 @@ class AdBreaks {
                     Mark(at, event.durationMs.takeIf { it > 0 }, opens)
                 }
             }
-            Stretch(period.startMs, length?.let { period.startMs + it }, marks, streams.isNotEmpty())
+            val inserted = period.adaptationSets.any { set -> set.representations.any { rep -> rep.baseUrls.any { INSERTED in it.url } } }
+            Stretch(period.startMs, length?.let { period.startMs + it }, marks, streams.isNotEmpty(), inserted)
         }
 
         /** The ad breaks among [stretches], in the manifest's time, in order and without overlap. */
@@ -219,17 +230,21 @@ class AdBreaks {
                     }
                 }
             } else {
-                (1 until stretches.size - 1).mapNotNull { i ->
+                val shaped = (1 until stretches.size - 1).mapNotNull { i ->
                     val before = stretches[i - 1]
                     val jingle = stretches[i]
                     val after = stretches[i + 1]
                     val beforeEnd = before.endMs ?: return@mapNotNull null
                     val jingleEnd = jingle.endMs ?: return@mapNotNull null
                     val afterEnd = after.endMs ?: return@mapNotNull null
-                    val shaped = jingleEnd - jingle.startMs < JINGLE_MAX_MS &&
+                    // The jingle is the channel's own, never filler that the ad server serves.
+                    val shaped = !jingle.inserted && jingleEnd - jingle.startMs < JINGLE_MAX_MS &&
                         beforeEnd - before.startMs in HALF_BREAK_MS && afterEnd - after.startMs in HALF_BREAK_MS
                     (before.startMs..afterEnd).takeIf { shaped }
                 }
+                // The adverts of a break that aired since the stream was asked for, each a period of
+                // its own; the few seconds of jingle between its halves, left as aired, are merged in.
+                shaped + stretches.filter { it.inserted }.mapNotNull { stretch -> stretch.endMs?.let { stretch.startMs..it } }
             }
             val merged = mutableListOf<LongRange>()
             for (range in raw.sortedBy { it.first }) {
