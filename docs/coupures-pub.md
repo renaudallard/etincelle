@@ -182,7 +182,7 @@ programme, la coupure n'est pas sûre et reste au bouton.
   image, et un noir en fait une douzaine de quelques octets. L'en-tête de chaque segment de la vidéo
   suffit.
 - Il est lu dans trois qualités de la vidéo (270, 540 et 1080 lignes), chacune avec ses propres
-  seuils, soit environ 22 Mo par heure : chacune manque des noirs que les autres trouvent (un noir
+  seuils, soit environ 11 Mo par heure : chacune manque des noirs que les autres trouvent (un noir
   de quelques octets de trop, une publicité qui commence sur une image sombre), et un noir trouvé
   dans l'une compte, une seule fois. La qualité 432 lignes n'est pas lue : elle prenait des images
   de dessins animés de Canal J pour des noirs.

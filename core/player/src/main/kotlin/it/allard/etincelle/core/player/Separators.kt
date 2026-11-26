@@ -307,8 +307,9 @@ internal class SeparatorBreaks {
         private const val AT_ONCE = 6
         private const val TRIES = 3
 
-        // A segment's header is in its first few kilobytes; more is read when it is not.
-        private const val HEAD_BYTES = 8192
+        // A segment's header, to the end of its first moof, was 2609 bytes in every rendition of
+        // these channels in November 2026; more is read when it is longer.
+        private const val HEAD_BYTES = 4096
 
         // Read this far on each side of the playhead: further than a break lasts, so that one the
         // playhead is in is known from its first separator to its last.
