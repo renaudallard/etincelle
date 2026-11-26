@@ -1,8 +1,7 @@
 # Coupures pub, chaîne par chaîne
 
 Pour chaque chaîne, comment etincelle repère les coupures publicitaires, ce qu'il passe tout seul
-selon le réglage, et où il reprend. État de la version 2026.11.43 au 26 novembre 2026 ; les points
-marqués *(prochaine version)* sont faits mais pas encore publiés.
+selon le réglage, et où il reprend. État de la version 2026.11.44, au 26 novembre 2026.
 
 ## Le réglage « Passer les publicités automatiquement »
 
@@ -11,7 +10,7 @@ Une coupure qui n'est pas passée toute seule est toujours proposée par le bout
 | Réglage | Passé tout seul |
 |---|---|
 | **Non** | rien : toujours le bouton |
-| **Coupures signalées** | les coupures que la chaîne signale (groupes TF1 et France Télévisions) ; sur RMC et BFMTV, celles trouvées par la forme du flux ; les publicités que le serveur publicitaire place dans une coupure diffusée pendant qu'on regarde *(prochaine version)* |
+| **Coupures signalées** | les coupures que la chaîne signale (groupes TF1 et France Télévisions) ; sur RMC et BFMTV, celles trouvées par la forme du flux ; les publicités que le serveur publicitaire place dans une coupure diffusée pendant qu'on regarde |
 | **Signalées et presque sûres** | en plus, les coupures trouvées par les noirs entre les publicités, tout de suite, et celles trouvées par le logo et jugées sûres, 12 s après leur début. L'application prévient : peut couper la fin d'un générique ou quelques secondes d'émission. |
 
 ## Partout
@@ -22,7 +21,7 @@ Une coupure qui n'est pas passée toute seule est toujours proposée par le bout
 - **Regarder depuis le début** met en différé d'autant que le temps écoulé depuis le début du
   programme ; chaque coupure passée réduit ce retard.
 - **Chromecast** : le récepteur ne passe rien tout seul ; il affiche **Passer la pub : OK** et la
-  touche OK passe la coupure. Il a déjà les corrections marquées *(prochaine version)*, sauf celle du
+  touche OK passe la coupure. Il trouve les coupures de la même façon, sauf par les publicités du
   serveur publicitaire, dont il n'a pas besoin.
 - **Enregistrements** : coupures trouvées par les vignettes et les sous-titres, sûres seulement quand
   les deux sont d'accord ; reprise 32 s avant le retour du logo. Les replays n'ont pas de publicité.
@@ -32,7 +31,7 @@ Une coupure qui n'est pas passée toute seule est toujours proposée par le bout
 | Méthode | Comment | Reprise |
 |---|---|---|
 | **Signalée** | la chaîne marque chaque coupure dans le flux (SCTE-35) | exacte |
-| **Forme RMC** | le flux est coupé en périodes : une partie, un jingle de moins de 10 s, une partie ; ou bien les publicités viennent du serveur publicitaire *(prochaine version)* | exacte |
+| **Forme RMC** | le flux est coupé en périodes : une partie, un jingle de moins de 10 s, une partie ; ou bien les publicités viennent du serveur publicitaire | exacte |
 | **Noirs** | la demi-seconde de noir entre deux publicités, lue dans la taille des images du flux | à l'avant-dernier noir : la première publicité et une ou deux dernières passent |
 | **Logo** | le logo de la chaîne disparaît des vignettes du service pendant la coupure | 32 s avant son retour, 24 s si la coupure est sûre |
 
@@ -63,14 +62,14 @@ serveur publicitaire compte comme signalée. Le logo prend le reste.
 | RMC Story | Forme RMC, logo | Signalées ; Presque sûres pour un logo sûr | ≈ 6 s | les coupures de l'émission du matin sont d'une seule période, sans jingle : logo seulement |
 | RMC Découverte | Forme RMC, logo | Signalées ; Presque sûres pour un logo sûr | non mesuré | entre deux épisodes, le logo est revenu 68 s après la reprise ; cette coupure n'était pas sûre : bouton seulement |
 | RMC Life | Forme RMC, logo | Signalées ; Presque sûres pour un logo sûr | 7,4 s | |
-| BFMTV | Forme RMC, logo | Signalées ; Presque sûres pour un logo sûr | ≈ 7,2 s | les longues coupures de la nuit, aux parties de 5 min 30 à 7 min, sont trouvées aussi *(prochaine version)* |
+| BFMTV | Forme RMC, logo | Signalées ; Presque sûres pour un logo sûr | ≈ 7,2 s | les longues coupures de la nuit, aux parties de 5 min 30 à 7 min, sont trouvées aussi |
 | RMC Mécanic | logo | Presque sûres pour un logo sûr | non mesuré | ses périodes de 90 s sont des bandes-annonces de la chaîne, pas des coupures |
 
 ### Noirs entre les publicités, et logo
 
 Une coupure trouvée par les noirs est passée tout de suite avec **Signalées et presque sûres**, du
 deuxième noir à l'avant-dernier : la première et la dernière publicité passent toujours.
-*(Prochaine version)* Un carton avec un seul noir ne coupe plus une coupure en deux, et une coupure
+Un carton avec un seul noir ne coupe pas une coupure en deux, et une coupure
 trouvée par le logo qui finit dans une coupure trouvée par les noirs va jusqu'au bout de celle-ci.
 
 | Chaîne | Trouvée par | Toute seule avec | Retard | Remarques |
