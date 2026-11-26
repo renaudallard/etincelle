@@ -114,6 +114,36 @@ class SeparatorsTest {
     }
 
     @Test
+    fun `a break is one across a card with a single black, not across one too far`() {
+        // M6 on 2026-11-25 at 21:01: seven blacks, the "Publicité" card and trailers with one, more
+        // adverts, and two blacks a minute on, which stay out.
+        val m6 = seconds(0, 26, 20, 25, 26, 15, 21, 65, 77, 20, 41, 59, 15, 31, 45, 36, 16, 30, 26, 15, 31, 61, 20)
+        assertEquals(listOf(m6[1]..m6[m6.size - 4]), Separators.breaks(m6))
+        // Gulli at 23:47: five blacks, its sponsor's card with one, five more.
+        val gulli = seconds(0, 31, 20, 11, 15, 63, 61, 20, 16, 25, 16)
+        assertEquals(listOf(gulli[1]..gulli[gulli.size - 2]), Separators.breaks(gulli))
+        // Two breaks of their own where the single black is too far from one of them.
+        val first = seconds(0, 15, 15, 30, 15, 20)
+        val lone = first.last() + Separators.GAP_MS + 10_000
+        val second = seconds(lone + Separators.WIDE_GAP_MS + 1_000, 15, 15, 30, 15, 20)
+        assertEquals(
+            listOf(first[1]..first[first.size - 2], second[1]..second[second.size - 2]),
+            Separators.breaks(first + lone + second),
+        )
+        // The same, too far from the first.
+        val early = first.last() + Separators.WIDE_GAP_MS + 1_000
+        val third = seconds(early + Separators.GAP_MS + 10_000, 15, 15, 30, 15, 20)
+        assertEquals(
+            listOf(first[1]..first[first.size - 2], third[1]..third[third.size - 2]),
+            Separators.breaks(first + early + third),
+        )
+        // And as far as can be from both.
+        val edge = first.last() + Separators.WIDE_GAP_MS
+        val fourth = seconds(edge + Separators.WIDE_GAP_MS, 15, 15, 30, 15, 20)
+        assertEquals(listOf(first[1]..fourth[fourth.size - 2]), Separators.breaks(first + edge + fourth))
+    }
+
+    @Test
     fun `a stray separator at either end leaves the break in the adverts`() {
         val ads = seconds(100_000, 15, 15, 30, 15, 20, 30)
         val before = ads.first() - 50_000

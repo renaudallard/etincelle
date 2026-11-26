@@ -44,8 +44,10 @@ import kotlinx.coroutines.withContext
  * cartoon's within a minute, and a break is at least [LEAST] of them over [SPAN_MS] or more, none
  * more than [GAP_MS] from the next. A black now and then is a few bytes over and missed (seen: 41 on
  * average), which leaves two adverts between two others, 95 s on M6: two runs of [PART] or more are
- * one across up to [WIDE_GAP_MS], but not a run of one or two, as a cartoon's last blacks just
- * before a break on Canal J. W9 and 6ter have none.
+ * one across up to [WIDE_GAP_MS], and so across a run of one or two between them, each side as far:
+ * a card in the break, M6's "Publicité" among trailers or Gulli's sponsor, has no black. But not a
+ * run of one or two at an end, as a cartoon's last blacks just before a break on Canal J. W9 and
+ * 6ter have none.
  * The first advert has no separator before it and the last none after it, so the separators of a
  * break are all in its adverts. A stray one, in the programme less than a minute from a break, would
  * be counted in it: a break runs from the second to the one before the last, which one stray at
@@ -104,9 +106,21 @@ internal object Separators {
             if (last != null && end - last.last() <= GAP_MS) last += end else runs += mutableListOf(end)
         }
         val joined = ArrayList<MutableList<Long>>()
-        for (run in runs) {
-            val last = joined.lastOrNull()
-            if (last != null && run.first() - last.last() <= WIDE_GAP_MS && last.size >= PART && run.size >= PART) last += run else joined += run
+        var i = 0
+        while (i < runs.size) {
+            val run = runs[i]
+            val next = runs.getOrNull(i + 1)
+            val last = joined.lastOrNull()?.takeIf { it.size >= PART && run.first() - it.last() <= WIDE_GAP_MS }
+            when {
+                last != null && run.size >= PART -> last += run
+                last != null && next != null && next.size >= PART && next.first() - run.last() <= WIDE_GAP_MS -> {
+                    last += run
+                    last += next
+                    i++
+                }
+                else -> joined += run
+            }
+            i++
         }
         return joined.filter { it.size >= LEAST && it.last() - it.first() >= SPAN_MS }.map { it[1]..it[it.size - 2] }
     }
