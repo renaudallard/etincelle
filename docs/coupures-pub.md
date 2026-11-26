@@ -180,7 +180,15 @@ programme, la coupure n'est pas sûre et reste au bouton.
 - M6, Gulli, Canal J, TIJI, Paris Première, Automoto, Toute l'Histoire et AB 1 séparent deux
   publicités par une demi-seconde de noir. L'image du flux est chiffrée, mais pas la taille de chaque
   image, et un noir en fait une douzaine de quelques octets. L'en-tête de chaque segment de la vidéo
-  suffit, environ 7 Mo par heure.
+  suffit.
+- Il est lu dans trois qualités de la vidéo (270, 540 et 1080 lignes), chacune avec ses propres
+  seuils, soit environ 22 Mo par heure : chacune manque des noirs que les autres trouvent (un noir
+  de quelques octets de trop, une publicité qui commence sur une image sombre), et un noir trouvé
+  dans l'une compte, une seule fois. La qualité 432 lignes n'est pas lue : elle prenait des images
+  de dessins animés de Canal J pour des noirs.
+- Sur deux heures de M6, Gulli et Paris Première et quatre heures de Canal J, TIJI, Automoto,
+  Toute l'Histoire et AB 1, en novembre 2026, les trois qualités passaient 45 % de publicité de plus
+  que la plus basse seule ; tout ce qu'elles ajoutaient était de la publicité ou des bandes-annonces.
 - Une coupure compte au moins six noirs sur une minute et demie ou plus, jamais à plus d'une minute
   l'un de l'autre, ou d'une minute quarante entre deux groupes d'au moins trois : un noir manqué
   laisse deux publicités entre deux autres, mais un ou deux noirs d'un dessin animé juste avant la

@@ -92,7 +92,8 @@ Les coupures sont trouvées de quatre façons :
 - **Forme du flux** (groupe RMC, BFMTV, longues coupures de la nuit comprises) : exactes.
 - **Noirs entre les publicités** (M6, Gulli, Canal J, TIJI, Paris Première, Automoto, Toute
   l'Histoire, AB 1) : l'image est chiffrée, mais pas la taille de chaque image, et la demi-seconde de
-  noir entre deux publicités s'y lit. La coupure va du deuxième noir à l'avant-dernier.
+  noir entre deux publicités s'y lit, dans trois qualités de la vidéo. La coupure va du deuxième noir
+  à l'avant-dernier.
 - **Logo de la chaîne**, dans les vignettes que le service garde de chaque chaîne (les autres chaînes,
   sauf Arte, qui n'a pas de publicité) : une estimation, qui s'arrête une demi-minute avant le retour
   du logo, 24 secondes pour une coupure presque sûre. Mieux vaut voir les dernières publicités que

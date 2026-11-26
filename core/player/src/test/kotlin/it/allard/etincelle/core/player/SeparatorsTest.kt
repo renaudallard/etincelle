@@ -76,11 +76,27 @@ class SeparatorsTest {
         // Nor is one held longer.
         for (i in 75 until 95) frames[i] = 20
         frames[95] = 12000
+        val low = Separators.BLACKS.getValue(270)
 
-        assertEquals(listOf(10_000L + 42 * 40), Separators.ends(frames, 10_000L, 40.0))
+        assertEquals(listOf(10_000L + 42 * 40), Separators.ends(frames, 10_000L, 40.0, low))
         // A key frame of a little over four kilobytes after a black, as seen on M6, ends it all the same.
         frames[42] = 4600
-        assertEquals(listOf(10_000L + 42 * 40), Separators.ends(frames, 10_000L, 40.0))
+        assertEquals(listOf(10_000L + 42 * 40), Separators.ends(frames, 10_000L, 40.0, low))
+    }
+
+    @Test
+    fun `each rendition has its own black`() {
+        // M6 on 2026-11-26 at 13:52:59: a black and the first frame of the next advert, at 270 and 1080
+        // lines. At 270 its frames are a few bytes over on average; at 1080 they are all bigger.
+        val low = intArrayOf(952, 673, 71, 34, 82, 32, 32, 32, 36, 32, 32, 32, 36, 32, 16689)
+        val high = intArrayOf(16199, 15090, 2538, 91, 223, 91, 141, 118, 88, 93, 86, 86, 88, 86, 165207)
+
+        assertTrue(Separators.ends(low, 0L, 40.0, Separators.BLACKS.getValue(270)).isEmpty())
+        assertEquals(listOf(14 * 40L), Separators.ends(high, 0L, 40.0, Separators.BLACKS.getValue(1080)))
+        assertTrue(Separators.ends(high, 0L, 40.0, Separators.BLACKS.getValue(270)).isEmpty())
+        // A key frame big at 270 lines but not at 1080 does not end a black there.
+        high[14] = 9000
+        assertTrue(Separators.ends(high, 0L, 40.0, Separators.BLACKS.getValue(1080)).isEmpty())
     }
 
     private fun seconds(first: Long, vararg gaps: Int): List<Long> = gaps.runningFold(first) { at, gap -> at + gap * 1000L }
@@ -141,6 +157,16 @@ class SeparatorsTest {
         val edge = first.last() + Separators.WIDE_GAP_MS
         val fourth = seconds(edge + Separators.WIDE_GAP_MS, 15, 15, 30, 15, 20)
         assertEquals(listOf(first[1]..fourth[fourth.size - 2]), Separators.breaks(first + edge + fourth))
+    }
+
+    @Test
+    fun `a separator found in several renditions counts once`() {
+        // Five are no break, however many renditions find them, a frame apart or not.
+        val five = seconds(0, 20, 25, 30, 20)
+        assertTrue(Separators.breaks(five + five + five.map { it + 40 }).isEmpty())
+        // Six are one, from the second to the one before the last.
+        val six = seconds(0, 15, 15, 30, 15, 20)
+        assertEquals(listOf(six[1]..six[4]), Separators.breaks(six + six.map { it + 40 } + six.drop(2)))
     }
 
     @Test

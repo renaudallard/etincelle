@@ -33,21 +33,29 @@ import kotlinx.coroutines.withContext
  * The ad breaks of M6, Gulli and a few others (see PlaybackSource.separatedBreaks) as their streams
  * give them away: these channels put 0.48 s of black between two adverts. The pictures are
  * encrypted, but not the size of each frame, in the header of each segment, and a black is a dozen
- * frames of a few bytes, ended by a key frame of several kilobytes where the next advert starts. A break is a series of these, one every 10 to 55 s, or
- * twice that where one was missed.
+ * frames of a few bytes, ended by a key frame of several kilobytes where the next advert starts. A
+ * break is a series of these, one every 10 to 55 s, or twice that where one was missed.
  *
  * Seen on the service in November 2026, at the lowest rendition (270 lines, 25 frames a second), over
  * four hours of each: on M6, nearly every separator of a break and a few elsewhere; on Gulli the same
  * in its breaks, but cartoons hold still frames that look alike, which made seven in under two
  * minutes. A black's frames are the smallest a frame can be, 32 to 36 bytes, a held picture's
- * mostly more: so they must be [BLACK_MEAN] at most on average, which left at most three of a
- * cartoon's within a minute, and a break is at least [LEAST] of them over [SPAN_MS] or more, none
- * more than [GAP_MS] from the next. A black now and then is a few bytes over and missed (seen: 41 on
+ * mostly more: so they must be 40 at most on average, which left at most three of a cartoon's
+ * within a minute, and a break is at least [LEAST] of them over [SPAN_MS] or more, none more than
+ * [GAP_MS] from the next. A black now and then is a few bytes over and missed (seen: 41 on
  * average), which leaves two adverts between two others, 95 s on M6: two runs of [PART] or more are
  * one across up to [WIDE_GAP_MS], and so across a run of one or two between them, each side as far:
  * a card in the break, M6's "Publicité" among trailers or Gulli's sponsor, has no black. But not a
  * run of one or two at an end, as a cartoon's last blacks just before a break on Canal J. W9 and
  * 6ter have none.
+ * The same blacks are in the higher renditions, in bigger frames, and each rendition misses some
+ * that another finds: a black a few bytes over in one, an advert that opens on a dark picture. So
+ * three are read, each with its own limits (see [BLACKS]), and a black any of them finds counts,
+ * once. Over two hours of M6, Gulli and Paris Première, and four of Canal J, TIJI, Automoto, Toute
+ * l'Histoire and AB 1, that skipped 45 % more of their adverts than 270 lines alone, and every
+ * stretch it added was adverts or trailers on the pictures. The few blacks it found in programmes
+ * were alone, far from a break. 432 lines found more in Canal J's cartoons, one of which took a break
+ * into a cartoon's opening, so it is not read; 720 added little.
  * The first advert has no separator before it and the last none after it, so the separators of a
  * break are all in its adverts. A stray one, in the programme less than a minute from a break, would
  * be counted in it: a break runs from the second to the one before the last, which one stray at
@@ -55,13 +63,26 @@ import kotlinx.coroutines.withContext
  * All times in ms.
  */
 internal object Separators {
-    // A frame of black, or of a picture held, is a few bytes; the key frame after a black is several
-    // kilobytes, as a picture held ends with no new one. At 25 frames a second, 0.48 s is 12 frames,
-    // of which those around the segment's own key frames can be counted in or out.
-    private const val TINY = 120
-    private const val BLACK_MEAN = 40
-    private const val KEY = 4000
+    /**
+     * What a black is in one rendition: [BLACK] frames under [tiny] bytes, [mean] at most on
+     * average, then a key frame over [key] bytes.
+     */
+    class Black(val tiny: Int, val mean: Int, val key: Int)
+
+    // The renditions read, by their height. A frame of black, or of a picture held, is a few bytes;
+    // the key frame after a black is several kilobytes, as a picture held ends with no new one.
+    // Higher up, both are bigger, and a black has the odd bigger frame: its frames are 32 bytes at
+    // the least at 270 lines, 43 at 540 and 86 at 1080, the next frame some 10, 28 and 83 kilobytes.
+    // The limits of the higher two are those that found most of the blacks 270 lines finds on two
+    // hours of M6, Gulli and Paris Première, and none in their programmes.
+    val BLACKS = mapOf(270 to Black(120, 40, 4000), 540 to Black(172, 86, 8000), 1080 to Black(430, 172, 12000))
+
+    // At 25 frames a second, 0.48 s is 12 frames, of which those around the segment's own key frames
+    // can be counted in or out.
     private val BLACK = 10..14
+
+    // Two separators this close are the same one, found in two renditions.
+    private const val SAME_MS = 200L
 
     // The separators of a break, at the least, how long they span at the least, and the most apart
     // two of them are: the longest advert seen between two was 55 s. Two runs of PART or more are one
@@ -79,30 +100,34 @@ internal object Separators {
 
     /**
      * Where the separators in a segment end, the next advert starting: [sizes] are its frames', the
-     * first at [startMs], each [frameMs] long.
+     * first at [startMs], each [frameMs] long, in a rendition where a black is [black].
      */
-    fun ends(sizes: IntArray, startMs: Long, frameMs: Double): List<Long> {
+    fun ends(sizes: IntArray, startMs: Long, frameMs: Double, black: Black): List<Long> {
         val out = ArrayList<Long>()
         var tiny = 0
         var bytes = 0
         for ((i, size) in sizes.withIndex()) {
-            if (size in 0 until TINY) {
+            if (size in 0 until black.tiny) {
                 tiny++
                 bytes += size
                 continue
             }
-            if (tiny in BLACK && bytes <= BLACK_MEAN * tiny && size > KEY) out += startMs + (i * frameMs).roundToLong()
+            if (tiny in BLACK && bytes <= black.mean * tiny && size > black.key) out += startMs + (i * frameMs).roundToLong()
             tiny = 0
             bytes = 0
         }
         return out
     }
 
-    /** The breaks the separators ending at [ends] make, in order: each from its second to the one before its last. */
+    /**
+     * The breaks the separators ending at [ends] make, in order: each from its second to the one
+     * before its last. One found in several renditions counts once.
+     */
     fun breaks(ends: List<Long>): List<LongRange> {
         val runs = ArrayList<MutableList<Long>>()
         for (end in ends.sorted()) {
             val last = runs.lastOrNull()
+            if (last != null && end - last.last() <= SAME_MS) continue
             if (last != null && end - last.last() <= GAP_MS) last += end else runs += mutableListOf(end)
         }
         val joined = ArrayList<MutableList<Long>>()
@@ -207,25 +232,30 @@ internal object Separators {
 }
 
 /**
- * A segment of a stream's video: when it starts (ms since 1970), how long it is, and where it is,
- * from [offset] in what [uri] gives.
+ * A segment of a stream's video: when it starts (ms since 1970), how long it is, where it is, from
+ * [offset] in what [uri] gives, and the height of its rendition.
  */
-internal class Segment(val startMs: Long, val durationMs: Long, val uri: Uri, val offset: Long)
+internal class Segment(val startMs: Long, val durationMs: Long, val uri: Uri, val offset: Long, val height: Int)
 
 /**
  * Reads the separators of the live stream around the playhead (see [Separators]), from the first
- * bytes of each segment of its lowest video rendition, and gives the breaks they make. One instance
- * per stream watched; calls to [around] are taken one at a time.
+ * bytes of each segment of the video renditions [Separators.BLACKS] lists, and gives the breaks they
+ * make. One instance per stream watched; calls to [around] are taken one at a time.
  */
 internal class SeparatorBreaks {
     private val http = DefaultHttpDataSource.Factory()
     private val lock = Mutex()
 
-    // The separators of each segment read, by its start (ms since 1970).
-    private val read = TreeMap<Long, LongArray>()
+    // What was read of each rendition, by its height.
+    private val renditions = Separators.BLACKS.keys.associateWith { Rendition() }
 
-    // The segments that could not be read, with how many times each was asked for.
-    private val missed = HashMap<Long, Int>()
+    private class Rendition {
+        // The separators of each segment read, by its start (ms since 1970).
+        val read = TreeMap<Long, LongArray>()
+
+        // The segments that could not be read, with how many times each was asked for.
+        val missed = HashMap<Long, Int>()
+    }
 
     /**
      * The breaks around the playhead of the stream [dash] describes, at [atMs] with the live point
@@ -233,8 +263,10 @@ internal class SeparatorBreaks {
      * still needs: for an IO thread.
      */
     suspend fun around(dash: DashManifest, atMs: Long, liveMs: Long): List<LongRange> = lock.withLock {
-        val wanted = segments(dash, atMs - FAR_MS, minOf(liveMs - NOT_YET_MS, atMs + FAR_MS))
-            .filter { it.startMs !in read || (missed[it.startMs] ?: TRIES) < TRIES }
+        val wanted = segments(dash, atMs - FAR_MS, minOf(liveMs - NOT_YET_MS, atMs + FAR_MS)).filter {
+            val of = renditions.getValue(it.height)
+            it.startMs !in of.read || (of.missed[it.startMs] ?: TRIES) < TRIES
+        }
         val got = coroutineScope {
             val gate = Semaphore(AT_ONCE)
             wanted.map { segment -> async { gate.withPermit { ensureActive(); ends(segment) } } }.awaitAll()
@@ -242,13 +274,16 @@ internal class SeparatorBreaks {
         // One that cannot be read has no separator, which ends a break rather than making one, and is
         // asked for again the next times, a few of them.
         wanted.forEachIndexed { i, segment ->
+            val of = renditions.getValue(segment.height)
             val ends = got[i]
-            if (ends == null) missed[segment.startMs] = (missed[segment.startMs] ?: 0) + 1 else missed.remove(segment.startMs)
-            read[segment.startMs] = ends ?: LongArray(0)
+            if (ends == null) of.missed[segment.startMs] = (of.missed[segment.startMs] ?: 0) + 1 else of.missed.remove(segment.startMs)
+            of.read[segment.startMs] = ends ?: LongArray(0)
         }
-        read.headMap(atMs - KEPT_MS).clear()
-        missed.keys.removeAll { it < atMs - KEPT_MS }
-        Separators.breaks(read.values.flatMap { it.asList() })
+        for (of in renditions.values) {
+            of.read.headMap(atMs - KEPT_MS).clear()
+            of.missed.keys.removeAll { it < atMs - KEPT_MS }
+        }
+        Separators.breaks(renditions.values.flatMap { of -> of.read.values.flatMap { it.asList() } })
     }
 
     // Where the separators of [segment] end; null when it cannot be read.
@@ -257,7 +292,8 @@ internal class SeparatorBreaks {
         val end = Separators.moofEnd(bytes) ?: return null
         if (end > bytes.size) bytes = fetch(segment, end) ?: return null
         val sizes = Separators.sizes(bytes)?.takeIf { it.isNotEmpty() } ?: return null
-        return Separators.ends(sizes, segment.startMs, segment.durationMs.toDouble() / sizes.size).toLongArray()
+        val black = Separators.BLACKS.getValue(segment.height)
+        return Separators.ends(sizes, segment.startMs, segment.durationMs.toDouble() / sizes.size, black).toLongArray()
     }
 
     private fun fetch(segment: Segment, length: Int): ByteArray? = try {
@@ -285,12 +321,14 @@ internal class SeparatorBreaks {
         // How long after the live point a segment can be asked for.
         private const val NOT_YET_MS = 8_000L
 
-        // The most segments listed at once, for a manifest that would give them too short.
+        // The most segments of a rendition listed at once, for a manifest that would give them too
+        // short.
         private const val MOST = 1000
 
         /**
-         * The segments of the lowest video rendition of [dash] that play between [fromMs] and [toMs]
-         * (ms since 1970), in order.
+         * The segments of the video renditions of [dash] that [Separators.BLACKS] lists, the lowest
+         * of each height there, that play between [fromMs] and [toMs] (ms since 1970), in order for
+         * each.
          */
         fun segments(dash: DashManifest, fromMs: Long, toMs: Long): List<Segment> {
             val out = ArrayList<Segment>()
@@ -299,23 +337,28 @@ internal class SeparatorBreaks {
                 val period = dash.getPeriod(i)
                 val periodMs = dash.availabilityStartTimeMs + period.startMs
                 val lengthUs = dash.getPeriodDurationUs(i)
-                val rep = period.adaptationSets.filter { it.type == C.TRACK_TYPE_VIDEO }
-                    .flatMap { it.representations }.filter { it.format.bitrate > 0 }.minByOrNull { it.format.bitrate } ?: continue
-                val index = rep.index ?: continue
-                val base = rep.baseUrls.firstOrNull()?.url ?: continue
-                val count = index.getSegmentCount(lengthUs)
-                val last = if (count == DashSegmentIndex.INDEX_UNBOUNDED.toLong()) Long.MAX_VALUE else index.firstSegmentNum + count - 1
-                var n = maxOf(index.firstSegmentNum, index.getSegmentNum(Util.msToUs(maxOf(0L, fromMs - periodMs)), lengthUs))
-                while (n <= last && out.size < MOST) {
-                    val start = periodMs + Util.usToMs(index.getTimeUs(n))
-                    if (start >= toMs) break
-                    val duration = Util.usToMs(index.getDurationUs(n, lengthUs))
-                    if (duration <= 0) break
-                    if (start + duration > fromMs) {
-                        val where = index.getSegmentUrl(n)
-                        out += Segment(start, duration, where.resolveUri(base), where.start)
+                val reps = period.adaptationSets.filter { it.type == C.TRACK_TYPE_VIDEO }.flatMap { it.representations }
+                    .filter { it.format.bitrate > 0 && it.format.height in Separators.BLACKS }
+                    .groupBy { it.format.height }.values.map { same -> same.minBy { it.format.bitrate } }
+                for (rep in reps) {
+                    val index = rep.index ?: continue
+                    val base = rep.baseUrls.firstOrNull()?.url ?: continue
+                    val count = index.getSegmentCount(lengthUs)
+                    val last = if (count == DashSegmentIndex.INDEX_UNBOUNDED.toLong()) Long.MAX_VALUE else index.firstSegmentNum + count - 1
+                    var n = maxOf(index.firstSegmentNum, index.getSegmentNum(Util.msToUs(maxOf(0L, fromMs - periodMs)), lengthUs))
+                    var listed = 0
+                    while (n <= last && listed < MOST) {
+                        val start = periodMs + Util.usToMs(index.getTimeUs(n))
+                        if (start >= toMs) break
+                        val duration = Util.usToMs(index.getDurationUs(n, lengthUs))
+                        if (duration <= 0) break
+                        if (start + duration > fromMs) {
+                            val where = index.getSegmentUrl(n)
+                            out += Segment(start, duration, where.resolveUri(base), where.start, rep.format.height)
+                            listed++
+                        }
+                        n++
                     }
-                    n++
                 }
             }
             return out
