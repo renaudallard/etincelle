@@ -186,6 +186,8 @@ programme, la coupure n'est pas sûre et reste au bouton.
   de quelques octets de trop, une publicité qui commence sur une image sombre), et un noir trouvé
   dans l'une compte, une seule fois. La qualité 432 lignes n'est pas lue : elle prenait des images
   de dessins animés de Canal J pour des noirs.
+- Sur un Chromecast, dont le navigateur refuse de lire le début d'un segment seul, le récepteur lit
+  les segments entiers de la qualité 270 lignes, soit environ 135 Mo par heure.
 - Sur deux heures de M6, Gulli et Paris Première et quatre heures de Canal J, TIJI, Automoto,
   Toute l'Histoire et AB 1, en novembre 2026, les trois qualités passaient 45 % de publicité de plus
   que la plus basse seule ; tout ce qu'elles ajoutaient était de la publicité ou des bandes-annonces.
