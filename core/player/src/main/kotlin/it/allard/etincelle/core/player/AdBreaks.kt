@@ -183,9 +183,10 @@ class AdBreaks {
         private const val MERGE_GAP_MS = 10_000L
 
         // The shape of a break on a stream that marks nothing: a jingle of a few seconds between two
-        // stretches of one to five and a half minutes.
+        // stretches of one to seven minutes (just over six in BFMTV's long breaks at night, November
+        // 2026).
         private const val JINGLE_MAX_MS = 10_000L
-        private val HALF_BREAK_MS = 60_000L..330_000L
+        private val HALF_BREAK_MS = 60_000L..420_000L
 
         private const val SCTE35 = "urn:scte:scte35"
         private val BASE64 = Regex("[A-Za-z0-9+/]{16,}={0,2}")

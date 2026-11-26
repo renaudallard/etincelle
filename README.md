@@ -41,7 +41,7 @@ depuis leur dernier bouton puis **OK**) et mène à la fin de la coupure ; le r�
 publicités automatiquement** (dans **Paramètres**, sur **Non** par défaut) le fait sans rien
 demander, sauf pour une coupure dans laquelle on est revenu en arrière. Sur **Coupures signalées**,
 il vaut pour les chaînes dont le flux signale ses coupures : celles des groupes TF1 et France
-Télévisions exactement, celles du groupe RMC d'après la forme de leurs coupures. Sur les chaînes qui signalent leurs coupures (groupe
+Télévisions exactement, celles du groupe RMC et BFMTV d'après la forme de leurs coupures, longues coupures de BFMTV la nuit comprises. Sur les chaînes qui signalent leurs coupures (groupe
 TF1, LCI, France Télévisions), rien d'autre n'est proposé : ce qui les entoure, bandes-annonces et
 parrainages, ne se distingue pas sûrement du début de l'émission. Sur les autres (groupe M6, groupe
 RMC, où le flux en manque beaucoup, CSTAR, CNEWS, BFMTV… ; pas Arte, qui n'a pas de publicité),

@@ -77,6 +77,18 @@ class AdBreaksTest {
         )
         assertEquals(listOf(10 * minute..16 * minute), AdBreaks.breaks(shaped))
 
+        // A long break of BFMTV at night, 26 November 2026: 362 s, 5 s, 369 s. Halves of eight
+        // minutes are too long for one.
+        fun halves(first: Long, second: Long) = listOf(
+            plain(0, 10 * minute),
+            plain(10 * minute, 10 * minute + first),
+            plain(10 * minute + first, 10 * minute + first + 5_000),
+            plain(10 * minute + first + 5_000, 10 * minute + first + 5_000 + second),
+            plain(10 * minute + first + 5_000 + second, null),
+        )
+        assertEquals(listOf(10 * minute..10 * minute + 736_000), AdBreaks.breaks(halves(362_000, 369_000)))
+        assertEquals(emptyList<LongRange>(), AdBreaks.breaks(halves(480_000, 369_000)))
+
         // Short periods alone are no break: a 90 s one every ten minutes, as on RMC Mécanic.
         val unshaped = listOf(plain(0, 10 * minute), plain(10 * minute, 11 * minute + 30_000), plain(11 * minute + 30_000, null))
         assertEquals(emptyList<LongRange>(), AdBreaks.breaks(unshaped))
