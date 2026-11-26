@@ -111,7 +111,7 @@ lecture), refaite cinq minutes plus tard, puis de moins en moins souvent, si le 
 interrompue. Seul le réglage **Signalées et presque sûres** y saute une coupure, presque sûre d'après
 les vignettes et dont les sous-titres, quand ils permettent d'en juger, confirment les deux bords. Sur un **Chromecast**, c'est le récepteur qui
 cherche les coupures de la même façon et affiche **Passer la pub : OK** sur le téléviseur : la
-touche OK de sa télécommande y mène à la fin de la coupure. Cliquer sur un programme ouvre d'abord sa **fiche détaillée**
+touche OK de sa télécommande y mène à la fin de la coupure. Ce que l'application trouve et passe sur chaque chaîne est résumé dans [docs/coupures-pub.md](docs/coupures-pub.md). Cliquer sur un programme ouvre d'abord sa **fiche détaillée**
 (synopsis, casting, année, classification) plutôt que de le lire aussitôt, et la fiche regroupe ses
 autres diffusions disponibles. Comme dans l'application officielle, la fiche indique au-dessus du titre
 quand le programme a été **diffusé** (« Diffusé: 12 févr. ») ou jusqu'à quand il reste disponible
