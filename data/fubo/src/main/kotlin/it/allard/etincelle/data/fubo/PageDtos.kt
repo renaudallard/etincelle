@@ -5,6 +5,7 @@ package it.allard.etincelle.data.fubo
 
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
+import it.allard.etincelle.core.model.CardProgress
 import it.allard.etincelle.core.model.CardShape
 import it.allard.etincelle.core.model.CardTag
 import it.allard.etincelle.core.model.ContentCard
@@ -159,6 +160,8 @@ data class ComponentDto(
     val info: TextDto? = null,
     val tags: List<TagDto>? = null,
     @Json(name = "channel_picture") val channelPicture: PictureDto? = null,
+    // An episode row carries its progress itself too.
+    @Json(name = "progress_bar") val progressBar: ProgressBarDto? = null,
 )
 
 // Live ("En direct à la TV") cards carry their show title in a footer rather than in title/heading.
@@ -171,6 +174,19 @@ data class BodyDto(
     val picture: PictureDto?,
     @Json(name = "station_logo") val stationLogo: PictureDto? = null,
     val tags: List<TagDto>? = null,
+    @Json(name = "progress_bar") val progressBar: ProgressBarDto? = null,
+)
+
+// How far a card's programme is: "live" with the times it airs between, "vod" with how much of it was
+// watched, each in the backend's colours.
+@JsonClass(generateAdapter = true)
+data class ProgressBarDto(
+    val kind: String? = null,
+    val percentage: Int? = null,
+    @Json(name = "start_time") val startTime: String? = null,
+    @Json(name = "end_time") val endTime: String? = null,
+    @Json(name = "progress_color") val progressColor: String? = null,
+    @Json(name = "background_color") val backgroundColor: String? = null,
 )
 @JsonClass(generateAdapter = true)
 data class HeaderDto(@Json(name = "station_logo") val stationLogo: PictureDto? = null)
@@ -432,7 +448,32 @@ private fun ComponentDto.toCard(shape: CardShape = CardShape.WIDE): ContentCard?
         },
         // The official app shows the footer's subtitle under the title, or an episode row's info.
         caption = (footer?.subtitle?.text ?: info?.text)?.takeIf { it.isNotBlank() },
+        progress = (body?.progressBar ?: progressBar)?.toProgress(),
     )
+}
+
+// A live card's bar, between the times it airs, or a watched one's, at its percentage. The space a
+// recordings page has used ("dvr_space") is no card's.
+private fun ProgressBarDto.toProgress(): CardProgress? {
+    val color = argb(progressColor)
+    val track = argb(backgroundColor)
+    return when (kind?.lowercase()) {
+        "live" -> {
+            val start = rfc3339UtcToEpochMillis(startTime) ?: return null
+            val end = rfc3339UtcToEpochMillis(endTime) ?: return null
+            CardProgress(startMs = start, endMs = end, color = color, track = track).takeIf { end > start }
+        }
+        "vod" -> CardProgress(percent = (percentage ?: return null).coerceIn(0, 100), color = color, track = track)
+        else -> null
+    }
+}
+
+// "#RRGGBB" or "#AARRGGBB" as an ARGB value; null for anything else.
+private fun argb(hex: String?): Long? {
+    val digits = hex?.removePrefix("#") ?: return null
+    if (digits.length != 6 && digits.length != 8 || digits.any { Character.digit(it, 16) < 0 }) return null
+    val value = digits.toLong(16)
+    return if (digits.length == 6) 0xFF000000L or value else value
 }
 
 // The first api_call among [items] as a replayable action, or null when there is none.

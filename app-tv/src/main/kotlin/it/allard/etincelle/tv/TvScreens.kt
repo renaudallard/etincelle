@@ -97,6 +97,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import it.allard.etincelle.core.designsystem.CardProgressBar
 import it.allard.etincelle.core.designsystem.CardTagPill
 import it.allard.etincelle.core.designsystem.categoryIconRes
 import it.allard.etincelle.core.designsystem.R as DesignR
@@ -1187,6 +1188,7 @@ private fun TvEpisodeRow(
                 contentScale = ContentScale.Crop,
             )
             card.tag?.let { CardTagPill(it) }
+            card.progress?.let { CardProgressBar(it) }
             card.channelLogoUrl?.let {
                 AsyncImage(
                     model = it,
@@ -1363,6 +1365,7 @@ private fun TvCard(card: ContentCard, onCardClick: (ContentCard) -> Unit, focusM
                 )
             }
             card.tag?.let { CardTagPill(it) }
+            card.progress?.let { CardProgressBar(it) }
             // The logo of the channel offering the card, as the official app shows it.
             card.channelLogoUrl?.let {
                 AsyncImage(

@@ -70,6 +70,8 @@ En bref :
   son vrai commencement, l'heure que donne le guide et non l'horaire prévu, dans la limite de la
   fenêtre de rembobinage. **Regarder le replay** lit ce même programme en entier quand il est aussi
   disponible à la demande.
+- Comme dans l'application officielle, une fine barre sous l'image de chaque programme en direct
+  (onglet **Direct**, rangée *En direct à la TV*) montre où il en est, et avance avec l'heure.
 
 ### Passer la pub
 
@@ -135,7 +137,8 @@ Ce que l'application trouve et passe sur chaque chaîne, et les règles en déta
   d'enregistrer la série** une fois l'enregistrement programmé.
 - L'onglet **Enregistrements** (« Enregistrés » sur téléphone) les présente en grille, comme dans
   l'application officielle : une vignette par série indique son nombre d'épisodes et ouvre la liste des
-  épisodes enregistrés, avec leur date.
+  épisodes enregistrés, avec leur date. Une fine barre blanche sous un épisode ou un programme
+  commencé montre jusqu'où il a été regardé.
 - Un enregistrement se lit depuis le DVR où qu'on l'ouvre : onglet, rangées *Vos enregistrements* de
   l'accueil, des films et des séries, fiche d'une série.
 - Les contenus à la demande (rattrapage, VOD, enregistrements) sont mis en **mémoire tampon** plus loin

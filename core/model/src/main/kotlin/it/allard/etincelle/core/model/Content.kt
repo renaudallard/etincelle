@@ -74,10 +74,35 @@ data class ContentCard(
      * year ("52m • 2026"), a show's recorded episodes ("14 épisodes"), or on an episode row when it
      * aired or was recorded ("07 juin à 13h25", "Enregistré: 30 sept."). */
     val caption: String? = null,
+    /** How far its programme is, drawn under the picture; null when the backend gives none. */
+    val progress: CardProgress? = null,
 )
 
 /** A card's tag: its [label] and the small icon drawn before it. */
 data class CardTag(val label: String, val iconUrl: String?)
+
+/**
+ * How far a card's programme is, as the official app draws it along the bottom of the picture: a live
+ * one, airing from [startMs] to [endMs] (ms since 1970), as far as the clock; one watched before, at
+ * [percent]. [color] and [track] are the backend's colours (ARGB), null for the app's own.
+ */
+data class CardProgress(
+    val startMs: Long? = null,
+    val endMs: Long? = null,
+    val percent: Int? = null,
+    val color: Long? = null,
+    val track: Long? = null,
+) {
+    /** Whether it moves with the clock. */
+    val live: Boolean get() = startMs != null && endMs != null && endMs > startMs
+
+    /** The part of the bar filled at [nowMs], from 0 to 1. */
+    fun filledAt(nowMs: Long): Float = if (live && startMs != null && endMs != null) {
+        ((nowMs - startMs).toFloat() / (endMs - startMs)).coerceIn(0f, 1f)
+    } else {
+        ((percent ?: 0) / 100f).coerceIn(0f, 1f)
+    }
+}
 
 /**
  * The shape of a card's tile, from its row's layout on the backend: programme artwork is either

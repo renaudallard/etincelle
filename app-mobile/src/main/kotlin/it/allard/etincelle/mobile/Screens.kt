@@ -93,6 +93,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import coil.compose.AsyncImage
 import it.allard.etincelle.core.designsystem.RaisedButton
+import it.allard.etincelle.core.designsystem.CardProgressBar
 import it.allard.etincelle.core.designsystem.CardTagPill
 import it.allard.etincelle.core.cast.CastReceiver
 import it.allard.etincelle.core.designsystem.categoryIconRes
@@ -418,6 +419,7 @@ private fun GridCard(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
             }
             FavoriteStar(card)
             card.tag?.let { CardTagPill(it) }
+            card.progress?.let { CardProgressBar(it) }
             card.channelLogoUrl?.let { ChannelLogo(it) }
         }
         card.title?.let {
@@ -1286,6 +1288,7 @@ private fun EpisodeRow(card: ContentCard, enabled: Boolean, modifier: Modifier =
                 contentScale = ContentScale.Crop,
             )
             card.tag?.let { CardTagPill(it) }
+            card.progress?.let { CardProgressBar(it) }
             card.channelLogoUrl?.let { ChannelLogo(it) }
         }
         Spacer(Modifier.width(12.dp))
@@ -1425,6 +1428,7 @@ private fun CardItem(card: ContentCard, onCardClick: (ContentCard) -> Unit) {
             }
             FavoriteStar(card)
             card.tag?.let { CardTagPill(it) }
+            card.progress?.let { CardProgressBar(it) }
             card.channelLogoUrl?.let { ChannelLogo(it) }
         }
         card.title?.let {
