@@ -118,3 +118,94 @@ programme, la coupure n'est pas sûre et reste au bouton.
   peut alors reprendre dans le programme suivant.
 - L'émission du matin de RMC Story n'est trouvée que par le logo.
 - Avec les noirs, la première et la dernière publicité d'une coupure passent toujours.
+
+## Les règles en détail
+
+### Coupures trouvées d'après le logo
+
+- Les vignettes que le service garde de chaque chaîne montrent un logo dans un coin pendant
+  l'émission : celui de la chaîne, en haut, de préférence à celui d'une émission, en bas, dont la
+  présence, quand elle ressort nettement, suffit toutefois à reconnaître l'émission. Il disparaît
+  pendant la publicité.
+- C'est une estimation : une publicité qui porte quelque chose à elle dans le coin d'un de ces logos
+  peut écourter la coupure ou la faire manquer.
+- Quand des publicités gardent le logo de la chaîne visible la moitié du temps, comme les jouets sur
+  Gulli, la disparition du logo de l'émission tout du long suffit, si celui de la chaîne est bien
+  visible avant et après ; jamais au-delà de son retour (une scène de l'émission sans aucun des deux
+  logos, juste avant ou juste après, n'en fait pas partie), et jamais sautée d'office.
+- Une bande-annonce qui porte le pictogramme de la chaîne au milieu des publicités, comme sur Paris
+  Première, ne coupe pas la coupure en deux : le logo du bas ne compte pour l'émission qu'au-delà de
+  40 secondes. Les dernières publicités restent dans la coupure tant que rien entre elles ne
+  ressemble à l'émission (les deux logos à la fois, ou celui de l'émission pendant vingt secondes).
+- Une publicité qui montre sa marque dans le coin du logo de la chaîne, celui de l'émission absent,
+  comme sur M6 dont le logo est pâle, ne compte pas pour l'émission jusqu'à 48 secondes, même entre
+  une coupure et quelques minutes de publicités trop courtes pour en faire une à elles seules.
+- Dans l'heure qui précède le programme du soir, où publicités et bandes-annonces sont si nombreuses
+  qu'aucun logo ne ressort plus, le logo de la chaîne trouvé plus tôt sert encore, même lors d'un
+  autre visionnage depuis le lancement de l'application, ou à défaut celui qui ressort dans les deux
+  heures précédentes, cherché une fois par visionnage, tant qu'il se voit sur une bonne part des
+  vignettes.
+- Une coupure trouvée ainsi dure de deux minutes et demie à vingt minutes : sur M6, publicités et
+  bandes-annonces occupent dix-huit minutes et demie entre le journal du soir et la série qui suit.
+- Sur les chaînes qui signalent leurs coupures (groupe TF1, LCI, France Télévisions), rien d'autre
+  n'est cherché : bandes-annonces et parrainages ne se distinguent pas sûrement du début de
+  l'émission.
+
+### Coupures presque sûres
+
+- Avec **Signalées et presque sûres**, une coupure trouvée d'après le logo dont rien ne laisse douter
+  est sautée douze secondes après son début : d'un seul tenant, que le logo d'une émission ne réduit
+  pas, ou de douze secondes au plus à chaque bord, et le logo de la chaîne bien visible avant et
+  après. T18 retire le sien juste avant la fin de l'émission et le remet une douzaine de secondes
+  après sa reprise : sur les vignettes de novembre 2026, cette tolérance a donné 22 coupures de plus
+  sur 11 chaînes, toutes sautées dans la publicité.
+- Jamais d'après le seul logo d'une émission, qui part avec elle : la coupure courrait alors de la fin
+  d'une émission jusque dans le début de la suivante.
+- Sur près de 18 heures de vignettes de ces chaînes, en novembre 2026, c'était le cas de 133 coupures
+  sur 313 (un peu moins depuis, la règle étant devenue plus stricte) ; toutes s'arrêtaient dans la
+  publicité, les bandes-annonces ou les génériques de la chaîne, mais certaines commençaient pendant
+  le générique de fin de l'émission, et une huit secondes avant la fin d'un bulletin météo.
+- Au direct, une coupure presque sûre s'arrête 24 secondes seulement avant le retour du logo : après
+  les 210 coupures presque sûres de ces vignettes, l'émission elle-même, son générique de début à
+  part, ne reprenait jamais plus de 20 secondes avant lui.
+- Une coupure trouvée d'après le logo de la chaîne est aussi presque sûre, même découpée, quand ses
+  deux bords sont marqués par une image revue dans la coupure (le carton « Publicité » de la chaîne,
+  son jingle, le générique de reprise de l'émission, une publicité passée au début et à la fin) et
+  que le logo de la chaîne n'y reparaît jamais plus de 36 secondes d'affilée : sur les mêmes
+  vignettes, 33 coupures de plus, dont aucune ne commençait avant la fin de l'émission ni ne
+  s'arrêtait après sa reprise.
+
+### Noirs entre les publicités
+
+- M6, Gulli, Canal J, TIJI, Paris Première, Automoto, Toute l'Histoire et AB 1 séparent deux
+  publicités par une demi-seconde de noir. L'image du flux est chiffrée, mais pas la taille de chaque
+  image, et un noir en fait une douzaine de quelques octets. L'en-tête de chaque segment de la vidéo
+  suffit, environ 7 Mo par heure.
+- Une coupure compte au moins six noirs sur une minute et demie ou plus, jamais à plus d'une minute
+  l'un de l'autre, ou d'une minute quarante entre deux groupes d'au moins trois : un noir manqué
+  laisse deux publicités entre deux autres, mais un ou deux noirs d'un dessin animé juste avant la
+  coupure ne s'y joignent pas. Un ou deux noirs entre deux groupes, à une minute quarante au plus de
+  chacun (le carton « Publicité » de M6 parmi des bandes-annonces, le parrainage de Gulli), ne la
+  coupent pas non plus.
+- Elle va du deuxième noir à l'avant-dernier, qu'un noir égaré dans l'émission juste avant ou après la
+  coupure laisse encore dans la publicité ; **Signalées et presque sûres** la saute dès le deuxième.
+- Une coupure trouvée d'après le logo qui commence avant elle et s'arrête dedans mène jusqu'à sa fin.
+- Sur quatre heures de chacune de ces chaînes, en novembre 2026, elle trouvait 8 coupures de M6 et 7
+  de Gulli, et sur quatre heures des six autres 35 coupures ; toutes celles dont les vignettes
+  restaient (33) commençaient et s'arrêtaient dans la publicité, de quelques secondes à une minute et
+  demie avant la reprise de l'émission.
+- Les autres chaînes n'en ont pas, ou trop peu pour faire une coupure (W9, 6ter, TF1, France
+  Télévisions, groupe RMC, T18, NOVO19…) ; les images figées des dessins animés de Gulli en imitent
+  quelques-uns, jamais assez pour faire une coupure.
+
+### Enregistrements
+
+- Un enregistrement ne signale rien : ses coupures sont cherchées à l'ouverture, d'après ses vignettes
+  de la même façon et ses sous-titres (une émission parle pendant des minutes, une publicité quelques
+  secondes).
+- Le bouton apparaît une dizaine de secondes après le début de la lecture sur un réseau domestique, le
+  temps de la recherche (une quinzaine de Mo par heure d'enregistrement, soit un centième de ce que
+  demande sa lecture), refaite cinq minutes plus tard, puis de moins en moins souvent, si le réseau
+  l'a interrompue.
+- Seul **Signalées et presque sûres** y saute une coupure : presque sûre d'après les vignettes, et
+  dont les sous-titres, quand ils permettent d'en juger, confirment les deux bords.

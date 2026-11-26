@@ -12,312 +12,15 @@
 
 </div>
 
-Application Android native (ciblant **Android 16 / API 36**) pour regarder **Molotov** via le
-backend **Fubo** qu'utilise l'application Molotov actuelle (5.51), avec l'apparence de l'ancienne
-interface Molotov **4.27**, sur un fond **noir pur** (les pixels d'un écran OLED restent éteints) et avec
-des **boutons en relief** qui s'enfoncent à l'appui. Elle fonctionne sur **téléphone/tablette** et **Android TV**, et lit les
-contenus directement sur l'appareil avec le **DRM Widevine** via AndroidX Media3.
+**etincelle** est une application Android native pour regarder **Molotov** sur **téléphone**, **tablette**
+et **Android TV**. Elle passe par le backend **Fubo** qu'utilise l'application Molotov actuelle (5.51),
+reprend l'apparence de l'ancienne interface Molotov **4.27** sur un fond **noir pur** (les pixels d'un
+écran OLED restent éteints), avec des **boutons en relief** qui s'enfoncent à l'appui, et lit les
+contenus sur l'appareil avec le **DRM Widevine** d'AndroidX Media3.
 
-Elle donne accès au **direct**, au **guide des programmes** (EPG), à la **recherche**, au
-**rattrapage** et à la **VOD**. Le **direct** se **rembobine** : la barre de progression du lecteur
-épouse le **programme regardé** (du début à la fin de sa diffusion, heures de début et de fin
-affichées à ses extrémités), qui n'est pas celui à l'antenne quand on regarde en différé : la barre
-suit alors le programme où l'on se trouve, et couvre toute la fenêtre de rembobinage là où le guide
-ne sait plus ce qui passait. Tant que le guide ne donne que l'heure prévue d'un programme (une heure
-ronde, parfois à quelques minutes près), il est redemandé chaque minute pendant un quart d'heure, et
-la barre prend l'heure réelle dès qu'il la connaît. Le bord du direct se situe en
-cours de route et la portion pas encore diffusée formant la fin de la barre ; la partie trop ancienne
-pour être rembobinée y est tracée dans une couleur distincte, et un bouton **Revenir au direct**
-apparaît dès que l'on s'éloigne du bord pour y ramener d'un appui (sur le téléviseur, il s'affiche
-avec les commandes du lecteur et s'atteint avec la flèche **Haut**). Sur le téléviseur, commandes
-masquées, les flèches **Gauche** et **Droite** reculent de 10 s et avancent de 30 s sans les
-afficher, de plus en plus vite quand on les maintient, la barre et l'heure d'arrivée s'affichant le
-temps de choisir ; les appuis s'additionnent en un seul déplacement. Comme sur le Chromecast, un recul
-s'arrête au début de l'émission en cours ; un nouvel appui sur **Gauche**, une fois arrêté là, recule
-plus loin. En différé, quand ce que l'on
-regarde est une **coupure publicitaire** dont le flux indique la fin, un bouton **Passer la pub**
-apparaît (sur le téléviseur, **OK** suffit, ou, les commandes affichées, la flèche **Droite**
-depuis leur dernier bouton puis **OK**) et mène à la fin de la coupure ; le réglage **Passer les
-publicités automatiquement** (dans **Paramètres**, sur **Non** par défaut) le fait sans rien
-demander, sauf pour une coupure dans laquelle on est revenu en arrière. Sur **Coupures signalées**,
-il vaut pour les chaînes dont le flux signale ses coupures : celles des groupes TF1 et France
-Télévisions exactement, celles du groupe RMC et BFMTV d'après la forme de leurs coupures, longues coupures de BFMTV la nuit comprises, ou, pour une coupure diffusée pendant qu'on regarde, d'après les publicités que le service y place lui-même. Sur les chaînes qui signalent leurs coupures (groupe
-TF1, LCI, France Télévisions), rien d'autre n'est proposé : ce qui les entoure, bandes-annonces et
-parrainages, ne se distingue pas sûrement du début de l'émission. Sur les autres (groupe M6, groupe
-RMC pour ce que le flux ne montre pas, CSTAR, CNEWS, BFMTV… ; pas Arte, qui n'a pas de publicité),
-l'application cherche les coupures elle-même dans les **vignettes** que le service garde de
-chaque chaîne : le logo présent dans un coin pendant l'émission (celui de la chaîne, en haut, de
-préférence à celui d'une émission, en bas, dont la présence, s'il ressort nettement, suffit toutefois à
-reconnaître l'émission)
-disparaît pendant la publicité. Le
-bouton apparaît alors de la même façon : c'est une estimation, qu'une publicité portant quelque
-chose à elle dans le coin d'un de ces logos peut écourter ou faire manquer. Quand des publicités
-gardent ainsi le logo de la chaîne visible la moitié du temps, comme les jouets sur Gulli, la
-disparition du logo de l'émission tout du long suffit, si celui de la chaîne est bien visible avant
-et après ; jamais au-delà de son retour (une scène de l'émission sans aucun des deux logos, juste
-avant ou juste après, n'en fait pas partie), et jamais sautée d'office. Et une bande-annonce qui porte
-le pictogramme de la chaîne au milieu des publicités, comme sur Paris Première, ne coupe plus la
-coupure en deux : le logo du bas ne compte pour l'émission qu'au-delà de 40 secondes ; et ses dernières
-publicités restent dans la coupure tant que rien entre elles ne ressemble à l'émission (les deux logos à
-la fois, ou celui de l'émission pendant vingt secondes). Pas plus
-qu'une publicité qui montre sa marque dans le coin du logo de la chaîne, celui de l'émission absent,
-comme sur M6 dont le logo est pâle : jusqu'à 48 secondes, elle ne compte pas pour l'émission, même
-entre une coupure et quelques minutes de publicités trop courtes pour en faire une à elles seules. Et dans
-l'heure qui précède le programme du soir, où publicités et bandes-annonces sont si nombreuses qu'aucun
-logo ne ressort plus, le logo de la chaîne trouvé plus tôt sert encore, même lors d'un autre visionnage
-depuis le lancement de l'application, ou à défaut celui qui ressort dans les deux heures précédentes,
-cherché une fois par visionnage, tant qu'il se voit sur une bonne part des vignettes. Une coupure estimée d'après les vignettes dure de deux minutes et demie à vingt minutes : sur M6,
-publicités et bandes-annonces occupent dix-huit minutes et demie entre le journal du soir et la série
-qui suit. Elle s'arrête une
-demi-minute avant le retour du logo, que les chaînes remettent parfois après la reprise de
-l'émission : mieux vaut voir les dernières publicités que perdre le début de l'émission. Sur
-**Signalées et presque sûres**, le réglage saute aussi, douze secondes après son début, une coupure
-estimée dont rien ne laisse douter : d'un seul tenant, que le logo d'une émission ne réduit pas, ou de douze secondes au plus à chaque bord (T18 retire le sien juste avant la fin de l'émission et le remet une douzaine de secondes après sa reprise ; sur les mêmes vignettes, 22 coupures de plus sur 11 chaînes, toutes sautées dans la publicité), et
-le logo de la chaîne bien visible avant et après, jamais d'après le seul logo d'une émission, qui
-part avec elle : la coupure courrait alors de la fin d'une émission jusque dans le début de la
-suivante. Sur près de 18 heures de vignettes de ces chaînes, en
-novembre 2026, c'était le cas de 133 coupures sur 313 (un peu moins depuis, la règle étant devenue
-plus stricte) ; toutes s'arrêtaient dans la publicité, les
-bandes-annonces ou les génériques de la chaîne, mais certaines commençaient pendant le générique de
-fin de l'émission, et une huit secondes avant la fin d'un bulletin météo. Au direct, une coupure
-presque sûre s'arrête 24 secondes seulement avant le retour du logo : après les 210 coupures
-presque sûres de ces vignettes, l'émission elle-même, son générique de début à part, ne reprenait jamais plus de 20
-secondes avant lui. Une coupure trouvée d'après
-le logo de la chaîne est aussi sautée, même découpée, quand ses deux bords sont marqués par une
-image revue dans la coupure (le carton « Publicité » de la chaîne, son jingle, le générique de
-reprise de l'émission, une publicité passée au début et à la fin) et que le logo de la chaîne n'y
-reparaît jamais plus de 36 secondes d'affilée : sur les mêmes vignettes, 33 coupures de plus, dont
-aucune ne commençait avant la fin de l'émission ni ne s'arrêtait après sa reprise. Sur **M6**, **Gulli**,
-**Canal J**, **TIJI**, **Paris Première**, **Automoto**, **Toute l'Histoire** et **AB 1**, qui séparent deux
-publicités par une demi-seconde de noir, la coupure se lit aussi dans le
-flux lui-même : l'image est chiffrée, mais pas la taille de chaque image, et un noir en fait une
-douzaine de quelques octets. Une coupure en compte au moins six sur une minute et demie ou plus, jamais
-à plus d'une minute l'un de l'autre, ou d'une minute quarante entre deux groupes d'au moins trois (un noir manqué laisse deux publicités entre deux autres, mais un ou deux noirs d'un dessin animé juste avant la coupure ne s'y joignent pas), même avec un ou deux noirs entre eux, à une minute quarante au plus de chacun (le carton « Publicité » de M6 parmi des bandes-annonces, le parrainage de Gulli) ; elle va du deuxième à l'avant-dernier, qu'un noir égaré dans
-l'émission juste avant ou après la coupure laisse encore dans la publicité, et **Signalées et presque
-sûres** la saute dès le deuxième. Une coupure estimée d'après les vignettes qui commence avant elle et
-s'arrête dedans mène jusqu'à sa fin. Sur quatre heures de chacune de ces chaînes, en
-novembre 2026, elle trouvait 8 coupures de M6 et 7 de Gulli, et sur quatre heures des six autres 35
-coupures, toutes celles dont les vignettes restaient (33) commencées et arrêtées dans la publicité, de
-quelques secondes à une minute et demie avant la reprise de l'émission ; les autres chaînes
-n'en ont pas, ou trop peu pour faire une coupure (W9, 6ter, TF1, France Télévisions, groupe RMC, T18,
-NOVO19…) ; les images figées des
-dessins animés de Gulli en imitent quelques-uns, jamais assez pour faire une coupure. Il suffit pour
-cela de l'en-tête de chaque segment de la vidéo, environ 7 Mo par heure. Au direct même, il n'y a
-nulle part où sauter. Dans un **enregistrement**, qui ne signale rien non plus, les coupures sont
-cherchées à l'ouverture, d'après ses vignettes de la même façon et ses sous-titres (une émission
-parle pendant des minutes, une publicité quelques secondes) : le bouton apparaît dans la coupure,
-une dizaine de secondes après le début de la lecture sur un réseau domestique, le temps de la
-recherche (une quinzaine de Mo par heure d'enregistrement, soit un centième de ce que demande sa
-lecture), refaite cinq minutes plus tard, puis de moins en moins souvent, si le réseau l'a
-interrompue. Seul le réglage **Signalées et presque sûres** y saute une coupure, presque sûre d'après
-les vignettes et dont les sous-titres, quand ils permettent d'en juger, confirment les deux bords. Sur un **Chromecast**, c'est le récepteur qui
-cherche les coupures de la même façon et affiche **Passer la pub : OK** sur le téléviseur : la
-touche OK de sa télécommande y mène à la fin de la coupure. Ce que l'application trouve et passe sur chaque chaîne est résumé dans [docs/coupures-pub.md](docs/coupures-pub.md). Cliquer sur un programme ouvre d'abord sa **fiche détaillée**
-(synopsis, casting, année, classification) plutôt que de le lire aussitôt, et la fiche regroupe ses
-autres diffusions disponibles. Comme dans l'application officielle, la fiche indique au-dessus du titre
-quand le programme a été **diffusé** (« Diffusé: 12 févr. ») ou jusqu'à quand il reste disponible
-(« Expire dans 6j ») et chaque épisode de la liste sa date de diffusion (« 07 juin à 13h25 »). Les
-vignettes portent les mêmes indications que dans l'application officielle : sous le titre, l'épisode
-(« S16 E6 Agde »), la durée et l'année (« 52m • 2026 ») ou le nombre d'épisodes enregistrés, et sur
-l'image l'étiquette du programme (**REC** pour un enregistrement, l'heure de diffusion pour *Ce soir*) ; sur le téléviseur, l'image du programme en occupe le fond, comme dans
-l'application officielle. Pour une chaîne en **direct**, la fiche propose, à côté de **Regarder
-en direct**, un bouton **Regarder depuis le début** qui reprend le programme en
-cours à son commencement (dans la limite de la fenêtre de rembobinage) : celui que le guide indique,
-l'heure affichée sur la fiche, et non l'horaire prévu, qu'un programme en retard ne tient pas, un bouton **Regarder le
-replay** quand ce même programme est aussi disponible à la demande, qui le lit alors en entier depuis
-sa première minute, et un menu **Enregistrer** pour
-enregistrer soit **l'épisode** en cours, soit **la série** entière. Quand un programme fait partie d'une série en rattrapage, sa fiche
-liste en dessous les **épisodes disponibles** (avec leur vignette) pour en choisir un autre ; pour une
-série **enregistrée**, elle affiche d'abord vos épisodes enregistrés (lus depuis le DVR), puis la même
-liste des **épisodes disponibles** en rattrapage. À la fin d'un épisode, l'**épisode suivant**
-s'annonce par un compte à rebours (« Commence dans 9 s ») puis démarre tout seul, sur le téléphone comme
-sur le Chromecast pendant une diffusion, y compris l'application en arrière-plan ; **À suivre** le
-lance aussitôt et **Regarder le générique** laisse l'épisode se terminer. Un épisode regardé jusqu'au
-générique reprend ensuite depuis le début. Un programme **pas encore diffusé** indique quand il
-passera (par exemple « Ce programme sera en direct dans 4 jours. ») au lieu d'un « Regarder » qui
-échouerait. La fiche d'une **série** offre un bouton **Enregistrer la série** (qui devient **Arrêter
-d'enregistrer la série** une fois l'enregistrement programmé) ; vous retrouvez vos
-**enregistrements** (DVR) dans l'onglet **Enregistrements** (« Enregistrés » sur téléphone), en grille
-comme dans l'application officielle : une vignette par série indique son nombre d'épisodes et ouvre la
-liste des épisodes enregistrés, avec leur date d'enregistrement. Un enregistrement se lit depuis le
-DVR où qu'on l'ouvre (onglet, rangées *Vos enregistrements* de l'accueil, des films et des séries, fiche
-d'une série). Les contenus à la demande
-(rattrapage, VOD, enregistrements) sont mis en **mémoire tampon** plus loin à l'avance, selon la
-mémoire de l'appareil, pour qu'une brève coupure réseau n'interrompe pas la lecture. L'accueil réunit aussi les
-**applications des diffuseurs** (france.tv, MyTF1, M6+…) : ouvrez l'une d'elles pour parcourir son
-catalogue (un abonnement peut être requis). Cliquer sur l'en-tête d'une rangée (par ex. *En direct à
-la TV*) ouvre la **catégorie complète en grille**, avec le nom de la chaîne sous chaque programme.
-Dans la **recherche**, **Tout voir** sur une rangée de résultats (chaînes, programmes) les affiche
-tous en grille. Un même programme proposé sur plusieurs chaînes n'y apparaît qu'une fois, de
-préférence sur une chaîne incluse dans votre abonnement, avec le logo de la chaîne sur la vignette, et
-le nombre affiché en tête de rangée en tient compte. Une recherche sans résultat l'indique par
-« Aucun résultat trouvé », et sur téléphone le clavier se ferme dès la recherche lancée pour laisser
-voir les résultats. La recherche peut aussi se **dicter** : sur téléphone, le bouton au micro du
-champ de recherche ouvre la reconnaissance vocale de l'appareil et lance la recherche de ce qui a
-été entendu ; il n'apparaît que si l'appareil en a une. Sur un Google TV, la recherche se dicte
-avec la touche micro de la télécommande, clavier ouvert : clavier fermé, la touche lance une
-recherche Google TV hors de l'application. Le clavier s'ouvre donc de lui-même en arrivant sur une
-recherche vide. L'application n'enregistre rien elle-même et ne demande
-pas l'accès au micro.
-La grille de **toutes les chaînes** (TNT, chaînes thématiques Molotov…) s'ouvre avec l'onglet
-**Chaînes** sur la TV, et sur téléphone avec **Tout voir** de la rangée *Chaînes en direct* de
-l'accueil (sa place dans la barre du bas revient aux enregistrements), pour les parcourir directement ; ouvrir une chaîne propose son **direct** ainsi que ses **replays** et
-ses programmes **les plus vus**. Les **chaînes favorites** ouvrent cette grille, dans l'ordre que vous
-choisissez : sur téléphone, l'**étoile** d'une chaîne l'ajoute aux favoris ou l'en retire, et l'étoile
-de la barre du haut ouvre **Réorganiser les favoris** (▲ et ▼ déplacent une chaîne) ; sur la TV, un
-**appui long sur OK** fait de même, et le bouton **Réorganiser les favoris** permet de saisir une
-chaîne avec OK puis de la déplacer avec Haut et Bas. Le **guide** couvre toutes les chaînes de l'offre sur 24 heures ; rouvert dans la demi-heure, il s'affiche aussitôt tel qu'il était et ne se recharge que s'il a plus de 5 minutes ; un épisode y porte le nom de sa série, son propre titre en dessous.
-Ce qui passe **en ce moment** se périme avec l'heure : le guide et toute page qui montre des
-programmes en direct (l'accueil, **Direct**, les rangées « En direct ») se rechargent d'eux-mêmes,
-sans perdre la position dans la liste : toutes les 5 minutes tant qu'ils restent à l'écran, et dès
-que l'on y revient (retour dans l'application, sortie d'une fiche ou du lecteur) s'ils ont plus de
-2 minutes, 5 pour le guide, bien plus lourd. Les trois derniers onglets quittés depuis leur
-propre page (Accueil, Direct, Chaînes, Films ou Séries) s'affichent aussitôt tels qu'ils étaient s'ils
-sont rouverts dans la demi-heure, puis suivent ces mêmes règles ; ils sont oubliés si le système
-manque de mémoire. Sur téléphone, n'importe quelle page se **rafraîchit** aussi en tirant au-delà du haut ou
-du bas de la liste.
-
-L'application accepte aussi des **liens profonds** vers une fiche, pour l'intégration par des
-applications tierces (par ex. [multistream](https://github.com/renaudallard/multistream)) :
-`etincelle://series/{id}`, `etincelle://program/{id}` ou `etincelle://channel/{id}` (identifiants Fubo).
-
-Les **profils** du compte sont pris en charge : avec plusieurs profils, etincelle demande **Qui
-regarde ?** au démarrage, comme l'application officielle (quand le choix date de plus de deux jours
-ou que les profils ont changé). **Profils**, dans les paramètres, permet de changer de profil, d'en
-**ajouter** (jusqu'à la limite du compte), et avec **Modifier** de renommer un profil, de changer
-son avatar ou de le supprimer. Les chaînes favorites, l'accueil et les points de reprise des
-programmes suivent le profil choisi.
-
-Elle ajoute un **sélecteur de saison** sur les séries qui en comptent plusieurs, et des **icônes de
-genre** dans les grilles de catégories. Les vignettes portent le **logo de la chaîne** qui propose le
-programme (directs, résultats de recherche…), comme dans l'application officielle, et gardent la
-forme de leur image : affiches en portrait, images en paysage, logos de chaînes sur un carré. Sur téléphone, un
-menu **Paramètres**, ouvert par l'engrenage de la
-barre du haut, regroupe les réglages : les **profils**, le nombre de **vignettes par ligne** des
-grilles, le **masquage des contenus verrouillés** (cache les programmes non inclus dans votre
-abonnement), le choix d'une **icône monochrome** (logo blanc), l'activation expérimentale du
-**récepteur Cast Fubo officiel** (redémarrage requis), **Connecter une TV** (voir plus bas), un bouton
-**Vérifier les mises à jour** (compare la version installée à la dernière publiée sur GitHub) et la
-**déconnexion** (avec confirmation). Sur Android TV, l'onglet **Paramètres** propose la déconnexion,
-les profils, l'autorisation de réveil par le téléphone (voir plus bas) et le nombre de vignettes par
-ligne. Sur
-téléphone, vous pouvez **diffuser** le flux en cours vers un **Chromecast** et transférer la lecture
-d'un appareil à l'autre. Si le direct a été **rembobiné** avant la diffusion, le Chromecast reprend au
-même endroit dans le différé plutôt qu'au bord du direct, et y revient aussi quand le flux doit être
-rechargé en cours de diffusion ou que l'on change de Chromecast. D'un Chromecast vers l'application TV, ou vers un Chromecast joint directement, la lecture passe par le téléphone, qui en garde la place sans rien jouer. Un direct regardé en différé garde aussi sa place en revenant sur le téléphone (« Cet appareil ») et en passant d'un téléviseur à un autre. **Se déconnecter (la lecture continue)**, sous « Cet appareil », libère le téléphone en laissant le programme se poursuivre sur l'application TV ou le Chromecast, pour se connecter ailleurs. Une **coupure Wi-Fi** passagère du téléphone n'arrête pas
-la diffusion : le téléphone reprend la main sur le Chromecast, qui joue sans interruption. Un programme diffusé garde son **point de reprise** sur le
-téléphone, même arrêté depuis le téléviseur : il reprend ensuite là où la diffusion s'est arrêtée. Le **programme en cours** est aussi repéré
-sur la barre du téléviseur pendant la diffusion. Pendant la diffusion, l'application **reste sur la fiche du programme** : une
-**barre persistante** en bas de l'écran affiche l'appareil, avec une animation du logo Chromecast qui
-se remplit jusqu'à ce que la lecture démarre réellement sur la TV. **Touchez cette barre** pour
-ouvrir les **commandes de lecture** (lecture/pause, retour et avance, barre de progression) qui
-pilotent la diffusion ; le retour arrière revient à la navigation sans interrompre la diffusion. Les
-**boutons de volume** du téléphone règlent alors le volume du Chromecast (un indicateur s'affiche
-brièvement). Côté Chromecast, les contenus à la demande sont eux aussi mis en mémoire tampon plus
-loin à l'avance pour absorber les coupures réseau. La diffusion
-s'appuie sur un récepteur Cast Widevine personnalisé, hébergé séparément :
-[etincelle_receiver](https://github.com/renaudallard/etincelle_receiver).
-Certains téléphones cessent de trouver les Chromecast par les services Google, jusqu'à ce que l'on
-coupe puis rallume le Wi-Fi. etincelle cherche donc aussi les Chromecast **par lui-même** sur le
-réseau Wi-Fi et ajoute ceux que les services Google ne voient pas à la liste ; si les services
-Google affichent un Chromecast sans parvenir à s'y connecter, etincelle s'y connecte lui-même. Ce
-qu'il a trouvé ainsi, applications TV comprises, quitte la liste dès que le téléphone n'est plus sur
-ce réseau Wi-Fi. La
-diffusion vers un tel Chromecast passe par une **connexion directe** : le Chromecast doit d'abord
-prouver qu'il est un
-appareil Cast authentique (certificat signé par Google, et non révoqué) avant de recevoir quoi que ce soit, puis
-tout fonctionne comme d'habitude, commandes de lecture, barre du programme en cours, retour au
-direct, volume, passage d'un Chromecast à l'autre et retour sur le téléphone. Si la connexion est
-coupée, etincelle se reconnecte au Chromecast sans interrompre la lecture. La notification de
-lecture d'etincelle (voir plus bas) pilote alors le Chromecast.
-
-Le téléphone peut aussi **piloter l'application TV d'etincelle**, comme un Chromecast mais avec la
-télécommande d'etincelle elle-même : elle
-apparaît dans la liste **Lire sur** sous le nom du téléviseur suivi de « (appli TV) », les Chromecast
-y portant « (Chromecast) » puisqu'ils ont souvent le même nom, et l'on choisit
-laquelle quand il y en a plusieurs. La liste est cherchée de nouveau tant qu'elle est ouverte, même
-pendant une diffusion. Le téléviseur lit alors ce que l'on choisit sur le téléphone
-(direct, rattrapage, enregistrement) avec sa propre connexion, là où en était le téléphone, y compris
-dans un direct rembobiné, enchaîne lui-même l'épisode suivant,
-et se pilote depuis la barre de diffusion, la notification ou les touches de volume du téléphone.
-Si le téléviseur ne parvient pas à lire ce que le téléphone lui passe, ou si la liaison se perd avant
-qu'il ne l'ait lu, la lecture revient sur le téléphone, là où elle en était. La barre de diffusion indique « Lecture sur » le téléviseur quand il
-lit, « Connecté à » quand rien n'y passe.
-Toucher la barre de diffusion ouvre une **télécommande** : ce qui passe, lecture/pause, recul de
-10 s, avance de 30 s, **Revenir au début** (sur une chaîne en direct envoyée par le téléphone, au début
-de l'émission en cours, quand le guide la connaît), **Revenir au direct** quand le téléviseur est en
-retard sur le direct,
-et les flèches, OK et Retour pour naviguer dans l'application TV ; quand le
-téléviseur propose de passer une coupure publicitaire, le bouton **Passer la pub** y apparaît aussi. Tant qu'on la
-pilote ainsi, le téléviseur ne lance pas son économiseur d'écran, et OK ou Retour répondent à sa
-proposition de mise à jour quand elle est affichée (elle ne l'est jamais par-dessus un programme en cours). Seul un
-téléphone connecté au **même compte** Molotov peut piloter le téléviseur, et réciproquement : chacun
-le prouve à l'autre à partir du compte, sans que la télécommande n'envoie le moindre identifiant sur
-le réseau local, et leurs échanges sont chiffrés. Le téléphone et le téléviseur doivent utiliser la
-même version du protocole : mettez à jour les deux applications ensemble. Se déconnecter du compte
-sur le téléviseur y ferme aussitôt la télécommande des téléphones de ce compte. Quand on quitte
-l'application du téléphone, il ne reste relié au téléviseur que tant que celui-ci lit ce que le
-téléphone a lancé (ou ce que le téléviseur a enchaîné ensuite), pour que la notification continue de
-le piloter, et pas au-delà de dix minutes de pause ou après la fin du programme ; sinon il referme la liaison pour ménager sa batterie, et la rétablit de lui-même au
-retour dans l'application. Pour la même raison, le téléviseur ne tient le téléphone au courant que
-lorsque quelque chose change, et toutes les dix secondes sinon. Quand un second téléphone du compte se
-relie au téléviseur, il ne prend la main sur celui qui le pilote qu'en demandant quelque chose (une
-lecture, une pause, une touche), pas en se reliant.
-
-L'application TV peut rester joignable **à tout moment**, comme un Chromecast : ouverte ou non, derrière
-l'économiseur d'écran ou une autre application, téléviseur en veille s'il garde alors sa connexion au
-réseau (c'est le cas d'un Chromecast avec Google TV), et cela dès le démarrage du téléviseur. Une lecture lancée ou reprise depuis le téléphone, ou une touche de sa télécommande, ouvre alors
-etincelle et réveille le téléviseur. Il faut pour cela l'y autoriser, une seule fois : dans ses
-**Paramètres**, **Laisser le téléphone trouver et réveiller ce téléviseur à tout moment** ouvre la page
-système où l'autoriser à se superposer aux autres applications. Sans cette autorisation, elle n'est
-joignable que lorsqu'elle est à l'écran ou derrière l'**économiseur d'écran**, et la lecture demandée
-démarre dès que l'on réveille le téléviseur avec sa télécommande. Quittée avec un programme en cours,
-l'application TV le met en pause et cesse de le charger ; elle le reprend là où il en était quand on y
-revient, y compris un direct, repris à ce qui passait alors, ou au direct si cela remonte à plus loin que la fenêtre de rembobinage.
-
-Sur téléphone, la **lecture continue en arrière-plan** et écran verrouillé (le son seul, la vidéo
-reprenant au retour dans l'application), le point de reprise étant enregistré dès que l'on quitte
-l'application, en lecture comme en pause, avec une **notification de lecture** et des **commandes sur
-l'écran de verrouillage** : lecture/pause, recul de 10 s et avance de 30 s. Elles pilotent le
-téléphone, ou le Chromecast pendant une diffusion, direct compris (dans la limite de la fenêtre de
-rembobinage), comme les boutons de la télécommande plein écran qui s'ouvre en touchant la barre de
-diffusion. Toucher la notification ramène dans l'application. Si l'application est relancée pendant
-une diffusion passant par les services Google, elle la retrouve et la notification en reprend aussitôt
-le titre.
-Sur le téléviseur, l'application TV signale au système ce qu'elle lit (titre, position), tant
-qu'elle est à l'écran ; il peut la mettre en pause, la reprendre ou s'y déplacer, par exemple à la voix avec l'Assistant ; il ne
-peut ni y lancer autre chose, ni passer à un autre programme.
-
-etincelle **vérifie les mises à jour** sur GitHub à chaque démarrage (au plus une fois par heure),
-puis une fois par jour tant qu'elle reste ouverte, et propose d'installer la dernière version lorsqu'une plus récente est
-disponible (l'APK téléphone sur le téléphone, l'APK TV sur la TV). **Installer** la télécharge,
-vérifie sa taille et son empreinte SHA-256 publiées par GitHub, puis la confie à l'installateur
-d'Android, qui demande confirmation. La première fois, etincelle ouvre la page des paramètres où
-l'autoriser à installer des applications ; appuyez ensuite à nouveau sur **Installer**. Sur un
-téléviseur qui n'a pas cette page, etincelle ouvre ses paramètres et indique le chemin : **Applications
-> Sécurité et restrictions > Sources inconnues**, puis etincelle. Sur le téléviseur, Android ferme
-etincelle une fois la mise à jour installée : rouvrez-la depuis l'écran d'accueil.
-
-Avec le réglage **Mises à jour automatiques** (dans **Paramètres**, désactivé par défaut, proposé à
-partir d'Android 12), etincelle ne demande plus rien : elle télécharge la nouvelle version en silence et
-l'installe quand on quitte l'application alors que rien n'est lu, diffusé ou en cours de chargement,
-ni aucune connexion au compte en attente de son code, puisque l'installation ferme l'application. Sur le téléviseur, l'économiseur d'écran ne compte pas comme quitter
-l'application : le téléphone peut toujours la piloter ; et comme un téléviseur se quitte le plus
-souvent depuis le lecteur, la mise à jour s'y installe aussi une fois l'application quittée depuis une
-heure sur un programme, dont la place est déjà enregistrée. Une version déjà téléchargée n'est pas
-téléchargée de nouveau au démarrage suivant. etincelle doit déjà être autorisée à installer
-des applications, ce dont une première mise à jour à la main se charge. Google Play Protect peut
-encore afficher sa propre demande pour une version qu'il ne connaît pas ; et si Android réclame
-malgré tout une confirmation, ou si l'installation échoue, la version est proposée comme d'habitude
-à l'ouverture suivante. **Vérifier les mises à jour** propose toujours l'installation immédiate.
-
-La [politique de confidentialité](PRIVACY.md) dit ce que les applications envoient, et à qui ; elle
-s'ouvre aussi depuis **Paramètres**.
-
-> ### ⚠️ Avertissement
->
-> Projet non officiel, sans aucune affiliation avec Molotov ni Fubo. **etincelle** n'est qu'un
-> client alternatif : il n'offre aucun accès gratuit, ne partage aucun compte et ne contourne aucune
+> [!WARNING]
+> Projet non officiel, sans aucune affiliation avec Molotov ni Fubo. **etincelle** n'est qu'un client
+> alternatif : il n'offre aucun accès gratuit, ne partage aucun compte et ne contourne aucune
 > protection.
 >
 > - **Aucun contournement de géo-restriction.** L'application n'embarque ni VPN, ni proxy, ni aucun
@@ -330,6 +33,306 @@ s'ouvre aussi depuis **Paramètres**.
 >
 > Vous restez seul responsable du respect des conditions d'utilisation de Molotov/Fubo et de la
 > législation applicable.
+
+**Sommaire** : [Fonctionnalités](#fonctionnalités) · [Captures d'écran](#captures-décran) ·
+[Installation](#installation) · [Architecture du projet](#architecture-du-projet) ·
+[Construction](#construction) · [Licence](#licence)
+
+## Fonctionnalités
+
+En bref :
+
+- **Direct**, **guide des programmes** sur 24 heures, **recherche**, **rattrapage** et **VOD**.
+- Un direct qui se **rembobine** sur toute la durée du programme, avec **Regarder depuis le début**.
+- **Passer la pub** sur la plupart des chaînes, à la demande ou tout seul.
+- **Enregistrements** d'un épisode ou d'une série entière.
+- Diffusion vers un **Chromecast**, et **application TV** pilotée depuis le téléphone.
+- **Profils** du compte, **chaînes favorites**, **recherche vocale**.
+- **Mises à jour** depuis GitHub, automatiques si vous le souhaitez.
+
+### Le direct
+
+- La barre de progression épouse le **programme regardé**, du début à la fin de sa diffusion, ses
+  heures affichées aux extrémités. En différé, elle suit le programme où l'on se trouve, et couvre
+  toute la fenêtre de rembobinage là où le guide ne sait plus ce qui passait.
+- Tant que le guide ne donne que l'heure prévue d'un programme (une heure ronde, parfois à quelques
+  minutes près), il est redemandé chaque minute pendant un quart d'heure, et la barre prend l'heure
+  réelle dès qu'il la connaît.
+- Le bord du direct se situe en cours de route, la portion pas encore diffusée formant la fin de la
+  barre ; la partie trop ancienne pour être rembobinée est tracée dans une couleur distincte.
+- **Revenir au direct** apparaît dès que l'on s'éloigne du bord. Sur le téléviseur, il s'affiche avec
+  les commandes du lecteur et s'atteint avec la flèche **Haut**.
+- Sur le téléviseur, commandes masquées, **Gauche** et **Droite** reculent de 10 s et avancent de
+  30 s, de plus en plus vite quand on les maintient. La barre et l'heure d'arrivée s'affichent le
+  temps de choisir, et les appuis s'additionnent en un seul déplacement. Comme sur le Chromecast, un
+  recul s'arrête au début de l'émission en cours ; un nouvel appui sur **Gauche** recule plus loin.
+- Sur la fiche d'une chaîne en direct, **Regarder depuis le début** reprend le programme en cours à
+  son vrai commencement, l'heure que donne le guide et non l'horaire prévu, dans la limite de la
+  fenêtre de rembobinage. **Regarder le replay** lit ce même programme en entier quand il est aussi
+  disponible à la demande.
+
+### Passer la pub
+
+En différé, dans une coupure publicitaire, un bouton **Passer la pub** mène à sa fin. Sur le
+téléviseur, **OK** suffit, ou, les commandes affichées, la flèche **Droite** depuis leur dernier bouton
+puis **OK**. Le réglage **Passer les publicités automatiquement**, dans **Paramètres**, le fait sans
+rien demander, sauf dans une coupure où l'on est revenu en arrière :
+
+| Réglage | Ce qui est passé tout seul |
+|---|---|
+| **Non** (par défaut) | rien : le bouton est toujours proposé |
+| **Coupures signalées** | les coupures que la chaîne signale : groupes TF1 et France Télévisions exactement, groupe RMC et BFMTV d'après la forme de leurs coupures, ou d'après les publicités que le service place lui-même dans une coupure diffusée pendant qu'on regarde |
+| **Signalées et presque sûres** | en plus, les coupures trouvées par les noirs entre les publicités, et celles que le logo de la chaîne désigne sans doute possible |
+
+Les coupures sont trouvées de quatre façons :
+
+- **Signalées dans le flux** (groupes TF1 et France Télévisions, LCI) : exactes. Rien d'autre n'est
+  proposé sur ces chaînes, dont les bandes-annonces et parrainages ne se distinguent pas sûrement du
+  début de l'émission.
+- **Forme du flux** (groupe RMC, BFMTV, longues coupures de la nuit comprises) : exactes.
+- **Noirs entre les publicités** (M6, Gulli, Canal J, TIJI, Paris Première, Automoto, Toute
+  l'Histoire, AB 1) : l'image est chiffrée, mais pas la taille de chaque image, et la demi-seconde de
+  noir entre deux publicités s'y lit. La coupure va du deuxième noir à l'avant-dernier.
+- **Logo de la chaîne**, dans les vignettes que le service garde de chaque chaîne (les autres chaînes,
+  sauf Arte, qui n'a pas de publicité) : une estimation, qui s'arrête une demi-minute avant le retour
+  du logo, 24 secondes pour une coupure presque sûre. Mieux vaut voir les dernières publicités que
+  perdre le début de l'émission.
+
+Au direct, il n'y a nulle part où sauter. Dans un **enregistrement**, les coupures sont cherchées à
+l'ouverture d'après ses vignettes et ses sous-titres. Sur un **Chromecast**, c'est le récepteur qui les
+cherche de la même façon et affiche **Passer la pub : OK**.
+
+Ce que l'application trouve et passe sur chaque chaîne, et les règles en détail, sont dans
+[docs/coupures-pub.md](docs/coupures-pub.md).
+
+### Fiches, séries et épisodes
+
+- Cliquer sur un programme ouvre d'abord sa **fiche détaillée** (synopsis, casting, année,
+  classification) plutôt que de le lire aussitôt. Elle regroupe ses autres diffusions disponibles.
+- Comme dans l'application officielle, la fiche indique au-dessus du titre quand le programme a été
+  **diffusé** (« Diffusé: 12 févr. ») ou jusqu'à quand il reste disponible (« Expire dans 6j »), et
+  chaque épisode sa date de diffusion (« 07 juin à 13h25 »). Sur le téléviseur, l'image du programme
+  occupe le fond de la fiche.
+- Les vignettes portent l'épisode (« S16 E6 Agde »), la durée et l'année (« 52m • 2026 ») ou le nombre
+  d'épisodes enregistrés, l'étiquette du programme (**REC** pour un enregistrement, l'heure de
+  diffusion pour *Ce soir*) et le **logo de la chaîne** qui le propose. Elles gardent la forme de leur
+  image : affiches en portrait, images en paysage, logos de chaînes sur un carré.
+- Une série en rattrapage liste ses **épisodes disponibles**, avec un **sélecteur de saison** quand
+  elle en compte plusieurs. Une série **enregistrée** montre d'abord vos épisodes enregistrés, puis les
+  épisodes disponibles.
+- À la fin d'un épisode, l'**épisode suivant** s'annonce par un compte à rebours (« Commence dans
+  9 s ») puis démarre tout seul, sur le téléphone comme sur le Chromecast, application en arrière-plan
+  comprise. **À suivre** le lance aussitôt, **Regarder le générique** laisse l'épisode se terminer. Un
+  épisode regardé jusqu'au générique reprend ensuite depuis le début.
+- Un programme **pas encore diffusé** indique quand il passera (« Ce programme sera en direct dans
+  4 jours. ») au lieu d'un « Regarder » qui échouerait.
+
+### Enregistrements
+
+- Sur la fiche d'une chaîne en direct, le menu **Enregistrer** enregistre **l'épisode** en cours ou
+  **la série** entière. La fiche d'une série offre **Enregistrer la série**, qui devient **Arrêter
+  d'enregistrer la série** une fois l'enregistrement programmé.
+- L'onglet **Enregistrements** (« Enregistrés » sur téléphone) les présente en grille, comme dans
+  l'application officielle : une vignette par série indique son nombre d'épisodes et ouvre la liste des
+  épisodes enregistrés, avec leur date.
+- Un enregistrement se lit depuis le DVR où qu'on l'ouvre : onglet, rangées *Vos enregistrements* de
+  l'accueil, des films et des séries, fiche d'une série.
+- Les contenus à la demande (rattrapage, VOD, enregistrements) sont mis en **mémoire tampon** plus loin
+  à l'avance, selon la mémoire de l'appareil, pour qu'une brève coupure réseau n'interrompe pas la
+  lecture.
+
+### Parcourir et chercher
+
+- L'accueil réunit aussi les **applications des diffuseurs** (france.tv, MyTF1, M6+…) pour parcourir
+  leur catalogue ; un abonnement peut être requis.
+- L'en-tête d'une rangée (par ex. *En direct à la TV*) ouvre la **catégorie complète en grille**, avec
+  le nom de la chaîne sous chaque programme et des **icônes de genre**.
+- La grille de **toutes les chaînes** (TNT, chaînes thématiques Molotov…) s'ouvre avec l'onglet
+  **Chaînes** sur la TV, et sur téléphone avec **Tout voir** de la rangée *Chaînes en direct* de
+  l'accueil (sa place dans la barre du bas revient aux enregistrements). Ouvrir une chaîne propose son **direct**, ses **replays** et ses programmes **les plus
+  vus**.
+- Les **chaînes favorites** ouvrent cette grille, dans l'ordre que vous choisissez. Sur téléphone,
+  l'**étoile** d'une chaîne l'ajoute ou la retire, et l'étoile de la barre du haut ouvre **Réorganiser
+  les favoris** (▲ et ▼ déplacent une chaîne). Sur la TV, un **appui long sur OK** fait de même, et
+  **Réorganiser les favoris** permet de saisir une chaîne avec OK puis de la déplacer avec Haut et Bas.
+- Le **guide** couvre toutes les chaînes de l'offre sur 24 heures ; un épisode y porte le nom de sa
+  série, son propre titre en dessous. Rouvert dans la demi-heure, il s'affiche aussitôt tel qu'il était
+  et ne se recharge que s'il a plus de 5 minutes.
+- Dans la **recherche**, **Tout voir** affiche une rangée de résultats en grille. Un programme proposé
+  sur plusieurs chaînes n'apparaît qu'une fois, de préférence sur une chaîne de votre abonnement, et le
+  nombre affiché en tête de rangée en tient compte. Une
+  recherche vide l'indique par « Aucun résultat trouvé », et sur téléphone le clavier se ferme dès la
+  recherche lancée.
+- La recherche se **dicte** : sur téléphone, avec le micro du champ de recherche, présent si
+  l'appareil a une reconnaissance vocale ; sur Google TV, avec la touche micro de la télécommande,
+  clavier ouvert (fermé, elle lance une recherche Google TV hors de l'application), d'où le clavier
+  qui s'ouvre de lui-même sur une recherche vide. L'application n'enregistre rien elle-même et ne
+  demande pas l'accès au micro.
+- Ce qui passe **en ce moment** reste à jour : le guide et les pages qui montrent des programmes en
+  direct se rechargent d'eux-mêmes sans perdre la position dans la liste, toutes les 5 minutes tant
+  qu'ils restent à l'écran, et au retour s'ils ont plus de 2 minutes (5 pour le guide). Les trois
+  derniers onglets quittés (Accueil, Direct, Chaînes, Films ou Séries) s'affichent aussitôt s'ils sont
+  rouverts dans la demi-heure, sauf si le système a manqué de mémoire. Sur téléphone, toute page se **rafraîchit** en tirant au-delà du haut ou
+  du bas de la liste.
+- Des **liens profonds** ouvrent une fiche depuis une application tierce (par ex.
+  [multistream](https://github.com/renaudallard/multistream)) : `etincelle://series/{id}`,
+  `etincelle://program/{id}` ou `etincelle://channel/{id}` (identifiants Fubo).
+
+### Profils et compte
+
+- Avec plusieurs profils, etincelle demande **Qui regarde ?** au démarrage, comme l'application
+  officielle, quand le choix date de plus de deux jours ou que les profils ont changé.
+- **Profils**, dans les paramètres, permet de changer de profil, d'en **ajouter** (jusqu'à la limite du
+  compte), et avec **Modifier** de renommer un profil, de changer son avatar ou de le supprimer. Les
+  chaînes favorites, l'accueil et les points de reprise suivent le profil choisi.
+- Un compte protégé par la **validation en deux étapes** se connecte comme dans l'application
+  officielle : après l'email et le mot de passe, etincelle demande le **code** envoyé par Molotov, avec
+  **Renvoyer le code** s'il n'arrive pas.
+- Sur Android TV, la connexion se fait par **code** plutôt qu'en tapant un mot de passe à la
+  télécommande : le téléviseur affiche un **QR code** et un code à six chiffres, à saisir sur le
+  téléphone dans **Paramètres > Connecter une TV** (ou sur molotov.tv/tv). La connexion par email reste
+  disponible en secours.
+
+### Paramètres
+
+| Téléphone (engrenage de la barre du haut) | Android TV (onglet **Paramètres**) |
+|---|---|
+| Profils | Profils |
+| Vignettes par ligne | Vignettes par ligne |
+| Masquer les contenus verrouillés (non inclus dans l'abonnement) | |
+| Passer les publicités automatiquement | Passer les publicités automatiquement |
+| Icône monochrome (logo blanc) | |
+| Récepteur Cast Fubo officiel (expérimental, redémarrage requis) | |
+| Connecter une TV | Laisser le téléphone trouver et réveiller ce téléviseur à tout moment |
+| Vérifier les mises à jour, Mises à jour automatiques | Mises à jour automatiques |
+| Politique de confidentialité | Politique de confidentialité |
+| Déconnexion (avec confirmation) | Déconnexion (avec confirmation) |
+
+### Chromecast
+
+- Sur téléphone, le flux en cours se **diffuse** vers un **Chromecast**, et la lecture passe d'un
+  appareil à l'autre. Un direct **rembobiné** reprend au même endroit sur le Chromecast, y compris quand
+  le flux doit être rechargé ou que l'on change de Chromecast, et garde sa place en revenant sur le
+  téléphone (« Cet appareil ») ou en passant d'un téléviseur à un autre.
+- Pendant la diffusion, l'application **reste sur la fiche du programme**. Une **barre persistante**
+  en bas de l'écran affiche l'appareil, avec le logo Chromecast qui se remplit jusqu'à ce que la
+  lecture démarre réellement. La toucher ouvre les **commandes de lecture** ; le retour arrière revient
+  à la navigation sans interrompre la diffusion. Les **boutons de volume** du téléphone règlent le
+  Chromecast, et le programme en cours est repéré sur la barre du téléviseur.
+- **Se déconnecter (la lecture continue)**, sous « Cet appareil », libère le téléphone en laissant le
+  programme se poursuivre sur l'application TV ou le Chromecast.
+- Une **coupure Wi-Fi** passagère du téléphone n'arrête pas la diffusion : le téléphone reprend la
+  main, et le Chromecast joue sans interruption. Un programme diffusé garde son **point de reprise** sur
+  le téléphone, même arrêté depuis le téléviseur.
+- D'un Chromecast vers l'application TV, ou vers un Chromecast joint directement, la lecture passe par
+  le téléphone, qui en garde la place sans rien jouer.
+- Certains téléphones cessent de trouver les Chromecast par les services Google, jusqu'à ce que l'on
+  coupe puis rallume le Wi-Fi. etincelle les cherche donc aussi **par lui-même** sur le réseau Wi-Fi,
+  et s'y connecte directement si les services Google n'y parviennent pas. Le Chromecast doit d'abord
+  prouver qu'il est un appareil Cast authentique (certificat signé par Google, et non révoqué), puis
+  tout fonctionne comme d'habitude, la notification de lecture comprise ; si la connexion est coupée,
+  etincelle se reconnecte sans interrompre la lecture. Ce qu'il a trouvé ainsi quitte la liste dès que le téléphone quitte ce
+  réseau Wi-Fi.
+- Côté Chromecast aussi, les contenus à la demande sont mis en mémoire tampon plus loin à l'avance. La
+  diffusion s'appuie sur un récepteur Cast Widevine personnalisé, hébergé séparément :
+  [etincelle_receiver](https://github.com/renaudallard/etincelle_receiver).
+
+### L'application TV pilotée depuis le téléphone
+
+- L'application TV apparaît dans la liste **Lire sur** sous le nom du téléviseur suivi de « (appli
+  TV) », les Chromecast y portant « (Chromecast) » puisqu'ils ont souvent le même nom. La liste est
+  cherchée de nouveau tant qu'elle est ouverte, même pendant une diffusion.
+- Le téléviseur lit ce que l'on choisit (direct, rattrapage, enregistrement) avec sa propre connexion,
+  là où en était le téléphone, direct rembobiné compris, et enchaîne lui-même l'épisode suivant. S'il
+  ne parvient pas à le lire, ou si la liaison se perd avant, la lecture revient sur le téléphone, là où
+  elle en était. La barre de diffusion indique « Lecture sur » le téléviseur quand il lit, et
+  « Connecté à » quand rien n'y passe.
+- Toucher la barre ouvre une **télécommande** : ce qui passe, lecture/pause, recul de 10 s, avance de
+  30 s, **Revenir au début** de l'émission en cours, **Revenir au direct** quand le téléviseur est en
+  retard, **Passer la pub** quand il propose de passer une coupure, et les flèches, OK et Retour pour
+  naviguer. Tant qu'on le pilote, le téléviseur ne lance pas son économiseur d'écran, et OK ou Retour
+  répondent à sa proposition de mise à jour, jamais affichée par-dessus un programme.
+- Seul un téléphone connecté au **même compte** Molotov peut piloter le téléviseur, et réciproquement :
+  chacun le prouve à l'autre à partir du compte, sans envoyer le moindre identifiant sur le réseau
+  local, et leurs échanges sont chiffrés. Mettez à jour les deux applications ensemble, qui doivent
+  utiliser la même version du protocole. Se déconnecter du compte sur le téléviseur ferme la
+  télécommande des téléphones de ce compte.
+- Pour ménager la batterie, un téléphone dont on a quitté l'application ne reste relié que tant que le
+  téléviseur lit ce qu'il a lancé, et pas au-delà de dix minutes de pause ou après la fin du programme ;
+  il rétablit la liaison au retour dans l'application. Le téléviseur ne le tient au courant que lorsque
+  quelque chose change, et toutes les dix secondes sinon. Un second téléphone du compte ne prend la
+  main qu'en demandant quelque chose, pas en se reliant.
+- L'application TV peut rester **joignable à tout moment**, comme un Chromecast : ouverte ou non,
+  derrière l'économiseur d'écran ou une autre application, téléviseur en veille s'il garde sa connexion
+  au réseau, et cela dès le démarrage du téléviseur. Une lecture lancée depuis le téléphone, ou une
+  touche de sa télécommande, ouvre alors etincelle et réveille le téléviseur. Il faut l'y autoriser une
+  fois : **Paramètres > Laisser le téléphone trouver et réveiller ce téléviseur à tout moment**. Sans
+  cela, elle n'est joignable qu'à l'écran ou derrière l'économiseur d'écran, et la lecture demandée
+  démarre dès que l'on réveille le téléviseur.
+
+### Sur le téléphone
+
+- La **lecture continue en arrière-plan** et écran verrouillé (le son seul, la vidéo reprenant au
+  retour), avec une **notification de lecture** et des **commandes sur l'écran de verrouillage** :
+  lecture/pause, recul de 10 s et avance de 30 s. Elles pilotent aussi le Chromecast pendant une
+  diffusion, direct compris. Toucher la notification ramène dans l'application, et le point de reprise
+  est enregistré dès que l'on quitte l'application.
+- Relancée pendant une diffusion passant par les services Google, l'application la retrouve, et la
+  notification en reprend aussitôt le titre.
+- Un direct rembobiné retrouve sa place quand le flux doit être redemandé. Un lecteur que la reprise n'a
+  pas pu relancer se ferme sur « Lecture impossible, réessayez ». L'écran ne reste allumé que pendant la
+  lecture sur le téléphone, pas pendant une diffusion.
+
+### Sur Android TV
+
+- Une lecture qu'une erreur interrompt (adresse du flux périmée, coupure du réseau) reprend d'elle-même
+  là où elle en était, direct rembobiné compris, de même qu'une chaîne choisie dans le guide du
+  téléviseur. Après cinq échecs de suite, le lecteur se ferme et la page d'où il a été lancé affiche
+  « Lecture impossible, réessayez ».
+- En pause, l'écran n'est plus maintenu allumé : le téléviseur passe à son économiseur d'écran puis en
+  veille comme d'habitude. Après cinq minutes d'économiseur d'écran, le programme cesse de se charger,
+  et il est rechargé à sa place au retour. Quittée avec un programme en cours, l'application le met en
+  pause et le reprend là où il en était, ou au direct si cela remonte plus loin que la fenêtre de
+  rembobinage.
+- L'application signale au système ce qu'elle lit (titre, position) tant qu'elle est à l'écran : il peut
+  la mettre en pause, la reprendre ou s'y déplacer, par exemple à la voix avec l'Assistant, mais ni y
+  lancer autre chose, ni passer à un autre programme.
+- etincelle publie une rangée **etincelle** de programmes recommandés sur l'écran d'accueil et place
+  les programmes commencés dans **Continuer à regarder** (Watch Next), à partir des listes de Molotov.
+  Elles se mettent à jour toutes les trois heures et chaque fois que l'on quitte l'application ; choisir
+  un programme ouvre sa fiche. L'écran d'accueil Android TV classique les affiche ; le lanceur Google TV
+  n'affiche pas les rangées des applications et, sur le Chromecast avec Google TV essayé, refuse les
+  entrées de Watch Next.
+- etincelle est aussi une **entrée TV** du système : ses chaînes, avec douze heures de programmes,
+  rejoignent le **guide des chaînes** d'Android TV (l'onglet Direct de Google TV, là où il existe, ou
+  l'application Chaînes en direct), et etincelle les lit elle-même. Le guide se met à jour au plus
+  toutes les trois heures ; dans les paramètres du téléviseur, **Chaînes et entrées** ajoute les
+  chaînes de l'entrée etincelle à la demande.
+
+### Mises à jour
+
+- etincelle **vérifie les mises à jour** sur GitHub à chaque démarrage (au plus une fois par heure),
+  puis une fois par jour tant qu'elle reste ouverte, et propose d'installer la nouvelle version :
+  l'APK téléphone sur le téléphone, l'APK TV sur la TV.
+- **Installer** la télécharge, vérifie sa taille et son empreinte SHA-256 publiées par GitHub, puis la
+  confie à l'installateur d'Android, qui demande confirmation. La première fois, etincelle ouvre la
+  page où l'autoriser à installer des applications ; sur un téléviseur qui n'a pas cette page, elle
+  indique le chemin : **Applications > Sécurité et restrictions > Sources inconnues**, puis etincelle.
+  Sur le téléviseur, Android ferme etincelle une fois la mise à jour installée : rouvrez-la depuis
+  l'écran d'accueil.
+- Avec **Mises à jour automatiques** (désactivé par défaut, à partir d'Android 12), etincelle ne
+  demande plus rien : elle télécharge la nouvelle version en silence et l'installe quand on quitte
+  l'application alors que rien n'est lu, diffusé ou en cours de chargement, ni aucune connexion au
+  compte en attente de son code. Une version déjà téléchargée ne l'est pas de nouveau. Sur le téléviseur,
+  l'économiseur d'écran ne compte pas comme quitter l'application, et la mise à jour s'installe aussi
+  une heure après l'avoir quittée sur un programme, dont la place est déjà enregistrée. etincelle doit
+  déjà être autorisée à installer des applications, ce dont une première mise à jour à la main se
+  charge. Google Play Protect peut encore afficher sa propre demande ; si Android réclame une
+  confirmation ou si l'installation échoue, la version est proposée à l'ouverture suivante. **Vérifier
+  les mises à jour** propose toujours l'installation immédiate.
+
+La [politique de confidentialité](PRIVACY.md) dit ce que les applications envoient, et à qui ; elle
+s'ouvre aussi depuis **Paramètres**.
 
 ## Captures d'écran
 
@@ -347,48 +350,15 @@ Android TV (Compose for TV, navigation D-pad) :
   <img src="docs/screenshots/tv-browse.png" width="640" alt="Android TV, navigation avec onglets en haut et carrousels de chaînes">
 </p>
 
-Sur Android TV, la connexion se fait par **code** plutôt qu'en tapant un mot de passe à la
-télécommande : le téléviseur affiche un **QR code** et un code à six chiffres. Sur votre téléphone,
-ouvrez etincelle, allez dans **Paramètres > Connecter une TV** (ou sur molotov.tv/tv), connectez-vous
-et saisissez le code : le téléviseur se connecte automatiquement. La connexion par email reste
-disponible en secours.
-
-Sur Android TV, une lecture qu'une erreur interrompt (adresse du flux périmée, coupure du réseau)
-reprend d'elle-même là où elle en était, y compris dans un direct rembobiné, en redemandant le flux.
-Après cinq échecs de suite, le lecteur se ferme et la page d'où il a été lancé affiche « Lecture
-impossible, réessayez ». Une chaîne choisie dans le guide du téléviseur est reprise de la même façon.
-Sur téléphone, un direct rembobiné retrouve lui aussi sa place quand le flux doit être redemandé.
-Sur un programme en pause, l'écran n'est plus maintenu allumé : le téléviseur passe à son économiseur
-d'écran puis en veille comme d'habitude, et la position est enregistrée dès que l'on quitte
-l'application. Après cinq minutes d'économiseur d'écran, il cesse de se charger, et il est rechargé à sa
-place au retour. Sur le téléphone aussi, un lecteur que la reprise n'a pas pu relancer se ferme avec le
-même message, et l'écran ne reste allumé que pendant la lecture sur le téléphone : pendant une
-diffusion vers un téléviseur, il se met en veille comme d'habitude.
-
-Sur Android TV, etincelle publie aussi une rangée **etincelle** de programmes recommandés sur
-l'écran d'accueil et place les programmes commencés dans **Continuer à regarder** (Watch Next), à
-partir des listes de Molotov. Elles se mettent à jour toutes les trois heures, et chaque fois que l'on
-quitte l'application ; choisir un programme ouvre sa fiche. L'écran d'accueil Android TV
-classique les affiche ; le lanceur Google TV n'affiche pas les rangées des applications et, sur le
-Chromecast avec Google TV essayé, refuse les entrées de Watch Next.
-
-etincelle est aussi une **entrée TV** du système : ses chaînes Molotov, avec douze heures de
-programmes, rejoignent le **guide des chaînes** d'Android TV (l'onglet Direct de Google TV, là où il
-existe, ou l'application Chaînes en direct), et etincelle les lit elle-même quand on en choisit une.
-Le guide se met à jour au plus toutes les trois heures ; dans les paramètres du téléviseur
-(**Chaînes et entrées**), l'entrée etincelle ajoute les chaînes à la demande.
-
-Un compte protégé par la **validation en deux étapes** se connecte comme dans l'application
-officielle : après l'email et le mot de passe, etincelle demande le **code** envoyé par Molotov,
-avec **Renvoyer le code** s'il n'arrive pas.
-
 ## Installation
 
 Téléchargez l'APK signé pour votre appareil depuis la
 [dernière version](https://github.com/renaudallard/etincelle/releases/latest) :
 
-- **Téléphone / tablette** : `etincelle-<version>-mobile.apk`
-- **Android TV** : `etincelle-<version>-tv.apk`
+| Appareil | Fichier |
+|---|---|
+| Téléphone / tablette | `etincelle-<version>-mobile.apk` |
+| Android TV | `etincelle-<version>-tv.apk` |
 
 Les deux fonctionnent sur Android 7.0+ (`minSdk 24`) et sont auto-signés, donc Android vous demande
 d'autoriser l'installation depuis une source inconnue. La connexion nécessite un compte payant
@@ -409,8 +379,8 @@ d'autoriser l'installation depuis une source inconnue. La connexion nécessite u
   TV*, *Downloader*), puis ouvrez-le.
 
 Les builds téléphone et TV sont des paquets distincts (`it.allard.etincelle` et
-`it.allard.etincelle.tv`), vous pouvez donc installer les deux côte à côte. Pour construire les APK
-vous-même, voir [Construction](#construction) ci-dessous.
+`it.allard.etincelle.tv`), que l'on peut installer côte à côte. Pour construire les APK vous-même,
+voir [Construction](#construction).
 
 ## Architecture du projet
 
@@ -439,9 +409,9 @@ TV). La couche de présentation (`core:ui`) ne dépend que de l'interface `Molot
 `core:domain`, le backend reste donc interchangeable. Les tests unitaires couvrent les intercepteurs,
 les mappers DTO vers métier/DRM, le rafraîchissement des jetons, la logique de lecture (points de
 reprise, direct, mémoire tampon, épisode suivant), la recherche et l'authentification des Chromecast,
-le protocole de la télécommande TV, la vérification des mises à jour et le `MainViewModel`. L'injection de dépendances est un
-petit `AppContainer` manuel (Hilt serait surdimensionné pour une application à un seul ViewModel et un
-seul backend ; il pourra être ajouté si le graphe grandit).
+le protocole de la télécommande TV, la vérification des mises à jour et le `MainViewModel`.
+L'injection de dépendances est un petit `AppContainer` manuel (Hilt serait surdimensionné pour une
+application à un seul ViewModel et un seul backend ; il pourra être ajouté si le graphe grandit).
 
 ## Construction
 
@@ -452,20 +422,20 @@ Prérequis sur la machine de build :
 - **JDK 21** pour Gradle (Gradle 8.14 ne fonctionne pas sous le JDK 25). Le JDK du daemon Gradle est
   fixé dans `gradle.properties` via `org.gradle.java.home` ; adaptez le chemin à votre machine.
 - Le wrapper Gradle (Gradle 8.14) est versionné ; utilisez `./gradlew`, pas un Gradle système.
+- L'emplacement du SDK va dans `local.properties` (`sdk.dir=/chemin/vers/Android/Sdk`).
 
 ```bash
 ./gradlew :app-mobile:assembleGithubDebug      # APK debug téléphone/tablette
 ./gradlew :app-tv:assembleGithubDebug          # APK debug Android TV
 ```
 
-Chaque application existe en deux variantes. **github** est celle des versions publiées sur GitHub :
-elle vérifie et installe elle-même ses mises à jour. **play** est destinée à Google Play, qui met
-lui-même ses applications à jour et interdit qu'elles le fassent autrement : elle n'a ni la
-vérification des mises à jour, ni le réglage **Mises à jour automatiques**, ni les permissions
-d'installation (`:app-mobile:bundlePlayRelease`, `:app-tv:bundlePlayRelease`). Les deux variantes
-portent le même identifiant et la même signature.
+Chaque application existe en deux variantes, qui portent le même identifiant et la même signature :
 
-Indiquez l'emplacement du SDK dans `local.properties` (`sdk.dir=/chemin/vers/Android/Sdk`).
+- **github**, celle des versions publiées sur GitHub, vérifie et installe elle-même ses mises à jour.
+- **play** est destinée à Google Play, qui met lui-même ses applications à jour et interdit qu'elles le
+  fassent autrement : elle n'a ni la vérification des mises à jour, ni le réglage **Mises à jour
+  automatiques**, ni les permissions d'installation (`:app-mobile:bundlePlayRelease`,
+  `:app-tv:bundlePlayRelease`).
 
 ## Chaîne d'outils
 
