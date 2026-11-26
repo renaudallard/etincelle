@@ -137,7 +137,7 @@ class AdBreaks {
         separated.firstOrNull { at >= it.first - start && at < it.last - start }
             ?.let { return breakAt(it.first - start, it.last - start, it.first - SEPARATED_LEAD_MS, guessed = true, sure = true, separated = true) }
         return guessed.firstOrNull { at >= it.range.first - start && at < liveEnd(it) - start }
-            ?.let { breakAt(it.range.first - start, liveEnd(it) - start, it.range.first, guessed = true, sure = it.sure) }
+            ?.let { breakAt(it.range.first - start, liveEnd(it, separated) - start, it.range.first, guessed = true, sure = it.sure) }
     }
 
     /** One period of a manifest, as far as its ads go; times in ms from the manifest's time zero. */
@@ -168,6 +168,16 @@ class AdBreaks {
 
         /** Where the live break [guess] is taken to end. */
         fun liveEnd(guess: Guess) = guess.range.last - if (guess.sure) SURE_EARLY_MS else GUESS_EARLY_MS
+
+        /**
+         * Where the live break [guess] is taken to end when the blacks between its adverts are
+         * known: a break of [separated] begun before [liveEnd] is the same one, and its end is in the
+         * adverts, so it is skipped to when further.
+         */
+        fun liveEnd(guess: Guess, separated: List<LongRange>): Long {
+            val end = liveEnd(guess)
+            return separated.firstOrNull { it.first < end && it.last > end }?.last ?: end
+        }
 
         // Two breaks this close are one: the TF1 channels put three seconds of jingle between two halves.
         private const val MERGE_GAP_MS = 10_000L

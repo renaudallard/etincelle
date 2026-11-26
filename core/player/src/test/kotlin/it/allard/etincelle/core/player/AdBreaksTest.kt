@@ -90,4 +90,24 @@ class AdBreaksTest {
         assertEquals(268_000L, AdBreaks.liveEnd(Guess(0L..300_000L)))
         assertEquals(276_000L, AdBreaks.liveEnd(Guess(0L..300_000L, sure = true)))
     }
+
+    @Test
+    fun `a live guess ends with the blacks of its break when they go further`() {
+        val guess = Guess(100_000L..400_000L)
+        // Begun before the guess ends and ending after it: the same break.
+        assertEquals(500_000L, AdBreaks.liveEnd(guess, listOf(200_000L..500_000L)))
+        // Begun before the guess even began.
+        assertEquals(500_000L, AdBreaks.liveEnd(guess, listOf(50_000L..500_000L)))
+        // Ending before the guess does: no further.
+        assertEquals(368_000L, AdBreaks.liveEnd(guess, listOf(200_000L..300_000L)))
+        // Begun after the guess ends, where the programme may already be back: another break.
+        assertEquals(368_000L, AdBreaks.liveEnd(guess, listOf(380_000L..600_000L)))
+        // Before the guess, and none at all.
+        assertEquals(368_000L, AdBreaks.liveEnd(guess, listOf(0L..90_000L)))
+        assertEquals(368_000L, AdBreaks.liveEnd(guess, emptyList()))
+        // A sure guess ends 24 s before the logo is back, not 32 s.
+        val sure = Guess(100_000L..400_000L, sure = true)
+        assertEquals(376_000L, AdBreaks.liveEnd(sure, listOf(200_000L..370_000L)))
+        assertEquals(500_000L, AdBreaks.liveEnd(sure, listOf(370_000L..500_000L)))
+    }
 }

@@ -94,7 +94,8 @@ flux lui-même : l'image est chiffrée, mais pas la taille de chaque image, et u
 douzaine de quelques octets. Une coupure en compte au moins six sur une minute et demie ou plus, jamais
 à plus d'une minute l'un de l'autre, ou d'une minute quarante entre deux groupes d'au moins trois (un noir manqué laisse deux publicités entre deux autres, mais un ou deux noirs d'un dessin animé juste avant la coupure ne s'y joignent pas) ; elle va du deuxième à l'avant-dernier, qu'un noir égaré dans
 l'émission juste avant ou après la coupure laisse encore dans la publicité, et **Signalées et presque
-sûres** la saute dès le deuxième. Sur quatre heures de chacune de ces chaînes, en
+sûres** la saute dès le deuxième. Une coupure estimée d'après les vignettes qui commence avant elle et
+s'arrête dedans mène jusqu'à sa fin. Sur quatre heures de chacune de ces chaînes, en
 novembre 2026, elle trouvait 8 coupures de M6 et 7 de Gulli, et sur quatre heures des six autres 31
 coupures, toutes celles dont les vignettes restaient (29) commencées et arrêtées dans la publicité, de
 quelques secondes à une minute et demie avant la reprise de l'émission ; les autres chaînes
