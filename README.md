@@ -164,8 +164,9 @@ et affiche **Passer la pub : OK**.
   les favoris** (▲ et ▼ déplacent une chaîne). Sur la TV, un **appui long sur OK** fait de même, et
   **Réorganiser les favoris** permet de saisir une chaîne avec OK puis de la déplacer avec Haut et Bas.
 - Le **guide** couvre toutes les chaînes de l'offre sur 24 heures ; un épisode y porte le nom de sa
-  série, son propre titre en dessous. Rouvert dans la demi-heure, il s'affiche aussitôt tel qu'il était
-  et ne se recharge que s'il a plus de 5 minutes.
+  série, son propre titre en dessous. Le programme en cours ouvre sa chaîne, pour le regarder en direct ;
+  un autre ouvre sa propre page, pour voir ce que c'est ou l'enregistrer. Rouvert dans la demi-heure, il
+  s'affiche aussitôt tel qu'il était et ne se recharge que s'il a plus de 5 minutes.
 - Dans la **recherche**, **Tout voir** affiche une rangée de résultats en grille. Un programme proposé
   sur plusieurs chaînes n'apparaît qu'une fois, de préférence sur une chaîne de votre abonnement, et le
   nombre affiché en tête de rangée en tient compte. Une

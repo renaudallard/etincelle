@@ -129,12 +129,18 @@ private class LocalHourMinute {
     private val format = SimpleDateFormat("HH:mm", Locale.getDefault())
 
     fun of(rfc3339: String?): String? = parseRfc3339(rfc3339, parser)?.let { format.format(it) }
+
+    /** The same timestamp in ms since 1970, or null. */
+    fun millis(rfc3339: String?): Long? = parseRfc3339(rfc3339, parser)?.time
 }
 
 // --- mapping to domain ---
 
-/** Maps the /epg guide into a page: one rail per channel, one card per program (tap plays live). */
-fun EpgResponse.toGuidePage(): ContentPage {
+/**
+ * Maps the /epg guide into a page: one rail per channel, one card per program, the one on air at
+ * [nowMs] opening its channel to watch it live, the others their own page.
+ */
+fun EpgResponse.toGuidePage(nowMs: Long = System.currentTimeMillis()): ContentPage {
     val seen = HashSet<String>()
     val hours = LocalHourMinute()
     val rails = response.orEmpty().mapNotNull { entry ->
@@ -145,7 +151,7 @@ fun EpgResponse.toGuidePage(): ContentPage {
         if (!seen.add(channelId)) return@mapNotNull null
         val ids = HashSet<String>()
         val cards = data.programsWithAssets.orEmpty()
-            .mapIndexedNotNull { index, p -> p.toCard(channelId, channel.logoOnDarkUrl, index, hours, ids) }
+            .mapIndexedNotNull { index, p -> p.toCard(channelId, channel.logoOnDarkUrl, index, hours, ids, nowMs) }
         if (cards.isEmpty()) null else ContentRail("guide-$channelId", channel.displayName ?: channel.name, cards)
     }
     return ContentPage("Guide", rails)
@@ -157,11 +163,19 @@ private fun EpgProgramWithAssetsDto.toCard(
     index: Int,
     hours: LocalHourMinute,
     ids: MutableSet<String>,
+    nowMs: Long,
 ): ContentCard? {
     // The show's name: on an episode the title is the episode's own ("Episode 38").
     val name = program?.heading ?: program?.title ?: return null
-    val start = assets?.firstOrNull()?.accessRights?.startTime
+    val asset = assets?.firstOrNull()
+    val start = asset?.accessRights?.startTime
     val time = hours.of(start)
+    // One not on air opens its own page, by its airing (an id in LIVE_), to read what it is or have
+    // it recorded: its channel's would show the programme on air instead. The one on air, or one
+    // with no airing, opens the channel.
+    val from = hours.millis(start)
+    val to = hours.millis(asset?.accessRights?.endTime)
+    val airing = asset?.assetId?.takeIf { it.isNotBlank() && ((from != null && nowMs < from) || (to != null && nowMs >= to)) }
     return ContentCard(
         // By its start, so that a programme keeps its id as those before it end and leave the guide
         // loaded again; by its place when it has none, or shares it, as no two may have one id.
@@ -169,8 +183,8 @@ private fun EpgProgramWithAssetsDto.toCard(
         title = if (time != null) "$time · $name" else name,
         imageUrl = program?.horizontalImage ?: channelLogo,
         isLocked = false,
-        channelId = channelId,
-        vodId = null,
+        channelId = if (airing == null) channelId else null,
+        vodId = airing,
         seriesId = null,
         actionUrl = null,
         recordingAssetId = null,

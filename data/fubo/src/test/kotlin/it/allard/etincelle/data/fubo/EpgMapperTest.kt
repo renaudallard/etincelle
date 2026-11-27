@@ -70,6 +70,34 @@ class EpgMapperTest {
     }
 
     @Test
+    fun `a programme not on air opens its own page, the one on air its channel`() {
+        fun programme(title: String, start: String, end: String, airing: String?) =
+            EpgProgramWithAssetsDto(EpgProgramDto(title, null, null), listOf(EpgAssetDto(EpgAccessRightsDto(start, end), airing)))
+        // M6 on 27 November 2026 at 19:30 (UTC 18:30): what airs then opens the channel, what comes
+        // later its airing's page.
+        val cards = EpgResponse(
+            listOf(
+                EpgEntryDto(
+                    EpgChannelDataDto(
+                        EpgChannelDto("600045", "m6", "M6", null),
+                        listOf(
+                            programme("La meilleure cuisine régionale", "2026-11-27T17:40:00Z", "2026-11-27T18:45:00Z", "LIVE_1"),
+                            programme("Un Noël en famille", "2026-11-27T20:10:00Z", "2026-11-27T21:50:00Z", "LIVE_2"),
+                            programme("Sans diffusion", "2026-11-27T21:50:00Z", "2026-11-27T23:00:00Z", null),
+                        ),
+                    ),
+                ),
+            ),
+        ).toGuidePage(nowMs = rfc3339UtcToEpochMillis("2026-11-27T18:30:00Z")!!).rails.single().cards
+        assertEquals("600045", cards[0].channelId)
+        assertNull(cards[0].vodId)
+        assertNull(cards[1].channelId)
+        assertEquals("LIVE_2", cards[1].vodId)
+        assertEquals("600045", cards[2].channelId)
+        assertNull(cards[2].vodId)
+    }
+
+    @Test
     fun `an episode is listed under its show's name, its own title below`() {
         val response = EpgResponse(
             listOf(
