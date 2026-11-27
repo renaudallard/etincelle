@@ -106,9 +106,6 @@ Au direct, il n'y a nulle part où sauter. Dans un **enregistrement**, les coupu
 l'ouverture d'après ses vignettes et ses sous-titres. Sur un **Chromecast**, c'est le récepteur qui les
 cherche de la même façon et affiche **Passer la pub : OK**.
 
-Ce que l'application trouve et passe sur chaque chaîne, et les règles en détail, sont dans
-[docs/coupures-pub.md](docs/coupures-pub.md).
-
 ### Fiches, séries et épisodes
 
 - Cliquer sur un programme ouvre d'abord sa **fiche détaillée** (synopsis, casting, année,
