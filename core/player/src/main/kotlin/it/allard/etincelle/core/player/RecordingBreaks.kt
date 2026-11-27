@@ -146,7 +146,8 @@ object RecordingBreaks {
         BreakGuess.combine(captions.await(), logo.await()).filter { it.range.first > 0 && it.range.last < lengthMs }
     }
 
-    private class Segment(val timeMs: Long, val durationMs: Long, val uri: Uri)
+    // Counted: within what the player library counts, which reads no endNumber.
+    private class Segment(val timeMs: Long, val durationMs: Long, val uri: Uri, val counted: Boolean = true)
 
     private fun segments(representation: Representation, lengthMs: Long): List<Segment> {
         val index = representation.index ?: return emptyList()
@@ -166,8 +167,9 @@ object RecordingBreaks {
         val spanUs = lengthUs - early
         val count = index.getSegmentCount(spanUs)
         if (count !in 1..MAX_SEGMENTS) return emptyList()
+        val counted = index.getSegmentCount(lengthUs)
         return (first until first + count).map { n ->
-            Segment(Util.usToMs(index.getTimeUs(n) + early), Util.usToMs(index.getDurationUs(n, spanUs)), index.getSegmentUrl(n).resolveUri(base))
+            Segment(Util.usToMs(index.getTimeUs(n) + early), Util.usToMs(index.getDurationUs(n, spanUs)), index.getSegmentUrl(n).resolveUri(base), n < first + counted)
         }
     }
 
@@ -208,8 +210,14 @@ object RecordingBreaks {
         val across = representation.format.tileCountHorizontal
         val down = representation.format.tileCountVertical
         if (across == Format.NO_VALUE || down == Format.NO_VALUE || across <= 0 || down <= 0) return null
-        val strips = segments(representation, lengthMs)
-        if (strips.isEmpty() || strips.size > MAX_STRIPS) return null
+        val listed = segments(representation, lengthMs)
+        if (listed.isEmpty() || listed.size > MAX_STRIPS) return null
+        // One past what the library counts is used only once read: a track can end short of the
+        // recording, and a strip missing where it was wanted would pass for a break.
+        val counted = listed.count { it.counted }
+        val ahead = ArrayList<ByteArray>()
+        for (strip in listed.drop(counted)) ahead += fetch(strip.uri) ?: break
+        val strips = listed.take(counted + ahead.size)
         val perStrip = across * down
         var track: LogoTrack? = null
         var width = 0
@@ -218,7 +226,7 @@ object RecordingBreaks {
         val lock = Any()
         // Gives the track the pictures of the strips [wanted]; false when one could not be had.
         suspend fun give(wanted: List<Int>): Boolean = each(wanted, STRIPS_AT_ONCE) { _, i ->
-            val bitmap = fetch(strips[i].uri)?.let { decode(it) } ?: return@each false
+            val bitmap = (if (i >= counted) ahead[i - counted] else fetch(strips[i].uri))?.let { decode(it) } ?: return@each false
             try {
                 val w = bitmap.width / across
                 val h = bitmap.height / down
