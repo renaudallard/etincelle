@@ -174,7 +174,8 @@ class AdBreaks {
          * yet, or null. By [separated], the blacks between its adverts, first, where [guesses] by its
          * pictures or captions also have the programme away (see [confirmed]): both ends are in the
          * adverts, and as on a live stream the break may have begun up to SEPARATED_LEAD_MS before its
-         * first black. Then by [guesses], to some seconds before where they end.
+         * first black. Then by [guesses], to some seconds before where they end, or to the end of such
+         * a break they run into (see [reach]).
          */
         fun recordingBreak(at: Long, guesses: List<Guess>, separated: List<SeparatedBreak>): AdBreak? {
             val sure = confirmed(separated, guesses)
@@ -182,8 +183,9 @@ class AdBreaks {
                 val asked = askedEnd(s, guesses) { it.range.last - GUESS_EARLY_MS } ?: s.range.last
                 return AdBreak(s.range.first, s.range.last, s.firstMs - SEPARATED_LEAD_MS, skippable = at < s.range.last - LAST_MOMENT_MS, guessed = true, sure = true, separated = true, askedEndMs = asked)
             }
+            val ranges = sure.map { it.range }
             return guesses.firstOrNull { at >= offeredFrom(it, sure) && at < it.range.last - GUESS_EARLY_MS }?.let {
-                val end = it.range.last - GUESS_EARLY_MS
+                val end = reach(it.range.last - GUESS_EARLY_MS, ranges)
                 AdBreak(offeredFrom(it, sure), end, it.range.first, skippable = at < end - LAST_MOMENT_MS, guessed = true, sure = it.sure)
             }
         }
@@ -240,15 +242,16 @@ class AdBreaks {
         /** Where the live break [guess] is taken to end. */
         fun liveEnd(guess: Guess) = guess.range.last - if (guess.sure) SURE_EARLY_MS else GUESS_EARLY_MS
 
+        /** Where the live break [guess] is taken to end when the blacks between its adverts are known. */
+        fun liveEnd(guess: Guess, separated: List<LongRange>): Long = reach(liveEnd(guess), separated)
+
         /**
-         * Where the live break [guess] is taken to end when the blacks between its adverts are
-         * known: a break of [separated] begun before [liveEnd] is the same one, and its end is in the
+         * Where a break by the logo taken to end at [end] ends when the blacks between its adverts are
+         * known: a break of [separated] begun before [end] is the same one, and its end is in the
          * adverts, so it is skipped to when further.
          */
-        fun liveEnd(guess: Guess, separated: List<LongRange>): Long {
-            val end = liveEnd(guess)
-            return separated.firstOrNull { it.first < end && it.last > end }?.last ?: end
-        }
+        fun reach(end: Long, separated: List<LongRange>): Long =
+            separated.firstOrNull { it.first < end && it.last > end }?.last ?: end
 
         // Two breaks this close are one: the TF1 channels put three seconds of jingle between two halves.
         private const val MERGE_GAP_MS = 10_000L

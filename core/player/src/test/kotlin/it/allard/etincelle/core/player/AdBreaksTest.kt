@@ -232,10 +232,12 @@ class AdBreaksTest {
         assertTrue(byBlacks.separated && byBlacks.sure)
         assertEquals(3_679_500L, byBlacks.endMs)
         assertEquals(3_684_300L, byBlacks.askedEndMs)
-        // Where the logo's break is taken to end before the blacks do, both stop at the blacks' end.
+        // Where the logo's break is taken to end before the blacks do, both stop at the blacks' end,
+        // and so does one pressed in the logo's break before them.
         val first = AdBreaks.recordingBreak(1_500_000L, guesses, separated)!!
         assertEquals(1_706_900L, first.endMs)
         assertEquals(1_706_900L, first.askedEndMs)
+        assertEquals(1_706_900L, AdBreaks.recordingBreak(1_420_000L, guesses, separated)!!.endMs)
         // Blacks with no break by the pictures about them make none.
         assertNull(AdBreaks.recordingBreak(2_100_000L, guesses, listOf(SeparatedBreak(2_000_000L..2_200_000L, 1_980_000L))))
     }

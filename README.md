@@ -103,8 +103,8 @@ Les coupures sont trouvées de quatre façons :
   sauf Arte, qui n'a pas de publicité) : une estimation, proposée dès le départ du logo, ou dès le
   premier noir entre les publicités quand ils sont connus (un parrainage et des bandes-annonces
   viennent souvent avant), qui s'arrête une demi-minute avant le retour du logo, 24 secondes pour une
-  coupure presque sûre. Mieux vaut voir les dernières publicités que
-  perdre le début de l'émission.
+  coupure presque sûre, mais jamais au milieu des publicités entre les noirs : elle va alors jusqu'à
+  l'avant-dernier. Mieux vaut voir les dernières publicités que perdre le début de l'émission.
 
 Au direct, il n'y a nulle part où sauter. Dans un **enregistrement**, les coupures sont cherchées à
 l'ouverture d'après ses vignettes et ses sous-titres, et d'après les noirs entre les publicités sur les
