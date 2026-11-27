@@ -108,28 +108,13 @@ class AdBreaks {
      */
     fun current(player: Player, window: Timeline.Window): AdBreak? {
         val at = player.currentPosition
-        if (!player.isCurrentMediaItemLive) {
-            // The blacks between the adverts first, where the pictures or captions also have the
-            // programme away: both ends are in the adverts, and as on a live stream the break may have
-            // begun up to SEPARATED_LEAD_MS before its first black.
-            val sure = confirmed(recordedSeparated, recorded)
-            sure.firstOrNull { at >= it.range.first && at < it.range.last }?.let { s ->
-                val asked = askedEnd(s, recorded) { it.range.last - GUESS_EARLY_MS } ?: s.range.last
-                return AdBreak(s.range.first, s.range.last, s.firstMs - SEPARATED_LEAD_MS, skippable = at < s.range.last - LAST_MOMENT_MS, guessed = true, sure = true, separated = true, askedEndMs = asked)
-            }
-            return recorded.firstOrNull { at >= offeredFrom(it, sure) && at < it.range.last - GUESS_EARLY_MS }?.let {
-                val end = it.range.last - GUESS_EARLY_MS
-                AdBreak(offeredFrom(it, sure), end, it.range.first, skippable = at < end - LAST_MOMENT_MS, guessed = true, sure = it.sure)
-            }
-        }
+        if (!player.isCurrentMediaItemLive) return recordingBreak(at, recorded, recordedSeparated)
         val timeline = player.currentTimeline
         if (timeline.isEmpty) return null
         timeline.getWindow(player.currentMediaItemIndex, window)
         val start = window.windowStartTimeMs
         if (start == C.TIME_UNSET) return null
         val live = window.defaultPositionMs
-        fun breakAt(from: Long, to: Long, id: Long, guessed: Boolean, sure: Boolean = false, separated: Boolean = false, askedTo: Long? = null) =
-            AdBreak(from, to, id, skippable = at < to - LAST_MOMENT_MS && to <= live - LIVE_MARGIN_MS, guessed = guessed, sure = sure, separated = separated, askedEndMs = askedTo ?: to)
         // What the stream marks is exact, and comes first.
         val dash = player.currentManifest as? DashManifest
         val zero = dash?.availabilityStartTimeMs ?: C.TIME_UNSET
@@ -150,17 +135,9 @@ class AdBreaks {
             // From the manifest's own time to a position in the window.
             val shift = zero - start
             found.firstOrNull { at >= it.first + shift && at < it.last + shift }
-                ?.let { return breakAt(it.first + shift, it.last + shift, zero + it.first, guessed = false) }
+                ?.let { return liveBreak(at, live, it.first + shift, it.last + shift, zero + it.first, guessed = false) }
         }
-        // Then the blacks between the adverts, whose ends are in them, and as the break began up to
-        // SEPARATED_LEAD_MS before its first black, one gone back into there was gone back into.
-        val ranges = separated.map { it.range }
-        separated.firstOrNull { at >= it.range.first - start && at < it.range.last - start }?.let { s ->
-            val asked = askedEnd(s, guessed) { liveEnd(it, ranges) }?.minus(start)?.takeIf { it <= live - LIVE_MARGIN_MS }
-            return breakAt(s.range.first - start, s.range.last - start, s.firstMs - SEPARATED_LEAD_MS, guessed = true, sure = true, separated = true, askedTo = asked)
-        }
-        return guessed.firstOrNull { at >= offeredFrom(it, separated) - start && at < liveEnd(it) - start }
-            ?.let { breakAt(offeredFrom(it, separated) - start, liveEnd(it, ranges) - start, it.range.first, guessed = true, sure = it.sure) }
+        return guessedBreak(at, start, live, guessed, separated)
     }
 
     /**
@@ -191,6 +168,47 @@ class AdBreaks {
         // How long before the first black between its adverts a break begins, at the most: the card
         // that opens it and the first advert, 8 to 45 s on M6 and Gulli in November 2026.
         private const val SEPARATED_LEAD_MS = 45_000L
+
+        /**
+         * The break of a recording that [at], a position in it, is in, whether or not it can be skipped
+         * yet, or null. By [separated], the blacks between its adverts, first, where [guesses] by its
+         * pictures or captions also have the programme away (see [confirmed]): both ends are in the
+         * adverts, and as on a live stream the break may have begun up to SEPARATED_LEAD_MS before its
+         * first black. Then by [guesses], to some seconds before where they end.
+         */
+        fun recordingBreak(at: Long, guesses: List<Guess>, separated: List<SeparatedBreak>): AdBreak? {
+            val sure = confirmed(separated, guesses)
+            sure.firstOrNull { at >= it.range.first && at < it.range.last }?.let { s ->
+                val asked = askedEnd(s, guesses) { it.range.last - GUESS_EARLY_MS } ?: s.range.last
+                return AdBreak(s.range.first, s.range.last, s.firstMs - SEPARATED_LEAD_MS, skippable = at < s.range.last - LAST_MOMENT_MS, guessed = true, sure = true, separated = true, askedEndMs = asked)
+            }
+            return guesses.firstOrNull { at >= offeredFrom(it, sure) && at < it.range.last - GUESS_EARLY_MS }?.let {
+                val end = it.range.last - GUESS_EARLY_MS
+                AdBreak(offeredFrom(it, sure), end, it.range.first, skippable = at < end - LAST_MOMENT_MS, guessed = true, sure = it.sure)
+            }
+        }
+
+        /**
+         * The break of a live stream that [at], a position in its window, is in by [separated], the
+         * blacks between its adverts, or by [guessed], its logo, whether or not it can be skipped yet,
+         * or null. [start] is the time of day the window begins at, [live] the live point in it.
+         */
+        fun guessedBreak(at: Long, start: Long, live: Long, guessed: List<Guess>, separated: List<SeparatedBreak>): AdBreak? {
+            // The blacks between the adverts, whose ends are in them, and as the break began up to
+            // SEPARATED_LEAD_MS before its first black, one gone back into there was gone back into.
+            val ranges = separated.map { it.range }
+            separated.firstOrNull { at >= it.range.first - start && at < it.range.last - start }?.let { s ->
+                val asked = askedEnd(s, guessed) { liveEnd(it, ranges) }?.minus(start)?.takeIf { it <= live - LIVE_MARGIN_MS }
+                return liveBreak(at, live, s.range.first - start, s.range.last - start, s.firstMs - SEPARATED_LEAD_MS, guessed = true, sure = true, separated = true, askedTo = asked)
+            }
+            return guessed.firstOrNull { at >= offeredFrom(it, separated) - start && at < liveEnd(it) - start }
+                ?.let { liveBreak(at, live, offeredFrom(it, separated) - start, liveEnd(it, ranges) - start, it.range.first, guessed = true, sure = it.sure) }
+        }
+
+        // A break of a live stream from [from] to [to], positions in its window, with playback at [at]
+        // and the live point at [live].
+        private fun liveBreak(at: Long, live: Long, from: Long, to: Long, id: Long, guessed: Boolean, sure: Boolean = false, separated: Boolean = false, askedTo: Long? = null) =
+            AdBreak(from, to, id, skippable = at < to - LAST_MOMENT_MS && to <= live - LIVE_MARGIN_MS, guessed = guessed, sure = sure, separated = separated, askedEndMs = askedTo ?: to)
 
         /**
          * The breaks of [separated] that lie within one of [guesses], a recording's breaks by its

@@ -7,6 +7,7 @@ import it.allard.etincelle.core.player.AdBreaks.Mark
 import it.allard.etincelle.core.player.AdBreaks.Stretch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AdBreaksTest {
@@ -195,6 +196,48 @@ class AdBreaksTest {
         assertEquals(t(19, 1, 52), AdBreaks.offeredFrom(logo, emptyList()))
         // Blacks begun before the logo goes leave it as it is.
         assertEquals(t(19, 1, 52), AdBreaks.offeredFrom(logo, listOf(SeparatedBreak(t(19, 2, 10)..t(19, 6, 36), t(19, 1, 40)))))
+    }
+
+    @Test
+    fun `live, a break by the blacks is skipped unasked to their end, asked as far as the logo's once reached`() {
+        // That break in a window begun at 18:00, its live point at 19:30.
+        val start = t(18, 0, 0)
+        fun at(h: Int, m: Int, s: Int) = t(h, m, s) - start
+        val live = at(19, 30, 0)
+        assertNull(AdBreaks.guessedBreak(at(19, 2, 30), start, live, listOf(logo), listOf(blacks)))
+        val byLogo = AdBreaks.guessedBreak(at(19, 3, 0), start, live, listOf(logo), listOf(blacks))!!
+        assertEquals(at(19, 2, 58), byLogo.startMs)
+        assertEquals(at(19, 7, 20), byLogo.endMs)
+        val byBlacks = AdBreaks.guessedBreak(at(19, 4, 0), start, live, listOf(logo), listOf(blacks))!!
+        assertTrue(byBlacks.separated && byBlacks.skippable)
+        assertEquals(at(19, 6, 36), byBlacks.endMs)
+        assertEquals(at(19, 7, 20), byBlacks.askedEndMs)
+        // The logo's end not yet two seconds behind the live point: no further than the blacks.
+        val near = AdBreaks.guessedBreak(at(19, 4, 0), start, at(19, 7, 21), listOf(logo), listOf(blacks))!!
+        assertEquals(at(19, 6, 36), near.askedEndMs)
+    }
+
+    @Test
+    fun `in a recording, a break by the blacks is skipped unasked to their end, asked as far as the logo's`() {
+        // Très très bon, S16 E30, as phone B found it on 27 November: the pictures and captions give
+        // 1388.3 to 1736.3 s (sure) and 3152.3 to 3716.3 s, the blacks 1443.1 to 1706.9 s from a
+        // first black at 1412.6 s and 3251.6 to 3679.5 s from one at 3231.1 s.
+        val guesses = listOf(Guess(1_388_300L..1_736_300L, sure = true), Guess(3_152_300L..3_716_300L))
+        val separated = listOf(SeparatedBreak(1_443_100L..1_706_900L, 1_412_600L), SeparatedBreak(3_251_600L..3_679_500L, 3_231_100L))
+        assertNull(AdBreaks.recordingBreak(3_200_000L, guesses, separated))
+        val byLogo = AdBreaks.recordingBreak(3_240_000L, guesses, separated)!!
+        assertEquals(3_231_100L, byLogo.startMs)
+        assertEquals(3_684_300L, byLogo.endMs)
+        val byBlacks = AdBreaks.recordingBreak(3_300_000L, guesses, separated)!!
+        assertTrue(byBlacks.separated && byBlacks.sure)
+        assertEquals(3_679_500L, byBlacks.endMs)
+        assertEquals(3_684_300L, byBlacks.askedEndMs)
+        // Where the logo's break is taken to end before the blacks do, both stop at the blacks' end.
+        val first = AdBreaks.recordingBreak(1_500_000L, guesses, separated)!!
+        assertEquals(1_706_900L, first.endMs)
+        assertEquals(1_706_900L, first.askedEndMs)
+        // Blacks with no break by the pictures about them make none.
+        assertNull(AdBreaks.recordingBreak(2_100_000L, guesses, listOf(SeparatedBreak(2_000_000L..2_200_000L, 1_980_000L))))
     }
 
     @Test
