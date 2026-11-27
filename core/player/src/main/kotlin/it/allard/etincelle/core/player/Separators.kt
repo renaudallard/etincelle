@@ -319,8 +319,10 @@ internal class SeparatorBreaks {
         // start, and with it the time it began (see AdBreaks.current).
         private const val KEPT_MS = 2 * FAR_MS
 
-        // How long after the live point a segment can be asked for.
-        private const val NOT_YET_MS = 8_000L
+        // Segments are read up to this close to the live point. The player keeps it 30 s behind the
+        // newest segment, as none of these channels sets a latency of its own (November 2026), and
+        // every segment there could be read: reading on to it shows a break's last blacks sooner.
+        private const val NOT_YET_MS = 1_000L
 
         // The most segments of a rendition listed at once, for a manifest that would give them too
         // short.
