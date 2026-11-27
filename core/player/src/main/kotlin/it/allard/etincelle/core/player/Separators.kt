@@ -4,6 +4,7 @@
 package it.allard.etincelle.core.player
 
 import android.net.Uri
+import android.os.SystemClock
 import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
@@ -263,9 +264,12 @@ internal class SeparatorBreaks {
         // The separators of each segment read, by its start (ms since 1970).
         val read = TreeMap<Long, LongArray>()
 
-        // The segments that could not be read, with how many times each was asked for.
-        val missed = HashMap<Long, Int>()
+        // The segments that could not be read, with how many times each was asked for and when last.
+        val missed = HashMap<Long, Miss>()
     }
+
+    /** A segment that could not be read: asked for [times] times, the last at [atMs] (elapsed ms). */
+    internal class Miss(val times: Int, val atMs: Long)
 
     /**
      * The breaks around the playhead of the stream [dash] describes, at [atMs] with the live point
@@ -274,20 +278,21 @@ internal class SeparatorBreaks {
      */
     suspend fun around(dash: DashManifest, atMs: Long, liveMs: Long, newestMs: Long?): List<SeparatedBreak> = lock.withLock {
         val untilMs = minOf(liveMs - NOT_YET_MS, atMs + FAR_MS, if (newestMs != null) newestMs - FRESH_MS else Long.MAX_VALUE)
+        val now = SystemClock.elapsedRealtime()
         val wanted = segments(dash, atMs - FAR_MS, untilMs).filter {
             val of = renditions.getValue(it.height)
-            it.startMs !in of.read || (of.missed[it.startMs] ?: TRIES) < TRIES
+            it.startMs !in of.read || again(of.missed[it.startMs], now)
         }
         val got = coroutineScope {
             val gate = Semaphore(AT_ONCE)
             wanted.map { segment -> async { gate.withPermit { ensureActive(); ends(segment) } } }.awaitAll()
         }
         // One that cannot be read has no separator, which ends a break rather than making one, and is
-        // asked for again the next times, a few of them.
+        // asked for again (see [again]).
         wanted.forEachIndexed { i, segment ->
             val of = renditions.getValue(segment.height)
             val ends = got[i]
-            if (ends == null) of.missed[segment.startMs] = (of.missed[segment.startMs] ?: 0) + 1 else of.missed.remove(segment.startMs)
+            if (ends == null) of.missed[segment.startMs] = Miss((of.missed[segment.startMs]?.times ?: 0) + 1, now) else of.missed.remove(segment.startMs)
             of.read[segment.startMs] = ends ?: LongArray(0)
         }
         for (of in renditions.values) {
@@ -316,7 +321,16 @@ internal class SeparatorBreaks {
 
     companion object {
         private const val AT_ONCE = 6
+
+        // A segment that cannot be read is asked for again at the next looks, TRIES times in all,
+        // then once every AGAIN_MS: the service refuses one rendition of a small channel now and then
+        // for some minutes (Toute l'Histoire, Automoto and AB 1 in November 2026), and answers again
+        // after.
         private const val TRIES = 3
+        private const val AGAIN_MS = 60_000L
+
+        /** Whether a segment that could not be read, as [miss] says, is to be asked for again at [nowMs]. */
+        internal fun again(miss: Miss?, nowMs: Long): Boolean = miss != null && (miss.times < TRIES || nowMs - miss.atMs >= AGAIN_MS)
 
         // A segment's header, to the end of its first moof, was 2609 bytes in every rendition of
         // these channels in November 2026; more is read when it is longer.

@@ -7,6 +7,7 @@ import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -176,6 +177,17 @@ class SeparatorsTest {
         // A stray one before is its first: the break may have begun up to that much earlier.
         val before = ads.first() - 50_000
         assertEquals(listOf(SeparatedBreak(ads.first()..ads[ads.size - 2], before)), Separators.found(listOf(before) + ads))
+    }
+
+    @Test
+    fun `a segment that cannot be read is asked for again a few times, then once a minute`() {
+        assertFalse(SeparatorBreaks.again(null, 0))
+        assertTrue(SeparatorBreaks.again(SeparatorBreaks.Miss(1, 0), 4_000))
+        assertTrue(SeparatorBreaks.again(SeparatorBreaks.Miss(2, 0), 4_000))
+        assertFalse(SeparatorBreaks.again(SeparatorBreaks.Miss(3, 0), 4_000))
+        assertFalse(SeparatorBreaks.again(SeparatorBreaks.Miss(3, 0), 59_999))
+        assertTrue(SeparatorBreaks.again(SeparatorBreaks.Miss(3, 0), 60_000))
+        assertTrue(SeparatorBreaks.again(SeparatorBreaks.Miss(9, 120_000), 180_000))
     }
 
     @Test
