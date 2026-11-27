@@ -97,10 +97,13 @@ Les coupures sont trouvées de quatre façons :
 - **Noirs entre les publicités** (M6, Gulli, Canal J, TIJI, Paris Première, Automoto, Toute
   l'Histoire, AB 1) : l'image est chiffrée, mais pas la taille de chaque image, et la demi-seconde de
   noir entre deux publicités s'y lit, dans trois qualités de la vidéo. La coupure va du deuxième noir
-  à l'avant-dernier.
+  à l'avant-dernier ; passée avec le bouton, elle va jusqu'où mène celle du logo qui l'entoure, si
+  c'est plus loin (carton de la chaîne, bandes-annonces et parrainage après la dernière publicité).
 - **Logo de la chaîne**, dans les vignettes que le service garde de chaque chaîne (les autres chaînes,
-  sauf Arte, qui n'a pas de publicité) : une estimation, qui s'arrête une demi-minute avant le retour
-  du logo, 24 secondes pour une coupure presque sûre. Mieux vaut voir les dernières publicités que
+  sauf Arte, qui n'a pas de publicité) : une estimation, proposée dès le départ du logo, ou dès le
+  premier noir entre les publicités quand ils sont connus (un parrainage et des bandes-annonces
+  viennent souvent avant), qui s'arrête une demi-minute avant le retour du logo, 24 secondes pour une
+  coupure presque sûre. Mieux vaut voir les dernières publicités que
   perdre le début de l'émission.
 
 Au direct, il n'y a nulle part où sauter. Dans un **enregistrement**, les coupures sont cherchées à
