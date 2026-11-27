@@ -1,7 +1,7 @@
 # Coupures pub, chaîne par chaîne
 
 Pour chaque chaîne, comment etincelle repère les coupures publicitaires, ce qu'il passe tout seul
-selon le réglage, et où il reprend. État de la version 2026.11.44, au 26 novembre 2026.
+selon le réglage, et où il reprend. État de la version 2026.11.46, au 27 novembre 2026.
 
 ## Le réglage « Passer les publicités automatiquement »
 
@@ -190,7 +190,8 @@ programme, la coupure n'est pas sûre et reste au bouton.
   les segments entiers de la qualité 270 lignes, soit environ 135 Mo par heure.
 - Sur deux heures de M6, Gulli et Paris Première et quatre heures de Canal J, TIJI, Automoto,
   Toute l'Histoire et AB 1, en novembre 2026, les trois qualités passaient 45 % de publicité de plus
-  que la plus basse seule ; tout ce qu'elles ajoutaient était de la publicité ou des bandes-annonces.
+  que la plus basse seule, et 9 % de plus sur trois heures et demie de soirée de M6, Gulli et Paris
+  Première ; tout ce qu'elles ajoutaient était de la publicité ou des bandes-annonces.
 - Une coupure compte au moins six noirs sur une minute et demie ou plus, jamais à plus d'une minute
   l'un de l'autre, ou d'une minute quarante entre deux groupes d'au moins trois : un noir manqué
   laisse deux publicités entre deux autres, mais un ou deux noirs d'un dessin animé juste avant la
@@ -200,10 +201,10 @@ programme, la coupure n'est pas sûre et reste au bouton.
 - Elle va du deuxième noir à l'avant-dernier, qu'un noir égaré dans l'émission juste avant ou après la
   coupure laisse encore dans la publicité ; **Signalées et presque sûres** la saute dès le deuxième.
 - Une coupure trouvée d'après le logo qui commence avant elle et s'arrête dedans mène jusqu'à sa fin.
-- Sur quatre heures de chacune de ces chaînes, en novembre 2026, elle trouvait 8 coupures de M6 et 7
-  de Gulli, et sur quatre heures des six autres 35 coupures ; toutes celles dont les vignettes
-  restaient (33) commençaient et s'arrêtaient dans la publicité, de quelques secondes à une minute et
-  demie avant la reprise de l'émission.
+- Sur quatre heures de chacune de ces chaînes, en novembre 2026, avec la seule qualité la plus basse,
+  elle trouvait 8 coupures de M6 et 7 de Gulli, et sur quatre heures des six autres 35 coupures ;
+  toutes celles dont les vignettes restaient (33) commençaient et s'arrêtaient dans la publicité, de
+  quelques secondes à une minute et demie avant la reprise de l'émission.
 - Les autres chaînes n'en ont pas, ou trop peu pour faire une coupure (W9, 6ter, TF1, France
   Télévisions, groupe RMC, T18, NOVO19…) ; les images figées des dessins animés de Gulli en imitent
   quelques-uns, jamais assez pour faire une coupure.
