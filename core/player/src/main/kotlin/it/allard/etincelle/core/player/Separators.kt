@@ -306,16 +306,21 @@ internal class SeparatorBreaks {
     }
 
     /**
-     * The breaks of the recording [dash] describes, by their place in it (ms), from every segment of
-     * the renditions [Separators.BLACKS] lists, or null when too many could not be read to tell. For
-     * an IO thread.
+     * The breaks of the recording [dash] describes about the places [around] (ms in it), by their
+     * place in it, from the segments of the renditions [Separators.BLACKS] lists, or null when too
+     * many could not be read to tell. For an IO thread.
      */
-    suspend fun recording(dash: DashManifest): List<SeparatedBreak>? = lock.withLock {
+    suspend fun recording(dash: DashManifest, around: List<LongRange>): List<SeparatedBreak>? = lock.withLock {
         val lengthMs = dash.durationMs
         if (dash.dynamic || lengthMs == C.TIME_UNSET || lengthMs <= 0) return@withLock null
+        if (around.isEmpty()) return@withLock emptyList()
+        // As far beyond each as a run of blacks reaches, so that one across its edge is read whole.
         // In slices, as a rendition gives at most MOST segments at a time.
-        val all = (0L until lengthMs step SLICE_MS).flatMap { segments(dash, it, minOf(it + SLICE_MS, lengthMs)) }
-            .distinctBy { it.height to it.startMs }
+        val all = around.flatMap { place ->
+            val fromMs = maxOf(0L, place.first - Separators.WIDE_GAP_MS)
+            val toMs = minOf(lengthMs, place.last + Separators.WIDE_GAP_MS)
+            (fromMs until toMs step SLICE_MS).flatMap { segments(dash, it, minOf(it + SLICE_MS, toMs)) }
+        }.distinctBy { it.height to it.startMs }
         if (all.isEmpty()) return@withLock null
         val got = arrayOfNulls<LongArray>(all.size)
         repeat(TRIES) {

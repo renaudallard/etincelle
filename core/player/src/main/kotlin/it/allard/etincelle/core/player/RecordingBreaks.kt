@@ -41,8 +41,8 @@ import kotlinx.coroutines.sync.withPermit
  * for an hour) and two strips of thumbnails in three (some fifteen megabytes, a hundredth of what
  * playing the hour takes), once per recording for as long as the app lives. Some ten seconds on a
  * home network. The blacks between its adverts (see [SeparatorBreaks.recording]) are read once per
- * recording too, from the first bytes of every segment of two renditions: some eight megabytes an
- * hour, about a minute.
+ * recording too, from the first bytes of the segments of two renditions about the breaks found that
+ * way, as only one within them counts: a few megabytes an hour.
  */
 object RecordingBreaks {
     private const val CAPTIONS_AT_ONCE = 6
@@ -66,9 +66,12 @@ object RecordingBreaks {
     // Not the screen's: a search cut short by leaving it would download it all again on return.
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    // By the captions and thumbnails, and by the blacks between the adverts.
-    private val guesses = Searches<List<Guess>> { read(it) }
-    private val blacks = Searches<List<SeparatedBreak>> { SeparatorBreaks().recording(it) }
+    // By the captions and thumbnails, and by the blacks between the adverts about what those give.
+    private val guesses = Searches<List<Guess>> { _, manifest -> read(manifest) }
+    private val blacks = Searches<List<SeparatedBreak>> { key, manifest ->
+        val found = guesses.find(key, manifest) ?: return@Searches null
+        if (found.isEmpty()) emptyList() else SeparatorBreaks().recording(manifest, found.map { it.range })
+    }
 
     /**
      * The breaks of the recording [key], whose [manifest] the player holds, as positions (ms) in it.
@@ -82,7 +85,7 @@ object RecordingBreaks {
 
     // What a search found in each of the last KNOWN recordings, so that coming back to one, or to the
     // phone's player after a cast, does not download it again.
-    private class Searches<T : Any>(private val look: suspend (DashManifest) -> T?) {
+    private class Searches<T : Any>(private val look: suspend (String, DashManifest) -> T?) {
         // Nor cancelled with the screen, so recordings opened one after the other would be searched
         // all at once, each with its downloads, and its pictures in memory: one at a time.
         private val oneAtATime = Mutex()
@@ -107,7 +110,7 @@ object RecordingBreaks {
             var found: T? = null
             try {
                 found = try {
-                    oneAtATime.withLock { look(manifest) }
+                    oneAtATime.withLock { look(key, manifest) }
                 } catch (e: IOException) {
                     null
                 }
@@ -303,7 +306,7 @@ suspend fun AdSkipper.followRecording(
             dash = manifestOf(player, key)
         }
     }
-    // The blacks between its adverts, where its channel has them, read from its segments.
+    // The blacks between its adverts, where its channel has them, read about its guessed breaks.
     follow({ RecordingBreaks.separated(key, it) }) { recordedSeparated(it) }
     follow({ RecordingBreaks.find(key, it) }) { recorded(it) }
     while (true) {
