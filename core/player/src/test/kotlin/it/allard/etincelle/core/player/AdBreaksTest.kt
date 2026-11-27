@@ -190,6 +190,14 @@ class AdBreaksTest {
     }
 
     @Test
+    fun `a break by the logo is offered from the first black within it`() {
+        assertEquals(t(19, 2, 58), AdBreaks.offeredFrom(logo, listOf(blacks)))
+        assertEquals(t(19, 1, 52), AdBreaks.offeredFrom(logo, emptyList()))
+        // Blacks begun before the logo goes leave it as it is.
+        assertEquals(t(19, 1, 52), AdBreaks.offeredFrom(logo, listOf(SeparatedBreak(t(19, 2, 10)..t(19, 6, 36), t(19, 1, 40)))))
+    }
+
+    @Test
     fun `a recording's break by its blacks counts only within one by its pictures or captions`() {
         // Très très bon, S16 E30: the blacks give 1443 to 1698 s and 3252 to 3464 s, the pictures
         // and captions 1388 to 1736 s and 3152 to 3716 s.

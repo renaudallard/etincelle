@@ -117,9 +117,9 @@ class AdBreaks {
                 val asked = askedEnd(s, recorded) { it.range.last - GUESS_EARLY_MS } ?: s.range.last
                 return AdBreak(s.range.first, s.range.last, s.firstMs - SEPARATED_LEAD_MS, skippable = at < s.range.last - LAST_MOMENT_MS, guessed = true, sure = true, separated = true, askedEndMs = asked)
             }
-            return recorded.firstOrNull { at >= it.range.first && at < it.range.last - GUESS_EARLY_MS }?.let {
+            return recorded.firstOrNull { at >= offeredFrom(it, sure) && at < it.range.last - GUESS_EARLY_MS }?.let {
                 val end = it.range.last - GUESS_EARLY_MS
-                AdBreak(it.range.first, end, it.range.first, skippable = at < end - LAST_MOMENT_MS, guessed = true, sure = it.sure)
+                AdBreak(offeredFrom(it, sure), end, it.range.first, skippable = at < end - LAST_MOMENT_MS, guessed = true, sure = it.sure)
             }
         }
         val timeline = player.currentTimeline
@@ -159,8 +159,8 @@ class AdBreaks {
             val asked = askedEnd(s, guessed) { liveEnd(it, ranges) }?.minus(start)?.takeIf { it <= live - LIVE_MARGIN_MS }
             return breakAt(s.range.first - start, s.range.last - start, s.firstMs - SEPARATED_LEAD_MS, guessed = true, sure = true, separated = true, askedTo = asked)
         }
-        return guessed.firstOrNull { at >= it.range.first - start && at < liveEnd(it) - start }
-            ?.let { breakAt(it.range.first - start, liveEnd(it, ranges) - start, it.range.first, guessed = true, sure = it.sure) }
+        return guessed.firstOrNull { at >= offeredFrom(it, separated) - start && at < liveEnd(it) - start }
+            ?.let { breakAt(offeredFrom(it, separated) - start, liveEnd(it, ranges) - start, it.range.first, guessed = true, sure = it.sure) }
     }
 
     /**
@@ -199,6 +199,15 @@ class AdBreaks {
          */
         fun confirmed(separated: List<SeparatedBreak>, guesses: List<Guess>): List<SeparatedBreak> =
             separated.filter { s -> guesses.any { it.range.first <= s.range.first && s.range.last <= it.range.last } }
+
+        /**
+         * Where the break [guess] by the logo is offered from: the first black of a break of
+         * [separated] within it, once known, rather than where the logo goes, as cards and trailers
+         * come between the programme and the adverts (M6, November 2026).
+         */
+        fun offeredFrom(guess: Guess, separated: List<SeparatedBreak>): Long =
+            separated.filter { it.range.first < guess.range.last && it.range.last > guess.range.first }
+                .minOfOrNull { it.firstMs }?.let { maxOf(guess.range.first, it) } ?: guess.range.first
 
         /**
          * Where a skip asked for in the break [s] by the blacks between its adverts goes beyond its end:
