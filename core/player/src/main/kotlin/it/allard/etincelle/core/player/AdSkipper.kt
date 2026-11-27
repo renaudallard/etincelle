@@ -63,7 +63,7 @@ class AdSkipper(private val skip: SkipAds) : Player.Listener {
     }
 
     /** The breaks of the live channel being played that the blacks between its adverts give away (see [Separators]). */
-    fun separated(found: List<LongRange>) {
+    fun separated(found: List<SeparatedBreak>) {
         breaks.separated = found
     }
 

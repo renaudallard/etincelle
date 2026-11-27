@@ -170,6 +170,15 @@ class SeparatorsTest {
     }
 
     @Test
+    fun `a break keeps where its first separator ends, for where it began`() {
+        val ads = seconds(100_000, 15, 15, 30, 15, 20, 30)
+        assertEquals(listOf(SeparatedBreak(ads[1]..ads[ads.size - 2], ads[0])), Separators.found(ads))
+        // A stray one before is its first: the break may have begun up to that much earlier.
+        val before = ads.first() - 50_000
+        assertEquals(listOf(SeparatedBreak(ads.first()..ads[ads.size - 2], before)), Separators.found(listOf(before) + ads))
+    }
+
+    @Test
     fun `a stray separator at either end leaves the break in the adverts`() {
         val ads = seconds(100_000, 15, 15, 30, 15, 20, 30)
         val before = ads.first() - 50_000

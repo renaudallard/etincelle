@@ -30,6 +30,13 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 /**
+ * A break the separators between its adverts make (see [Separators.found]): [range] from its second
+ * separator to the one before its last, and [firstMs] where its first one ends (ms since 1970), for
+ * where the break began.
+ */
+data class SeparatedBreak(val range: LongRange, val firstMs: Long)
+
+/**
  * The ad breaks of M6, Gulli and a few others (see PlaybackSource.separatedBreaks) as their streams
  * give them away: these channels put 0.48 s of black between two adverts. The pictures are
  * encrypted, but not the size of each frame, in the header of each segment, and a black is a dozen
@@ -123,7 +130,10 @@ internal object Separators {
      * The breaks the separators ending at [ends] make, in order: each from its second to the one
      * before its last. One found in several renditions counts once.
      */
-    fun breaks(ends: List<Long>): List<LongRange> {
+    fun breaks(ends: List<Long>): List<LongRange> = found(ends).map { it.range }
+
+    /** The breaks the separators ending at [ends] make, as [breaks] gives them, with their first. */
+    fun found(ends: List<Long>): List<SeparatedBreak> {
         val runs = ArrayList<MutableList<Long>>()
         for (end in ends.sorted()) {
             val last = runs.lastOrNull()
@@ -147,7 +157,7 @@ internal object Separators {
             }
             i++
         }
-        return joined.filter { it.size >= LEAST && it.last() - it.first() >= SPAN_MS }.map { it[1]..it[it.size - 2] }
+        return joined.filter { it.size >= LEAST && it.last() - it.first() >= SPAN_MS }.map { SeparatedBreak(it[1]..it[it.size - 2], it[0]) }
     }
 
     /**
@@ -262,7 +272,7 @@ internal class SeparatorBreaks {
      * at [liveMs] and its newest media ending at [newestMs] by now (ms since 1970, null when unknown),
      * as far as they are known, in the same time. Reads the segments it still needs: for an IO thread.
      */
-    suspend fun around(dash: DashManifest, atMs: Long, liveMs: Long, newestMs: Long?): List<LongRange> = lock.withLock {
+    suspend fun around(dash: DashManifest, atMs: Long, liveMs: Long, newestMs: Long?): List<SeparatedBreak> = lock.withLock {
         val untilMs = minOf(liveMs - NOT_YET_MS, atMs + FAR_MS, if (newestMs != null) newestMs - FRESH_MS else Long.MAX_VALUE)
         val wanted = segments(dash, atMs - FAR_MS, untilMs).filter {
             val of = renditions.getValue(it.height)
@@ -284,7 +294,7 @@ internal class SeparatorBreaks {
             of.read.headMap(atMs - KEPT_MS).clear()
             of.missed.keys.removeAll { it < atMs - KEPT_MS }
         }
-        Separators.breaks(renditions.values.flatMap { of -> of.read.values.flatMap { it.asList() } })
+        Separators.found(renditions.values.flatMap { of -> of.read.values.flatMap { it.asList() } })
     }
 
     // Where the separators of [segment] end; null when it cannot be read.

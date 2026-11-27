@@ -77,7 +77,7 @@ class AdBreaks {
      * The breaks of the live channel being played that the blacks between its adverts give away
      * (see [Separators]), as times of day (ms since 1970), both ends in the adverts.
      */
-    var separated: List<LongRange> = emptyList()
+    var separated: List<SeparatedBreak> = emptyList()
 
     /**
      * Where playback is, in the time of a break's [AdBreak.id]: the time of day on a live stream, the
@@ -135,11 +135,11 @@ class AdBreaks {
                 ?.let { return breakAt(it.first + shift, it.last + shift, zero + it.first, guessed = false) }
         }
         // Then the blacks between the adverts, whose ends are in them, and as the break began up to
-        // SEPARATED_LEAD_MS before its first, one gone back into there was gone back into.
-        separated.firstOrNull { at >= it.first - start && at < it.last - start }
-            ?.let { return breakAt(it.first - start, it.last - start, it.first - SEPARATED_LEAD_MS, guessed = true, sure = true, separated = true) }
+        // SEPARATED_LEAD_MS before its first black, one gone back into there was gone back into.
+        separated.firstOrNull { at >= it.range.first - start && at < it.range.last - start }
+            ?.let { return breakAt(it.range.first - start, it.range.last - start, it.firstMs - SEPARATED_LEAD_MS, guessed = true, sure = true, separated = true) }
         return guessed.firstOrNull { at >= it.range.first - start && at < liveEnd(it) - start }
-            ?.let { breakAt(it.range.first - start, liveEnd(it, separated) - start, it.range.first, guessed = true, sure = it.sure) }
+            ?.let { breakAt(it.range.first - start, liveEnd(it, separated.map { s -> s.range }) - start, it.range.first, guessed = true, sure = it.sure) }
     }
 
     /**
