@@ -149,8 +149,6 @@ object RecordingBreaks {
         val index = representation.index ?: return emptyList()
         val base = representation.baseUrls.firstOrNull()?.url ?: return emptyList()
         val lengthUs = Util.msToUs(lengthMs)
-        val count = index.getSegmentCount(lengthUs)
-        if (count !in 1..MAX_SEGMENTS) return emptyList()
         val first = index.firstSegmentNum
         // Segments that are numbered rather than timed, as older recordings have them, are timed by
         // the player library from the start of the recording, though the first may begin before it:
@@ -159,8 +157,14 @@ object RecordingBreaks {
         // segment before, nor after: that would be numbers that do not count from the same start.
         val length = index.getDurationUs(first, lengthUs)
         val early = if (index.isExplicit) 0L else ((first - 1) * length - representation.presentationTimeOffsetUs).takeIf { it < 0 && -it < length } ?: 0L
+        // As many as reach the end of the recording from where the first begins: counted from its
+        // start, as the library does (it reads no endNumber), the last strip of thumbnails is left
+        // out, and with it the logo coming back after a break in the last minutes.
+        val spanUs = lengthUs - early
+        val count = index.getSegmentCount(spanUs)
+        if (count !in 1..MAX_SEGMENTS) return emptyList()
         return (first until first + count).map { n ->
-            Segment(Util.usToMs(index.getTimeUs(n) + early), Util.usToMs(index.getDurationUs(n, lengthUs)), index.getSegmentUrl(n).resolveUri(base))
+            Segment(Util.usToMs(index.getTimeUs(n) + early), Util.usToMs(index.getDurationUs(n, spanUs)), index.getSegmentUrl(n).resolveUri(base))
         }
     }
 
