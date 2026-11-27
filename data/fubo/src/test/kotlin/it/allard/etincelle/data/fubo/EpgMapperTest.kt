@@ -98,6 +98,32 @@ class EpgMapperTest {
     }
 
     @Test
+    fun `a programme is on air from its start to just before its end`() {
+        val response = EpgResponse(
+            listOf(
+                EpgEntryDto(
+                    EpgChannelDataDto(
+                        EpgChannelDto("600045", "m6", "M6", null),
+                        listOf(
+                            EpgProgramWithAssetsDto(
+                                EpgProgramDto("La meilleure cuisine régionale", null, null),
+                                listOf(EpgAssetDto(EpgAccessRightsDto("2026-11-27T17:40:00Z", "2026-11-27T18:45:00Z"), "LIVE_1")),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        fun card(now: String) = response.toGuidePage(nowMs = rfc3339UtcToEpochMillis(now)!!).rails.single().cards.single()
+        assertEquals("LIVE_1", card("2026-11-27T17:39:59Z").vodId)
+        assertEquals("600045", card("2026-11-27T17:40:00Z").channelId)
+        assertEquals("600045", card("2026-11-27T18:44:59Z").channelId)
+        // Ended, as in a guide loaded before then, it opens its own page again.
+        assertEquals("LIVE_1", card("2026-11-27T18:45:00Z").vodId)
+        assertNull(card("2026-11-27T18:45:00Z").channelId)
+    }
+
+    @Test
     fun `an episode is listed under its show's name, its own title below`() {
         val response = EpgResponse(
             listOf(
