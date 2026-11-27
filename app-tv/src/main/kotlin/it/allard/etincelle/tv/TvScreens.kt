@@ -1318,6 +1318,8 @@ private fun TvCard(card: ContentCard, onCardClick: (ContentCard) -> Unit, focusM
     // A genre/category tile carries no artwork; draw the brand icon instead of a blank box.
     val categoryIcon = if (card.channelId == null && card.vodId == null) categoryIconRes(card.title) else null
     var focused by remember { mutableStateOf(false) }
+    // The focus border is drawn over the picture's edges: the progress bar goes inside it.
+    val border = if (focused) 3.dp else 0.dp
     val toggleFavorite = LocalFavoriteToggle.current
     // Artwork keeps its own shape: landscape cards are wider, posters as tall as the official app's.
     val w = when (card.shape) {
@@ -1333,7 +1335,7 @@ private fun TvCard(card: ContentCard, onCardClick: (ContentCard) -> Unit, focusM
                 .onFocusChanged { focused = it.isFocused }
                 .clip(RoundedCornerShape(10.dp))
                 .background(BackgroundLevel1)
-                .border(if (focused) 3.dp else 0.dp, if (focused) Color.White else Color.Transparent, RoundedCornerShape(10.dp))
+                .border(border, if (focused) Color.White else Color.Transparent, RoundedCornerShape(10.dp))
                 // A long press of OK on a channel adds it to the favourites or removes it.
                 .combinedClickable(
                     onLongClick = toggleFavorite?.takeIf { card.favorite != null }?.let { { it(card) } },
@@ -1365,7 +1367,7 @@ private fun TvCard(card: ContentCard, onCardClick: (ContentCard) -> Unit, focusM
                 )
             }
             card.tag?.let { CardTagPill(it) }
-            card.progress?.let { CardProgressBar(it) }
+            card.progress?.let { CardProgressBar(it, Modifier.padding(start = border, end = border, bottom = border)) }
             // The logo of the channel offering the card, as the official app shows it.
             card.channelLogoUrl?.let {
                 AsyncImage(

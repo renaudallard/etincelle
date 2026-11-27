@@ -30,17 +30,18 @@ private const val WATCHED = 0xFFFFFFFF
 
 /**
  * A card's progress along the bottom of its picture, as the official app draws it: a live programme
- * as far as the clock, moving with it, or one watched before as far as it was watched.
+ * as far as the clock, moving with it, or one watched before as far as it was watched. [modifier]
+ * moves it off that edge, for a card whose border is drawn over it.
  */
 @Composable
-fun BoxScope.CardProgressBar(progress: CardProgress, height: Dp = 3.dp) {
+fun BoxScope.CardProgressBar(progress: CardProgress, modifier: Modifier = Modifier, height: Dp = 3.dp) {
     val now by produceState(System.currentTimeMillis(), progress) {
         while (progress.live) {
             delay(TICK_MS)
             value = System.currentTimeMillis()
         }
     }
-    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(height).background(Color(progress.track ?: TRACK))) {
+    Box(modifier.align(Alignment.BottomCenter).fillMaxWidth().height(height).background(Color(progress.track ?: TRACK))) {
         Box(
             Modifier.fillMaxHeight().fillMaxWidth(progress.filledAt(now))
                 .background(Color(progress.color ?: if (progress.live) LIVE else WATCHED)),
