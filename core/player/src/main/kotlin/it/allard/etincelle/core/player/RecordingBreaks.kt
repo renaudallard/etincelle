@@ -29,7 +29,6 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
@@ -41,7 +40,9 @@ import kotlinx.coroutines.sync.withPermit
  * [BreakGuess] reads the breaks from them. It means fetching every caption segment (about a megabyte
  * for an hour) and two strips of thumbnails in three (some fifteen megabytes, a hundredth of what
  * playing the hour takes), once per recording for as long as the app lives. Some ten seconds on a
- * home network.
+ * home network. The blacks between its adverts (see [SeparatorBreaks.recording]) are read once per
+ * recording too, from the first bytes of every segment of two renditions: some eight megabytes an
+ * hour, about a minute.
  */
 object RecordingBreaks {
     private const val CAPTIONS_AT_ONCE = 6
@@ -65,54 +66,67 @@ object RecordingBreaks {
     // Not the screen's: a search cut short by leaving it would download it all again on return.
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    // Nor cancelled with it, so recordings opened one after the other would be searched all at once,
-    // each with its downloads and its pictures in memory: one at a time.
-    private val oneAtATime = Mutex()
-
-    // All three under the lock of [known].
-    private val known = LinkedHashMap<String, List<Guess>>()
-    private val running = HashMap<String, Deferred<List<Guess>?>>()
-    private val failedAt = LinkedHashMap<String, Long>()
+    // By the captions and thumbnails, and by the blacks between the adverts.
+    private val guesses = Searches<List<Guess>> { read(it) }
+    private val blacks = Searches<List<SeparatedBreak>> { SeparatorBreaks().recording(it) }
 
     /**
      * The breaks of the recording [key], whose [manifest] the player holds, as positions (ms) in it.
      * Empty when none is found; null when it could not be read, and is not to be asked again before
      * [RETRY_MS].
      */
-    suspend fun find(key: String, manifest: DashManifest): List<Guess>? {
-        val search = synchronized(known) {
-            known[key]?.let { return it }
-            // What could not be read is not remembered as nothing found: asked again a while later.
-            failedAt[key]?.let { if (SystemClock.elapsedRealtime() - it < RETRY_MS) return null }
-            // The search cannot finish before it is listed: it takes the lock to say so.
-            running.getOrPut(key) { scope.async { search(key, manifest) } }
-        }
-        return search.await()
-    }
+    suspend fun find(key: String, manifest: DashManifest): List<Guess>? = guesses.find(key, manifest)
 
-    private suspend fun search(key: String, manifest: DashManifest): List<Guess>? {
-        var found: List<Guess>? = null
-        try {
-            found = try {
-                oneAtATime.withLock { read(manifest) }
-            } catch (e: IOException) {
-                null
+    /** The breaks that the blacks between the adverts of the recording [key] give, as [find] does. */
+    suspend fun separated(key: String, manifest: DashManifest): List<SeparatedBreak>? = blacks.find(key, manifest)
+
+    // What a search found in each of the last KNOWN recordings, so that coming back to one, or to the
+    // phone's player after a cast, does not download it again.
+    private class Searches<T : Any>(private val look: suspend (DashManifest) -> T?) {
+        // Nor cancelled with the screen, so recordings opened one after the other would be searched
+        // all at once, each with its downloads, and its pictures in memory: one at a time.
+        private val oneAtATime = Mutex()
+
+        // All three under the lock of [known].
+        private val known = LinkedHashMap<String, T>()
+        private val running = HashMap<String, Deferred<T?>>()
+        private val failedAt = LinkedHashMap<String, Long>()
+
+        suspend fun find(key: String, manifest: DashManifest): T? {
+            val search = synchronized(known) {
+                known[key]?.let { return it }
+                // What could not be read is not remembered as nothing found: asked again a while later.
+                failedAt[key]?.let { if (SystemClock.elapsedRealtime() - it < RETRY_MS) return null }
+                // The search cannot finish before it is listed: it takes the lock to say so.
+                running.getOrPut(key) { scope.async { search(key, manifest) } }
             }
-        } finally {
-            synchronized(known) {
-                running.remove(key)
-                failedAt.remove(key)
-                val guesses = found
-                if (guesses == null) {
-                    failedAt[key] = SystemClock.elapsedRealtime()
-                    if (failedAt.size > KNOWN) failedAt.remove(failedAt.keys.first())
-                } else {
-                    known[key] = guesses
-                    if (known.size > KNOWN) known.remove(known.keys.first())
+            return search.await()
+        }
+
+        private suspend fun search(key: String, manifest: DashManifest): T? {
+            var found: T? = null
+            try {
+                found = try {
+                    oneAtATime.withLock { look(manifest) }
+                } catch (e: IOException) {
+                    null
+                }
+            } finally {
+                synchronized(known) {
+                    running.remove(key)
+                    failedAt.remove(key)
+                    val result = found
+                    if (result == null) {
+                        failedAt[key] = SystemClock.elapsedRealtime()
+                        if (failedAt.size > KNOWN) failedAt.remove(failedAt.keys.first())
+                    } else {
+                        known[key] = result
+                        if (known.size > KNOWN) known.remove(known.keys.first())
+                    }
                 }
             }
+            return found
         }
-        return found
     }
 
     private suspend fun read(manifest: DashManifest): List<Guess> = coroutineScope {
@@ -269,36 +283,25 @@ suspend fun AdSkipper.followRecording(
     window: Timeline.Window,
     onBreak: (AdBreak?) -> Unit,
 ): Unit = coroutineScope {
-    var manifest = manifestOf(player, key)
-    // The blacks between its adverts, where its channel has them, read at once from its segments.
-    launch {
-        val separators = SeparatorBreaks()
+    val manifest = manifestOf(player, key)
+    fun <T : Any> follow(find: suspend (DashManifest) -> T?, found: (T) -> Unit) = launch {
         var dash = manifest
         var wait = RecordingBreaks.RETRY_MS
         while (true) {
-            withContext(Dispatchers.IO) { separators.recording(dash) }?.let {
-                recordedSeparated(it)
-                return@launch
-            }
-            delay(wait)
-            wait *= 2
-            dash = manifestOf(player, key)
-        }
-    }
-    launch {
-        var wait = RecordingBreaks.RETRY_MS
-        while (true) {
-            RecordingBreaks.find(key, manifest)?.let {
-                recorded(it)
+            find(dash)?.let {
+                found(it)
                 return@launch
             }
             delay(wait)
             // Less and less often: one that can never be read would be downloaded again and again.
             wait *= 2
             // The player's own by then: a recording still being made has become whole.
-            manifest = manifestOf(player, key)
+            dash = manifestOf(player, key)
         }
     }
+    // The blacks between its adverts, where its channel has them, read from its segments.
+    follow({ RecordingBreaks.separated(key, it) }) { recordedSeparated(it) }
+    follow({ RecordingBreaks.find(key, it) }) { recorded(it) }
     while (true) {
         onBreak(if (recordingOf(player) == key) tick(player, window) else null)
         delay(1000)
