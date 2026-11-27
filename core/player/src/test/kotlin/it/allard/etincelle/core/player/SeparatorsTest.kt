@@ -191,14 +191,18 @@ class SeparatorsTest {
     }
 
     @Test
-    fun `a segment that cannot be read is asked for again a few times, then once a minute`() {
+    fun `a segment that cannot be read is asked for again a few times, then less and less often`() {
         assertFalse(SeparatorBreaks.again(null, 0))
         assertTrue(SeparatorBreaks.again(SeparatorBreaks.Miss(1, 0), 4_000))
         assertTrue(SeparatorBreaks.again(SeparatorBreaks.Miss(2, 0), 4_000))
         assertFalse(SeparatorBreaks.again(SeparatorBreaks.Miss(3, 0), 4_000))
         assertFalse(SeparatorBreaks.again(SeparatorBreaks.Miss(3, 0), 59_999))
         assertTrue(SeparatorBreaks.again(SeparatorBreaks.Miss(3, 0), 60_000))
-        assertTrue(SeparatorBreaks.again(SeparatorBreaks.Miss(9, 120_000), 180_000))
+        assertFalse(SeparatorBreaks.again(SeparatorBreaks.Miss(4, 100_000), 219_999))
+        assertTrue(SeparatorBreaks.again(SeparatorBreaks.Miss(4, 100_000), 220_000))
+        assertFalse(SeparatorBreaks.again(SeparatorBreaks.Miss(6, 0), 479_999))
+        assertTrue(SeparatorBreaks.again(SeparatorBreaks.Miss(6, 0), 480_000))
+        assertFalse(SeparatorBreaks.again(SeparatorBreaks.Miss(7, 0), 86_400_000))
     }
 
     @Test

@@ -352,14 +352,20 @@ internal class SeparatorBreaks {
         private const val AT_ONCE = 6
 
         // A segment that cannot be read is asked for again at the next looks, TRIES times in all,
-        // then once every AGAIN_MS: the service refuses one rendition of a small channel now and then
-        // for some minutes (Toute l'Histoire, Automoto and AB 1 in November 2026), and answers again
-        // after.
+        // then AGAIN_MS later, and twice as long after each of the LATER tries that fail: the service
+        // refuses one rendition of a small channel now and then for some minutes (Toute l'Histoire,
+        // Automoto and AB 1 in November 2026), and answers again after. What it goes on refusing is
+        // let be, rather than asked for every minute while in reach.
         private const val TRIES = 3
         private const val AGAIN_MS = 60_000L
+        private const val LATER = 4
 
         /** Whether a segment that could not be read, as [miss] says, is to be asked for again at [nowMs]. */
-        internal fun again(miss: Miss?, nowMs: Long): Boolean = miss != null && (miss.times < TRIES || nowMs - miss.atMs >= AGAIN_MS)
+        internal fun again(miss: Miss?, nowMs: Long): Boolean {
+            if (miss == null) return false
+            val later = miss.times - TRIES
+            return later < 0 || (later < LATER && nowMs - miss.atMs >= AGAIN_MS shl later)
+        }
 
         // A segment's header, to the end of its first moof, was 2609 bytes in every rendition of
         // these channels in November 2026; more is read when it is longer.
