@@ -52,6 +52,7 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -1257,11 +1258,12 @@ private fun TvPlayerSurface(
         TvSeekAndBar(player, seekWindow, { seekShown }, { parked }, programWindow, { barGeometry }, controlsVisible)
         // With or without the controls, for as long as the break can be skipped. A click is for a
         // mouse or a touch screen: the remote's OK is taken above, and with the controls up it skips
-        // once the pill is selected.
+        // once the pill is selected. Never focused: the remote's arrows would leave the controls
+        // for it, and from there reach neither them nor the keys above.
         if (adBreak != null) {
             SkipAdsButton(
                 onClick = { skipAd() },
-                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 48.dp)
+                modifier = Modifier.focusProperties { canFocus = false }.align(Alignment.CenterEnd).padding(end = 48.dp)
                     .then(if (skipSelected) Modifier.border(3.dp, Color.White, CircleShape) else Modifier),
                 label = if (controlsVisible && !skipSelected) "Passer la pub" else "Passer la pub : OK",
             )
@@ -1271,7 +1273,7 @@ private fun TvPlayerSurface(
             // focused, so the OK meant to pause or show the controls does not jump back to live.
             ReturnToLiveButton(
                 onClick = { player.seekToDefaultPosition() },
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 24.dp)
+                modifier = Modifier.focusProperties { canFocus = false }.align(Alignment.TopCenter).padding(top = 24.dp)
                     .then(if (pillSelected) Modifier.border(3.dp, Color.White, CircleShape) else Modifier),
             )
         }
