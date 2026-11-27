@@ -68,6 +68,13 @@ class AdBreaks {
     var recorded: List<Guess> = emptyList()
 
     /**
+     * The breaks of the recording being played that the blacks between its adverts give away (see
+     * [SeparatorBreaks.recording]), by their place in it. Only one within a break of [recorded] counts
+     * (see [confirmed]).
+     */
+    var recordedSeparated: List<SeparatedBreak> = emptyList()
+
+    /**
      * The breaks of the live channel being played that its pictures give away (see [LiveBreaks]), as
      * times of day (ms since 1970): those the stream does not mark.
      */
@@ -99,6 +106,12 @@ class AdBreaks {
     fun current(player: Player, window: Timeline.Window): AdBreak? {
         val at = player.currentPosition
         if (!player.isCurrentMediaItemLive) {
+            // The blacks between the adverts first, where the pictures or captions also have the
+            // programme away: both ends are in the adverts, and as on a live stream the break may have
+            // begun up to SEPARATED_LEAD_MS before its first black.
+            confirmed(recordedSeparated, recorded).firstOrNull { at >= it.range.first && at < it.range.last }?.let {
+                return AdBreak(it.range.first, it.range.last, it.firstMs - SEPARATED_LEAD_MS, skippable = at < it.range.last - LAST_MOMENT_MS, guessed = true, sure = true, separated = true)
+            }
             return recorded.firstOrNull { at >= it.range.first && at < it.range.last - GUESS_EARLY_MS }?.let {
                 val end = it.range.last - GUESS_EARLY_MS
                 AdBreak(it.range.first, end, it.range.first, skippable = at < end - LAST_MOMENT_MS, guessed = true, sure = it.sure)
@@ -170,6 +183,14 @@ class AdBreaks {
         // How long before the first black between its adverts a break begins, at the most: the card
         // that opens it and the first advert, 8 to 45 s on M6 and Gulli in November 2026.
         private const val SEPARATED_LEAD_MS = 45_000L
+
+        /**
+         * The breaks of [separated] that lie within one of [guesses], a recording's breaks by its
+         * pictures and captions: where the programme is away by those too, so that blacks in a
+         * programme, on a channel that has none between its adverts, never make one.
+         */
+        fun confirmed(separated: List<SeparatedBreak>, guesses: List<Guess>): List<SeparatedBreak> =
+            separated.filter { s -> guesses.any { it.range.first <= s.range.first && s.range.last <= it.range.last } }
 
         /** Where the live break [guess] is taken to end. */
         fun liveEnd(guess: Guess) = guess.range.last - if (guess.sure) SURE_EARLY_MS else GUESS_EARLY_MS

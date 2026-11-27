@@ -305,6 +305,32 @@ internal class SeparatorBreaks {
         Separators.found(renditions.values.flatMap { of -> of.read.values.flatMap { it.asList() } })
     }
 
+    /**
+     * The breaks of the recording [dash] describes, by their place in it (ms), from every segment of
+     * the renditions [Separators.BLACKS] lists, or null when too many could not be read to tell. For
+     * an IO thread.
+     */
+    suspend fun recording(dash: DashManifest): List<SeparatedBreak>? = lock.withLock {
+        val lengthMs = dash.durationMs
+        if (dash.dynamic || lengthMs == C.TIME_UNSET || lengthMs <= 0) return@withLock null
+        // In slices, as a rendition gives at most MOST segments at a time.
+        val all = (0L until lengthMs step SLICE_MS).flatMap { segments(dash, it, minOf(it + SLICE_MS, lengthMs)) }
+            .distinctBy { it.height to it.startMs }
+        if (all.isEmpty()) return@withLock null
+        val got = arrayOfNulls<LongArray>(all.size)
+        repeat(TRIES) {
+            val todo = all.indices.filter { got[it] == null }
+            if (todo.isNotEmpty()) {
+                coroutineScope {
+                    val gate = Semaphore(AT_ONCE)
+                    todo.map { i -> async { gate.withPermit { ensureActive(); got[i] = ends(all[i]) } } }.awaitAll()
+                }
+            }
+        }
+        if (got.count { it == null } * MISSED_IN > all.size) return@withLock null
+        Separators.found(got.filterNotNull().flatMap { it.asList() })
+    }
+
     // Where the separators of [segment] end; null when it cannot be read.
     private fun ends(segment: Segment): LongArray? {
         var bytes = fetch(segment, HEAD_BYTES) ?: return null
@@ -361,17 +387,24 @@ internal class SeparatorBreaks {
         // short.
         private const val MOST = 1000
 
+        // A recording's segments are listed this much at a time, under MOST; its breaks are told when
+        // all but one in MISSED_IN of them could be read.
+        private const val SLICE_MS = 1_800_000L
+        private const val MISSED_IN = 10
+
         /**
          * The segments of the video renditions of [dash] that [Separators.BLACKS] lists, the lowest
-         * of each height there, that play between [fromMs] and [toMs] (ms since 1970), in order for
-         * each.
+         * of each height there, that play between [fromMs] and [toMs] (ms since 1970 on a live stream,
+         * from its start in a recording), in order for each.
          */
         fun segments(dash: DashManifest, fromMs: Long, toMs: Long): List<Segment> {
             val out = ArrayList<Segment>()
-            if (dash.availabilityStartTimeMs == C.TIME_UNSET || toMs <= fromMs) return out
+            // A live stream's times are of day, a recording's from its start.
+            val zeroMs = if (dash.dynamic) dash.availabilityStartTimeMs else 0L
+            if (zeroMs == C.TIME_UNSET || toMs <= fromMs) return out
             for (i in 0 until dash.periodCount) {
                 val period = dash.getPeriod(i)
-                val periodMs = dash.availabilityStartTimeMs + period.startMs
+                val periodMs = zeroMs + period.startMs
                 val lengthUs = dash.getPeriodDurationUs(i)
                 val reps = period.adaptationSets.filter { it.type == C.TRACK_TYPE_VIDEO }.flatMap { it.representations }
                     .filter { it.format.bitrate > 0 && it.format.height in Separators.BLACKS }

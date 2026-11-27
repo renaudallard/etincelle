@@ -57,6 +57,14 @@ class AdSkipper(private val skip: SkipAds) : Player.Listener {
         breaks.recorded = found
     }
 
+    /**
+     * The breaks of the recording being played that the blacks between its adverts give away (see
+     * [SeparatorBreaks.recording]).
+     */
+    fun recordedSeparated(found: List<SeparatedBreak>) {
+        breaks.recordedSeparated = found
+    }
+
     /** The breaks of the live channel being played that its pictures give away (see [LiveBreaks]). */
     fun guessed(found: List<Guess>) {
         breaks.guessed = found

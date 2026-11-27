@@ -144,4 +144,19 @@ class AdBreaksTest {
         assertEquals(376_000L, AdBreaks.liveEnd(sure, listOf(200_000L..370_000L)))
         assertEquals(500_000L, AdBreaks.liveEnd(sure, listOf(370_000L..500_000L)))
     }
+
+    @Test
+    fun `a recording's break by its blacks counts only within one by its pictures or captions`() {
+        // Très très bon, S16 E30: the blacks give 1443 to 1698 s and 3252 to 3464 s, the pictures
+        // and captions 1388 to 1736 s and 3152 to 3716 s.
+        val first = SeparatedBreak(1_443_000L..1_698_000L, 1_420_000L)
+        val second = SeparatedBreak(3_252_000L..3_464_000L, 3_230_000L)
+        val guesses = listOf(Guess(1_388_000L..1_736_000L), Guess(3_152_000L..3_716_000L))
+        assertEquals(listOf(first, second), AdBreaks.confirmed(listOf(first, second), guesses))
+        // Blacks in a programme, where the logo is on, make no break; nor do they across its return.
+        val programme = SeparatedBreak(2_000_000L..2_200_000L, 1_980_000L)
+        val across = SeparatedBreak(3_600_000L..3_800_000L, 3_580_000L)
+        assertEquals(listOf(first), AdBreaks.confirmed(listOf(first, programme, across), guesses))
+        assertEquals(emptyList<SeparatedBreak>(), AdBreaks.confirmed(listOf(first), emptyList()))
+    }
 }

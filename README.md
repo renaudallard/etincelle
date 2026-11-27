@@ -103,8 +103,10 @@ Les coupures sont trouvées de quatre façons :
   perdre le début de l'émission.
 
 Au direct, il n'y a nulle part où sauter. Dans un **enregistrement**, les coupures sont cherchées à
-l'ouverture d'après ses vignettes et ses sous-titres. Sur un **Chromecast**, c'est le récepteur qui les
-cherche de la même façon et affiche **Passer la pub : OK**.
+l'ouverture d'après ses vignettes et ses sous-titres, et d'après les noirs entre les publicités sur les
+chaînes qui en mettent : une coupure ainsi trouvée à l'intérieur d'une coupure des vignettes est sûre.
+Sur un **Chromecast**, c'est le récepteur qui les cherche, de la même façon sauf les noirs d'un
+enregistrement, et affiche **Passer la pub : OK**.
 
 ### Fiches, séries et épisodes
 

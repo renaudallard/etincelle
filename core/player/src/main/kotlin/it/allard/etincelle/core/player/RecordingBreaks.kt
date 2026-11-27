@@ -29,6 +29,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
@@ -269,6 +270,21 @@ suspend fun AdSkipper.followRecording(
     onBreak: (AdBreak?) -> Unit,
 ): Unit = coroutineScope {
     var manifest = manifestOf(player, key)
+    // The blacks between its adverts, where its channel has them, read at once from its segments.
+    launch {
+        val separators = SeparatorBreaks()
+        var dash = manifest
+        var wait = RecordingBreaks.RETRY_MS
+        while (true) {
+            withContext(Dispatchers.IO) { separators.recording(dash) }?.let {
+                recordedSeparated(it)
+                return@launch
+            }
+            delay(wait)
+            wait *= 2
+            dash = manifestOf(player, key)
+        }
+    }
     launch {
         var wait = RecordingBreaks.RETRY_MS
         while (true) {
