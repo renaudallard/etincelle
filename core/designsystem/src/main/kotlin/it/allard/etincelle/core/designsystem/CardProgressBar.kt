@@ -17,6 +17,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import it.allard.etincelle.core.model.CardProgress
 import kotlinx.coroutines.delay
 
@@ -35,10 +38,17 @@ private const val WATCHED = 0xFFFFFFFF
  */
 @Composable
 fun BoxScope.CardProgressBar(progress: CardProgress, modifier: Modifier = Modifier, height: Dp = 3.dp) {
-    val now by produceState(System.currentTimeMillis(), progress) {
-        while (progress.live) {
-            delay(TICK_MS)
-            value = System.currentTimeMillis()
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val now by produceState(System.currentTimeMillis(), progress, lifecycle) {
+        val end = progress.endMs?.takeIf { progress.live } ?: return@produceState
+        // Only while the app is on screen, and from the clock again each time it comes back: a wait
+        // does not count the time the device sleeps.
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                value = System.currentTimeMillis()
+                if (value >= end) break
+                delay(TICK_MS)
+            }
         }
     }
     Box(modifier.align(Alignment.BottomCenter).fillMaxWidth().height(height).background(Color(progress.track ?: TRACK))) {
