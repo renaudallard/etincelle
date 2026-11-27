@@ -103,10 +103,11 @@ class AdSkipper(private val skip: SkipAds) : Player.Listener {
     }
 
     /**
-     * The button was used: to the end of the break playback is in. Looked up again rather than taken
-     * from what [tick] gave, whose positions are those of a window that has slid since.
+     * The button was used: to where a skip asked for in the break playback is in goes (see
+     * [AdBreak.askedEndMs]). Looked up again rather than taken from what [tick] gave, whose
+     * positions are those of a window that has slid since.
      */
     fun skip(player: Player, window: Timeline.Window) {
-        breaks.current(player, window)?.takeIf { it.skippable }?.let { player.seekTo(it.endMs) }
+        breaks.current(player, window)?.takeIf { it.skippable }?.let { player.seekTo(it.askedEndMs) }
     }
 }

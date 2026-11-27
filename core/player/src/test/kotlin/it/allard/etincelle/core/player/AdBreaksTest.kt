@@ -172,6 +172,23 @@ class AdBreaksTest {
         assertEquals(500_000L, AdBreaks.liveEnd(sure, listOf(370_000L..500_000L)))
     }
 
+    // M6, 27 November 2026, 19:01:52: the logo goes at a sponsor's card after the programme, then come
+    // trailers, adverts from 19:02:43, their first black at 19:02:58, a break by the blacks from
+    // 19:03:14 to 19:06:36, the channel's card, trailers, and the logo is back at 19:07:52.
+    private fun t(h: Int, m: Int, s: Int) = ((h * 60 + m) * 60 + s) * 1_000L
+    private val logo = Guess(t(19, 1, 52)..t(19, 7, 52))
+    private val blacks = SeparatedBreak(t(19, 3, 14)..t(19, 6, 36), t(19, 2, 58))
+
+    @Test
+    fun `a skip asked for in a break by the blacks goes on as far as the logo's break it lies in`() {
+        // As pressed before the blacks' break: 32 s before the logo is back.
+        assertEquals(t(19, 7, 20), AdBreaks.askedEnd(blacks, listOf(logo)) { AdBreaks.liveEnd(it, listOf(blacks.range)) })
+        // A logo's break taken to end before the blacks do takes the skip no further.
+        assertEquals(null, AdBreaks.askedEnd(blacks, listOf(Guess(t(19, 1, 52)..t(19, 7, 0)))) { AdBreaks.liveEnd(it) })
+        // Nor one that begins after the blacks' break.
+        assertEquals(null, AdBreaks.askedEnd(blacks, listOf(Guess(t(19, 6, 40)..t(19, 9, 0)))) { AdBreaks.liveEnd(it) })
+    }
+
     @Test
     fun `a recording's break by its blacks counts only within one by its pictures or captions`() {
         // Très très bon, S16 E30: the blacks give 1443 to 1698 s and 3252 to 3464 s, the pictures

@@ -18,7 +18,9 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  * is one, as in a recording (see [RecordingBreaks]) or by a live channel's pictures (see
  * [LiveBreaks]): for a button to offer, and to skip unasked only when [sure] and the settings
  * allow it (see [SkipAds]). [separated] when found by the blacks between its adverts (see
- * [Separators]): both its ends are then in the adverts, and it is sure from its start.
+ * [Separators]): both its ends are then in the adverts, and it is sure from its start. A skip asked
+ * for goes to [askedEndMs], which is [endMs] but where such a break lies in one by the logo that is
+ * taken to end later (see [AdBreaks.askedEnd]).
  */
 data class AdBreak(
     val startMs: Long,
@@ -28,6 +30,7 @@ data class AdBreak(
     val guessed: Boolean = false,
     val sure: Boolean = false,
     val separated: Boolean = false,
+    val askedEndMs: Long = endMs,
 )
 
 /**
@@ -109,8 +112,10 @@ class AdBreaks {
             // The blacks between the adverts first, where the pictures or captions also have the
             // programme away: both ends are in the adverts, and as on a live stream the break may have
             // begun up to SEPARATED_LEAD_MS before its first black.
-            confirmed(recordedSeparated, recorded).firstOrNull { at >= it.range.first && at < it.range.last }?.let {
-                return AdBreak(it.range.first, it.range.last, it.firstMs - SEPARATED_LEAD_MS, skippable = at < it.range.last - LAST_MOMENT_MS, guessed = true, sure = true, separated = true)
+            val sure = confirmed(recordedSeparated, recorded)
+            sure.firstOrNull { at >= it.range.first && at < it.range.last }?.let { s ->
+                val asked = askedEnd(s, recorded) { it.range.last - GUESS_EARLY_MS } ?: s.range.last
+                return AdBreak(s.range.first, s.range.last, s.firstMs - SEPARATED_LEAD_MS, skippable = at < s.range.last - LAST_MOMENT_MS, guessed = true, sure = true, separated = true, askedEndMs = asked)
             }
             return recorded.firstOrNull { at >= it.range.first && at < it.range.last - GUESS_EARLY_MS }?.let {
                 val end = it.range.last - GUESS_EARLY_MS
@@ -123,8 +128,8 @@ class AdBreaks {
         val start = window.windowStartTimeMs
         if (start == C.TIME_UNSET) return null
         val live = window.defaultPositionMs
-        fun breakAt(from: Long, to: Long, id: Long, guessed: Boolean, sure: Boolean = false, separated: Boolean = false) =
-            AdBreak(from, to, id, skippable = at < to - LAST_MOMENT_MS && to <= live - LIVE_MARGIN_MS, guessed = guessed, sure = sure, separated = separated)
+        fun breakAt(from: Long, to: Long, id: Long, guessed: Boolean, sure: Boolean = false, separated: Boolean = false, askedTo: Long? = null) =
+            AdBreak(from, to, id, skippable = at < to - LAST_MOMENT_MS && to <= live - LIVE_MARGIN_MS, guessed = guessed, sure = sure, separated = separated, askedEndMs = askedTo ?: to)
         // What the stream marks is exact, and comes first.
         val dash = player.currentManifest as? DashManifest
         val zero = dash?.availabilityStartTimeMs ?: C.TIME_UNSET
@@ -149,10 +154,13 @@ class AdBreaks {
         }
         // Then the blacks between the adverts, whose ends are in them, and as the break began up to
         // SEPARATED_LEAD_MS before its first black, one gone back into there was gone back into.
-        separated.firstOrNull { at >= it.range.first - start && at < it.range.last - start }
-            ?.let { return breakAt(it.range.first - start, it.range.last - start, it.firstMs - SEPARATED_LEAD_MS, guessed = true, sure = true, separated = true) }
+        val ranges = separated.map { it.range }
+        separated.firstOrNull { at >= it.range.first - start && at < it.range.last - start }?.let { s ->
+            val asked = askedEnd(s, guessed) { liveEnd(it, ranges) }?.minus(start)?.takeIf { it <= live - LIVE_MARGIN_MS }
+            return breakAt(s.range.first - start, s.range.last - start, s.firstMs - SEPARATED_LEAD_MS, guessed = true, sure = true, separated = true, askedTo = asked)
+        }
         return guessed.firstOrNull { at >= it.range.first - start && at < liveEnd(it) - start }
-            ?.let { breakAt(it.range.first - start, liveEnd(it, separated.map { s -> s.range }) - start, it.range.first, guessed = true, sure = it.sure) }
+            ?.let { breakAt(it.range.first - start, liveEnd(it, ranges) - start, it.range.first, guessed = true, sure = it.sure) }
     }
 
     /**
@@ -191,6 +199,16 @@ class AdBreaks {
          */
         fun confirmed(separated: List<SeparatedBreak>, guesses: List<Guess>): List<SeparatedBreak> =
             separated.filter { s -> guesses.any { it.range.first <= s.range.first && s.range.last <= it.range.last } }
+
+        /**
+         * Where a skip asked for in the break [s] by the blacks between its adverts goes beyond its end:
+         * where one of [guesses] by the logo that it lies in is taken to end, [end], when later, as the
+         * cards and trailers after the last advert go too; null when none goes further. Pressed earlier
+         * in the logo's break, a skip goes there already. One unasked stays at the blacks' end, which is
+         * sure.
+         */
+        fun askedEnd(s: SeparatedBreak, guesses: List<Guess>, end: (Guess) -> Long): Long? =
+            guesses.filter { it.range.first < s.range.last }.map(end).filter { it > s.range.last }.maxOrNull()
 
         /** Where the live break [guess] is taken to end. */
         fun liveEnd(guess: Guess) = guess.range.last - if (guess.sure) SURE_EARLY_MS else GUESS_EARLY_MS
