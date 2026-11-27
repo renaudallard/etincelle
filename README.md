@@ -92,7 +92,8 @@ Les coupures sont trouvées de quatre façons :
 - **Signalées dans le flux** (groupes TF1 et France Télévisions, LCI) : exactes. Rien d'autre n'est
   proposé sur ces chaînes, dont les bandes-annonces et parrainages ne se distinguent pas sûrement du
   début de l'émission.
-- **Forme du flux** (groupe RMC, BFMTV, longues coupures de la nuit comprises) : exactes.
+- **Forme du flux** (groupe RMC, BFMTV, longues coupures de la nuit et coupures d'un seul bloc du
+  matin comprises) : exactes.
 - **Noirs entre les publicités** (M6, Gulli, Canal J, TIJI, Paris Première, Automoto, Toute
   l'Histoire, AB 1) : l'image est chiffrée, mais pas la taille de chaque image, et la demi-seconde de
   noir entre deux publicités s'y lit, dans trois qualités de la vidéo. La coupure va du deuxième noir

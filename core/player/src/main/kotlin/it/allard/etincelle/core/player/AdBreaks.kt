@@ -263,9 +263,23 @@ class AdBreaks {
                         beforeEnd - before.startMs in HALF_BREAK_MS && afterEnd - after.startMs in HALF_BREAK_MS
                     (before.startMs..afterEnd).takeIf { shaped }
                 }
+                // A break in one piece, as RMC Story's in the morning: one to seven minutes between two
+                // longer stretches, the one after it maybe still on air. Only on a stream that shows it
+                // cuts itself at its breaks, by one of the shape above: one cut at its programmes would
+                // lose a short one.
+                val alone = if (shaped.isEmpty()) emptyList() else (1 until stretches.size - 1).mapNotNull { i ->
+                    val before = stretches[i - 1]
+                    val block = stretches[i]
+                    val after = stretches[i + 1]
+                    val beforeEnd = before.endMs ?: return@mapNotNull null
+                    val blockEnd = block.endMs ?: return@mapNotNull null
+                    val single = !block.inserted && blockEnd - block.startMs in HALF_BREAK_MS &&
+                        beforeEnd - before.startMs > HALF_BREAK_MS.last && (after.endMs?.let { it - after.startMs > HALF_BREAK_MS.last } ?: true)
+                    (block.startMs..blockEnd).takeIf { single }
+                }
                 // The adverts of a break that aired since the stream was asked for, each a period of
                 // its own; the few seconds of jingle between its halves, left as aired, are merged in.
-                shaped + stretches.filter { it.inserted }.mapNotNull { stretch -> stretch.endMs?.let { stretch.startMs..it } }
+                shaped + alone + stretches.filter { it.inserted }.mapNotNull { stretch -> stretch.endMs?.let { stretch.startMs..it } }
             }
             val merged = mutableListOf<LongRange>()
             for (range in raw.sortedBy { it.first }) {

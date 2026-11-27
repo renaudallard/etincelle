@@ -98,6 +98,33 @@ class AdBreaksTest {
     }
 
     @Test
+    fun `a break in one piece counts on a stream that shows it cuts itself at its breaks`() {
+        fun plain(from: Long, to: Long?) = Stretch(from, to, emptyList(), signalled = false)
+        val s = 1_000L
+        // RMC Story, 26 November 2026 from 08:01:38: a break of 76 s, 5 s and 95 s, then breaks of
+        // one period of 183 s and 272 s between programme of 719 s and 1320 s, the last on air.
+        val morning = listOf(
+            plain(0, 600 * s),
+            plain(600 * s, 676 * s),
+            plain(676 * s, 681 * s),
+            plain(681 * s, 776 * s),
+            plain(776 * s, 1495 * s),
+            plain(1495 * s, 1678 * s),
+            plain(1678 * s, 2998 * s),
+            plain(2998 * s, 3270 * s),
+            plain(3270 * s, null),
+        )
+        assertEquals(listOf(600 * s..776 * s, 1495 * s..1678 * s, 2998 * s..3270 * s), AdBreaks.breaks(morning))
+        // Without a break with a jingle, nothing says the stream is cut at its breaks.
+        assertEquals(emptyList<LongRange>(), AdBreaks.breaks(morning.drop(4)))
+        // Seven minutes or more is programme, and so is a short stretch beside another short one.
+        val long = morning.take(5) + listOf(plain(1495 * s, 1925 * s), plain(1925 * s, 3000 * s), plain(3000 * s, null))
+        assertEquals(listOf(600 * s..776 * s), AdBreaks.breaks(long))
+        val beside = morning.take(5) + listOf(plain(1495 * s, 1700 * s), plain(1700 * s, 2000 * s), plain(2000 * s, null))
+        assertEquals(listOf(600 * s..776 * s), AdBreaks.breaks(beside))
+    }
+
+    @Test
     fun `the adverts the ad server puts in a break while it airs are a break`() {
         fun plain(from: Long, to: Long?) = Stretch(from, to, emptyList(), signalled = false)
         fun ad(from: Long, to: Long?) = Stretch(from, to, emptyList(), signalled = false, inserted = true)
