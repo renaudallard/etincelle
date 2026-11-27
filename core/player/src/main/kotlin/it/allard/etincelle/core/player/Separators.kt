@@ -259,11 +259,12 @@ internal class SeparatorBreaks {
 
     /**
      * The breaks around the playhead of the stream [dash] describes, at [atMs] with the live point
-     * at [liveMs] (ms since 1970), as far as they are known, in the same time. Reads the segments it
-     * still needs: for an IO thread.
+     * at [liveMs] and its newest media ending at [newestMs] by now (ms since 1970, null when unknown),
+     * as far as they are known, in the same time. Reads the segments it still needs: for an IO thread.
      */
-    suspend fun around(dash: DashManifest, atMs: Long, liveMs: Long): List<LongRange> = lock.withLock {
-        val wanted = segments(dash, atMs - FAR_MS, minOf(liveMs - NOT_YET_MS, atMs + FAR_MS)).filter {
+    suspend fun around(dash: DashManifest, atMs: Long, liveMs: Long, newestMs: Long?): List<LongRange> = lock.withLock {
+        val untilMs = minOf(liveMs - NOT_YET_MS, atMs + FAR_MS, if (newestMs != null) newestMs - FRESH_MS else Long.MAX_VALUE)
+        val wanted = segments(dash, atMs - FAR_MS, untilMs).filter {
             val of = renditions.getValue(it.height)
             it.startMs !in of.read || (of.missed[it.startMs] ?: TRIES) < TRIES
         }
@@ -324,6 +325,11 @@ internal class SeparatorBreaks {
         // every segment there could be read: reading on to it shows a break's last blacks sooner.
         private const val NOT_YET_MS = 1_000L
 
+        // Nor any that starts closer than this to where the newest one ends by now, should a channel
+        // set a latency that brings the live point near it: a segment is not always readable the
+        // moment it is listed. The receiver reads the same way.
+        private const val FRESH_MS = 8_000L
+
         // The most segments of a rendition listed at once, for a manifest that would give them too
         // short.
         private const val MOST = 1000
@@ -382,11 +388,25 @@ private const val LOOK_EVERY_MS = 4_000L
  */
 suspend fun AdSkipper.followSeparators(player: Player, window: Timeline.Window) {
     val breaks = SeparatorBreaks()
+    // The manifest last seen and when it came: its newest segment ends that much further on by now.
+    var seen: DashManifest? = null
+    var cameMs = 0L
     while (true) {
         val dash = player.currentManifest as? DashManifest
+        if (dash !== seen) {
+            seen = dash
+            cameMs = System.currentTimeMillis()
+        }
         val at = LivePlayback.playheadEpochMs(player, window)
         val behind = LivePlayback.behindLiveEdgeMs(player, window)
-        if (dash != null && at != null && behind > BEHIND_MS) separated(withContext(Dispatchers.IO) { breaks.around(dash, at, at + behind) })
+        // Where the newest media ends by now: where the window, as behindLiveEdgeMs has just read it,
+        // ends, plus the time since its manifest came.
+        val newest = if (window.windowStartTimeMs != C.TIME_UNSET && window.durationUs != C.TIME_UNSET) {
+            window.windowStartTimeMs + window.durationMs + (System.currentTimeMillis() - cameMs)
+        } else {
+            null
+        }
+        if (dash != null && at != null && behind > BEHIND_MS) separated(withContext(Dispatchers.IO) { breaks.around(dash, at, at + behind, newest) })
         delay(LOOK_EVERY_MS)
     }
 }
