@@ -314,26 +314,35 @@ internal class SeparatorBreaks {
         val lengthMs = dash.durationMs
         if (dash.dynamic || lengthMs == C.TIME_UNSET || lengthMs <= 0) return@withLock null
         if (around.isEmpty()) return@withLock emptyList()
-        // As far beyond each as a run of blacks reaches, so that one across its edge is read whole.
-        // In slices, as a rendition gives at most MOST segments at a time.
-        val all = around.flatMap { place ->
-            val fromMs = maxOf(0L, place.first - Separators.WIDE_GAP_MS)
-            val toMs = minOf(lengthMs, place.last + Separators.WIDE_GAP_MS)
-            (fromMs until toMs step SLICE_MS).flatMap { segments(dash, it, minOf(it + SLICE_MS, toMs)) }
-        }.distinctBy { it.height to it.startMs }
-        if (all.isEmpty()) return@withLock null
-        val got = arrayOfNulls<LongArray>(all.size)
-        repeat(TRIES) {
-            val todo = all.indices.filter { got[it] == null }
-            if (todo.isNotEmpty()) {
-                coroutineScope {
-                    val gate = Semaphore(AT_ONCE)
-                    todo.map { i -> async { gate.withPermit { ensureActive(); got[i] = ends(all[i]) } } }.awaitAll()
+        // What was read of each segment, by its height and start: its blacks, or null.
+        val read = HashMap<Pair<Int, Long>, LongArray?>()
+        // As far beyond each place as a run of blacks reaches, so that one across its edge is read
+        // whole, then further while one is found near an edge (see [widened]).
+        val reach = Separators.WIDE_GAP_MS
+        var places = around.map { maxOf(0L, it.first - reach)..minOf(lengthMs, it.last + reach) }
+        while (true) {
+            // In slices, as a rendition gives at most MOST segments at a time.
+            val todo = places.flatMap { place ->
+                (place.first until place.last step SLICE_MS).flatMap { segments(dash, it, minOf(it + SLICE_MS, place.last)) }
+            }.distinctBy { it.height to it.startMs }.filter { (it.height to it.startMs) !in read }
+            val got = arrayOfNulls<LongArray>(todo.size)
+            repeat(TRIES) {
+                val missing = todo.indices.filter { got[it] == null }
+                if (missing.isNotEmpty()) {
+                    coroutineScope {
+                        val gate = Semaphore(AT_ONCE)
+                        missing.map { i -> async { gate.withPermit { ensureActive(); got[i] = ends(todo[i]) } } }.awaitAll()
+                    }
                 }
             }
+            todo.forEachIndexed { i, segment -> read[segment.height to segment.startMs] = got[i] }
+            val wider = widened(places, read.values.filterNotNull().flatMap { it.asList() }, lengthMs)
+            if (wider == places) break
+            places = wider
         }
-        if (got.count { it == null } * MISSED_IN > all.size) return@withLock null
-        Separators.found(got.filterNotNull().flatMap { it.asList() })
+        if (read.isEmpty()) return@withLock null
+        if (read.values.count { it == null } * MISSED_IN > read.size) return@withLock null
+        Separators.found(read.values.filterNotNull().flatMap { it.asList() })
     }
 
     // Where the separators of [segment] end; null when it cannot be read.
@@ -364,6 +373,23 @@ internal class SeparatorBreaks {
         private const val TRIES = 3
         private const val AGAIN_MS = 60_000L
         private const val LATER = 4
+
+        /**
+         * The stretches of a recording [lengthMs] long read for their blacks, [places], once those
+         * [ends] are known: each edge with a black nearer than a run of blacks reaches (WIDE_GAP_MS)
+         * goes that much further, as the run may go on past it. A run cut short by an edge could end
+         * a break on a black of the programme after it, where reading the whole recording finds it
+         * ends outside the guessed break, and leaves it out.
+         */
+        internal fun widened(places: List<LongRange>, ends: List<Long>, lengthMs: Long): List<LongRange> {
+            val reach = Separators.WIDE_GAP_MS
+            fun near(edge: Long) = ends.any { it > edge - reach && it < edge + reach }
+            return places.map { place ->
+                val from = if (place.first > 0 && near(place.first)) maxOf(0L, place.first - reach) else place.first
+                val to = if (place.last < lengthMs && near(place.last)) minOf(lengthMs, place.last + reach) else place.last
+                from..to
+            }
+        }
 
         /** Whether a segment that could not be read, as [miss] says, is to be asked for again at [nowMs]. */
         internal fun again(miss: Miss?, nowMs: Long): Boolean {

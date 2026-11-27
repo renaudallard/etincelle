@@ -206,6 +206,28 @@ class SeparatorsTest {
     }
 
     @Test
+    fun `a recording is read further past an edge while a black is near it`() {
+        val s = 1_000L
+        // A guessed break read as 900 to 1400 s, its adverts' blacks every 30 s from 1030 to 1240 s,
+        // then blacks of the programme at 1290 and 1350 s, which may go on past 1400.
+        val place = listOf(900 * s..1400 * s)
+        val ends = (1030L..1240L step 30).map { it * s } + listOf(1290 * s, 1350 * s)
+        assertEquals(listOf(900 * s..1500 * s), SeparatorBreaks.widened(place, ends, 3600 * s))
+        // Nothing near either edge: as read.
+        assertEquals(place, SeparatorBreaks.widened(place, (1030L..1240L step 30).map { it * s }, 3600 * s))
+        // Never before the start of the recording nor after its end.
+        assertEquals(listOf(0L..1450 * s), SeparatorBreaks.widened(listOf(0L..1400 * s), listOf(20 * s, 1350 * s), 1450 * s))
+        // Read on to 1500 then 1600 s, the run is whole once none is that near: it ends at 1460 s,
+        // so the break ends at 1405 s, past the guessed one, and is left out, as when the whole
+        // recording is read; cut at 1400 s, it would end on the programme's 1290 s.
+        val whole = ends + listOf(1405 * s, 1460 * s)
+        assertEquals(listOf(900 * s..1600 * s), SeparatorBreaks.widened(listOf(900 * s..1500 * s), whole, 3600 * s))
+        assertEquals(listOf(900 * s..1600 * s), SeparatorBreaks.widened(listOf(900 * s..1600 * s), whole, 3600 * s))
+        assertEquals(1405 * s, Separators.found(whole).single().range.last)
+        assertEquals(1290 * s, Separators.found(ends).single().range.last)
+    }
+
+    @Test
     fun `a stray separator at either end leaves the break in the adverts`() {
         val ads = seconds(100_000, 15, 15, 30, 15, 20, 30)
         val before = ads.first() - 50_000
