@@ -74,8 +74,8 @@ class SeparatorsTest {
         // Nor one whose frames are not all as small as black ones, as a cartoon's held picture.
         for (i in 45 until 57) frames[i] = if (i % 2 == 0) 32 else 100
         frames[57] = 9000
-        // Nor is one held longer.
-        for (i in 75 until 95) frames[i] = 20
+        // Nor is one held longer than 20 frames.
+        for (i in 73 until 95) frames[i] = 20
         frames[95] = 12000
         val low = Separators.BLACKS.getValue(270)
 
@@ -83,6 +83,17 @@ class SeparatorsTest {
         // A key frame of a little over four kilobytes after a black, as seen on M6, ends it all the same.
         frames[42] = 4600
         assertEquals(listOf(10_000L + 42 * 40), Separators.ends(frames, 10_000L, 40.0, low))
+    }
+
+    @Test
+    fun `a black can run to 20 frames, as some do on every one of these channels`() {
+        val frames = IntArray(96) { if (it % 4 == 0) 2500 else 300 }
+        for (i in 20 until 37) frames[i] = 32
+        frames[37] = 9000
+        for (i in 50 until 71) frames[i] = 32
+        frames[71] = 9000
+
+        assertEquals(listOf(10_000L + 37 * 40), Separators.ends(frames, 10_000L, 40.0, Separators.BLACKS.getValue(270)))
     }
 
     @Test

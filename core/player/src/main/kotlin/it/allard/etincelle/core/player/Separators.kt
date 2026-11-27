@@ -86,8 +86,11 @@ internal object Separators {
     val BLACKS = mapOf(270 to Black(120, 40, 4000), 540 to Black(172, 86, 8000), 1080 to Black(430, 172, 12000))
 
     // At 25 frames a second, 0.48 s is 12 frames, of which those around the segment's own key frames
-    // can be counted in or out.
-    private val BLACK = 10..14
+    // can be counted in or out; now and then a black runs longer, mostly 15 to 19 frames, on every one
+    // of these channels. Over a fresh 3.5 hours of five of them in November 2026, each break that
+    // made start earlier, end later or appear was in the adverts on the pictures; past 20 frames
+    // nothing more was found.
+    private val BLACK = 10..20
 
     // Two separators this close are the same one, found in two renditions.
     private const val SAME_MS = 200L
