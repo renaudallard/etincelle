@@ -238,6 +238,12 @@ class AdBreaksTest {
         assertEquals(1_706_900L, first.endMs)
         assertEquals(1_706_900L, first.askedEndMs)
         assertEquals(1_706_900L, AdBreaks.recordingBreak(1_420_000L, guesses, separated)!!.endMs)
+        // A logo break with two by the blacks, the second running past where the logo's is taken to
+        // end: asked in the first, as far as the second's end in one go; unasked, the first's end.
+        val two = listOf(SeparatedBreak(1_100_000L..1_250_000L, 1_080_000L), SeparatedBreak(1_400_000L..1_590_000L, 1_380_000L))
+        val inFirst = AdBreaks.recordingBreak(1_200_000L, listOf(Guess(1_000_000L..1_600_000L)), two)!!
+        assertEquals(1_250_000L, inFirst.endMs)
+        assertEquals(1_590_000L, inFirst.askedEndMs)
         // Blacks with no break by the pictures about them make none.
         assertNull(AdBreaks.recordingBreak(2_100_000L, guesses, listOf(SeparatedBreak(2_000_000L..2_200_000L, 1_980_000L))))
     }

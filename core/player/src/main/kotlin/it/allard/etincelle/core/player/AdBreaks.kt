@@ -179,11 +179,11 @@ class AdBreaks {
          */
         fun recordingBreak(at: Long, guesses: List<Guess>, separated: List<SeparatedBreak>): AdBreak? {
             val sure = confirmed(separated, guesses)
+            val ranges = sure.map { it.range }
             sure.firstOrNull { at >= it.range.first && at < it.range.last }?.let { s ->
-                val asked = askedEnd(s, guesses) { it.range.last - GUESS_EARLY_MS } ?: s.range.last
+                val asked = askedEnd(s, guesses) { reach(it.range.last - GUESS_EARLY_MS, ranges) } ?: s.range.last
                 return AdBreak(s.range.first, s.range.last, s.firstMs - SEPARATED_LEAD_MS, skippable = at < s.range.last - LAST_MOMENT_MS, guessed = true, sure = true, separated = true, askedEndMs = asked)
             }
-            val ranges = sure.map { it.range }
             return guesses.firstOrNull { at >= offeredFrom(it, sure) && at < it.range.last - GUESS_EARLY_MS }?.let {
                 val end = reach(it.range.last - GUESS_EARLY_MS, ranges)
                 AdBreak(offeredFrom(it, sure), end, it.range.first, skippable = at < end - LAST_MOMENT_MS, guessed = true, sure = it.sure)
