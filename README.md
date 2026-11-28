@@ -154,7 +154,9 @@ et affiche **Passer la pub : OK**.
 - L'accueil réunit aussi les **applications des diffuseurs** (france.tv, MyTF1, M6+…) pour parcourir
   leur catalogue ; un abonnement peut être requis.
 - L'en-tête d'une rangée (par ex. *En direct à la TV*) ouvre la **catégorie complète en grille**, avec
-  le nom de la chaîne sous chaque programme et des **icônes de genre**.
+  le nom de la chaîne sous chaque programme et des **icônes de genre**. Quand cette grille est la page
+  d'un onglet (*En direct à la TV* celle de **Direct**, *Chaînes en direct* celle de **Chaînes**), la
+  barre marque cet onglet, sauf Chaînes sur téléphone, absent de sa barre ; Retour ramène à l'accueil.
 - La grille de **toutes les chaînes** (TNT, chaînes thématiques Molotov…) s'ouvre avec l'onglet
   **Chaînes** sur la TV, et sur téléphone avec **Tout voir** de la rangée *Chaînes en direct* de
   l'accueil (sa place dans la barre du bas revient aux enregistrements). Ouvrir une chaîne propose son **direct**, ses **replays** et ses programmes **les plus

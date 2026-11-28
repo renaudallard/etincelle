@@ -759,12 +759,14 @@ private fun AppRoot(
                                             NavigationBarDefaults.windowInsets
                                         },
                                     ) {
+                                        // The tab stays marked on its sub-pages ("Tout voir", categories), and
+                                        // the tab whose own page another tab's row opened is marked when the
+                                        // bar has it (not Chaînes), so the bar always says where you are;
+                                        // tapping it goes back to the tab's first page.
+                                        val marked = state.shownTab.takeIf { it in PHONE_TABS } ?: state.tab
                                         PHONE_TABS.forEach { tab ->
-                                            // The tab stays marked on its sub-pages ("Tout voir", categories),
-                                            // so the bar always says where you are; tapping it goes back to
-                                            // the tab's first page.
                                             NavigationBarItem(
-                                                selected = state.tab == tab,
+                                                selected = marked == tab,
                                                 onClick = { vm.selectTab(tab) },
                                                 colors = NavigationBarItemDefaults.colors(
                                                     indicatorColor = BrandYellow,

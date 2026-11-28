@@ -73,6 +73,33 @@ class MainViewModelTest {
     }
 
     @Test
+    fun theBarMarksTheTabWhoseOwnPageARowOpens() {
+        val vm = viewModel(FakeRepo())
+        assertEquals(Tab.HOME, vm.state.value.shownTab)
+
+        // Accueil's "En direct à la TV" row leads to the Direct tab's own page, its link tracked.
+        vm.onRailSeeAll(ContentRail("live", "En direct à la TV", emptyList(), "https://api-eu.fubo.tv/papi/v1/page/live-tv?trkOriginPage=home"))
+        assertEquals(Tab.HOME, vm.state.value.tab)
+        assertEquals(Tab.LIVE, vm.state.value.shownTab)
+
+        // Back on Accueil, marked again.
+        vm.back()
+        assertEquals(Tab.HOME, vm.state.value.shownTab)
+
+        // A page of Accueil's own leaves it marked.
+        vm.onRailSeeAll(ContentRail("tonight", "Ce soir", emptyList(), "https://api-eu.fubo.tv/papi/v1/page/ce-soir?trkOriginPage=home"))
+        assertEquals(Tab.HOME, vm.state.value.shownTab)
+    }
+
+    @Test
+    fun theSearchStaysMarkedOverWhatItsRowsOpen() {
+        val vm = viewModel(FakeRepo())
+        vm.selectTab(Tab.SEARCH)
+        vm.onRailSeeAll(ContentRail("live", "En direct", emptyList(), "https://api-eu.fubo.tv/papi/v1/page/live-tv"))
+        assertEquals(Tab.SEARCH, vm.state.value.shownTab)
+    }
+
+    @Test
     fun backDuringARefreshTakesTheProgressBarDown() {
         val repo = FakeRepo()
         val vm = viewModel(repo)

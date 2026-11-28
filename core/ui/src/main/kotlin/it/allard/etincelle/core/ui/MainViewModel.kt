@@ -136,7 +136,19 @@ data class UiState(
     val canGoBack: Boolean get() = backStack.size > 1
 
     /** The channel grid is shown, from its tab or a rail's "Tout voir": the favourites are reordered there. */
-    val onChannelsPage: Boolean get() = current?.reloadUrl?.substringBefore('?')?.endsWith(Tab.CHANNELS.path) == true
+    val onChannelsPage: Boolean get() = pageTab == Tab.CHANNELS
+
+    /**
+     * The tab the bar marks: the one whose own page is shown, as Direct's from Accueil's "En direct à la
+     * TV" row, else the one the page was opened from. The search keeps its mark over what its rows open.
+     */
+    val shownTab: Tab get() = if (tab == Tab.SEARCH) tab else pageTab ?: tab
+
+    // The tab whose own page is shown, whichever tab it was opened from.
+    private val pageTab: Tab? get() {
+        val path = current?.reloadUrl?.substringBefore('?') ?: return null
+        return Tab.entries.firstOrNull { it.path.isNotEmpty() && path.endsWith(it.path) }
+    }
 
     /** The detail page currently shown (the top of the stack), or null when browsing. */
     val detail: ProgramDetail? get() = detailStack.lastOrNull()?.detail

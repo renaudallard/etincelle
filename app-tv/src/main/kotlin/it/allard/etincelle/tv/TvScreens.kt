@@ -315,7 +315,7 @@ fun TvBrowseScreen(
     // Without a card to come back to, the search page starts on its field.
     LaunchedEffect(Unit) {
         if (!returnFocus.restore()) {
-            runCatching { (if (state.tab == Tab.SEARCH) searchField else tabFocus.getValue(state.tab)).requestFocus() }
+            runCatching { (if (state.tab == Tab.SEARCH) searchField else tabFocus.getValue(state.shownTab)).requestFocus() }
         }
     }
     Column(Modifier.fillMaxSize().padding(start = OVERSCAN, end = OVERSCAN, top = 24.dp)) {
@@ -323,10 +323,10 @@ fun TvBrowseScreen(
         LazyRow(
             modifier = Modifier
                 .fillMaxWidth()
-                // Coming up from the page lands on the current tab, not on the one nearest on screen.
+                // Coming up from the page lands on the marked tab, not on the one nearest on screen.
                 .focusProperties {
                     onEnter = {
-                        if (requestedFocusDirection == FocusDirection.Up) runCatching { tabFocus.getValue(state.tab).requestFocus() }
+                        if (requestedFocusDirection == FocusDirection.Up) runCatching { tabFocus.getValue(state.shownTab).requestFocus() }
                     }
                 }
                 .focusGroup()
@@ -343,8 +343,9 @@ fun TvBrowseScreen(
             items(tabs) { tab ->
                 TvTab(
                     label = tab.label,
-                    // Stays marked on the tab's sub-pages, so the bar always says where you are.
-                    selected = state.tab == tab,
+                    // Stays marked on the tab's sub-pages, and marks the tab whose own page another
+                    // tab's row opened, so the bar always says where you are.
+                    selected = state.shownTab == tab,
                     onClick = { onSelectTab(tab) },
                     modifier = Modifier.focusRequester(tabFocus.getValue(tab)),
                 )
