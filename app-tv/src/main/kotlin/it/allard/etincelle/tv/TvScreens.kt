@@ -12,8 +12,11 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.BringIntoViewSpec
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
@@ -50,6 +53,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -126,6 +130,11 @@ import it.allard.etincelle.core.ui.UiState
 import it.allard.etincelle.core.ui.UpdateInfo
 
 private val OVERSCAN = 48.dp
+
+// On a TV, Compose scrolls a list to put its focused item near the start. The tab bar is built anew
+// with each page, and as Back brings one in, the focus passes through its last tabs: that left the bar
+// scrolled to its end, Accueil out of view. The bar only scrolls as far as a focused tab needs.
+private val TabBarScroll = object : BringIntoViewSpec {}
 
 // The web page where the user confirms a TV: scanning the QR opens it; etincelle on a phone can
 // confirm too (Paramètres > Connecter une TV).
@@ -320,47 +329,52 @@ fun TvBrowseScreen(
     }
     Column(Modifier.fillMaxSize().padding(start = OVERSCAN, end = OVERSCAN, top = 24.dp)) {
         val tabs = Tab.entries
-        LazyRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                // Coming up from the page lands on the marked tab, not on the one nearest on screen.
-                .focusProperties {
-                    onEnter = {
-                        if (requestedFocusDirection == FocusDirection.Up) runCatching { tabFocus.getValue(state.shownTab).requestFocus() }
+        @OptIn(ExperimentalFoundationApi::class)
+        CompositionLocalProvider(LocalBringIntoViewSpec provides TabBarScroll) {
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    // Coming up from the page lands on the marked tab, not on the one nearest on screen.
+                    .focusProperties {
+                        onEnter = {
+                            if (requestedFocusDirection == FocusDirection.Up) {
+                                runCatching { tabFocus.getValue(state.shownTab).requestFocus() }
+                            }
+                        }
                     }
-                }
-                .focusGroup()
-                .onPreviewKeyEvent { event ->
-                    if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
-                        // The search page has its field on top of the results; elsewhere go to the rails.
-                        runCatching { (if (state.tab == Tab.SEARCH) searchField else railsFocus).requestFocus() }.isSuccess
-                    } else {
-                        false
-                    }
-                },
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            items(tabs) { tab ->
-                TvTab(
-                    label = tab.label,
-                    // Stays marked on the tab's sub-pages, and marks the tab whose own page another
-                    // tab's row opened, so the bar always says where you are.
-                    selected = state.shownTab == tab,
-                    onClick = { onSelectTab(tab) },
-                    modifier = Modifier.focusRequester(tabFocus.getValue(tab)),
-                )
-            }
-            item {
-                // Back from the settings comes back here: the current tab may be off the screen by then,
-                // the bar having scrolled to this end, and nothing would have the focus.
-                TvTab(
-                    label = "Paramètres", selected = false,
-                    onClick = {
-                        returnFocus.save(SETTINGS_FOCUS)
-                        onSettings()
+                    .focusGroup()
+                    .onPreviewKeyEvent { event ->
+                        if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
+                            // The search page has its field on top of the results; elsewhere go to the rails.
+                            runCatching { (if (state.tab == Tab.SEARCH) searchField else railsFocus).requestFocus() }.isSuccess
+                        } else {
+                            false
+                        }
                     },
-                    modifier = returnFocus.target(SETTINGS_FOCUS),
-                )
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                items(tabs) { tab ->
+                    TvTab(
+                        label = tab.label,
+                        // Stays marked on the tab's sub-pages, and marks the tab whose own page another
+                        // tab's row opened, so the bar always says where you are.
+                        selected = state.shownTab == tab,
+                        onClick = { onSelectTab(tab) },
+                        modifier = Modifier.focusRequester(tabFocus.getValue(tab)),
+                    )
+                }
+                item {
+                    // Back from the settings comes back here: the current tab may be off the screen by then,
+                    // the bar having scrolled to this end, and nothing would have the focus.
+                    TvTab(
+                        label = "Paramètres", selected = false,
+                        onClick = {
+                            returnFocus.save(SETTINGS_FOCUS)
+                            onSettings()
+                        },
+                        modifier = returnFocus.target(SETTINGS_FOCUS),
+                    )
+                }
             }
         }
         Spacer(Modifier.height(16.dp))
