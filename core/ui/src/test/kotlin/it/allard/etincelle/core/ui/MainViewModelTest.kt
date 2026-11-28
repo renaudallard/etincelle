@@ -92,6 +92,17 @@ class MainViewModelTest {
     }
 
     @Test
+    fun theRecordingsPageARecordingsRowBringsMarksItsTab() {
+        val repo = FakeRepo()
+        val vm = viewModel(repo)
+        // The row's link is the my-stuff landing; what comes is the recordings page, under its address.
+        repo.page = { ContentPage("Enregistrements", emptyList(), reloadUrl = "papi/v1/my-stuff/status/recordings") }
+        vm.onRailSeeAll(ContentRail("rec", "Vos enregistrements", emptyList(), "https://api-eu.fubo.tv/papi/v1/my-stuff/main?selectedTab=recordings"))
+        assertEquals(Tab.RECORDINGS, vm.state.value.shownTab)
+        assertEquals("papi/v1/my-stuff/status/recordings", vm.state.value.current?.reloadUrl)
+    }
+
+    @Test
     fun aTabsOwnPageKeepsItsMarkOnThePagesOpenedFromIt() {
         val vm = viewModel(FakeRepo())
 

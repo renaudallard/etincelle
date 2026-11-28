@@ -82,6 +82,17 @@ class FuboRepositoryTest {
     }
 
     @Test
+    fun `a recordings row's link brings the recordings page under its own address`() = runTest {
+        session.session = UserSession("AT", "RT", "u1", "p1")
+        server.enqueue(MockResponse().setBody("""{"title":{"text":"Enregistrements"},"content":{"sections":[]}}"""))
+
+        val page = repo.loadPage("https://api-eu.fubo.tv/papi/v1/my-stuff/main?selectedTab=recordings&trkOriginPage=home")
+
+        assertTrue(server.takeRequest().path!!.startsWith("/papi/v1/my-stuff/status/recordings"))
+        assertEquals("papi/v1/my-stuff/status/recordings", page.reloadUrl)
+    }
+
+    @Test
     fun `the guide follows the pages to the last channel`() = runTest {
         session.session = UserSession("AT", "RT", "u1", "p1")
         fun page(id: String, next: String) = MockResponse().setBody(

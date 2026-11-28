@@ -701,7 +701,7 @@ class MainViewModel(
                         // If the user navigated away during the fetch, drop the stale result.
                         if (current == null || current.reloadUrl != url) it.copy(refreshing = false)
                         else {
-                            val titled = page.copy(title = current.title, isGrid = grid, reloadUrl = url)
+                            val titled = page.copy(title = current.title, isGrid = grid, reloadUrl = page.reloadUrl ?: url)
                             it.copy(refreshing = false, backStack = it.backStack.dropLast(1) + titled)
                         }
                     }
@@ -1207,7 +1207,9 @@ class MainViewModel(
         navLaunch {
             runCatchingNav { repo.loadPage(url) }
                 .onSuccess { page ->
-                    val titled = page.copy(title = page.title ?: fallbackTitle, isGrid = grid || page.isGrid, reloadUrl = url)
+                    // Under the address the page gives for itself, if any: a recordings row's link
+                    // brings the recordings page, which the bar then marks as Enregistrements.
+                    val titled = page.copy(title = page.title ?: fallbackTitle, isGrid = grid || page.isGrid, reloadUrl = page.reloadUrl ?: url)
                     _state.update {
                         val stack = if (replace) listOf(titled) else it.backStack + titled
                         it.copy(busy = false, backStack = stack)

@@ -415,9 +415,9 @@ class FuboRepository(
 
     override suspend fun loadPage(url: String): ContentPage = withRefresh {
         // "Tout voir" on a recordings row points at the my-stuff landing page, which carries no
-        // sections of its own; its recordings tab is the recordings page.
+        // sections of its own; its recordings tab is the recordings page, given under its own address.
         if (url.contains("selectedTab=recordings")) {
-            api.pageByUrl(RECORDINGS_PATH).page()
+            api.pageByUrl(RECORDINGS_PATH).page().copy(reloadUrl = RECORDINGS_PATH)
         } else {
             val asker = session.session
             val response = api.pageByUrl(url)
