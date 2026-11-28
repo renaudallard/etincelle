@@ -24,8 +24,8 @@ android {
         applicationId = "it.allard.etincelle.tv"
         minSdk = 24
         targetSdk = 36
-        versionCode = 103
-        versionName = "2026.11.51"
+        versionCode = 104
+        versionName = "2026.11.52"
     }
 
     signingConfigs {
