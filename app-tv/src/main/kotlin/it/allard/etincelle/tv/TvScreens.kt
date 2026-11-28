@@ -383,7 +383,9 @@ fun TvBrowseScreen(
         } else {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(state.current?.title ?: state.tab.label, style = MaterialTheme.typography.headlineMedium)
-                if (state.tab == Tab.CHANNELS && !state.canGoBack) {
+                // Wherever the channel grid is, from its tab or Accueil's "Chaînes en direct" row, as on
+                // the phone.
+                if (state.onChannelsPage) {
                     Spacer(Modifier.width(24.dp))
                     TvButton(onClick = onFavoriteOrder, highlighted = false) { Text("Réorganiser les favoris") }
                     Spacer(Modifier.width(16.dp))

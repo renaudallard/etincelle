@@ -158,9 +158,9 @@ et affiche **Passer la pub : OK**.
   d'un onglet (*En direct à la TV* celle de **Direct**, *Chaînes en direct* celle de **Chaînes**, *Vos
   enregistrements* celle d'**Enregistrements**), la barre marque cet onglet, aussi sur les pages
   ouvertes depuis elle, sauf Chaînes sur téléphone, absent de sa barre ; Retour ramène à l'accueil.
-- La grille de **toutes les chaînes** (TNT, chaînes thématiques Molotov…) s'ouvre avec l'onglet
-  **Chaînes** sur la TV, et sur téléphone avec **Tout voir** de la rangée *Chaînes en direct* de
-  l'accueil (sa place dans la barre du bas revient aux enregistrements). Ouvrir une chaîne propose son **direct**, ses **replays** et ses programmes **les plus
+- La grille de **toutes les chaînes** (TNT, chaînes thématiques Molotov…) s'ouvre avec **Tout voir**
+  de la rangée *Chaînes en direct* de l'accueil, et sur la TV aussi avec l'onglet **Chaînes** (sur
+  téléphone, sa place dans la barre du bas revient aux enregistrements). Ouvrir une chaîne propose son **direct**, ses **replays** et ses programmes **les plus
   vus**.
 - Les **chaînes favorites** ouvrent cette grille, dans l'ordre que vous choisissez. Sur téléphone,
   l'**étoile** d'une chaîne l'ajoute ou la retire, et l'étoile de la barre du haut ouvre **Réorganiser
