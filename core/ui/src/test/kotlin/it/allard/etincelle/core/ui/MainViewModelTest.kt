@@ -92,6 +92,23 @@ class MainViewModelTest {
     }
 
     @Test
+    fun aTabsOwnPageKeepsItsMarkOnThePagesOpenedFromIt() {
+        val vm = viewModel(FakeRepo())
+
+        // Accueil's "Que voulez-vous regarder ?" row opens the Films tab's own page...
+        vm.onCardClick(CARD.copy(vodId = null, actionUrl = "https://api-eu.fubo.tv/papi/v1/page/films?trkOriginPage=home"))
+        assertEquals(Tab.MOVIES, vm.state.value.shownTab)
+        // ...and a row of that page one of its own.
+        vm.onRailSeeAll(ContentRail("best", "Le meilleur du cinéma", emptyList(), "https://api-eu.fubo.tv/papi/v1/page/films/grid/best?trkOriginPage=films"))
+        assertEquals(Tab.MOVIES, vm.state.value.shownTab)
+
+        vm.back()
+        assertEquals(Tab.MOVIES, vm.state.value.shownTab)
+        vm.back()
+        assertEquals(Tab.HOME, vm.state.value.shownTab)
+    }
+
+    @Test
     fun theSearchStaysMarkedOverWhatItsRowsOpen() {
         val vm = viewModel(FakeRepo())
         vm.selectTab(Tab.SEARCH)
